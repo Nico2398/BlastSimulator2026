@@ -614,7 +614,11 @@ selector to close the gap) ·
 the file's own premise — a warehouse inside a cleared safety zone
 survives the blast — held true, confirmed even under the corrected,
 more violent 16-hole grid) ·
-⬜ core-loop-visual · ⬜ i18n-display-visual · ⬜ main-menu-visual ·
+✅ core-loop-visual (**Finding #37** — see the findings log; a
+Finding-#15-class syntax bug and a repeat of the grid-spacing
+mismatch, plus the same never-hauls-anything contract-deliver gap
+already documented in contract-negotiation.json) ·
+⬜ i18n-display-visual · ⬜ main-menu-visual ·
 ⬜ save-load-visual · ⬜ sandbox-mode · ⬜ weather-display-visual ·
 ⬜ weather-flood
 
@@ -869,6 +873,8 @@ of each session, in case main added/removed a file.)
 35. **`time-management-visual.json` was console-only despite its own description explicitly promising real button clicks ("speed buttons... pause/resume toggle") — a direct instance of the original mandate's click-only requirement, not just a missing-assertion gap.** Every step's `interaction` used `type: "command"` for `time pause`/`time resume`/`time speed N`, never a click, and grepping every scenario file confirmed no file anywhere had ever clicked the HUD's pause or speed controls (`TopBar.ts`) — the only reference at all was one file clicking the *container* `.bs-speed-btn`, never an individual button. **Fixed** by rewriting every pause/resume/speed step to a real click: the speed buttons already carried a `data-speed` attribute (`TopBar.ts`, ready-made), but the pause/resume toggle had no selector at all — added `pauseBtn.dataset['action'] = 'pause-toggle'` (one line, no behavior change, confirmed via a screenshot that nothing visually shifted). Also **added `timeScale` to `SerializableGameState`** (`state.timeScale`, mirrored in `console-api.ts`/`main.ts`/`validate-state-schema.ts`, two new `console-api.test.ts` tests) — no field existed to prove a speed-button click genuinely changed the simulation rate rather than just being clickable; `isPaused` already existed and needed no addition. Verified in both command mode and a real browser.
 
 36. **`safety-projection-visual.json` had two problems, both repeats of earlier finding classes.** (a) A fourth instance of Finding #13's class: `buySoftwareCommand` (`mining.ts`) deducted `state.cash` directly for every software tier purchase but never called `addExpense` on `state.finances`. Confirmed by dumping both fields side by side after buying tiers 1/2/3 ($500+$2000+$5000): the flat `cash` field correctly dropped by $7500, but `state.finances.cash` never moved — an exact $7500 gap, invisible to every prior verification pass for the same reason as Finding #32 (no committed scenario assertion reads the nested `finances.cash` path). **Fixed at the root** — added the missing `addExpense(ctx.state!.finances, result.cost, 'equipment', ...)` call, matching the pattern every other cash-spending command already uses. New unit test in `mining-commands.test.ts` proving `state.finances.cash` mirrors the flat field after a tier purchase. (b) A repeat of Finding #3's class: `drill_plan grid rows:3 cols:3 spacing:5` didn't match the click's real (20,20)-(30,30) drag at the panel's default spacing (3), which actually produces a 4×4=16-hole grid, not 3×3=9 — same class already fixed in `nav-cell-types-visual.json`/`hauling-gate.json`. Fixed by correcting the command. Both fixes verified together: the file's own central premise — a `freight_warehouse` built inside a cleared safety zone survives the blast unscathed (HP 150/150 unchanged) — held true both before and after the grid correction, confirmed via direct trace even under the corrected, more violent 16-hole "BAD"-rated blast (furthest throw 23.9m vs. the original 4-hole version's much gentler spread). No existing scenario-file assertions needed updating for (a); (b) required updating the file's own hole/charge/sequence counts from 9 to 16.
+
+37. **`core-loop-visual.json` combined three already-known finding classes in one file.** (a) A Finding-#15-class syntax bug: `employee assign_skill 1 geology 3` used bare positional args, which the command silently rejects (`skill:`/`level:` are named params) — fixed to `skill:geology level:3`. (b) A repeat of Finding #3's grid-spacing class: `drill_plan grid rows:3 cols:3 spacing:5` didn't match the click's real (20,20)-(30,30) drag at the panel's default spacing, which produces 4×4=16 holes, not 3×3=9 — fixed by correcting the command. (c) The same never-hauls-anything gap already documented in `contract-negotiation.json`: this file's `contract deliver` step genuinely fails every run (confirmed via direct trace) since no vehicle ever hauls fragments into storage — fixed the test to describe this reality (`activeContractCount` stays 1, undelivered) rather than assume completion, with a `note` pointing at `economy-full-loop.json` as the file that actually completes a delivery. **A methodological catch during verification**: an initial `decreased: ["cash"]` guess on the `tick 5` step (copied from the pattern used elsewhere in this batch) failed command mode outright — a direct trace showed cash stays exactly flat there, since with only 1 employee and no buildings/vehicles yet, payroll doesn't cycle within a 5-tick window. Fixed by checking the real traced value instead of assuming the pattern held. Verified in both command mode and a real browser.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1212,4 +1218,17 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   11/18 done. Full local sweep green: typecheck, 124/124 scenarios,
   8312/8312 tests. GitHub Actions still not re-checked this session —
   all verification remains local. Next: core-loop-visual,
+  i18n-display-visual, main-menu-visual, then the rest of Batch 6.
+- 2026-08-07 (cont.) — core-loop-visual.json done (Finding #37):
+  combined three already-known finding classes in one file (a Finding-
+  #15-class assign_skill syntax bug, a repeat of the grid-spacing
+  command/click mismatch, and the same never-hauls-anything
+  contract-deliver gap from contract-negotiation.json) plus one
+  methodological catch — an initial decreased-cash guess on a tick step
+  (copied from the pattern used elsewhere) failed command mode outright
+  since cash genuinely stays flat with only 1 employee and no
+  buildings/vehicles yet; fixed by checking the real traced value.
+  Verified in both modes. Batch 6: 12/18 done. Full local sweep green:
+  typecheck, 124/124 scenarios, 8312/8312 tests. GitHub Actions still
+  not re-checked this session — all verification remains local. Next:
   i18n-display-visual, main-menu-visual, then the rest of Batch 6.

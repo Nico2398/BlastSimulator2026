@@ -11,17 +11,29 @@
           "command": "new_game seed:42 size:24"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
+      "description": "campaign start replaces the site entirely with dusty_hollow's own fixed 96x96 grid -- new_game's size:24 above never actually takes effect once this runs.",
       "interaction": [
         {
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -49,17 +61,31 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1,
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        }
+      }
     },
     {
-      "command": "employee assign_skill 1 geology 3",
+      "command": "employee assign_skill 1 skill:geology level:3",
+      "description": "Corrected from bare positional args (`employee assign_skill 1 geology 3`), which the command silently rejects (`skill`/`level` are named params, per assignSkillCommand's own usage string) -- Finding #15's class, the same syntax bug caught earlier in survey-confidence-overlay.json. Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 geology 3"
+          "command": "employee assign_skill 1 skill:geology level:3"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`."
+      "expect": {
+        "equals": {
+          "cash": 48800,
+          "proficiencyTotal": 3
+        }
+      }
     },
     {
       "command": "survey seismic x:20 z:20",
@@ -93,17 +119,28 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "tick 5",
+      "description": "Not long enough for the surveyor to walk to (20,20) and complete the survey (arrival-gated, #437) -- this file's own core-loop demonstration doesn't wait on it, moving straight to drilling instead.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 45800,
+          "surveyCount": 0
+        },
+        "note": "confirmed via direct trace: cash stays flat here -- with only 1 employee and no buildings/vehicles yet, payroll doesn't cycle within just 5 ticks"
+      }
     },
     {
       "command": "event choose 0",
@@ -126,7 +163,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:20,20",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -155,7 +193,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -165,7 +208,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 16
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -175,7 +223,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 16
+        }
+      }
     },
     {
       "command": "sequence show",
@@ -189,6 +242,7 @@
     },
     {
       "command": "blast_preview",
+      "description": "This file never buys any software tier, so the preview prints '[Requires software tier N]' for every section (see safety-projection-visual.json for the unlocked version) -- still a real, clickable control either way.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -199,7 +253,12 @@
           "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 45800
+        }
+      }
     },
     {
       "command": "blast",
@@ -228,7 +287,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "fragments",
@@ -266,7 +332,12 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "contract deliver 1 amount:500",
@@ -276,7 +347,14 @@
           "command": "contract deliver 1 amount:500"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. This file never hauls anything into storage -- like contract-negotiation.json, delivery genuinely fails every run (confirmed via direct trace: \"Not enough dirtite in storage: 0.0 kg available\").",
+      "expect": {
+        "equals": {
+          "cash": 45800,
+          "activeContractCount": 1
+        },
+        "note": "the contract stays active/undelivered -- this file's own \"contract delivery\" step in its description is a queued attempt, not a completed one; economy-full-loop.json is the file that actually hauls stock and completes a delivery"
+      }
     },
     {
       "command": "finances",
@@ -306,7 +384,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "activeContractCount": 1,
+          "holeCount": 0
+        }
+      }
     }
   ],
   "shots": [
