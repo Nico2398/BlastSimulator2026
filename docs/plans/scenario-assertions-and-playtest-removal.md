@@ -770,7 +770,22 @@ completely real, firing at tick 105 and holding through the rest of
 the file — by far the cheapest file this batch, no drilling/hauling/
 contracts to break. Verified 1/1 in both modes, interaction mode
 re-run twice, 74/74 steps, 0 failures both times) ·
-⬜ level2-playthrough-win ·
+✅ level2-playthrough-win (**Findings #59-#60** — see the findings
+log; same locked-level (Finding #58) and `assign_skill`/no-op-building
+patterns recur; a `debris_hauler` is bought but never driven, same
+treatment as `level1-win-conservative.json`/`level1-win-efficient.json`
+— not re-proven since the mechanism is already proven elsewhere; the
+file's own hardcoded contract IDs happened to already match the real
+pool at every listing, the only file this session not needing that
+fix; Finding #52's drill-grid class recurred a 4th time across all 4
+grids, whose corrected larger blasts kill 2 employees in the very
+first cycle; discovered mid-investigation of an unexplained income
+jump that some events — at least `lucky_strike` — resolve silently
+inside a `tick` call with no pending-choice step, contradicting the
+tick command's own "No events fired" text, softening `cash`
+assertions past the first such event accordingly. Verified 1/1 in
+both modes, interaction mode re-run twice for determinism, 108/108
+steps) ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win ·
 ⬜ ambient-timescale-sync · ⬜ landscape-continuity-visual ·
 ⬜ tutorial-steps-visual · ⬜ vehicle-purchase-visual ·
@@ -1059,6 +1074,10 @@ of each session, in case main added/removed a file.)
 57. **Confirmed via an actually-inspected screenshot, not just source reading, that `level1-win-efficient.json`'s stated blocker no longer holds.** The file's original description read "FAILS until GameRenderer wires survey overlay into syncFromContext()." Read `GameRenderer.ts` directly first: `syncFromContext()` (the method itself, not just a helper near it) already calls `this.syncSurveyOverlay(this.buildSurveyOverlayOptions(ctx.state))` at its own tail end — the wiring the description says is missing already exists in current `main`. Rather than trust that static read alone, ran this file in interaction mode with `--screenshots` and opened `screenshots/scenario-level1-win-efficient-interaction/step-31-survey.png` (a real browser run, Survey panel open after both surveys completed) with the Read tool: a lime-colored tile-pattern overlay is genuinely rendered on the terrain over the seismic survey's coverage area, and the Results list shows real computed confidence — 96% for the core sample, 89% for the seismic survey, both consistent with the level-3 geology skill from Finding #54. Updated the file's `description` field to remove the stale warning and record this confirmation, per the project's rendering-verification rule that a rendering claim is unverified until an image has actually been inspected, not merely reasoned about from source.
 
 58. **`level2-playthrough-bankruptcy.json`'s `campaign start level:grumpstone_ridge` fails outright — the same class already documented (not fixed) for `level3-playthrough-ecology.json`'s `treranium_depths`, now confirmed in a 2nd file.** `createCampaignState()` only unlocks difficulty-tier-1 levels by default; grumpstone_ridge is tier 2, so on a fresh campaign `campaignStartCommand` returns `Level "grumpstone_ridge" is locked. Complete previous levels first.` and never replaces `ctx.state` — the whole file actually runs against whatever `new_game seed:2277` alone produced (a generic 64×64×64 desert_badlands world, $50,000 cash), never grumpstone_ridge's real grid, biome, or economics. Not fixed here either, for the same reason PR #497 gave for treranium_depths: properly unlocking a level for a scenario is a scenario-design decision, not a drive-by fix. Unlike that file, this one's named outcome doesn't depend on which world it's playing in — 10 employees hired with zero income and zero work anywhere in the file drain payroll on a fixed schedule regardless of which terrain they're standing on, so bankruptcy still fires for real (`levelEndReason:'bankruptcy'` at tick 105). Also noted, not fixed: the `finances` command's own text prints "Bankrupt: YES" the instant cash crosses 0 (an immediate check), well before the structured `state.bankrupt`/`levelEndReason` fields actually flip — those require `Bankruptcy.ts`'s real 100-consecutive-tick grace period, which is what every `expect.equals` in this file asserts against. The other 3 files converted this session all needed real command-text fixes (skill syntax, contract IDs, drill grids); this one needed none — every purchase-adjacent step (5 vehicle buys, 10 employee hires) had already been correctly left command-only by the #479 conversion pass, anticipating the exact affordability-guard class (cash goes negative on the very first purchase and never recovers) that would otherwise have disabled every subsequent Buy/Hire button in a real browser. By far the cheapest file in this batch: no drilling, no hauling, no contracts, nothing to break.
+
+59. **`level2-playthrough-win.json` recurs nearly every established finding class in one file, plus one genuinely new discovery.** `campaign start level:grumpstone_ridge` fails the same way as Finding #58 (not fixed, same reason). `employee assign_skill` used the same rejected positional syntax as Findings #45/#54 — fixed. All 5 `build` commands name nonexistent types — left as documented no-ops, matching Finding #5/#47/#58. A `debris_hauler` is bought alongside a rock_digger and drill_rig, but never assigned a driver and never sent on a single `vehicle haul` — despite 4 real blasts, `storedMassKg` never leaves 0 and all 5 contract deliveries fail honestly for lack of storage; not fixed, for the same reason as `level1-win-conservative.json`/`level1-win-efficient.json` — the hauling mechanism is already proven end-to-end elsewhere, and re-proving it here buys nothing. Finding #52's drill-grid class recurred a 4th time, across all 4 of this file's grids (declared 12/16/20/20 holes vs. real 24/25/30/48 once traced against the panel's true defaults) — fixed the same way, and the corrected, much larger 1st blast now kills 2 employees (deathCount 0→2 at tick 32) where the originally-declared, undersized grid never would have. The one file-specific surprise: unlike every other multi-cycle-contract file this session, this file's own hardcoded contract IDs (1 through 5) all happened to already match the real, currently-available pool at every listing — no ID-mismatch fix was needed at all, the first (and so far only) file where that was true.
+
+60. **Discovered while chasing an unexplained $10,000-per-cycle income jump in `level2-playthrough-win.json`'s `finances` output despite every contract delivery failing: some random events resolve silently and instantly inside a `tick` call, with no pending-choice step at all.** Traced the exact transaction via `state.finances.transactions` directly (the `finances` command's own text output truncates to the last few entries, hiding older ones) and found `{"tick":32,"amount":10000,"category":"contracts","description":"Event: lucky_strike"}` — yet the `tick` command's own output at that exact point read "Advanced 8 tick(s). Now at tick 32. **No events fired.**" This is a materially different mechanic from every other event this project has encountered so far (Findings #34/#44's `weather_bad_forecast`, this session's own `lucky_strike` instances in `level1-win-conservative.json`/`level1-win-efficient.json`/`level2-playthrough-bankruptcy.json`), all of which print `[tick N] EVENT: Name` and block on a required `event choose <index>` step. Read `acceptContract`/the `contract accept`/`deliver` command handlers directly first to rule out a mundane explanation (a signing bonus, a partial-delivery credit) — confirmed neither exists; `consumeStoredOre` (`Logistics.ts`) genuinely returns `success:false` with zero funds movement whenever requested amount exceeds either the ore-specific or raw `storedMassKg` balance, for both the ore-specific and rubble/no-ore branches. The income has to be an auto-resolving event type, distinct from the pending-choice events documented so far. Because this file has a real (if silent) event firing, `cash` is hard-asserted only through the tick it fires at (32) and left unasserted afterward, applying Ground rule #12/Finding #34's established treatment rather than assuming safety just because no `event choose` step happened to be needed. Open follow-up: worth checking whether other already-completed files' `tick` steps have silently absorbed one of these auto-events without anyone noticing, since "No events fired" in the tick output is not actually proof that nothing happened to cash.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1876,3 +1895,40 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   the self-scheduled PR #497 check-in) — all verification here remains
   local. Next: the remaining 8 Batch 7 files (level2-playthrough-win
   next), then the depth-mismatch audit before Phase 3.
+- 2026-08-07 (cont.) — level2-playthrough-win.json done (**Findings
+  #59-#60**, Batch 7 12/19), 108 steps, applied every established fix
+  proactively before tracing this time rather than discovering each
+  one via a failed run: `assign_skill` syntax and all 4 `drill_plan`
+  grids fixed up front. Paid off — only needed one trace, no
+  iteration. Recurred Finding #58's locked-level issue
+  (grumpstone_ridge is tier 2, not fixed, same reasoning), the
+  no-op-building pattern (all 5 build commands), and the
+  don't-re-prove-hauling choice from the 2 win-* files earlier this
+  session (a debris_hauler is bought but never driven). The one
+  pleasant surprise: this file's hardcoded contract IDs (1-5) all
+  happened to already match the real pool at every listing — the
+  first file this session not needing an ID fix. Finding #52's
+  drill-grid class hit a 4th file, and the corrected, much larger 1st
+  blast now kills 2 employees where the original undersized grid
+  never would have. Chasing an unexplained $10k/cycle income jump
+  turned up something genuinely new: `lucky_strike` (at least)
+  resolves silently inside a `tick` call, no pending choice, even
+  though the tick command's own output claims "No events fired" —
+  traced via `state.finances.transactions` directly rather than the
+  finances command's truncated text. Softened `cash` assertions past
+  the first such event accordingly (Ground rule #12/Finding #34's
+  class). Final state: cash ~-$67k, deathCount 2, activeContractCount
+  5 (never cleared, nothing ever delivered), no bankruptcy within the
+  62-tick budget, safety and nuisance both bottomed at 0. Verified:
+  JSON valid, `scenario-defs.test.ts` green (3088 tests), full local
+  sweep green (typecheck, 124/124 scenarios, 8328/8328 tests), command
+  mode passes, interaction mode passes twice for determinism (108/108
+  steps each run, ~48s). GitHub Actions still down for this branch —
+  all verification remains local. Next: the remaining 7 Batch 7 files
+  (level3-playthrough-ecology next — already known to have its own
+  locked-level issue per PR #497's description, so expect Finding
+  #58's treatment to apply directly), then the depth-mismatch audit
+  before Phase 3. Open follow-up from Finding #60: worth spot-checking
+  whether any already-completed file's tick steps silently absorbed an
+  auto-resolving event without the session noticing, since "No events
+  fired" isn't proof nothing happened to cash.
