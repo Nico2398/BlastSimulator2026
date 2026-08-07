@@ -39,7 +39,7 @@ const AUDIO_CHANNELS: readonly { channel: 'master' | AudioCategory; labelKey: st
 const SHORTCUT_KEYS: readonly string[] = [
   'shortcuts.pause', 'shortcuts.speed', 'shortcuts.blast', 'shortcuts.contracts',
   'shortcuts.build', 'shortcuts.vehicles', 'shortcuts.employees', 'shortcuts.survey',
-  'shortcuts.navgrid', 'shortcuts.saves', 'shortcuts.settings',
+  'shortcuts.navgrid', 'shortcuts.survey_overlay', 'shortcuts.saves', 'shortcuts.settings',
 ];
 
 export class SettingsPanel {

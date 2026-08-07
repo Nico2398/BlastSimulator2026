@@ -215,6 +215,16 @@ export class UIManager {
     this.surveyPanel.setPlacementKit(kit);
   }
 
+  /** Wire the survey confidence overlay's player-facing visibility toggle (#496) — SurveyPanel's button drives this. */
+  setSurveyOverlayToggleHandler(cb: (visible: boolean) => void): void {
+    this.surveyPanel.setOverlayToggleHandler(cb);
+  }
+
+  /** Reflect the survey confidence overlay's current visibility preference in SurveyPanel's toggle button (#496). */
+  setSurveyOverlayVisible(visible: boolean): void {
+    this.surveyPanel.setOverlayVisible(visible);
+  }
+
   setSpeedChangeHandler(cb: (speed: number) => void): void {
     this.onSpeedChangeCb = cb;
   }

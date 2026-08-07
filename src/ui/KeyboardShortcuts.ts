@@ -19,6 +19,8 @@ export interface ShortcutCallbacks {
   onEscape: () => void;
   /** Toggle the NavGrid overlay on the MiniMap. */
   onToggleNavGrid?: () => void;
+  /** Toggle the survey confidence overlay's player-facing visibility. */
+  onToggleSurveyOverlay?: () => void;
 }
 
 export class KeyboardShortcuts {

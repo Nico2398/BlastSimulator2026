@@ -99,6 +99,14 @@ export class GameRenderer {
   /** Current weather, mirrored from syncFromContext() so update()'s per-frame WindState tick has it without re-reading MiningContext. */
   private lastWeather: WeatherState = 'sunny';
 
+  /**
+   * Player-facing visibility preference for the survey confidence overlay
+   * (#496) — a view-only toggle, not simulation state. Defaults to visible
+   * so existing behaviour (overlay shown whenever a survey exists) is
+   * unchanged until the player hides it.
+   */
+  private surveyOverlayPreference = true;
+
   // Track rendered entity IDs to detect additions
   private renderedBuildingIds = new Set<number>();
   private renderedVehicleIds = new Set<number>();
@@ -354,6 +362,16 @@ export class GameRenderer {
         return hd;
       }),
     });
+  }
+
+  /** Player-facing visibility preference for the survey confidence overlay (#496). */
+  get surveyOverlayVisible(): boolean {
+    return this.surveyOverlayPreference;
+  }
+
+  /** Set the player-facing visibility preference for the survey confidence overlay (#496). */
+  setSurveyOverlayVisible(visible: boolean): void {
+    this.surveyOverlayPreference = visible;
   }
 
   /**
