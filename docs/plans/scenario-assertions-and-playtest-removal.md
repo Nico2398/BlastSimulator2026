@@ -498,7 +498,11 @@ need-decay over 40 ticks are what this file actually tests) ·
 idle ticks fatigue drains steadily to ~30, breakNeed stays flat at 100
 the whole time per `needs`'s own output, and hunger/fatigue diverge by
 the end — added missing `event choose 0` after every tick step) ·
-⬜ needs-gauges-visual · ⬜ needs-morale-visual ·
+✅ needs-gauges-visual (3 hires, 100 idle ticks total; cash doesn't move
+within the first 5 ticks since no payroll cycle has hit yet, so
+minFatigue alone anchors that step — added missing `event choose 0`
+after every tick step) ·
+⬜ needs-morale-visual ·
 ⬜ needs-proactive-queue-visual · ⬜ needs-replenishment-visual ·
 ⬜ needs-shift-cycle-visual · ⬜ nav-dynamic-updates-visual ·
 ⬜ nav-move-costs-visual · ⬜ nav-path-following-visual ·
