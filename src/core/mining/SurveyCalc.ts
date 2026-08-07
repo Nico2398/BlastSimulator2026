@@ -13,6 +13,7 @@ import {
   SURVEY_DURATION_TICKS,
 } from '../config/balance.js';
 import type { GameState } from '../state/GameState.js';
+import { addExpense } from '../economy/Finance.js';
 
 /** The three supported methods for surveying a mining site. */
 export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial';
@@ -282,6 +283,7 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
   }
 
   state.cash -= cost;
+  addExpense(state.finances, cost, 'materials', `${method} survey`, state.tickCount);
 
   const actionId = state.nextPendingActionId++;
 
