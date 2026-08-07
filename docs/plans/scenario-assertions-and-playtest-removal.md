@@ -332,9 +332,11 @@ drill/charge/sequence/blast pipeline; Finding #4 grid-spacing-stepper fix
 needed (default 3 → declared 5, 2 increment clicks); `survey ore_report`'s
 rich-text yield comparison left unmarked — no scalar field exists for it in
 `SerializableGameState`, matches precedent for `fragments`/`inspect`) ·
-⬜ survey-result-visualization · ⬜ survey-seismic-side-effects ·
-⬜ survey-stale-handling · ⬜ survey-then-blast ·
-⬜ survey-then-blast-playthrough · ⬜ skill-progression
+✅ survey-result-visualization (3 clean sequential rounds — seismic,
+core_sample, aerial — each a full 47-tick round before the next is queued,
+so no Finding #16 concurrent-queue risk; surveyCount ceiling 0→1→2→3) ·
+⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
+⬜ survey-then-blast · ⬜ survey-then-blast-playthrough · ⬜ skill-progression
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
