@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-bankruptcy",
-  "description": "Level 2 bankruptcy scenario: heavy overspending on buildings, vehicles, and employees with no profitable blasting to trigger financial collapse",
+  "description": "Level 2 (Grumpstone Ridge) bankruptcy scenario: heavy overspending on buildings, vehicles, and employees with no profitable blasting to trigger financial collapse. `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default on a fresh campaign) -- runs against the substitute new_game world instead, same class as the already-documented level3-playthrough-ecology.json/treranium_depths issue; see Finding #58. The named bankruptcy outcome is otherwise real: levelEndReason:'bankruptcy' fires for real at tick 105, well within this file's budget.",
   "steps": [
     {
       "command": "new_game seed:2277",
@@ -10,7 +10,18 @@
           "command": "new_game seed:2277"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "campaign start level:grumpstone_ridge",
@@ -20,7 +31,18 @@
           "command": "campaign start level:grumpstone_ridge"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "time resume",
@@ -30,7 +52,18 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -40,7 +73,22 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "finances",
@@ -50,7 +98,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build office at:5,5",
@@ -60,7 +119,18 @@
           "command": "build office at:5,5"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build storage_depot at:10,5",
@@ -70,7 +140,18 @@
           "command": "build storage_depot at:10,5"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build medical_bay at:5,10",
@@ -80,7 +161,18 @@
           "command": "build medical_bay at:5,10"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build canteen at:10,10",
@@ -90,7 +182,18 @@
           "command": "build canteen at:10,10"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build break_room at:15,5",
@@ -100,7 +203,18 @@
           "command": "build break_room at:15,5"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build bunkhouse at:15,10",
@@ -110,7 +224,18 @@
           "command": "build bunkhouse at:15,10"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`)."
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build management_office at:20,5",
@@ -140,7 +265,18 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "build list",
@@ -150,7 +286,18 @@
           "command": "build list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 42000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "finances",
@@ -160,7 +307,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 42000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "vehicle buy rock_digger",
@@ -170,7 +328,18 @@
           "command": "vehicle buy rock_digger"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -8000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -180,7 +349,18 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -33000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "vehicle buy drill_rig",
@@ -190,7 +370,18 @@
           "command": "vehicle buy drill_rig"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -68000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "vehicle buy building_destroyer",
@@ -200,7 +391,18 @@
           "command": "vehicle buy building_destroyer"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -98000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -210,7 +412,18 @@
           "command": "vehicle buy debris_hauler"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -123000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -220,7 +433,18 @@
           "command": "vehicle list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -123000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "finances",
@@ -230,7 +454,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -123000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 0,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -240,7 +475,18 @@
           "command": "employee hire role:driller"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -124000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 1,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -250,7 +496,18 @@
           "command": "employee hire role:driller"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -125000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 2,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -260,7 +517,18 @@
           "command": "employee hire role:driller"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -126000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 3,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -270,7 +538,18 @@
           "command": "employee hire role:blaster"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -127500,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 4,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -280,7 +559,18 @@
           "command": "employee hire role:blaster"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -129000,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -290,7 +580,18 @@
           "command": "employee hire role:driver"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -129800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 6,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -300,7 +601,18 @@
           "command": "employee hire role:driver"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -130600,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
@@ -310,7 +622,18 @@
           "command": "employee hire role:surveyor"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -131800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 8,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:manager",
@@ -320,7 +643,18 @@
           "command": "employee hire role:manager"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -133800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 9,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee hire role:manager",
@@ -330,7 +664,18 @@
           "command": "employee hire role:manager"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -135800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "employee list",
@@ -340,7 +685,18 @@
           "command": "employee list"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -135800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "finances",
@@ -350,7 +706,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -135800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "state full",
@@ -360,7 +727,18 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -135800,
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -370,7 +748,18 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -142850,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -380,7 +769,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -142850,
+          "tickCount": 10,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -390,7 +790,18 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -149900,
+          "tickCount": 20,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -400,7 +811,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -149900,
+          "tickCount": 20,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -410,7 +832,18 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -156950,
+          "tickCount": 30,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -420,7 +853,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -156950,
+          "tickCount": 30,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "finances",
@@ -430,7 +874,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -156950,
+          "tickCount": 30,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -440,7 +895,22 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -156950,
+          "tickCount": 30,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "wellBeing": 63.20000000000009,
+          "safety": 63.500000000000085,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -450,7 +920,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -164125,
+          "tickCount": 45,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -460,7 +941,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -164125,
+          "tickCount": 45,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -470,7 +962,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -178100,
+          "tickCount": 60,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -480,7 +983,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -178100,
+          "tickCount": 60,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -490,7 +1004,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -185275,
+          "tickCount": 75,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -500,7 +1025,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -185275,
+          "tickCount": 75,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "finances",
@@ -510,7 +1046,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -185275,
+          "tickCount": 75,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "scores",
@@ -520,7 +1067,22 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -185275,
+          "tickCount": 75,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "wellBeing": 99.95,
+          "safety": 83.75000000000021,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -530,7 +1092,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -199250,
+          "tickCount": 90,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -540,7 +1113,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -199250,
+          "tickCount": 90,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -550,7 +1134,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -206425,
+          "tickCount": 105,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -560,7 +1155,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -206425,
+          "tickCount": 105,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -570,7 +1176,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -220400,
+          "tickCount": 120,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -580,7 +1197,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -220400,
+          "tickCount": 120,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "finances",
@@ -590,7 +1218,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -220400,
+          "tickCount": 120,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "scores",
@@ -600,7 +1239,22 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -220400,
+          "tickCount": 120,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "wellBeing": 99.95,
+          "safety": 99.95,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -610,7 +1264,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -227450,
+          "tickCount": 130,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -620,7 +1285,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -267450,
+          "tickCount": 130,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -630,7 +1306,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -274625,
+          "tickCount": 145,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -640,7 +1327,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -274625,
+          "tickCount": 145,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "tick 15",
@@ -650,7 +1348,18 @@
           "command": "tick 15"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -288600,
+          "tickCount": 160,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -660,7 +1369,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -288600,
+          "tickCount": 160,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "finances",
@@ -670,7 +1390,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -288600,
+          "tickCount": 160,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "scores",
@@ -680,7 +1411,22 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -288600,
+          "tickCount": 160,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "wellBeing": 99.95,
+          "safety": 99.95,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -690,7 +1436,18 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -295650,
+          "tickCount": 170,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -700,7 +1457,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -295650,
+          "tickCount": 170,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -710,7 +1478,18 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -302700,
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -720,7 +1499,18 @@
           "command": "event choose 0"
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "expect": {
+        "equals": {
+          "cash": -302700,
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "finances",
@@ -730,7 +1520,18 @@
           "command": "finances"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -302700,
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "scores",
@@ -740,7 +1541,22 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -302700,
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "wellBeing": 96.03000000000004,
+          "safety": 99.95,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "stats",
@@ -750,7 +1566,22 @@
           "command": "stats"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -302700,
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "wellBeing": 96.03000000000004,
+          "safety": 99.95,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        }
+      }
     },
     {
       "command": "campaign status",
@@ -760,7 +1591,25 @@
           "command": "campaign status"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -302700,
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 10,
+          "wellBeing": 96.03000000000004,
+          "safety": 99.95,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy",
+          "surveyCount": 0,
+          "activeContractCount": 0
+        },
+        "note": "Finding #58: `campaign start level:grumpstone_ridge` fails outright ('Level \"grumpstone_ridge\" is locked. Complete previous levels first.') on a fresh campaign -- `createCampaignState()` only unlocks difficulty-tier-1 levels by default, and grumpstone_ridge is tier 2. `ctx.state` stays whatever `new_game seed:2277` alone produced (64x64x64 desert_badlands, $50,000 cash), never grumpstone_ridge's actual grid/biome/economics. Same class as the already-documented, already-merged `level3-playthrough-ecology.json`/`treranium_depths` finding (PR #497) -- not fixed here either, for the same reason: properly unlocking a level is a scenario-design decision, not a drive-by. 6 of the file's 7 `build` commands (`office`/`storage_depot`/`medical_bay`/`canteen`/`break_room`/`bunkhouse`) name building types that don't exist -- only `management_office` is real ($8,000) -- matching the established Finding #5/#47 no-op pattern, correctly left unmarked already by the #479 conversion pass. All 5 vehicle purchases and all 10 employee hires were already correctly left command-only by that same pass, anticipating exactly the Finding #1/#16/#46 affordability-guard class (cash goes negative on the very first vehicle purchase and never recovers, so a real Buy/Hire button would be disabled for every purchase from that point on) -- no fix needed here, already right. One cosmetic discrepancy worth noting, not fixing: the `finances` command's own text prints 'Bankrupt: YES' the instant cash goes negative (a simple `cash<0` check), well before the structured `state.bankrupt` flag actually flips true -- that flag (and `levelEndReason`) requires `Bankruptcy.ts`'s real `BANKRUPTCY_GRACE_TICKS=100` consecutive ticks below `BANKRUPTCY_THRESHOLD=5000`, which is what every `expect.equals` here asserts against, never the text. The named outcome is otherwise completely real and un-dramatic to verify: cash never recovers from tick 0 onward (10 employees with zero work, zero income, draining payroll every cycle), so bankruptcy is guaranteed once the grace period elapses -- fires for real at tick 105 (`[tick 100] BANKRUPTCY! The mine is seized.`), stays true through the rest of the file's 180-tick budget. wellBeing and safety both climb toward their ceiling despite the collapse, same non-neglect mechanic as Findings #43/#44 (no blasting happens anywhere in this file, so none of the 10 hires is ever dispatched into harm). Verified in both command mode and a real browser, 74/74 steps, 0 failures."
+      }
     }
   ]
 }

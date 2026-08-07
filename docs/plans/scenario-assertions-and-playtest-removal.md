@@ -757,7 +757,20 @@ that the survey confidence overlay genuinely renders with real
 computed confidence values, closing out this file's own stale
 "FAILS until..." warning. Verified 1/1 in both modes, interaction
 mode run with screenshots, 83/83 steps, 0 failures) ·
-⬜ level2-playthrough-bankruptcy · ⬜ level2-playthrough-win ·
+✅ level2-playthrough-bankruptcy (**Finding #58** — see the findings
+log; `campaign start level:grumpstone_ridge` fails outright, tier-2
+locked by default on a fresh campaign, same already-documented class
+as `level3-playthrough-ecology.json`/`treranium_depths` — runs
+against the substitute new_game world instead, not fixed here either;
+6 of 7 build commands are already-established no-ops and all 5
+vehicle buys plus all 10 employee hires were already correctly left
+command-only by the #479 pass, anticipating the affordability-guard
+class with zero fixes needed; the named bankruptcy is otherwise
+completely real, firing at tick 105 and holding through the rest of
+the file — by far the cheapest file this batch, no drilling/hauling/
+contracts to break. Verified 1/1 in both modes, interaction mode
+re-run twice, 74/74 steps, 0 failures both times) ·
+⬜ level2-playthrough-win ·
 ⬜ level3-playthrough-ecology · ⬜ level3-playthrough-win ·
 ⬜ ambient-timescale-sync · ⬜ landscape-continuity-visual ·
 ⬜ tutorial-steps-visual · ⬜ vehicle-purchase-visual ·
@@ -1044,6 +1057,8 @@ of each session, in case main added/removed a file.)
 56. **A 3rd recurrence of Finding #52's drill-grid class: all 3 of `level1-win-efficient.json`'s `drill_plan grid` steps declared spacing/depth values the real Drill panel never used, since none of their interaction arrays click a stepper before dragging.** Read the real drag-to-grid formula from `Drill.ts` directly (as in Finding #52) and recomputed each of the 3 grids against the panel's true defaults (`spacing=3`, `depth=6`, `diameter=0.089`): declared 3×3/4×4/4×4 (9/16/16 holes) versus real 4×4/5×5/6×6 (16/25/36 holes) — a much larger gap than Finding #52's file, since this file's drag rectangles are bigger relative to the 3m default spacing. Fixed the same way: rewrote the declared grids to match what the real drag genuinely produces. The corrected, far larger 3rd blast (36 holes instead of the originally-declared 16) is violent enough to kill both employees hired immediately beforehand (a driller and a blaster, hired right before this blast to staff future cycles) — `deathCount` goes from 1 to 3 across this one blast. Same treatment as Finding #40: a real, reproducible consequence of correcting the grid to match reality, not a scenario-authoring mistake to paper over. This is now the 2nd file (after Finding #40's `tutorial-playthrough.json`) where a grid-size correction directly causes additional deaths — worth treating as expected, not alarming, once the Finding #42/#52 depth-mismatch audit reaches a file with newly-hired employees standing near a corrected blast.
 
 57. **Confirmed via an actually-inspected screenshot, not just source reading, that `level1-win-efficient.json`'s stated blocker no longer holds.** The file's original description read "FAILS until GameRenderer wires survey overlay into syncFromContext()." Read `GameRenderer.ts` directly first: `syncFromContext()` (the method itself, not just a helper near it) already calls `this.syncSurveyOverlay(this.buildSurveyOverlayOptions(ctx.state))` at its own tail end — the wiring the description says is missing already exists in current `main`. Rather than trust that static read alone, ran this file in interaction mode with `--screenshots` and opened `screenshots/scenario-level1-win-efficient-interaction/step-31-survey.png` (a real browser run, Survey panel open after both surveys completed) with the Read tool: a lime-colored tile-pattern overlay is genuinely rendered on the terrain over the seismic survey's coverage area, and the Results list shows real computed confidence — 96% for the core sample, 89% for the seismic survey, both consistent with the level-3 geology skill from Finding #54. Updated the file's `description` field to remove the stale warning and record this confirmation, per the project's rendering-verification rule that a rendering claim is unverified until an image has actually been inspected, not merely reasoned about from source.
+
+58. **`level2-playthrough-bankruptcy.json`'s `campaign start level:grumpstone_ridge` fails outright — the same class already documented (not fixed) for `level3-playthrough-ecology.json`'s `treranium_depths`, now confirmed in a 2nd file.** `createCampaignState()` only unlocks difficulty-tier-1 levels by default; grumpstone_ridge is tier 2, so on a fresh campaign `campaignStartCommand` returns `Level "grumpstone_ridge" is locked. Complete previous levels first.` and never replaces `ctx.state` — the whole file actually runs against whatever `new_game seed:2277` alone produced (a generic 64×64×64 desert_badlands world, $50,000 cash), never grumpstone_ridge's real grid, biome, or economics. Not fixed here either, for the same reason PR #497 gave for treranium_depths: properly unlocking a level for a scenario is a scenario-design decision, not a drive-by fix. Unlike that file, this one's named outcome doesn't depend on which world it's playing in — 10 employees hired with zero income and zero work anywhere in the file drain payroll on a fixed schedule regardless of which terrain they're standing on, so bankruptcy still fires for real (`levelEndReason:'bankruptcy'` at tick 105). Also noted, not fixed: the `finances` command's own text prints "Bankrupt: YES" the instant cash crosses 0 (an immediate check), well before the structured `state.bankrupt`/`levelEndReason` fields actually flip — those require `Bankruptcy.ts`'s real 100-consecutive-tick grace period, which is what every `expect.equals` in this file asserts against. The other 3 files converted this session all needed real command-text fixes (skill syntax, contract IDs, drill grids); this one needed none — every purchase-adjacent step (5 vehicle buys, 10 employee hires) had already been correctly left command-only by the #479 conversion pass, anticipating the exact affordability-guard class (cash goes negative on the very first purchase and never recovers) that would otherwise have disabled every subsequent Buy/Hire button in a real browser. By far the cheapest file in this batch: no drilling, no hauling, no contracts, nothing to break.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1832,3 +1847,32 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   `role:'player'` `drill_plan grid` step with non-default
   spacing/depth and no matching stepper-click interaction is
   suspect, not just an edge case.
+- 2026-08-07 (cont.) — level2-playthrough-bankruptcy.json done
+  (**Finding #58**, Batch 7 11/19), by far the cheapest file this
+  batch — no drilling, no hauling, no contracts, nothing for the
+  Finding #48/#50/#52 classes to touch. `campaign start
+  level:grumpstone_ridge` fails outright (tier-2, locked by default
+  on a fresh campaign) — same already-documented class as PR #497's
+  `level3-playthrough-ecology.json`/`treranium_depths` finding, not
+  fixed here either. Unlike that file, the named outcome doesn't
+  depend on which world it's playing in: 10 employees hired with zero
+  work anywhere in the file drain payroll on a fixed schedule
+  regardless of terrain, so bankruptcy still fires for real at tick
+  105. All 5 vehicle-buy and all 10 employee-hire steps were already
+  correctly left command-only by the #479 conversion pass, already
+  anticipating the affordability-guard class (cash goes negative on
+  the very first purchase and never recovers) with zero fixes needed
+  — the first file this session that needed no command-text changes
+  at all, only `expect` blocks. Also noted (not fixed): `finances`'s
+  own text prints "Bankrupt: YES" immediately on cash<0, well before
+  the structured `bankrupt`/`levelEndReason` fields actually flip
+  after the real 100-tick grace period — every assertion here checks
+  the structured fields, never the text. Verified: JSON valid,
+  `scenario-defs.test.ts` green (3088 tests), full local sweep green
+  (typecheck, 124/124 scenarios, 8328/8328 tests), command mode
+  passes, interaction mode passes twice (74/74 steps, 0 failures each
+  run, ~12s per run — much faster than the drilling/hauling files).
+  GitHub Actions still down for this branch (tracked separately via
+  the self-scheduled PR #497 check-in) — all verification here remains
+  local. Next: the remaining 8 Batch 7 files (level2-playthrough-win
+  next), then the depth-mismatch audit before Phase 3.
