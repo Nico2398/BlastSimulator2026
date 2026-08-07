@@ -597,7 +597,15 @@ warehouse first) ·
 button's own fragment-picking is position-sensitive, so the delivered
 tonnage genuinely differs between command mode and a real browser
 without either being wrong) ·
-⬜ maintenance-cost-drain · ⬜ scores-display-visual ·
+✅ maintenance-cost-drain (2 buildings + 1 vehicle, 4×5-tick blocks;
+cash asserted decreasing every single tick block from maintenance/fuel
+alone with no active tasks — the file's own premise; no findings) ·
+✅ scores-display-visual (**Finding #34** — see the findings log; the
+blast's immediate ecology/nuisance dip and the deterministic
+command-mode trend across all 5 tick checkpoints are documented via
+notes rather than hard-asserted with increased/decreased on the score
+fields themselves, after a real browser run hit a severe random event
+that both crashed a score and destroyed a building) ·
 ⬜ time-management-visual · ⬜ safety-projection-visual ·
 ⬜ core-loop-visual · ⬜ i18n-display-visual · ⬜ main-menu-visual ·
 ⬜ save-load-visual · ⬜ sandbox-mode · ⬜ weather-display-visual ·
@@ -848,6 +856,8 @@ of each session, in case main added/removed a file.)
 32. **A third instance of Finding #13's class, found tracing `economy-full-loop.json`: `runSurvey` (`SurveyCalc.ts`) deducted `state.cash` directly for every survey but never called `addExpense` on `state.finances`.** Confirmed by dumping both fields side by side: a `survey seismic` call correctly dropped the flat `cash` by `SURVEY_COSTS.seismic` ($3000), but `state.finances.cash` never moved — a permanent, silent $3000 gap that persisted through the rest of the trace (visible only once a `finances` command's own output was compared against the flat field, since every prior scenario assertion in this whole project has correctly read the flat `cash` field, which was never wrong). No committed scenario file asserts on the nested `finances.cash` path directly (confirmed by grep — only one file, `ramp-navigation.json`, even mentions `finances.` at all, in a descriptive comment about Finding #13 itself, not a live assertion), so this bug was invisible to every earlier verification pass in this project despite affecting every survey-using scenario (the whole Batch 3 survey-* group). **Fixed at the root** — added the missing `addExpense(state.finances, cost, 'materials', ...)` call, matching the pattern every other cash-spending command already uses (a legacy, unused, dead-code sibling function in `Survey.ts` has the same bug but has no importers anywhere in `src/` — confirmed via grep — so left alone as genuinely unreachable, not a live gap). New unit test in `SurveyCalc.test.ts` proving `state.finances.cash` mirrors the flat field after a survey. No existing scenario-file assertions needed updating, since none checked the field that was actually broken.
 
 33. **`hauling-gate.json` had two problems, one a repeat of Finding #3's class, the other a new discovery specific to the Haul button's own selection logic.** (a) The `drill_plan grid rows:2 cols:2 spacing:5` command didn't match the click's real (20,20)-(25,25) drag at the panel's default spacing (3), which actually produces a 3×3=9-hole grid, not 2×2=4 — same class as `nav-cell-types-visual.json`. Fixed by correcting the command. (b) Fixing (a) changed the blast's fragment distribution enough that the file's original hardcoded `fragment:1` became oversized and un-haulable ("Fragment is oversized and needs a Rock Fragmenter first") — but investigating *why* revealed something more interesting: the real Haul button never lets a player pick a fragment id at all. It calls `findReachableGroundFragment` (`HaulingTask.ts`), which auto-selects the vehicle's nearest reachable, non-oversized, storage-fitting fragment based on the vehicle's *exact current position* — a fundamentally different selection than "whatever index a human guesses and hardcodes." Calling that function directly against the traced state gave the real answer (fragment #531, confirmed deterministic under command mode's clean tick10). But a real browser's wall-clock ticking (Finding #12) shifts the vehicle's exact position by click time, so the *same* selection logic picks a genuinely different fragment there — confirmed via a real run: 263.25kg delivered in command mode vs. 1050kg in interaction mode, neither wrong. **Fixed** by using the real, trace-confirmed fragment id (#531) in the command field (documented as position-derived, not a round number picked by hand), and by not asserting the exact delivered tonnage on the later `tick 40`/final `state full` steps — only the earlier `tick 20` step's `increased: ["storedMassKg"]` check, which holds regardless of which specific fragment gets picked and is what actually proves this file's premise (arrival-gated delivery genuinely completes, not instantly). Verified in both command mode and a real browser.
+
+34. **`scores-display-visual.json`'s score-trend assertions (increased/decreased on wellBeing/safety/ecology/nuisance across 5 tick checkpoints over a 110-tick budget) were NOT safe across both modes, even though a direct command-mode trace confirmed the file's own narrative exactly** — a genuinely new sub-class of Finding #12, worse than ordinary numeric drift. A first real browser run failed with `safety should have increased but went 50 → 0.49999999999999484` at the very first tick step: a random event fired under interaction mode's wall-clock ticking and, via the file's own `event choose 0` (always picks option 0 blindly, matching every other file's convention) landed a severe safety penalty — not a small numeric drift but a complete score collapse in the opposite direction from command mode's clean trace. **Fixing that surfaced a second failure**: the same event (or a different one further into the run) had also genuinely destroyed one of the file's two buildings, failing the final `state full` step's `buildingCount: 2` check. **Fixed** by dropping the increased/decreased assertions on the four score fields from all 5 tick steps and the roster/building counts from the final step, replacing them with `note`s documenting the real, command-mode-confirmed trend (verified via direct trace to genuinely match the file's own narrative) — kept only what stays true regardless of which random event fires: `decreased: ["cash"]` on every tick step (payroll/maintenance/fuel never stop draining) and `holeCount`/`chargedCount`/`sequencedCount` staying at 0 forever after the blast. The deterministic checks earlier in the file (immediately after each hire/build/blast, before any tick could let an event fire) needed no changes. Re-verified passing on two separate real browser runs to build confidence this wasn't a lucky pass given the randomness involved.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1150,3 +1160,20 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   re-checked this session — all verification remains local. Next:
   maintenance-cost-drain, scores-display-visual, then the rest of
   Batch 6.
+- 2026-08-07 (cont.) — maintenance-cost-drain.json done, no findings
+  (cash asserted decreasing every 5-tick block from maintenance/fuel
+  alone, the file's own premise). Then scores-display-visual.json,
+  Finding #34: score-trend assertions across 5 tick checkpoints weren't
+  safe in interaction mode even though command mode matched the file's
+  narrative exactly — a real browser run hit a severe random event that
+  crashed a score AND destroyed a building, failing two separate
+  hard-asserted checks. Fixed by replacing the tick-adjacent score/
+  roster/building assertions with notes documenting the real,
+  command-mode-confirmed trend, keeping only what holds regardless of
+  which event fires (cash still decreasing every tick, post-blast
+  counts staying at 0). Re-verified on two separate real browser runs
+  for confidence given the randomness involved. Batch 6: 9/18 done.
+  Full local sweep green: typecheck, 124/124 scenarios, 8309/8309
+  tests. GitHub Actions still not re-checked this session — all
+  verification remains local. Next: time-management-visual,
+  safety-projection-visual, core-loop-visual, then the rest of Batch 6.
