@@ -20,6 +20,10 @@ import type { MiningContext } from '../../src/console-api.js';
  * ctx.state alone, so a scenario step's expect.equals/increased on any of
  * them used to be checkable in interaction mode only — command mode had no
  * way to report them at all, silently failing any such assertion there.
+ * wellBeing/safety/ecology/nuisance (ScoreState) were never exposed on
+ * either side at all — added together so a scenario can finally assert on
+ * the four scores that gate events/contracts/lawsuits, not just guess at
+ * them from a screenshot.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'mineType',
@@ -28,7 +32,7 @@ const SERIALIZED_FIELDS = [
   'sequencedCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
-  'arrested', 'cash', 'profit', 'muckPile',
+  'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
 ] as const;
 
 describe('console-api', () => {
@@ -121,6 +125,16 @@ describe('console-api', () => {
       expect(state.employeeCount).toBe(1);
       expect(state.qualificationCount).toBeGreaterThan(0);
       expect(state.proficiencyTotal).toBeGreaterThan(0);
+    });
+
+    it('starts all four scores at 50 (createScoreState) for a fresh game', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.wellBeing).toBe(50);
+      expect(state.safety).toBe(50);
+      expect(state.ecology).toBe(50);
+      expect(state.nuisance).toBe(50);
     });
 
     it('reports the world bounding box once a game exists', () => {

@@ -47,6 +47,11 @@ export interface SerializableGameState {
   arrested: boolean;
   cash: number;
   profit: number;
+  /** The four 0-100 scores (ScoreState) that gate events and contracts. */
+  wellBeing: number;
+  safety: number;
+  ecology: number;
+  nuisance: number;
   /** The rock a blast left on the ground; null before a world exists. */
   muckPile: MuckPileSummary | null;
 }
@@ -88,6 +93,10 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     arrested: s.arrest.arrested,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
+    wellBeing: s.scores.wellBeing,
+    safety: s.scores.safety,
+    ecology: s.scores.ecology,
+    nuisance: s.scores.nuisance,
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,

@@ -85,6 +85,10 @@ export const GAME_STATE_SCHEMA: Schema = {
   arrested: { type: 'boolean', description: 'Loss condition' },
   cash: { type: 'number' },
   profit: { type: 'number', description: 'Total wealth accumulated this level' },
+  wellBeing: { type: 'number', description: '0-100 score (ScoreState)' },
+  safety: { type: 'number', description: '0-100 score (ScoreState)' },
+  ecology: { type: 'number', description: '0-100 score (ScoreState)' },
+  nuisance: { type: 'number', description: '0-100 score (ScoreState)' },
   muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
 };
 
