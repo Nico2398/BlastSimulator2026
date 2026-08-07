@@ -99,7 +99,7 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
       "interaction": [
         {
           "type": "clickSelector",
@@ -141,7 +141,8 @@
         "equals": {
           "holeCount": 9
         }
-      }
+      },
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:1",
@@ -208,7 +209,7 @@
           "sequencedCount": 0,
           "buildingCount": 0
         },
-        "note": "both warehouses (200/150 max HP) are within the blast's damage radius and get destroyed — the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: explosive_warehouse #1, freight_warehouse #2')"
+        "note": "both warehouses (200/150 max HP) are within the blast's damage radius and get destroyed \u2014 the file's own stated purpose, confirmed via a real dump (blast rating CATASTROPHIC, 'Buildings destroyed: explosive_warehouse #1, freight_warehouse #2')"
       }
     },
     {
