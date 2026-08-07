@@ -13,7 +13,12 @@ import { WorldMap } from './ui/screens/WorldMap.js';
 import { LevelEndScreen } from './ui/screens/LevelEndScreen.js';
 import { SandboxPanel } from './ui/SandboxPanel.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
+import type { LoadingSiteInfo } from './ui/LoadingScreen.js';
 import type { CommandResult } from './console/ConsoleRunner.js';
+import { getLevel, getAllLevels, type LevelDef } from './core/campaign/Level.js';
+import { formatMoney } from './core/economy/formatMoney.js';
+import { SANDBOX_DEFAULTS, type SandboxConfig } from './core/campaign/Sandbox.js';
+import { getAllExplosives } from './core/world/ExplosiveCatalog.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
@@ -25,7 +30,7 @@ import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
-import { t } from './core/i18n/I18n.js';
+import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { ScenePicking } from './ui/scene/ScenePicking.js';
 import { HoverTag } from './ui/scene/HoverTag.js';
 import { SelectionBar } from './ui/shell/SelectionBar.js';
@@ -179,7 +184,8 @@ worldMap.setOnStartLevel((levelId) => {
   worldMap.hide();
   // Ensure a base GameState (with campaign) exists before starting a level.
   const commands = ctx.state ? [] : ['new_game'];
-  void enterLevel([...commands, `campaign start level:${levelId}`]).then(() => {
+  const level = getLevel(levelId);
+  void enterLevel([...commands, `campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined).then(() => {
     // First-time players get tutorial guidance once their level is actually
     // loaded, not while still picking one from the world map.
     if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
@@ -190,11 +196,13 @@ worldMap.setOnStartLevel((levelId) => {
 const levelEndScreen = new LevelEndScreen(uiContainer);
 levelEndScreen.setOnReplay((levelId) => {
   levelEndScreen.hide();
-  void enterLevel([`campaign start level:${levelId}`]);
+  const level = getLevel(levelId);
+  void enterLevel([`campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined);
 });
 levelEndScreen.setOnContinue((nextLevelId) => {
   levelEndScreen.hide();
-  void enterLevel([`campaign start level:${nextLevelId}`]);
+  const level = getLevel(nextLevelId);
+  void enterLevel([`campaign start level:${nextLevelId}`], level ? buildLoadingSiteInfo(level) : undefined);
 });
 levelEndScreen.setOnBackToPortfolio(() => {
   levelEndScreen.hide();
@@ -209,27 +217,79 @@ levelEndScreen.setOnBackToPortfolio(() => {
 // command and run as its own phase.
 const loadingScreen = new LoadingScreen(uiContainer);
 
-function enterLevel(commands: readonly string[]): Promise<void> {
+/**
+ * Biome id (campaign LevelDef.biome / SandboxConfig.biome) → loading screen
+ * eyebrow category key. Mirrors WorldMap's own BIOME_STYLE categorisation
+ * (screens/WorldMap.ts) — small local duplication of a 3-entry map rather
+ * than exporting WorldMap's private table for one caller (#493).
+ */
+const BIOME_CATEGORY_KEY: Record<string, string> = {
+  desert_badlands: 'ui.portfolio.biome.desert',
+  alpine_granite: 'ui.portfolio.biome.mountain',
+  tropical_karst: 'ui.portfolio.biome.tropical',
+};
+const DEFAULT_BIOME_CATEGORY_KEY = 'ui.portfolio.biome.mountain';
+
+/** Loading screen content (eyebrow/subtitle/briefing) for a campaign level entry. */
+function buildLoadingSiteInfo(level: LevelDef): LoadingSiteInfo {
+  return {
+    siteNumber: level.difficultyTier,
+    biomeCategoryKey: BIOME_CATEGORY_KEY[level.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
+    difficulty: level.difficultyTier,
+    descriptionKey: level.descKey,
+    briefing: [
+      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
+      { labelKey: 'loading.brief.target', value: `$${formatMoney(level.unlockThreshold)}` },
+      { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
+    ],
+  };
+}
+
+/** Loading screen content for a sandbox site — no site number, no difficulty pips. */
+function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
+  // Empty availableExplosives means "every explosive" (SandboxConfig's own convention).
+  const explosivesCount = config.availableExplosives.length > 0
+    ? config.availableExplosives.length
+    : getAllExplosives().length;
+  return {
+    siteNumber: null,
+    biomeCategoryKey: BIOME_CATEGORY_KEY[config.biome] ?? DEFAULT_BIOME_CATEGORY_KEY,
+    difficulty: 0,
+    descriptionKey: 'loading.sandbox_subtitle',
+    briefing: [
+      { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(config.startingCash)}` },
+      { labelKey: 'loading.brief.target', value: `$${formatMoney(config.unlockThreshold)}` },
+      { labelKey: 'loading.brief.explosives', value: String(explosivesCount) },
+    ],
+  };
+}
+
+function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Promise<void> {
   return loadingScreen.runPhases([
     { run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); } },
     { run: () => { gameRenderer.syncFromContext(ctx); } },
-  ]);
+  ], siteInfo);
 }
 
 // --- Tutorial ---
 const tutorial = new TutorialOverlay(uiContainer);
+const tutorialPitLevel = getLevel('tutorial_pit');
 mainMenu.setOnTutorial(() => {
   mainMenu.hide();
-  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
-    .then(() => { tutorial.start(ctx.state ?? undefined); });
+  void enterLevel(
+    ['new_game seed:42 size:24', 'campaign start level:tutorial_pit'],
+    tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
+  ).then(() => { tutorial.start(ctx.state ?? undefined); });
 });
 // Settings' REPLAY TUTORIAL button (10.x): same fresh-tutorial-level entry
 // point as MainMenu's own TUTORIAL button above — the tutorial's steps are
 // tuned to that specific map (tutorialStages.ts's REGION table), not to
 // whatever the player currently has loaded.
 uiManager.setReplayTutorialHandler(() => {
-  void enterLevel(['new_game seed:42 size:24', 'campaign start level:tutorial_pit'])
-    .then(() => { tutorial.start(ctx.state ?? undefined); });
+  void enterLevel(
+    ['new_game seed:42 size:24', 'campaign start level:tutorial_pit'],
+    tutorialPitLevel ? buildLoadingSiteInfo(tutorialPitLevel) : undefined,
+  ).then(() => { tutorial.start(ctx.state ?? undefined); });
 });
 
 // --- Settings: persistence wiring (redesign P10; audio wired below, once
@@ -250,7 +310,7 @@ sandboxPanel.setOnStart((config) => {
     ` depth:${config.depth} cash:${config.startingCash} goal:${config.unlockThreshold}` +
     ` events:${config.eventFreqMultiplier} prices:${config.contractPriceMultiplier}` +
     ` decay:${config.scoreDecayRate} mixed_rock:${config.mixedRockHardness}${explosives}`,
-  ]);
+  ], buildSandboxLoadingSiteInfo(config));
 });
 
 // --- Audio ---
@@ -336,6 +396,15 @@ declare global {
     };
     /** World tile → screen pixel, for the playtest harness's real clicks on the P3 placement canvas (unlike __placement, which scenario-mode uses directly). */
     __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
+    /**
+     * Preview the loading screen without running a real (multi-second,
+     * main-thread-blocking) level load — the visual-testing scenario has no
+     * other deterministic way to see it (#493). `kind` picks a campaign level
+     * or a sandbox site; `locale` optionally renders it in the other
+     * language, restored once the synchronous `show()` call returns.
+     */
+    __loadingScreenPreview: (kind?: 'level' | 'sandbox', locale?: 'en' | 'fr') => void;
+    __loadingScreenHide: () => void;
   }
 }
 
@@ -682,6 +751,23 @@ window.__seekBlastPlayback = (t: number) => {
   gameRenderer.seekFragmentPlayback(t);
 };
 window.__blastPlaybackDuration = () => gameRenderer.fragmentPlaybackDuration;
+
+// Loading screen debug/preview bridge (#493) — see the declare-global doc comment.
+window.__loadingScreenPreview = (kind = 'level', locale) => {
+  const prevLocale = locale ? getLocale() : null;
+  if (locale) setLocale(locale as Locale);
+  try {
+    if (kind === 'sandbox') {
+      loadingScreen.show(buildSandboxLoadingSiteInfo(SANDBOX_DEFAULTS));
+    } else {
+      const level = getLevel('grumpstone_ridge') ?? getAllLevels()[0];
+      loadingScreen.show(level ? buildLoadingSiteInfo(level) : undefined);
+    }
+  } finally {
+    if (prevLocale) setLocale(prevLocale);
+  }
+};
+window.__loadingScreenHide = () => { loadingScreen.hide(); };
 
 uiManager.setGameConsole(window.__gameConsole);
 tutorial.setGameConsole(window.__gameConsole);

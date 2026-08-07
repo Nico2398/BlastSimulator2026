@@ -14,7 +14,7 @@
 // while the work happens.
 
 import { t } from '../core/i18n/I18n.js';
-import { QuipBag } from './loadingQuips.js';
+import { QuipBag, TipBag } from './loadingQuips.js';
 import { iconEl } from './icons.js';
 
 /**
@@ -156,6 +156,7 @@ export class LoadingScreen {
   private readonly tipTextEl: HTMLElement;
   private readonly tipNextBtn: HTMLButtonElement;
   private readonly quips = new QuipBag();
+  private readonly tips = new TipBag();
 
   constructor(container: HTMLElement) {
     this.overlay = document.createElement('div');
@@ -273,22 +274,29 @@ export class LoadingScreen {
   get progress(): number { return parseFloat(this.barFill.style.width) / 100; }
 
   /** Eyebrow row text (site identity + biome) — exposed for tests. */
-  get eyebrowText(): string { return ''; }
+  get eyebrowText(): string {
+    return this.eyebrowEl.querySelector('.bsx-loading-eyebrow-text')?.textContent ?? '';
+  }
 
   /** Subtitle text under the title — exposed for tests. */
-  get subtitleText(): string { return ''; }
+  get subtitleText(): string { return this.subtitleEl.textContent ?? ''; }
 
   /** Briefing rows currently rendered — exposed for tests. */
-  get briefingRows(): { label: string; value: string }[] { return []; }
+  get briefingRows(): { label: string; value: string }[] {
+    return Array.from(this.briefingEl.children).map((cell) => ({
+      label: cell.querySelector('.bsx-stat-key')?.textContent ?? '',
+      value: cell.querySelector('.bsx-stat-value')?.textContent ?? '',
+    }));
+  }
 
   /** Stage label text alongside the percentage — exposed for tests. */
-  get stageLabelText(): string { return ''; }
+  get stageLabelText(): string { return this.stageLabelEl.textContent ?? ''; }
 
   /** Stage meta text alongside the percentage — exposed for tests. */
-  get stageMetaText(): string { return ''; }
+  get stageMetaText(): string { return this.stageMetaEl.textContent ?? ''; }
 
   /** Tip text currently shown in the tip block — exposed for tests. */
-  get tipText(): string { return ''; }
+  get tipText(): string { return this.tipTextEl.textContent ?? ''; }
 
   show(siteInfo?: LoadingSiteInfo): void {
     this.titleEl.textContent = t('loading.title');
@@ -313,8 +321,9 @@ export class LoadingScreen {
 
   /** Serve another tip into the tip block, for the NEXT button. */
   nextTip(): string {
-    // TODO: implement
-    return '';
+    const tip = this.tips.next();
+    this.tipTextEl.textContent = tip;
+    return tip;
   }
 
   hide(): void { this.overlay.style.display = 'none'; }
@@ -323,38 +332,83 @@ export class LoadingScreen {
 
   /** Populate the eyebrow row (site identity, biome, difficulty pips) from `info`. */
   private renderEyebrow(info: LoadingSiteInfo | null): void {
-    void info;
-    // TODO: implement
+    this.eyebrowEl.replaceChildren();
+    if (!info) return;
+
+    const leadRule = document.createElement('span');
+    leadRule.className = 'bsx-loading-eyebrow-rule';
+
+    const text = document.createElement('span');
+    text.className = 'bsx-loading-eyebrow-text';
+    const siteText = info.siteNumber === null
+      ? t('loading.eyebrow_sandbox')
+      : t('loading.eyebrow_site', { number: String(info.siteNumber).padStart(2, '0') });
+    text.textContent = `${siteText} · ${t(info.biomeCategoryKey)}`;
+
+    const pips = document.createElement('span');
+    pips.className = 'bsx-loading-eyebrow-pips';
+    for (let i = 0; i < Math.max(0, info.difficulty); i++) pips.appendChild(iconEl('pick', 13));
+
+    const tailRule = document.createElement('span');
+    tailRule.className = 'bsx-loading-eyebrow-rule';
+
+    this.eyebrowEl.append(leadRule, text, pips, tailRule);
   }
 
   /** Populate the subtitle from `info.descriptionKey`, or clear it when absent. */
   private renderSubtitle(info: LoadingSiteInfo | null): void {
-    void info;
-    // TODO: implement
+    this.subtitleEl.textContent = info?.descriptionKey ? t(info.descriptionKey) : '';
   }
 
   /** Populate the briefing block's key/value rows from `info.briefing`. */
   private renderBriefing(info: LoadingSiteInfo | null): void {
-    void info;
-    // TODO: implement
+    this.briefingEl.replaceChildren();
+    for (const row of info?.briefing ?? []) {
+      const cell = document.createElement('div');
+      cell.className = 'bsx-stat-cell bsx-stat-cell-center';
+
+      const key = document.createElement('span');
+      key.className = 'bsx-stat-key';
+      key.textContent = t(row.labelKey);
+
+      const value = document.createElement('span');
+      value.className = 'bsx-stat-value';
+      value.textContent = row.value;
+      value.style.color = `var(${row.colorVar ?? '--bsx-text-primary'})`;
+
+      cell.append(key, value);
+      this.briefingEl.appendChild(cell);
+    }
   }
 
-  /** Lay `phaseCount` segment marks onto the progress track. */
+  /**
+   * Lay `phaseCount` segment marks onto the progress track.
+   *
+   * Boundaries mirror the fractions `setPhase` already drives the bar to
+   * ((i+1)/(phaseCount+1) for each phase index i) — one mark per phase
+   * boundary, none at 0% or 100%.
+   */
   private renderSegmentMarks(phaseCount: number): void {
-    void phaseCount;
-    // TODO: implement
+    this.marksLayer.replaceChildren();
+    if (phaseCount <= 0) return;
+    const total = phaseCount + 1;
+    for (let i = 1; i <= phaseCount; i++) {
+      const mark = document.createElement('div');
+      mark.className = 'bsx-loading-mark';
+      mark.style.left = `${(i / total) * 100}%`;
+      this.marksLayer.appendChild(mark);
+    }
   }
 
   /** Update the stage label + meta alongside the percentage. */
   private setStage(current: number, total: number): void {
-    void current;
-    void total;
-    // TODO: implement
+    this.stageLabelEl.textContent = t('loading.stage_label', { current, total });
+    this.stageMetaEl.textContent = t('loading.stage_meta', { current, total });
   }
 
   /** Draw the next tip into the tip block. */
   private renderTip(): void {
-    // TODO: implement
+    this.nextTip();
   }
 
   /**

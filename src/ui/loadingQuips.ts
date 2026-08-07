@@ -81,10 +81,26 @@ export class QuipBag {
 /**
  * Gameplay tips shown in the loading screen's tip block, served by TipBag.
  *
- * Placeholder — test-writer/implementer fill in real copy; do not invent tip
- * text during the skeleton pass.
+ * Unlike LOADING_QUIPS these are meant to be read and acted on, not just a
+ * joke to skim past — real mechanics a player might not have discovered yet.
  */
-export const LOADING_TIPS: readonly string[] = [];
+export const LOADING_TIPS: readonly string[] = [
+  'A survey narrows the odds before you drill — skipping it is a bet, not a shortcut.',
+  'Stemming the top of a hole keeps the blast energy pointed at the rock, not the sky.',
+  'A free face lets rock break sideways. Without one, energy has nowhere to go but up.',
+  'Underloaded holes leave oversize boulders; overloaded ones fling debris past the berm.',
+  'Fatigued crew work slower and get hurt more — a bunkhouse pays for itself.',
+  'Contracts reward the ore grade you promised, not the grade you hoped for.',
+  'A hauler idle at the depot is a hauler not making you money on the muck pile.',
+  'Weather changes visibility and footing — check it before committing to a big sequence.',
+  'Training a proficiency to the next level shows up in task duration, not just the number.',
+  'The union notices skipped breaks long before it notices skipped raises.',
+  'A warehouse tier caps how much ore you can stockpile before a sale.',
+  'Sequencing charges in the right order controls where the muck pile ends up.',
+  'Corruption buys speed today and an inspector tomorrow.',
+  'Mixed rock hardness sites hide soft pockets next to hard ones — surveys still lie less than guessing.',
+  'A vehicle needs a qualified driver before it needs fuel.',
+];
 
 /**
  * A bag that hands out tips without repeating until it is empty — same shape
@@ -92,18 +108,28 @@ export const LOADING_TIPS: readonly string[] = [];
  * shared `DrawBag<T>`; that refactor, if any, is implementation-phase work.
  */
 export class TipBag {
+  private remaining: string[] = [];
+  private readonly random: () => number;
+
+  /** `random` is injectable so tests can pin the order. */
   constructor(random: () => number = Math.random) {
-    void random;
-    // TODO: implement
+    this.random = random;
+    this.refill();
   }
 
+  private refill(): void {
+    this.remaining = [...LOADING_TIPS];
+  }
+
+  /** Draw a tip. Refills once every line has been used. */
   next(): string {
-    // TODO: implement
-    return '';
+    if (this.remaining.length === 0) this.refill();
+    const i = Math.min(this.remaining.length - 1, Math.floor(this.random() * this.remaining.length));
+    return this.remaining.splice(i, 1)[0]!;
   }
 
+  /** Lines still unused in the current pass — exposed for tests. */
   get remainingCount(): number {
-    // TODO: implement
-    return 0;
+    return this.remaining.length;
   }
 }
