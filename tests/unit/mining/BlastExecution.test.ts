@@ -127,6 +127,59 @@ describe('executeBlast — crater', () => {
   });
 });
 
+describe('executeBlast — flooded holes (wetHoleIds, water-sensitive explosive)', () => {
+  /** Same 2×3 grid/plan as the crater tests above, built fresh so the two sides of a dry/flooded comparison never share a mutated grid. */
+  function buildCraterPlan(explosiveId: string) {
+    const grid = new VoxelGrid(40, 20, 40);
+    fillRegion(grid, 'molite', 5, 25, 0, 10, 5, 25, 'blingite', 0.2);
+    const holes = createGridPlan({ x: 12, z: 12 }, 2, 3, 4, 8, 0.15);
+    const holeIds = holes.map(h => h.id);
+    const holeDepths: Record<string, number> = {};
+    for (const h of holes) holeDepths[h.id] = h.depth;
+    const { charges } = batchCharge(holeIds, holeDepths, explosiveId, 8, 2);
+    const delays = autoVPattern(holes, 25);
+    return { grid, holes, holeIds, plan: assembleBlastPlan(holes, charges, delays) };
+  }
+
+  it('a flooded hole charged with a water-sensitive explosive (boomite) clears fewer voxels than the same plan dry', () => {
+    const dry = buildCraterPlan('boomite');
+    const dryResult = executeBlast(dry.plan, dry.grid, []);
+    expect(dryResult).not.toBeNull();
+
+    const flooded = buildCraterPlan('boomite');
+    const allHolesWet = new Set(flooded.holeIds);
+    const floodedResult = executeBlast(flooded.plan, flooded.grid, [], undefined, undefined, undefined, allHolesWet);
+    expect(floodedResult).not.toBeNull();
+
+    expect(floodedResult!.clearedVoxels).toBeLessThan(dryResult!.clearedVoxels);
+    expect(floodedResult!.totalRockVolume).toBeLessThan(dryResult!.totalRockVolume);
+  });
+
+  it('a flooded hole charged with a water-resistant explosive (krackle) clears the same as dry', () => {
+    const dry = buildCraterPlan('krackle');
+    const dryResult = executeBlast(dry.plan, dry.grid, []);
+    expect(dryResult).not.toBeNull();
+
+    const flooded = buildCraterPlan('krackle');
+    const allHolesWet = new Set(flooded.holeIds);
+    const floodedResult = executeBlast(flooded.plan, flooded.grid, [], undefined, undefined, undefined, allHolesWet);
+    expect(floodedResult).not.toBeNull();
+
+    expect(floodedResult!.clearedVoxels).toBe(dryResult!.clearedVoxels);
+  });
+
+  it('a wetHoleIds entry with no overlap with the plan behaves exactly like no flooding at all', () => {
+    const dry = buildCraterPlan('boomite');
+    const dryResult = executeBlast(dry.plan, dry.grid, []);
+
+    const unaffected = buildCraterPlan('boomite');
+    const irrelevantWetIds = new Set(['hole-not-in-this-plan']);
+    const result = executeBlast(unaffected.plan, unaffected.grid, [], undefined, undefined, undefined, irrelevantWetIds);
+
+    expect(result!.clearedVoxels).toBe(dryResult!.clearedVoxels);
+  });
+});
+
 describe('buildBlastReport', () => {
   it('carries the tick, rating, and per-blast totals straight from the result', () => {
     const grid = new VoxelGrid(40, 20, 40);

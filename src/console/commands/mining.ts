@@ -32,6 +32,7 @@ import {
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../core/weather/WeatherCycle.js';
+import { wetHoles } from '../../core/mining/WetHoles.js';
 import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
@@ -274,7 +275,13 @@ export function blastCommand(
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
 
-  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings, ctx.emitter);
+  // ctx.weatherCycle may not exist yet (created lazily by the `weather`
+  // command, eagerly by main.ts on new_game/campaign start/sandbox start —
+  // see console-api.ts's `weather` field doc) — 'sunny' (not raining) is the
+  // correct fallback either way, since createWeatherCycle's own initial
+  // state is always 'sunny' regardless of seed.
+  const wetHoleIds = new Set(wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny'));
+  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
   if (!result) return { success: false, output: 'Blast execution failed.' };
 
   // Store fragment data for renderer (localized remesh + mesh spawning)
@@ -751,6 +758,7 @@ export function tubingCommand(
     const result = buyTubing(ctx.state!.tubingState, amount, ctx.state!.cash);
     if (!result.success) return { success: false, output: result.message };
     ctx.state!.cash -= result.cost;
+    addExpense(ctx.state!.finances, result.cost, 'equipment', `Tubing x${amount}`, ctx.state!.tickCount);
     return { success: true, output: `${result.message}. Inventory: ${ctx.state!.tubingState.inventory}` };
   }
 

@@ -211,6 +211,8 @@ export function executeBlast(
   groundFactor: number = DEFAULT_GROUND_FACTOR,
   buildingState?: BuildingState,
   emitter?: EventEmitter,
+  /** Hole ids currently flooded (raining, no tubing installed — see wetHoles() in WetHoles.ts). A water-sensitive explosive charged into one of these detonates at 10% strength (waterEffect, BlastCalc.ts). */
+  wetHoleIds: ReadonlySet<string> = new Set(),
 ): BlastResult | null {
   // 1. Validate
   const errors = validateBlastPlan(plan);
@@ -231,7 +233,7 @@ export function executeBlast(
   emitter?.emit('blast:started', { originX: blastCenter.x, originY, originZ: blastCenter.z });
 
   // 3. Propagate the charge energy through the rock, then read off what broke.
-  const field = buildBlastEnergyField(plan, grid, bbox, holeSurfaceYs);
+  const field = buildBlastEnergyField(plan, grid, bbox, holeSurfaceYs, wetHoleIds);
   const fragmentation = field ? identifyFragmentedVoxels(field, grid) : null;
 
   const fragments: FragmentData[] = [];
@@ -389,7 +391,7 @@ export function executeBlast(
   for (const hole of plan.holes) {
     const charge = plan.charges[hole.id];
     if (!charge) continue;
-    const energy = effectiveHoleEnergy(charge, hole.depth, false, false);
+    const energy = effectiveHoleEnergy(charge, hole.depth, wetHoleIds.has(hole.id), false);
     vibModSum += energy.vibrationMod;
     vibModCount++;
   }
@@ -502,6 +504,7 @@ export function buildBlastEnergyField(
   grid: VoxelGrid,
   bbox: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number },
   holeSurfaceYs: Record<string, number>,
+  wetHoleIds: ReadonlySet<string> = new Set(),
 ): EnergyField | null {
   // calculateBlastZone reports an inclusive box; the field's is half-open.
   const requested: BlastBox = {
@@ -515,7 +518,7 @@ export function buildBlastEnergyField(
   for (const hole of plan.holes) {
     const charge = plan.charges[hole.id];
     if (!charge) continue;
-    const energy = computeInitialEnergy(charge, hole.depth) * EXPLOSIVE_ENERGY_SCALE;
+    const energy = computeInitialEnergy(charge, hole.depth, wetHoleIds.has(hole.id)) * EXPLOSIVE_ENERGY_SCALE;
     if (energy <= 0) continue;
     seeds.push(...buildHoleSeeds(
       holeSurfaceYs[hole.id] ?? 0,

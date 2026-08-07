@@ -10,7 +10,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +25,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -30,7 +40,12 @@
           "command": "time resume"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "weather set heavy_rain",
@@ -40,7 +55,13 @@
           "command": "weather set heavy_rain"
         }
       ],
-      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness. Also fixed a scenario bug while here: the command was `weather heavy_rain` (missing `set`), which mining.ts's weatherCommand silently falls through to a plain read for -- the flood test never actually set heavy_rain at all. Corrected to `weather set heavy_rain`."
+      "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness. Also fixed a scenario bug while here: the command was `weather heavy_rain` (missing `set`), which mining.ts's weatherCommand silently falls through to a plain read for -- the flood test never actually set heavy_rain at all. Corrected to `weather set heavy_rain`.",
+      "expect": {
+        "equals": {
+          "weather": "heavy_rain",
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -50,7 +71,14 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 5
+        },
+        "note": "confirmed via direct trace: cash stays flat, no employees exist yet to pay"
+      }
     },
     {
       "command": "scores",
@@ -60,10 +88,19 @@
           "command": "scores"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15",
+      "description": "Corrected from rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = round(5/3)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json and repeated in several other files this batch (hauling-gate.json, safety-projection-visual.json, core-loop-visual.json). Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -92,7 +129,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -102,7 +145,13 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -112,10 +161,16 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
+      "description": "boomite is waterSensitive:true (ExplosiveCatalog.ts); every hole here is flooded (raining, no tubing installed -- WetHoles.ts's wetHoles()) so this blast now genuinely detonates weak (Finding #39: BlastExecution.ts never wired the water/flood mechanic into the real energy calculation at all -- waterEffect/wetHoles existed but had zero effect on any blast until this fix). No state field exposes the blast report's clearedVoxels/rating directly, so the weakening itself is proven by dedicated tests rather than a scenario assertion: a direct trace of this exact command sequence shows 27 cleared voxels / $83,500 ore value flooded vs. 395 cleared voxels / $1,337,550 dry (~14x weaker, same seed/grid/charge) -- confirmed end-to-end through the real console command pipeline by tests/integration/weather-blast.integration.test.ts, and at the physics level by new tests in BlastCalc.test.ts/BlastExecution.test.ts.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -138,7 +193,15 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "weather": "heavy_rain"
+        }
+      }
     },
     {
       "command": "fragments",
@@ -158,7 +221,15 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 5,
+          "holeCount": 0,
+          "weather": "heavy_rain"
+        }
+      }
     }
   ]
 }

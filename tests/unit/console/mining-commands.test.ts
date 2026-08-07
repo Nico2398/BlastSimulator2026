@@ -12,6 +12,7 @@ import {
   drillPlanCommand,
   sequenceCommand,
   surveyCommand,
+  tubingCommand,
 } from '../../../src/console/commands/mining.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
@@ -19,6 +20,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
 import { RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
+import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
 
 function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
@@ -213,6 +215,34 @@ describe('buy_software tier validation', () => {
     const result = buySoftwareCommand(ctx, [], { tier: '0' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('Already at tier');
+  });
+});
+
+describe('tubingCommand — buy subcommand', () => {
+  it('deducts cash and adds to inventory', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 999_999;
+    const result = tubingCommand(ctx, ['buy'], { amount: '4' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.tubingState.inventory).toBe(4);
+    expect(ctx.state!.cash).toBe(999_999 - 4 * TUBING_COST);
+  });
+
+  it('mirrors the deduction in state.finances.cash, not just the flat field', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 999_999;
+    ctx.state!.finances.cash = 999_999;
+    const cashBefore = ctx.state!.cash;
+
+    const result = tubingCommand(ctx, ['buy'], { amount: '4' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
+    expect(ctx.state!.cash).toBeLessThan(cashBefore);
+    const entry = ctx.state!.finances.transactions.find(t => t.category === 'equipment' && t.description.startsWith('Tubing'));
+    expect(entry).toBeDefined();
+    expect(entry!.type).toBe('expense');
+    expect(entry!.description).toBe('Tubing x4');
   });
 });
 

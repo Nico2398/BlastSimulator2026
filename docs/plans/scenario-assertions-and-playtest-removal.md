@@ -651,7 +651,15 @@ state field existed to check the weather cycle at all, closed by adding
 command-vs-interaction bootstrap-timing asymmetry — lazy creation on
 first `weather` command vs. eager creation on `new_game`/`campaign
 start` — distinct from Finding #12's wall-clock drift) ·
-⬜ weather-flood
+✅ weather-flood (**Finding #39** — see the findings log; the file's
+whole premise was false until this fix — the water/flood mechanic
+(`waterEffect`/`wetHoles`/tubing) had zero effect on real blast
+execution despite the game's own Charge panel already warning the
+player about it. Fixed at the root with a small, purely-additive
+change (optional parameters, one real call site), proved at three
+layers — unit, integration, and this scenario — plus a sixth Finding
+#13-class cash/finances desync caught in `tubingCommand`'s `buy`
+subcommand along the way)
 
 ### Batch 7 — big playthroughs + the 3 stragglers (19) — **+ tutorial parity check**
 ⬜ tutorial-interactive (parity check + close tutorial.json gap here) ·
@@ -908,6 +916,8 @@ of each session, in case main added/removed a file.)
 37. **`core-loop-visual.json` combined three already-known finding classes in one file.** (a) A Finding-#15-class syntax bug: `employee assign_skill 1 geology 3` used bare positional args, which the command silently rejects (`skill:`/`level:` are named params) — fixed to `skill:geology level:3`. (b) A repeat of Finding #3's grid-spacing class: `drill_plan grid rows:3 cols:3 spacing:5` didn't match the click's real (20,20)-(30,30) drag at the panel's default spacing, which produces 4×4=16 holes, not 3×3=9 — fixed by correcting the command. (c) The same never-hauls-anything gap already documented in `contract-negotiation.json`: this file's `contract deliver` step genuinely fails every run (confirmed via direct trace) since no vehicle ever hauls fragments into storage — fixed the test to describe this reality (`activeContractCount` stays 1, undelivered) rather than assume completion, with a `note` pointing at `economy-full-loop.json` as the file that actually completes a delivery. **A methodological catch during verification**: an initial `decreased: ["cash"]` guess on the `tick 5` step (copied from the pattern used elsewhere in this batch) failed command mode outright — a direct trace showed cash stays exactly flat there, since with only 1 employee and no buildings/vehicles yet, payroll doesn't cycle within a 5-tick window. Fixed by checking the real traced value instead of assuming the pattern held. Verified in both command mode and a real browser.
 
 38. **`weather-display-visual.json`'s entire premise — verify the weather cycle's state transitions — had no state field to check at all, and the fix surfaced a genuine mode-asymmetric bootstrap timing gap distinct from Finding #12's wall-clock drift.** `SerializableGameState` had no `weather` field in either `serializeGameState()` or `window.__gameState()` — every `weather set`/`weather advance` this file (and any future one) could ever do was verifiable only by eyeballing a screenshot. **Added `weather: string | null`** (`ctx.weatherCycle?.current ?? null`) in lockstep across `console-api.ts`/`main.ts`/`validate-state-schema.ts`, with three new `console-api.test.ts` tests (null before any weather command; `'sunny'` — `createWeatherCycle`'s fixed initial state — once the first one lazily creates the cycle; the new value after `weather set`). Investigating the right field type surfaced a real structural difference between the two modes, not drift: `ctx.weatherCycle` is created *lazily* in command mode (only inside `weatherCommand`, on the first explicit `weather`/`weather set`/`weather advance` call) but *eagerly* in the browser (`main.ts`'s `runGameCommand` re-seeds it the instant `ctx.state` is replaced — `new_game`/`campaign start`/`sandbox start`). So immediately after `new_game`, command mode's `weather` field reads `null` while interaction mode's already reads `'sunny'` — a real, permanent asymmetry, not a timing race, and it would fail one mode or the other on any file that asserts `weather` before that file's own first explicit weather command. Confirmed via grep that `advanceWeather`/`forceAdvance` have zero call sites anywhere in `src/` outside the console command and `WeatherCycle.ts` itself — nothing ticks weather automatically, so once both modes converge (both have created the cycle from the same `ctx.state.seed`, and `setWeather` is a direct, RNG-free assignment), every subsequent value is fully deterministic and identical in both modes. **Fixed** by never asserting `weather` on the file's first three (bootstrap) steps, and asserting it on every step from the file's own first `weather` command onward — the file's full sunny→cloudy→light_rain→heavy_rain→storm→heat_wave→cold_snap cycle is now genuinely proven, in both modes, for the first time. Verified in both command mode and a real browser. Lesson for future files: any `ctx`-level field created lazily by a console command but eagerly by `main.ts`'s bootstrap wrapper needs the same treatment — check both creation paths, not just one, before asserting on it near a bootstrap step.
+
+39. **`weather-flood.json`'s whole premise — "verify water-sensitive explosive fails to detonate" — was completely false: the water/flood mechanic (`waterEffect`, `wetHoles`, tubing) had been fully modeled since some earlier point in this project's history but was never actually wired into blast execution, so a water-sensitive explosive charged into a flooded hole with no tubing detonated at full, undiminished strength, no matter the weather.** Tracing `BlastExecution.ts`'s real energy path (`executeBlast` → `buildBlastEnergyField` → `computeInitialEnergy`, `BlastCalc.ts`) found none of those three functions took an `isFlooded`/weather parameter at all — the *only* place `isFlooded`/`hasTubing` appeared was a single hardcoded `effectiveHoleEnergy(charge, hole.depth, false, false)` call used solely to average `vibrationMod` for the villages-vibration calculation, whose output doesn't even depend on the water multiplier. `wetHoles()` (`WetHoles.ts`) itself was correct and already consumed by several UI panels (`Charge.ts`, `Fire.ts`, `Drill.ts`, `PreflightModal.ts`) to *warn* the player — confirmed by screenshot: the real Charge panel says outright **"9 holes are taking on water. Tubing keeps them dry until you fire."** — but nothing downstream of that warning ever made it true. **Fixed at the root, scoped to a small, purely-additive change**: `computeInitialEnergy` gained an `isFlooded = false` optional parameter applying `waterEffect`'s multiplier (default preserves old behavior exactly); `buildBlastEnergyField`/`executeBlast` gained a `wetHoleIds: ReadonlySet<string> = new Set()` optional parameter, threaded down to both `computeInitialEnergy` and the vibration-calc `effectiveHoleEnergy` call. The *only* real call site, `blastCommand` (`console/commands/mining.ts`), now computes `wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny')` and passes it through — the `'sunny'` fallback for a not-yet-created `weatherCycle` matches `createWeatherCycle`'s own fixed initial state, so every one of the other 123 scenario files (none of which combine `weather set <raining state>` with an actual `blast`, confirmed by grep) is provably unaffected; all default parameters mean zero existing call sites or tests needed to change, confirmed by the full existing test suite passing unmodified. Proved the fix at three layers: `BlastCalc.test.ts`/`BlastExecution.test.ts` (physics-level, flooded+water-sensitive clears measurably fewer voxels; flooded+water-resistant unaffected; an unrelated hole id in `wetHoleIds` is a no-op) and a new `tests/integration/weather-blast.integration.test.ts` (full console-command pipeline: `weather set heavy_rain` → drill → charge → sequence → `blast`, comparing real `state.lastBlastReport` between a dry and a flooded run of the identical plan, plus a third case proving installed tubing fully protects a hole despite the rain). A direct trace of this exact scenario file's own corrected command sequence measured the real magnitude: **27 cleared voxels / $83,500 ore value flooded vs. 395 cleared voxels / $1,337,550 dry — roughly 14× weaker**, same seed/grid/charge — a large effect because energy dropping to 10% pushes most voxels below their fracture threshold entirely, not a small linear scale-down. **Found a sixth instance of Finding #13's class along the way**: `tubingCommand`'s `buy` subcommand (needed for the tubing-protection integration test) deducted `state.cash` directly but never called `addExpense` on `state.finances` — fixed with the same one-line dual-write every other cash-spending command in that file uses, with a new `mining-commands.test.ts` test. The scenario file itself also had a repeat of Finding #3's grid-spacing class (`rows:2 cols:2 spacing:5` against a (15,15)-(20,20) drag, which the panel's real default spacing (3) turns into 3×3=9 holes, not 2×2=4) — fixed by correcting the command. Since no `SerializableGameState` field exposes the blast report's `clearedVoxels`/`rating` directly, the scenario's own `expect` on the `blast` step documents the real, dedicated-test-verified weakening via a `note` (the Finding #21/#22/#31 precedent for effects no scalar can check) rather than adding a new field purely to re-prove what the unit/integration tests already prove more precisely — the scenario channel's job here is reachability and bookkeeping (hole/charge/sequence counts, weather state), not re-deriving blast physics. Verified in both command mode and a real browser, including a screenshot confirming the corrected 3×3 hole grid renders and the post-blast crater is visibly small.
 
 _(Add new findings here as you hit them. Number sequentially.)_
 
@@ -1337,3 +1347,35 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   8315/8315 tests (+3 from the new weather field-parity tests). GitHub
   Actions still not re-checked this session — all verification remains
   local. Next: weather-flood, the last Batch 6 file.
+- 2026-08-07 (cont.) — **Batch 6 complete (18/18)** — weather-flood.json
+  done (**Finding #39**, the biggest production bug found this session):
+  the water/flood mechanic (`waterEffect`/`wetHoles`/tubing) had been
+  fully modeled but never wired into real blast execution —
+  `BlastExecution.ts`'s actual energy path took no flood parameter at
+  all, so a water-sensitive explosive in a flooded hole always
+  detonated at full strength regardless of weather, even though the
+  real Charge panel already (falsely) warns "N holes are taking on
+  water. Tubing keeps them dry until you fire" (confirmed via
+  screenshot). Fixed at the root with a small, purely-additive change:
+  `computeInitialEnergy`/`buildBlastEnergyField`/`executeBlast` gained
+  optional parameters defaulting to today's behavior (zero blast radius
+  — confirmed via the full existing test suite passing unmodified), and
+  the one real call site (`blastCommand`) now threads real
+  `wetHoles(state, weather)` through. Proved at three layers: new
+  `BlastCalc.test.ts`/`BlastExecution.test.ts` unit tests (physics),
+  new `tests/integration/weather-blast.integration.test.ts` (full
+  console-command pipeline, dry vs. flooded vs. tubed-and-protected),
+  and the scenario file itself. A direct trace of the file's own
+  corrected sequence measured the real effect: 27 vs 395 cleared voxels
+  (~14x weaker) for the identical plan, dry vs. flooded. Also fixed a
+  sixth Finding #13-class bug caught along the way: `tubingCommand`'s
+  `buy` subcommand deducted flat cash without mirroring to
+  `state.finances`. The scenario file also had a repeat grid-spacing
+  bug (Finding #3's class, 2×2 command vs. the click's real 3×3).
+  Verified in both command mode and a real browser, with a screenshot
+  confirming the corrected grid and the visibly small post-blast
+  crater. Full local sweep green: typecheck, 124/124 scenarios, full
+  test suite including all new tests. GitHub Actions still not
+  re-checked this session — all verification remains local. Next:
+  Batch 7 (19 files) — the big playthroughs, the 3 stragglers, and the
+  tutorial-interactive parity check.
