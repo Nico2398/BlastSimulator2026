@@ -29,9 +29,9 @@
       ]
     },
     {
-      "command": "employee assign_skill 1 geology 3",
+      "command": "employee assign_skill 1 skill:geology level:3",
       "interaction": [
-        { "type": "command", "command": "employee assign_skill 1 geology 3" }
+        { "type": "command", "command": "employee assign_skill 1 skill:geology level:3" }
       ]
     },
     {
@@ -41,10 +41,10 @@
       ]
     },
     {
-      "command": "tick 8",
-      "description": "Padding for the seismic survey (8 ticks) to resolve",
+      "command": "tick 25",
+      "description": "Padding for the seismic survey to resolve",
       "interaction": [
-        { "type": "command", "command": "tick 8" }
+        { "type": "command", "command": "tick 25" }
       ]
     },
     {
@@ -54,9 +54,21 @@
       ]
     },
     {
-      "command": "tick 8",
+      "command": "tick 10",
       "interaction": [
-        { "type": "command", "command": "tick 8" }
+        { "type": "command", "command": "tick 10" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
       ]
     },
     {
@@ -94,10 +106,10 @@
       ]
     },
     {
-      "command": "tick 8",
+      "command": "tick 25",
       "description": "Padding for the second seismic survey to resolve",
       "interaction": [
-        { "type": "command", "command": "tick 8" }
+        { "type": "command", "command": "tick 25" }
       ]
     },
     {
@@ -107,9 +119,21 @@
       ]
     },
     {
-      "command": "tick 8",
+      "command": "tick 10",
       "interaction": [
-        { "type": "command", "command": "tick 8" }
+        { "type": "command", "command": "tick 10" }
+      ]
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "command", "command": "event choose 0" }
+      ]
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
       ]
     },
     {
