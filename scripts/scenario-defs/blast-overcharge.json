@@ -19,8 +19,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15",
-      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(20,20) rectangle computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4).",
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:15,15",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(20,20) rectangle computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -67,7 +67,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "FINDING: stemming:0 (this file's original declared value, fully unstemmed) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...), so a player can never leave a hole truly unstemmed, only reach 0.5m. The console command has no such floor, so command mode's version of this file (and every earlier interaction-mode run, which never touched these steppers and silently charged at the 5kg/2m panel defaults instead) tested a different, stronger-than-achievable unstemmed case that no player could reproduce. Corrected to the real UI-reachable extreme: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) — the strongest overcharge a real player can actually create.",
+      "description": "FINDING: stemming:0 (this file's original declared value, fully unstemmed) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...), so a player can never leave a hole truly unstemmed, only reach 0.5m. The console command has no such floor, so command mode's version of this file (and every earlier interaction-mode run, which never touched these steppers and silently charged at the 5kg/2m panel defaults instead) tested a different, stronger-than-achievable unstemmed case that no player could reproduce. Corrected to the real UI-reachable extreme: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) \u2014 the strongest overcharge a real player can actually create.",
       "interaction": [
         {
           "type": "clickSelector",
