@@ -11,7 +11,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -25,6 +31,7 @@
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:8 start:14,14",
+      "description": "One increment click on the spacing stepper (data-field=\"spacing\") raises it 3->4m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (14,14)-(26,26) rectangle computes the declared 4x4 instead of the default-spacing 5x5 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -43,6 +50,10 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 14,
           "z1": 14,
@@ -57,7 +68,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        },
+        "note": "4 rows x 4 cols = 16"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -71,7 +88,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 16
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -85,7 +107,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 16
+        }
+      }
     },
     {
       "command": "blast",
@@ -116,7 +143,15 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      }
     },
     {
       "command": "state full",

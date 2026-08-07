@@ -215,9 +215,11 @@ Charge panel's amount/stemming steppers had no selector either, and
 stemming:0 turned out to be unreachable by any click — fixed at the root,
 corrected to the true UI-reachable extreme, verified against the real
 chargesByHole dump**) · ✅ blast-undercharge (same fix, amount only) ·
-⬜ blast-report-metrics · ⬜ blast-voxel-fragmentation ·
-⬜ blast-voxel-fragmentation-visual · ⬜ blast-preview-software-tiers ·
-⬜ blast-report-visual · ⬜ blast-visual-full · ⬜ blast-charge-sequence-visual ·
+✅ blast-report-metrics (Finding #4 grid fix) · ✅ blast-voxel-fragmentation
+(same) · ✅ blast-voxel-fragmentation-visual (same) ·
+✅ blast-preview-software-tiers (same + real tier costs 500/2000/5000/12000
+verified) · ✅ blast-report-visual (same) · ✅ blast-visual-full (same +
+same tier costs) · ⬜ blast-charge-sequence-visual ·
 ⬜ blast-preview-tiers-visual · ⬜ blast-workshop-french-visual ·
 ⬜ blast-preview-step-visual · ⬜ blast-sequence-step-visual ·
 ⬜ blast-fire-step-visual · ⬜ multi-deck-blast · ⬜ presplit-wall ·

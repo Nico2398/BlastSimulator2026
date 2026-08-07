@@ -11,10 +11,17 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (20,20)-(35,30) rectangle computes the declared 4x3 instead of the default-spacing 6x4 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -33,6 +40,14 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
@@ -47,7 +62,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 12
+        },
+        "note": "3 rows x 4 cols = 12"
+      }
     },
     {
       "command": "drill_plan show",
@@ -81,7 +102,12 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 12
+        }
+      }
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
@@ -115,7 +141,12 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 12
+        }
+      }
     },
     {
       "command": "sequence set hole:H1 delay:0",
@@ -173,7 +204,12 @@
           "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49500
+        }
+      }
     },
     {
       "command": "preview energy",
@@ -197,7 +233,12 @@
           "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47500
+        }
+      }
     },
     {
       "command": "preview fragments",
@@ -221,7 +262,12 @@
           "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42500
+        }
+      }
     },
     {
       "command": "preview projections",
@@ -245,7 +291,12 @@
           "selector": "#bs-blast-panel [data-tier=\"4\"] [data-action=\"buy-tier\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 30500
+        }
+      }
     },
     {
       "command": "preview vibrations",
@@ -302,7 +353,15 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      }
     },
     {
       "command": "fragments",
