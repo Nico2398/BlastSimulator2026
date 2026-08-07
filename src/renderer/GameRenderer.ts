@@ -369,20 +369,29 @@ export class GameRenderer {
     return this.surveyOverlayPreference;
   }
 
-  /** Set the player-facing visibility preference for the survey confidence overlay (#496). */
+  /**
+   * Set the player-facing visibility preference for the survey confidence
+   * overlay (#496) and immediately re-sync it against the last known state,
+   * so hiding/showing takes effect without waiting for the next natural sync
+   * cycle. Safe to call before any game is loaded (lastState is null).
+   */
   setSurveyOverlayVisible(visible: boolean): void {
     this.surveyOverlayPreference = visible;
+    if (!this.lastState) return;
+    this.syncSurveyOverlay(this.buildSurveyOverlayOptions(this.lastState));
   }
 
   /**
    * Sync survey confidence overlay from the current game state.
    * Call from syncFromContext() to keep the overlay visible during gameplay.
+   * Gated on both "is there data" (options) and the player's visibility
+   * preference (#496) — either being false hides the overlay.
    */
   syncSurveyOverlay(options: SurveyConfidenceOverlayOptions | null): void {
     if (!this.terrain) return;
 
     const overlay = this.terrain.getSurveyOverlay();
-    if (options && options.points.length > 0) {
+    if (options && options.points.length > 0 && this.surveyOverlayPreference) {
       overlay.show(options);
     } else {
       overlay.hide();

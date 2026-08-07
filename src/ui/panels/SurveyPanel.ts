@@ -97,6 +97,7 @@ export class SurveyPanel {
     this.overlayToggleBtn.style.cssText = 'margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
     this.overlayToggleBtn.setAttribute('data-role', 'overlay-toggle');
     this.overlayToggleBtn.addEventListener('click', () => this.handleOverlayToggleClick());
+    this.locale.bindTitle(this.overlayToggleBtn, 'ui.survey.overlay_toggle_tip');
 
     const closeBtn = el('button', { children: [iconEl('x', 12)] });
     closeBtn.style.cssText = 'width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bsx-hairline-strong);border-radius:4px;background:transparent;color:var(--bsx-text-muted);cursor:pointer';
@@ -131,6 +132,7 @@ export class SurveyPanel {
     container.appendChild(this.el);
 
     this.buildMethodList();
+    this.syncOverlayButton();
   }
 
   get root(): HTMLElement { return this.el; }
@@ -141,8 +143,16 @@ export class SurveyPanel {
   /** Register the callback fired when the player clicks the overlay-visibility toggle button (#496). */
   setOverlayToggleHandler(cb: (visible: boolean) => void): void { this.onToggleOverlayCb = cb; }
 
-  /** Reflect the survey confidence overlay's current visibility preference in the toggle button's state (#496). */
-  setOverlayVisible(visible: boolean): void { this.overlayVisible = visible; }
+  /**
+   * External sync path (keyboard-shortcut flow via main.ts/UIManager, #496):
+   * reflect the survey confidence overlay's current visibility preference in
+   * the toggle button's state. Must NOT invoke onToggleOverlayCb — that would
+   * feed back into the renderer that just called this.
+   */
+  setOverlayVisible(visible: boolean): void {
+    this.overlayVisible = visible;
+    this.syncOverlayButton();
+  }
 
   show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
@@ -205,10 +215,19 @@ export class SurveyPanel {
     }
   }
 
-  /** Overlay-toggle button click — TODO: implement real toggle logic (#496). */
+  /** Overlay-toggle button click (#496): flip preference, update button, notify the click-path callback. */
   private handleOverlayToggleClick(): void {
-    void this.overlayVisible;
-    void this.onToggleOverlayCb;
+    this.overlayVisible = !this.overlayVisible;
+    this.syncOverlayButton();
+    this.onToggleOverlayCb?.(this.overlayVisible);
+  }
+
+  /** Paint the toggle button's on/off visual state, matching MiniMap's own nav-toggle-button convention. */
+  private syncOverlayButton(): void {
+    const active = this.overlayVisible;
+    this.overlayToggleBtn.style.borderColor = active ? 'var(--bsx-amber)' : 'var(--bsx-hairline-strong)';
+    this.overlayToggleBtn.style.color = active ? 'var(--bsx-amber)' : 'var(--bsx-text-muted)';
+    this.overlayToggleBtn.style.background = active ? 'rgba(255,176,46,.12)' : 'transparent';
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────

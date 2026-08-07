@@ -50,6 +50,7 @@ export class KeyboardShortcuts {
         case 'KeyE': callbacks.togglePanel('employees'); break;
         case 'KeyS': callbacks.togglePanel('survey'); break;
         case 'KeyN': callbacks.onToggleNavGrid?.(); break;
+        case 'KeyO': callbacks.onToggleSurveyOverlay?.(); break;
         case 'F5':
           e.preventDefault();
           callbacks.quickSave();
