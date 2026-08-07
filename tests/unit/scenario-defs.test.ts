@@ -17,6 +17,7 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   'scroll', 'wheel',
   'wait', 'waitForSelector', 'waitForTutorialStep', 'type',
   'assert', 'viewport', 'command', 'screenshot',
+  'loadingScreenDebug',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [

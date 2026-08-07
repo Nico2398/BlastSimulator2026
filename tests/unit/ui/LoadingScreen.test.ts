@@ -2,8 +2,22 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { LoadingScreen, nextPaint } from '../../../src/ui/LoadingScreen.js';
-import { LOADING_QUIPS, QuipBag } from '../../../src/ui/loadingQuips.js';
+import { LoadingScreen, nextPaint, type LoadingSiteInfo } from '../../../src/ui/LoadingScreen.js';
+import { LOADING_QUIPS, QuipBag, LOADING_TIPS, TipBag } from '../../../src/ui/loadingQuips.js';
+import { t } from '../../../src/core/i18n/I18n.js';
+
+/** Fixture site info for the eyebrow/subtitle/briefing block tests (#493). */
+const FIXTURE_SITE_INFO: LoadingSiteInfo = {
+  siteNumber: 2,
+  biomeCategoryKey: 'ui.portfolio.biome.mountain',
+  difficulty: 2,
+  descriptionKey: 'loading.sandbox_subtitle',
+  briefing: [
+    { labelKey: 'loading.brief.starting_cash', value: '$75,000' },
+    { labelKey: 'loading.brief.target', value: '$250,000' },
+    { labelKey: 'loading.brief.explosives', value: 'Boomite' },
+  ],
+};
 
 describe('LoadingScreen', () => {
   let container: HTMLElement;
@@ -136,6 +150,206 @@ describe('LoadingScreen', () => {
   });
 });
 
+// ── Eyebrow / subtitle / briefing block (#493) ──
+
+describe('LoadingScreen — site info blocks', () => {
+  let container: HTMLElement;
+  let screen: LoadingScreen;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0) as unknown as number);
+    screen = new LoadingScreen(container);
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('show(siteInfo) populates eyebrowText, subtitleText, and briefingRows', () => {
+    screen.show(FIXTURE_SITE_INFO);
+
+    // Eyebrow carries the biome and the site number — the exact separator is
+    // an implementation choice, but both pieces of information must appear.
+    expect(screen.eyebrowText).toContain(t('ui.portfolio.biome.mountain'));
+    expect(screen.eyebrowText).toContain('2');
+
+    expect(screen.subtitleText).toBe(t('loading.sandbox_subtitle'));
+
+    expect(screen.briefingRows).toEqual([
+      { label: t('loading.brief.starting_cash'), value: '$75,000' },
+      { label: t('loading.brief.target'), value: '$250,000' },
+      { label: t('loading.brief.explosives'), value: 'Boomite' },
+    ]);
+  });
+
+  it('show() with no siteInfo leaves eyebrow/subtitle/briefing empty', () => {
+    screen.show();
+    expect(screen.eyebrowText).toBe('');
+    expect(screen.subtitleText).toBe('');
+    expect(screen.briefingRows).toEqual([]);
+
+    // Every existing assertion about the base phase/progress machinery still
+    // holds when no site info is supplied.
+    expect(screen.visible).toBe(true);
+    expect(screen.progress).toBe(0);
+    expect(LOADING_QUIPS).toContain(screen.phaseText);
+  });
+
+  it('runPhases([...]) with no siteInfo also leaves eyebrow/subtitle/briefing empty', async () => {
+    let seenDuringPhase: { eyebrow: string; subtitle: string; rows: unknown[] } | null = null;
+    await screen.runPhases([
+      {
+        run: () => {
+          seenDuringPhase = {
+            eyebrow: screen.eyebrowText,
+            subtitle: screen.subtitleText,
+            rows: screen.briefingRows,
+          };
+        },
+      },
+    ]);
+    expect(seenDuringPhase).toEqual({ eyebrow: '', subtitle: '', rows: [] });
+  });
+
+  it('runPhases([...]) with siteInfo populates eyebrow/subtitle/briefing for the whole run', async () => {
+    let seenDuringPhase: { eyebrow: string; rows: unknown[] } | null = null;
+    await screen.runPhases(
+      [{ run: () => { seenDuringPhase = { eyebrow: screen.eyebrowText, rows: screen.briefingRows }; } }],
+      FIXTURE_SITE_INFO,
+    );
+    expect(seenDuringPhase).not.toBeNull();
+    expect(seenDuringPhase!.eyebrow).toContain('2');
+    expect(seenDuringPhase!.rows).toHaveLength(3);
+  });
+});
+
+// ── Segment marks / stage row (#493) ──
+
+describe('LoadingScreen — segment marks and stage row', () => {
+  let container: HTMLElement;
+  let screen: LoadingScreen;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0) as unknown as number);
+    screen = new LoadingScreen(container);
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('renders one segment per phase — proven through the stage total, since there is no public marks-count accessor', async () => {
+    const n = 5;
+    let lastTotalSeen = -1;
+    await screen.runPhases(Array.from({ length: n }, (_, i) => ({
+      run: () => {
+        // stage_meta is "Stage {current} of {total}" — decoding `total` back
+        // out of it is how this proves the mark count without a new getter.
+        for (let total = 1; total <= n + 2; total++) {
+          if (screen.stageMetaText === t('loading.stage_meta', { current: i + 1, total })) {
+            lastTotalSeen = total;
+          }
+        }
+      },
+    })));
+    expect(lastTotalSeen).toBe(n);
+  });
+
+  it('stageLabelText/stageMetaText update in lockstep with progress on each phase', async () => {
+    const n = 3;
+    const seen: { current: number; label: string; meta: string; progress: number }[] = [];
+    await screen.runPhases(Array.from({ length: n }, (_, i) => ({
+      run: () => {
+        seen.push({
+          current: i + 1,
+          label: screen.stageLabelText,
+          meta: screen.stageMetaText,
+          progress: screen.progress,
+        });
+      },
+    })));
+
+    expect(seen).toHaveLength(n);
+    for (const s of seen) {
+      expect(s.label).toBe(t('loading.stage_label', { current: s.current, total: n }));
+      expect(s.meta).toBe(t('loading.stage_meta', { current: s.current, total: n }));
+    }
+    // Monotonically increasing progress across stages.
+    for (let i = 1; i < seen.length; i++) expect(seen[i]!.progress).toBeGreaterThan(seen[i - 1]!.progress);
+    // Final phase reports current === total.
+    expect(seen[n - 1]!.label).toBe(t('loading.stage_label', { current: n, total: n }));
+  });
+});
+
+// ── Tip block (#493) ──
+
+describe('LoadingScreen — tip block', () => {
+  let container: HTMLElement;
+  let screen: LoadingScreen;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0) as unknown as number);
+    screen = new LoadingScreen(container);
+  });
+
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('shows a non-empty tip after show() with no siteInfo', () => {
+    screen.show();
+    expect(screen.tipText.length).toBeGreaterThan(0);
+    expect(LOADING_TIPS).toContain(screen.tipText);
+  });
+
+  it('shows a non-empty tip after show(siteInfo)', () => {
+    screen.show(FIXTURE_SITE_INFO);
+    expect(screen.tipText.length).toBeGreaterThan(0);
+    expect(LOADING_TIPS).toContain(screen.tipText);
+  });
+
+  it('nextTip() draws a different tip than the current one', () => {
+    screen.show();
+    const first = screen.tipText;
+    const second = screen.nextTip();
+    expect(second).not.toBe(first);
+    expect(screen.tipText).toBe(second);
+    expect(LOADING_TIPS).toContain(second);
+  });
+
+  it('clicking #bs-loading-tip-next changes tipText the same way nextTip() does', () => {
+    screen.show();
+    const before = screen.tipText;
+    const btn = document.getElementById('bs-loading-tip-next') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    btn.click();
+    const after = screen.tipText;
+    expect(after).not.toBe(before);
+    expect(LOADING_TIPS).toContain(after);
+  });
+
+  it('clicking NEXT mid-phase does not disturb visible, progress, or phaseText', async () => {
+    let before: { visible: boolean; progress: number; phaseText: string } | null = null;
+    let after: { visible: boolean; progress: number; phaseText: string } | null = null;
+    await screen.runPhases([
+      {
+        run: () => {
+          before = { visible: screen.visible, progress: screen.progress, phaseText: screen.phaseText };
+          const btn = document.getElementById('bs-loading-tip-next') as HTMLButtonElement;
+          btn.click();
+          after = { visible: screen.visible, progress: screen.progress, phaseText: screen.phaseText };
+        },
+      },
+      { run: () => {} },
+    ]);
+    expect(before).not.toBeNull();
+    expect(after).toEqual(before);
+  });
+});
+
 describe('nextPaint', () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -181,5 +395,50 @@ describe('QuipBag', () => {
   it('a degenerate random source still yields valid lines', () => {
     const bag = new QuipBag(() => 1);
     for (let i = 0; i < 5; i++) expect(LOADING_QUIPS).toContain(bag.next());
+  });
+});
+
+// ── TipBag (#493) — same contract as QuipBag, for the loading screen's tip block ──
+
+describe('TipBag', () => {
+  it('offers a decent spread of lines', () => {
+    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    expect(new Set(LOADING_TIPS).size).toBe(LOADING_TIPS.length);
+    for (const tip of LOADING_TIPS) expect(tip.trim().length).toBeGreaterThan(0);
+  });
+
+  it('never repeats a line until every one has been used', () => {
+    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    const bag = new TipBag();
+    const drawn = new Set<string>();
+    for (let i = 0; i < LOADING_TIPS.length; i++) {
+      const tip = bag.next();
+      expect(drawn.has(tip), `repeated "${tip}" before the bag was empty`).toBe(false);
+      drawn.add(tip);
+    }
+    expect(drawn.size).toBe(LOADING_TIPS.length);
+  });
+
+  it('refills once drained rather than running out', () => {
+    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    const bag = new TipBag();
+    for (let i = 0; i < LOADING_TIPS.length; i++) bag.next();
+    expect(bag.remainingCount).toBe(0);
+    expect(LOADING_TIPS).toContain(bag.next());
+  });
+
+  it('draws in a different order for a different random source', () => {
+    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    const seq = (r: () => number) => {
+      const bag = new TipBag(r);
+      return Array.from({ length: 8 }, () => bag.next()).join('|');
+    };
+    expect(seq(() => 0)).not.toBe(seq(() => 0.999));
+  });
+
+  it('a degenerate random source still yields valid lines', () => {
+    expect(LOADING_TIPS.length).toBeGreaterThanOrEqual(12);
+    const bag = new TipBag(() => 1);
+    for (let i = 0; i < 5; i++) expect(LOADING_TIPS).toContain(bag.next());
   });
 });

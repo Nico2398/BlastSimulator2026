@@ -79,6 +79,121 @@
           "command": "terrain_info"
         }
       ]
+    },
+    {
+      "command": "state",
+      "description": "Debug-preview a level load (bypassing terrain generation) to verify the eyebrow, subtitle, briefing, and tip blocks are all on screen (#493). Command mode has no equivalent for a debug-only bridge, so it falls back to a plain state dump.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "loadingScreenDebug",
+          "action": "preview",
+          "kind": "level"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-loading-screen",
+          "property": "visible",
+          "expectedValue": true
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-eyebrow"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-subtitle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-briefing"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-stage-label"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-tip-text"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Click NEXT on the tip block mid-preview and confirm the overlay is still showing — proves the tip cycling control does not tear down the debug preview.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-loading-tip-next"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-loading-screen",
+          "property": "visible",
+          "expectedValue": true
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Debug-preview a sandbox load — the eyebrow should read the sandbox wording rather than a numbered site.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "loadingScreenDebug",
+          "action": "preview",
+          "kind": "sandbox"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-loading-screen",
+          "property": "visible",
+          "expectedValue": true
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-loading-eyebrow"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Dismiss the debug preview — the overlay must come back down without a real level ever loading.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "loadingScreenDebug",
+          "action": "hide"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-loading-screen",
+          "property": "visible",
+          "expectedValue": false
+        }
+      ]
     }
   ]
 }
