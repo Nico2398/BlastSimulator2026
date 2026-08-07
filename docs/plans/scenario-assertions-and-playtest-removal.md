@@ -316,7 +316,9 @@ never moved off the Rookie baseline — fixed**) ·
 ✅ survey-execution (single-method rounds; tick 23 alone isn't always
 enough for a survey to complete — dropped the fragile mid-round `increased`
 check, kept only the ceiling-safe `equals` at each round's `survey show`) ·
-⬜ survey-method-selection ·
+✅ survey-method-selection (3 rounds, no per-round `survey show` — verified
+each round's 47-tick padding is enough via a real dump, so later rounds'
+survey steps assert `surveyCount` at the prior rounds' ceiling directly) ·
 ⬜ survey-ore-vein-visibility · ⬜ survey-overlay-lifecycle ·
 ⬜ survey-post-blast-ore-report · ⬜ survey-result-visualization ·
 ⬜ survey-seismic-side-effects · ⬜ survey-stale-handling ·
