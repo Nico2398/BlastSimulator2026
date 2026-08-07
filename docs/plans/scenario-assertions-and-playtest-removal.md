@@ -352,7 +352,15 @@ proof stays at the surveyCount/cash level) ·
 3` used bare positional args, silently failed — fixed to `skill:geology
 level:3`**; 2 survey rounds then a real drill/charge/sequence/blast
 pipeline, Finding #4 grid-spacing-stepper fix needed again) ·
-⬜ survey-then-blast-playthrough · ⬜ skill-progression
+✅ survey-then-blast-playthrough (**Finding #15 class fix again**, 3
+employees hired; seismic + core_sample queued back to back for the same
+surveyor with zero ticks between — direct engine trace confirmed both
+complete cleanly by round 1, no Finding #16 drop at only 2 queued; full
+drill/charge/sequence/blast pipeline with the Finding #4 fix; `contract
+accept`/`contract deliver` left unmarked — no contract-count field exists,
+and `contract deliver`'s own step already carries a legacy note about
+command-runner.ts's success-handling gap) ·
+⬜ skill-progression
 
 ### Batch 4 — building-* (12) — **+ research-center-gate parity check**
 ⬜ building-destruction-visual · ⬜ building-lifecycle ·
