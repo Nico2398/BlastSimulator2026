@@ -393,7 +393,16 @@ genuine rejections by design (T2 not researched, target id #2 never
 existed since only building #1 was ever placed); `buildingCount`/`cash`
 asserted unchanged at each to confirm these are real no-ops, not silent
 successes) ·
-⬜ building-living-visual · ⬜ building-menu-visual ·
+✅ building-living-visual (`new_game ... cash:200000` custom starting
+cash; research_center + 3 living_quarters tiers with research queued
+between each, 3 employees hired, tick 5 + needs check — `decreased`
+used instead of `equals` for any cash/minFatigue check following a
+`tick N` step, per Finding #12's wall-clock-drift caution; confirmed
+minFatigue drops from 100 after just 5 idle ticks, no work assigned;
+`decreased` scopes to the step's OWN before/after — a `decreased` on the
+`needs` step right after `tick 5` fails since nothing changes fatigue
+between them, it has to sit on the `tick 5` step itself) ·
+⬜ building-menu-visual ·
 ⬜ building-placement-visual · ⬜ building-ramp-visual ·
 ⬜ building-research-progression-visual (parity check here) ·
 ⬜ building-research-visual (parity check here) ·

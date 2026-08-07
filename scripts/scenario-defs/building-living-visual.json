@@ -11,7 +11,13 @@
           "command": "new_game seed:42 cash:200000"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build research_center at:30,5",
@@ -42,7 +48,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 175000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build living_quarters at:5,5 tier:1",
@@ -68,7 +80,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 165000,
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "research queue type:living_quarters tier:2",
@@ -87,7 +105,12 @@
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 160000
+        }
+      }
     },
     {
       "command": "tick 50",
@@ -123,7 +146,14 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        },
+        "note": "cash uses decreased, not equals, because this build follows a tick step — real browser interaction mode keeps ticking on wall-clock time (Finding #12), so the exact post-tick cash value can drift"
+      }
     },
     {
       "command": "research queue type:living_quarters tier:3",
@@ -142,7 +172,10 @@
           "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "tick 50",
@@ -178,7 +211,13 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 4
+        }
+      }
     },
     {
       "command": "build list",
@@ -206,7 +245,13 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
@@ -220,7 +265,13 @@
           "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -234,7 +285,13 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee list",
@@ -264,7 +321,11 @@
           "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "decreased": ["minFatigue"],
+        "note": "fatigue accrues even while idle — minFatigue (100=rested) drops from tick 5 alone with no work assigned"
+      }
     },
     {
       "command": "needs",
