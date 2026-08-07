@@ -61,7 +61,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1,
           "qualificationCount": 1,
@@ -119,7 +121,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "surveyCount": 0
         },
@@ -136,7 +140,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "surveyCount": 0
         }
@@ -170,7 +176,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2,
           "qualificationCount": 2,
@@ -195,7 +203,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:8 start:10,10",
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -229,7 +237,8 @@
         "equals": {
           "holeCount": 4
         }
-      }
+      },
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
     },
     {
       "command": "charge hole:* explosive:boomite amount:3 stemming:2",
@@ -352,7 +361,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 3,
           "qualificationCount": 3,
@@ -406,7 +417,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 1
         }
@@ -430,7 +443,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -466,14 +481,17 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "surveyCount": 1
         }
       }
     },
     {
-      "command": "vehicle haul 1 fragment:0",
+      "command": "vehicle haul 1 fragment:138",
+      "description": "The Haul button always picks the vehicle's nearest reachable, non-oversized, storage-fitting fragment (findReachableGroundFragment, HaulingTask.ts) -- not a fixed index. #138 is what that function itself returns for this exact seed/command sequence. Re-derived from a previously-hardcoded #0 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting this file's drill_plan depth from 8 to 6 (the grid tool's real default, since this step never clicks the depth stepper) changes the whole blast/fragment population, and fragment #0 was no longer haul-eligible in the corrected population -- storedMassKg silently stayed 0 through the following tick and the contract delivery step never paid out. Confirmed by calling findReachableGroundFragment directly against the corrected blast.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -502,8 +520,12 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
-        "increased": ["storedMassKg"]
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "storedMassKg"
+        ]
       }
     },
     {
@@ -549,7 +571,9 @@
       ],
       "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. Unlike contract-negotiation.json/economy-display-visual.json, this file's hauled stock (1050kg, well over the 200kg requested) makes delivery genuinely succeed -- the whole pipeline this file exists to demonstrate.",
       "expect": {
-        "increased": ["cash"],
+        "increased": [
+          "cash"
+        ],
         "note": "delivery genuinely pays out here (unlike contract-negotiation.json, which never hauls anything into storage) -- confirmed via direct trace: Payment $234.49"
       }
     },
