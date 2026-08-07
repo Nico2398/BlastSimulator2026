@@ -447,7 +447,12 @@ parity row partially closed (tier-unlock proven both files; #442
 prerequisite-gate case still open for Phase 3).
 
 ### Batch 5 — vehicle-* / needs-* / nav-* (22)
-⬜ vehicle-3d-rendering-visual · ⬜ vehicle-driver-assignment-visual ·
+✅ vehicle-3d-rendering-visual (5 vehicle purchases, only the first
+affordable — `campaign start` wipes the file's cash:200000 bump back to
+dusty_hollow's own $50,000 default, already correctly documented in the
+file's own step descriptions; confirmed the remaining 4 overdraw exactly
+as described, vehicleCount reaching 5 regardless) ·
+⬜ vehicle-driver-assignment-visual ·
 ⬜ vehicle-purchase-tier-ui-visual · ⬜ vehicle-roles-panel-visual ·
 ⬜ vehicle-task-states-visual · ⬜ vehicle-traffic ·
 ⬜ vehicle-traffic-routing-visual · ⬜ needs-collapse-visual ·

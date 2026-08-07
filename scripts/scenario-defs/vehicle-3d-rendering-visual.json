@@ -12,7 +12,13 @@
         }
       ],
       "role": "setup",
-      "description": "Bumped cash from the 50k default to 200k: at 50k, only the first of 5 vehicle purchases affords -- the rest overdraw in command mode (Finding #1) but would leave 4 buy buttons permanently disabled for a real click. This is what the scenario's own premise (render all 5 vehicle types) needs."
+      "description": "Bumped cash from the 50k default to 200k: at 50k, only the first of 5 vehicle purchases affords -- the rest overdraw in command mode (Finding #1) but would leave 4 buy buttons permanently disabled for a real click. This is what the scenario's own premise (render all 5 vehicle types) needs.",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -24,7 +30,14 @@
         }
       ],
       "role": "setup",
-      "description": "campaign start replaces the whole GameState (createGameForLevel) including cash, reset to the level's own startingCash -- a `new_game ... cash:N` set beforehand (tried here first) is wiped the instant this step runs, regardless of order. There is no cash override for campaign start itself."
+      "description": "campaign start replaces the whole GameState (createGameForLevel) including cash, reset to the level's own startingCash -- a `new_game ... cash:N` set beforehand (tried here first) is wiped the instant this step runs, regardless of order. There is no cash override for campaign start itself.",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        },
+        "note": "confirms the cash:200000 bump above is wiped by dusty_hollow's own starting cash, exactly as this step's description warns"
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -43,7 +56,13 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy rock_digger",
@@ -54,7 +73,13 @@
           "command": "vehicle buy rock_digger"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -25000,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy drill_rig",
@@ -65,7 +90,13 @@
           "command": "vehicle buy drill_rig"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -60000,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy building_destroyer",
@@ -76,7 +107,13 @@
           "command": "vehicle buy building_destroyer"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -90000,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle buy rock_fragmenter",
@@ -87,7 +124,13 @@
           "command": "vehicle buy rock_fragmenter"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway."
+      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "expect": {
+        "equals": {
+          "cash": -122000,
+          "vehicleCount": 5
+        }
+      }
     },
     {
       "command": "vehicle list",
