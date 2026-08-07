@@ -49,6 +49,8 @@ export interface SerializableGameState {
   minFatigue: number;
   /** Employees currently in the `isMoveStuck` state — pathfinding has failed STUCK_THRESHOLD consecutive times (EntityMovementTick.ts). */
   stuckEmployeeCount: number;
+  /** Contracts currently accepted and in progress (state.contracts.active) — proves accept/deliver-completion actually moved a contract, not just clicked at. */
+  activeContractCount: number;
   levelEnded: boolean;
   levelEndReason: string | null;
   bankrupt: boolean;
@@ -102,6 +104,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
     minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
     stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
+    activeContractCount: s.contracts.active.length,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     bankrupt: s.bankruptcy.bankrupt,

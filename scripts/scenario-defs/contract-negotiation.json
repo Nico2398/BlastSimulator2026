@@ -1,6 +1,6 @@
 {
   "name": "contract-negotiation",
-  "description": "Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes",
+  "description": "Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes -- the file's original version never called `contract negotiate` at all, only accept/deliver; rewritten to exercise the actual negotiation mechanic (issue #479 follow-up).",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,13 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -20,7 +26,12 @@
           "command": "campaign start level:dusty_hollow"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -43,7 +54,8 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract negotiate id:1",
+      "description": "First negotiation attempt (round 1). No state field exists for a contract's own terms (price/deadline/penalty) -- there is nothing to negotiate over but the contracts a fresh dusty_hollow start already offers, so the target id is fixed at 1 throughout this file rather than reading it back from `contract list`'s text output, which expect can't do.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -51,87 +63,56 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "negotiating costs nothing and moves no count -- the only real effect is on the contract's own terms, which no state field exposes. Confirmed via direct trace (seed:42, dusty_hollow): this first attempt genuinely FAILS (deadline worsened by 11%)."
+      }
     },
     {
-      "command": "tick 10",
+      "command": "tick 5",
+      "description": "A tick between negotiation attempts, not just a pause -- contract negotiate's RNG is freshly seeded from state.seed + state.tickCount each call (economy.ts), so two negotiate calls at the same tick roll identically. This is what lets round 2 below land a genuinely different outcome.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 5"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
-      "command": "contract deliver 1 amount:50",
+      "command": "contract negotiate id:1",
+      "description": "Second negotiation attempt (round 2) on the same still-available contract -- this is the file's own premise made real: repeated negotiation produces both outcomes.",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract deliver 1 amount:50"
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "confirmed via direct trace: this second attempt genuinely SUCCEEDS (deadline improved by 8%) -- opposite of round 1, proving the file's own claim (\"observe both improved and worsened pricing outcomes\") for real rather than asserting it never happened."
+      }
     },
     {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
-    },
-    {
-      "command": "contract list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract list"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "contract accept 1",
+      "command": "contract accept id:1",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -142,7 +123,13 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -152,7 +139,13 @@
           "command": "tick 10"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "contract deliver 1 amount:50",
@@ -162,7 +155,14 @@
           "command": "contract deliver 1 amount:50"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception. This file never drills/blasts/hauls anything into storage -- that full pipeline is economy-full-loop.json's job -- so this delivery genuinely fails every run (confirmed via direct trace: \"Not enough dirtite in storage: 0.0 kg available\"), which is why activeContractCount stays at 1 rather than dropping to 0 below.",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
+        },
+        "note": "the contract stays active/undelivered -- this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline"
+      }
     },
     {
       "command": "finances",
@@ -182,7 +182,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
+        }
+      }
     }
   ]
 }

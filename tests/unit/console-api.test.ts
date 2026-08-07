@@ -37,7 +37,10 @@ import type { MiningContext } from '../../src/console-api.js';
  * scenario proving a proactive rest was queued had no field to check either.
  * stuckEmployeeCount closes the same gap for the isMoveStuck state — a
  * scenario proving pathfinding genuinely got an employee stuck (and later
- * un-stuck) had no field to check either.
+ * un-stuck) had no field to check either. activeContractCount closes the
+ * same gap for state.contracts.active — a scenario proving a contract
+ * accept/decline/deliver-completion actually moved a contract had no field
+ * to check either.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'mineType',
@@ -45,7 +48,7 @@ const SERIALIZED_FIELDS = [
   'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
-  'stuckEmployeeCount',
+  'stuckEmployeeCount', 'activeContractCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
   'storedMassKg',
@@ -187,6 +190,22 @@ describe('console-api', () => {
 
       const freedState = serializeGameState(runner.ctx as MiningContext)!;
       expect(freedState.stuckEmployeeCount).toBe(0);
+    });
+
+    it('reports zero activeContractCount for a fresh game with no contracts accepted', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.activeContractCount).toBe(0);
+    });
+
+    it('counts an accepted contract as active (state.contracts.active)', () => {
+      runner.runner.run('new_game seed:42');
+      runner.runner.run('campaign start level:dusty_hollow');
+      runner.runner.run('contract accept id:1');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.activeContractCount).toBe(1);
     });
 
     it('reports zero surveyCount for a fresh game with no surveys run', () => {

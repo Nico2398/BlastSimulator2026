@@ -82,6 +82,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   collapsedCount: { type: 'number', description: 'Employees currently in the collapsing state' },
   minFatigue: { type: 'number', description: 'Lowest fatigue (0-100, 100=rested) across the roster — closest employee to collapse, 100 with none' },
   stuckEmployeeCount: { type: 'number', description: 'Employees currently in the isMoveStuck state — pathfinding failed STUCK_THRESHOLD consecutive times' },
+  activeContractCount: { type: 'number', description: 'Contracts currently accepted and in progress (state.contracts.active)' },
   levelEnded: { type: 'boolean' },
   levelEndReason: { type: 'string', optional: true, description: 'null while the level runs' },
   bankrupt: { type: 'boolean', description: 'Loss condition' },

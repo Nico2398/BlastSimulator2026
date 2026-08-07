@@ -578,7 +578,9 @@ assert pendingActionCount climbing 1→6, the task-queue-overflow this
 file is named for; no findings) ·
 ✅ employee-training (**Finding #30** + closes the `training.json`
 parity row — see the findings log and the parity table above) ·
-⬜ contract-negotiation ·
+✅ contract-negotiation (**Finding #31: added `activeContractCount`,
+and the file never called `contract negotiate` at all** — see the
+findings log) ·
 ⬜ economy-display-visual · ⬜ economy-full-loop · ⬜ hauling-gate ·
 ⬜ maintenance-cost-drain · ⬜ scores-display-visual ·
 ⬜ time-management-visual · ⬜ safety-projection-visual ·
@@ -826,6 +828,8 @@ of each session, in case main added/removed a file.)
 
 30. **`employee-training.json` closed the `training.json` parity gap and, along the way, surfaced two of its own pre-existing bugs.** (a) A Finding-#15-class positional-arg bug: both `employee assign_skill id:1 skill:driving.excavator level:3` and `employee assign_skill id:1 skill:geology level:2` used `id:1` where the command actually requires a bare positional id (`args[1]`, `commands/employees.ts`) — `parseInt("id:1", 10)` is `NaN`, so both calls had *always* returned `{success:false}` silently, uncaught since the file had zero assertions before this pass and `runSteps`/the interaction executor only ever check `result.success` when an `expect` block exists (confirmed by reading `command-runner.ts` directly — a command's own failure is otherwise invisible). (b) A Finding-#3-class command/interaction mismatch on `drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:15,15`: the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (`DEFAULT_SPACING_M=3`), producing a 3×3=9-hole grid, not the command's literal 2×2=4 — the same class already fixed in `nav-cell-types-visual.json`. **Fixed both** — the geology call's syntax corrected (positional `1`), the drill command corrected to `rows:3 cols:3 spacing:3` (what the click truly produces). The excavator assign_skill call was removed outright rather than syntax-fixed, replaced with a real click-driven flow: build a `driving_center`, open the employee detail panel, confirm `usable` on `.bs-train-btn[data-skill="driving.excavator"]` (mirroring `training.json`'s own beat 4 concern verbatim), click-enrol, `tick 20` (`TRAINING_BASE_TICKS(20) × TRAINING_LEVEL_COST_MULTIPLIER[1](1) × TRAINING_TIER_SPEED[1](1)`), confirming `qualificationCount`/`trainingCount` move for real. A second real flow was added for the promotion beat: build a `blasting_academy`, click-enrol the driller in `blasting` (already held at Rookie from `ROLE_STARTING_QUALIFICATION`), `tick 32` (multiplier 1.6 for target level 2), confirming `proficiencyTotal` +1 with `qualificationCount` unchanged — training.json's own "a promotion raises the level of a held qualification rather than adding a second copy of it" beat, proven on a driller's `blasting` rather than a driver's `driving.truck` (no role restriction on who can train at a school — `availableTrainingOffers` has none — so the substitution preserves the exact principle being tested). One interaction-mode-only snag caught by the real browser run: the second build step (`blasting_academy`) initially failed with "element has zero size" because the intervening excavator-training step had switched the toolbar to the employees panel, closing the build panel — fixed by re-clicking `#bs-toolbar [data-panel="build"]` before the second build. Verified in both command mode and a real browser; full local sweep green.
 
+31. **`contract-negotiation.json`'s whole premise was never actually exercised — the file never once called `contract negotiate`, despite its own name and description ("Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes").** It only ever called `contract accept`/`contract deliver`, with no drill/blast/haul pipeline to ever put material in storage — a direct trace confirmed `contract deliver` fails on *every* run ("Not enough dirtite in storage: 0.0 kg available"), cash never once moves through the whole file (`finances` shows $0 income/expenses throughout), and the file's own second `contract accept 1` call fails too ("Contract #1 not found in available list") since the contract pool had refreshed with new ids by then. Nothing about "pricing outcomes" was ever observable. **Fixed by actually exercising the mechanic**: a real `contract negotiate id:1` UI click (`ContractsPanel.ts`'s `[data-action="negotiate"]` button — a control that existed the whole time and was simply never used) at round 1, a `tick 5` (negotiate's RNG reseeds from `state.seed + state.tickCount` each call, per `economy.ts` — two calls at the same tick roll identically), then a second `contract negotiate id:1` at round 2. Confirmed via direct trace (seed:42, dusty_hollow): round 1 genuinely FAILS (deadline worsened 11%), round 2 genuinely SUCCEEDS (deadline improved 8%) — the file's own claim, proven for real rather than never attempted. No state field exposes a contract's own terms, so each negotiate step's `expect` anchors on `cash` (negotiating is free) with a `note` documenting the trace-confirmed real outcome, the same precedent Findings #21/#22 set for effects no scalar can check directly. **Also added `activeContractCount`** (`state.contracts.active.length`) to `SerializableGameState` in lockstep across `console-api.ts`/`main.ts`/`validate-state-schema.ts` — no field existed to prove `contract accept` ever moved a contract from available to active at all, closing the same class of gap `pendingActionCount`/`stuckEmployeeCount` closed for their own mechanics; two new `console-api.test.ts` tests (zero on a fresh game, 1 after a real accept). Left `contract deliver`'s genuine failure (no stock, by this file's own narrower scope) as `activeContractCount: 1` unchanged with a `note` explaining the full haul-to-storage pipeline is `economy-full-loop.json`'s job, not this file's. Verified in both command mode and a real browser.
+
 _(Add new findings here as you hit them. Number sequentially.)_
 
 ## Status table
@@ -1058,3 +1062,23 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   scenarios, 8306/8306 tests. GitHub Actions still not re-checked this
   session — all verification remains local. Next: contract-negotiation,
   then the rest of Batch 6.
+- 2026-08-07 (cont.) — contract-negotiation.json done (Finding #31): the
+  file never once called `contract negotiate` despite being named and
+  described for exactly that mechanic — only accept/deliver, and
+  deliver failed on every run (no mining pipeline ever put material in
+  storage) while the file's own second accept call also failed (stale
+  contract id after pool refresh). Rewrote to exercise the real
+  `[data-action="negotiate"]` UI control across two rounds with a tick
+  between them (negotiate's RNG reseeds per tick, so same-tick repeats
+  roll identically) — confirmed via direct trace round 1 genuinely
+  fails, round 2 genuinely succeeds, the file's own "both improved and
+  worsened" claim finally proven for real. Added `activeContractCount`
+  (state.contracts.active.length) to SerializableGameState — no field
+  existed to prove `contract accept` ever moved a contract into active
+  at all. Left the genuine no-stock delivery failure as real, scoped
+  behavior (the full haul pipeline is economy-full-loop.json's job).
+  Batch 6: 4/18 done. Full local sweep green: typecheck, 124/124
+  scenarios, 8308/8308 tests (up 2 for activeContractCount's tests).
+  GitHub Actions still not re-checked this session — all verification
+  remains local. Next: economy-display-visual, economy-full-loop, then
+  the rest of Batch 6.
