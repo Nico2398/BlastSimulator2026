@@ -24,7 +24,12 @@
           "type": "command",
           "command": "new_game seed:42 size:24"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:tutorial_pit",
@@ -36,7 +41,12 @@
           "type": "command",
           "command": "campaign start level:tutorial_pit"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 80000
+        }
+      }
     },
     {
       "command": "tutorial_start",
@@ -56,7 +66,10 @@
           "type": "waitForTutorialStep",
           "stepId": "time-speed"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "time-speed"
+      }
     },
     {
       "command": "time speed:2",
@@ -72,7 +85,10 @@
           "type": "waitForTutorialStep",
           "stepId": "hire-surveyor"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "hire-surveyor"
+      }
     },
     {
       "command": "state",
@@ -104,7 +120,13 @@
           "type": "waitForTutorialStep",
           "stepId": "survey"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "survey",
+        "increased": ["employeeCount"],
+        "blocked": ".bs-return-map",
+        "note": "The tutorial is on rails: leaving for the world map mid-step is how a player loses it, so that button must be inert while the tutorial is up (mirrors tutorial.json's hire-surveyor beat)."
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:3",
@@ -118,15 +140,26 @@
       ]
     },
     {
-      "command": "survey seismic x:23 z:23",
-      "timeout": 90,
-      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
+      "command": "state",
+      "timeout": 30,
+      "description": "the hired surveyor can actually be sent to survey: opening the Survey panel alone must already show a usable Run button — a surveyor who cannot survey is not a surveyor. If Run is disabled here, hiring grants no geology qualification and no button in the game grants one (mirrors tutorial.json's own standalone beat).",
       "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"survey\"]"
-        },
+        }
+      ],
+      "expect": {
+        "usable": "#bs-survey-run"
+      }
+    },
+    {
+      "command": "survey seismic x:23 z:23",
+      "timeout": 90,
+      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
+      "role": "player",
+      "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-survey-panel [data-method=\"seismic\"]"
@@ -156,7 +189,10 @@
           "stepId": "hire-driller",
           "timeout": 60000
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "hire-driller"
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -176,7 +212,10 @@
           "type": "waitForTutorialStep",
           "stepId": "box-cut"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "box-cut"
+      }
     },
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
@@ -220,7 +259,11 @@
           "stepId": "drill-plan",
           "timeout": 30000
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "drill-plan",
+        "note": "Open pits start with an access cut dug before the first shot: blasted rock swells and needs a void to fall into (mirrors tutorial.json's box-cut beat)."
+      }
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
@@ -234,9 +277,9 @@
       ]
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
-      "timeout": 60,
-      "description": "drill-plan complete: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
+      "command": "state",
+      "timeout": 30,
+      "description": "the grid tool refuses a rectangle that is not the one asked for: (22,22)-(26,26) sits inside the outlined square but is not equal to it. The tutorial asks for exact coordinates, so Confirm must stay dead here — otherwise the step teaches one layout and accepts another (mirrors tutorial.json's own negative-test beat, closing a parity gap this scenario never had before). Does not re-click the panel/grid-tool buttons in the following step: the tool stays armed after a rejected drag, exactly like tutorial.json's own next beat does not re-open it either.",
       "role": "player",
       "interaction": [
         {
@@ -251,6 +294,24 @@
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
         },
+        {
+          "type": "dragTiles",
+          "x1": 22,
+          "z1": 22,
+          "x2": 26,
+          "z2": 26
+        }
+      ],
+      "expect": {
+        "blocked": "#bs-tile-select-confirm"
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
+      "timeout": 60,
+      "description": "drill-plan complete: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
+      "role": "player",
+      "interaction": [
         {
           "type": "dragTiles",
           "x1": 20,
@@ -269,7 +330,11 @@
           "type": "waitForTutorialStep",
           "stepId": "charge"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "charge",
+        "increased": ["holeCount"]
+      }
     },
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
@@ -285,7 +350,11 @@
           "type": "waitForTutorialStep",
           "stepId": "sequence"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "sequence",
+        "increased": ["chargedCount"]
+      }
     },
     {
       "command": "sequence auto",
@@ -301,7 +370,11 @@
           "type": "waitForTutorialStep",
           "stepId": "blast"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "blast",
+        "increased": ["sequencedCount"]
+      }
     },
     {
       "command": "blast",
@@ -344,7 +417,15 @@
           ],
           "timeout": 60000
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "Close dismisses BlastReportModal, which auto-opens with the real report right after DETONATE; scores card auto-advances, so tutorialStep is checked in the next beat (mirrors tutorial.json's own choice not to assert it here). holeCount/chargedCount/sequencedCount resetting to 0 is checkable in both modes and goes beyond what the DOM-only playtest reference could prove."
+      }
     },
     {
       "command": "event choose 0",
@@ -376,7 +457,10 @@
           "type": "waitForTutorialStep",
           "stepId": "hire-manager"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "hire-manager"
+      }
     },
     {
       "command": "employee hire role:manager",
@@ -396,7 +480,10 @@
           "type": "waitForTutorialStep",
           "stepId": "contract-accept"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "contract-accept"
+      }
     },
     {
       "command": "contract accept 1",
@@ -416,7 +503,10 @@
           "type": "waitForTutorialStep",
           "stepId": "hire-driver"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "hire-driver"
+      }
     },
     {
       "command": "employee hire role:driver",
@@ -436,7 +526,10 @@
           "type": "waitForTutorialStep",
           "stepId": "vehicle-buy-assign"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "vehicle-buy-assign"
+      }
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
@@ -467,7 +560,10 @@
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "expect": {
+        "increased": ["vehicleCount"]
+      }
     },
     {
       "command": "vehicle driver 1 4",
@@ -484,7 +580,10 @@
           "stepId": "build-storage",
           "timeout": 60000
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "build-storage"
+      }
     },
     {
       "command": "build freight_warehouse at:4,4",
@@ -520,7 +619,11 @@
           "type": "waitForTutorialStep",
           "stepId": "haul-debris"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "haul-debris",
+        "increased": ["buildingCount"]
+      }
     },
     {
       "command": "vehicle haul 1 fragment:1",
@@ -546,12 +649,16 @@
           "stepId": "contract-deliver",
           "timeout": 60000
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "contract-deliver",
+        "note": "The reported bug this beat guards: no UI control anywhere could trigger `vehicle haul`, so this is where a real player got stuck forever (mirrors tutorial.json's own note). No increased check on storedMassKg here — like hauling-gate.json (Finding #33), the exact delivered tonnage is position/timing-dependent, not the thing this beat proves."
+      }
     },
     {
       "command": "contract deliver 1 amount:5000",
       "timeout": 90,
-      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances",
+      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Left unmarked: command mode's own `contract deliver` fails synchronously here (\"Not enough stored material\" — command mode's `vehicle haul` dispatches but never waits for real arrival/unload, so nothing is ever in storage), while interaction mode's identical click genuinely succeeds because the tutorial's own waitForTutorialStep gate only advances once delivery truly completes — activeContractCount would drop to 0 there but stay 1 in command mode, so it is not safely checkable across both modes (same class as Findings #21/#22/#31).",
       "role": "player",
       "interaction": [
         {
@@ -611,7 +718,11 @@
           "type": "waitForTutorialStep",
           "stepId": "tick-advance"
         }
-      ]
+      ],
+      "expect": {
+        "tutorialStep": "tick-advance",
+        "note": "Applies without touching a control first — the form mirrors the policy already in force, and it used to leave the step stuck while the panel said the policy had been updated (mirrors tutorial.json's own note)."
+      }
     },
     {
       "command": "tick 6",
@@ -627,7 +738,11 @@
           ],
           "timeout": 30000
         }
-      ]
+      ],
+      "expect": {
+        "increased": ["tickCount"],
+        "note": "Either closing card is a correct outcome: victory hands off to the completion card as soon as the level's profit target is met, which is campaign economy rather than playability (mirrors tutorial.json's own note)."
+      }
     },
     {
       "command": "campaign complete",
@@ -643,7 +758,12 @@
           "type": "wait",
           "durationMs": 600
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "levelEnded": true
+        }
+      }
     },
     {
       "command": "campaign status",

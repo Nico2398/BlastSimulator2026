@@ -211,16 +211,14 @@ scripts/playtests/*.json until every row below is CLOSED**:
 
 | Playtest def | Nearest scenario | Gap | Status |
 |---|---|---|---|
-| `tutorial.json` (22 beats) | `tutorial-interactive.json` (29 steps) | Near-total overlap already — same click path, same `waitForTutorialStep` gating. Missing: (a) no `expect` blocks at all yet (needs `tutorialStep`/`increased` added per step, mirroring each beat); (b) the "grid tool refuses a rectangle that is not the one asked for" negative-test beat (`blocked: "#bs-tile-select-confirm"` after dragging a *wrong* rectangle) has no equivalent step at all; (c) the "leaving for the world map is blocked mid-tutorial" (`blocked: ".bs-return-map"`) check likewise. | ⬜ open |
+| `tutorial.json` (22 beats) | `tutorial-interactive.json` (31 steps) | Was near-total overlap with zero `expect` blocks anywhere. **Closed**: `expect` (`tutorialStep`/`increased`/`usable`/`blocked`/`equals`/`note`) added to 26 of 31 steps, mirroring all 22 beats (the 5 left unmarked are test-only `employee assign_skill` bootstraps and the final `campaign status` wrap-up read, matching the same class of step every other file in this project leaves unmarked). Added the missing "grid tool refuses a wrong rectangle" negative-test beat as a new step (`blocked: "#bs-tile-select-confirm"` after dragging (22,22)-(26,26), the tool staying armed for the next real drag exactly like `tutorial.json`'s own next beat does). Added the missing "leaving mid-tutorial is blocked" check (`blocked: ".bs-return-map"`) to the existing hire-surveyor step. Also split the survey step in two so `usable: "#bs-survey-run"` could be checked the instant the panel opens, before Run is ever clicked — `tutorial.json`'s own standalone beat, previously absent here entirely. Verified 1/1 in both modes with a real browser (both passed on the first run). | ✅ closed |
 | `research-center-gate.json` (7 beats) | `building-research-visual.json`/`building-research-progression-visual.json` now both fully inspected and given real assertions (Finding #20) | Both files now prove the tier-2/tier-3 unlock is real (`building-research-visual.json`'s Tier 2/3 builds succeed for real, asserted). Still open: neither file tests beat 3's specific case — clicking Queue Research on an ALREADY-PLACED building (e.g. `living_quarters`) with **zero Research Centers built at all** (#442's prerequisite gate). Both building-research-*.json files build a `research_center` as their very first step, so this specific "no Research Center anywhere" rejection is not covered by either. Needs a new step (or a small new scenario) added before Phase 3 closes this row — not blocking Batch 4's remaining files. | 🔶 partially closed — tier-unlock proven, prerequisite-gate case still open |
 | `scene-picking.json` (5 beats) | `scene-picking-visual.json` | Was building-only (raw `click`/`mousemove` pixel coords, no employee coverage at all) — a real gap, not just missing assertions. **Closed**: extended the file with 4 new steps (hire driller, `clickEntity` employee id:1, click DETAIL, click close) using `expect.usable`/`expect.blocked`, plus `expect` added to all 4 pre-existing building-picking steps (`equals`/`increased` on the build, `usable`/`blocked` on the selection-bar Esc-deselect pair). Verified 1/1 in both modes with a real browser. | ✅ closed |
 | `training.json` (7 beats) | `employee-training.json` | Was console-shortcut-only (`employee assign_skill`, and via a positional-arg bug — `id:1` instead of `1` — the excavator/geology calls had *always* silently failed, `success:false`, uncaught since the file had zero assertions before this pass). **Closed**: replaced the excavator assign_skill with a real build-driving_center → open detail panel → confirm `usable` on `.bs-train-btn[data-skill="driving.excavator"]` → click-enrol → `tick 20` → `qualificationCount`/`trainingCount` flow, proving the licence no role hires with is genuinely obtainable. Added a second real flow (build blasting_academy → click-enrol on the driller's own already-held `blasting` → `tick 32`) proving a promotion (raises an existing qualification's level, `qualificationCount` unchanged / `proficiencyTotal` +1) — the same principle as `training.json`'s `driving.truck` promotion beat, on a skill this file's own employee (a driller, not a driver) actually holds. Fixed the geology assign_skill's same positional-arg bug so it stops silently no-op'ing. Verified 1/1 in both modes with a real browser. | ✅ closed |
 
-Do the parity audit for the remaining 3 rows once the main batch pass
-(below) reaches those files' batches — no need to front-load all 4 before
-starting; `tutorial.json`'s gap is already scoped and can be closed
-alongside Batch 7 (tutorial-interactive.json's batch) or earlier as a
-standalone fix, whichever comes first chronologically.
+3 of 4 rows now closed. The one remaining gap (`research-center-gate.json`'s
+#442 prerequisite-gate case — Queue Research with zero Research Centers
+built at all) is deferred to Phase 3, not blocking any batch.
 
 ## Batch plan — same grouping as #479, now doing two things per file
 
@@ -662,7 +660,10 @@ layers — unit, integration, and this scenario — plus a sixth Finding
 subcommand along the way)
 
 ### Batch 7 — big playthroughs + the 3 stragglers (19) — **+ tutorial parity check**
-⬜ tutorial-interactive (parity check + close tutorial.json gap here) ·
+✅ tutorial-interactive (parity check closed — see the parity table
+above; 22/22 `tutorial.json` beats mirrored, both missing negative-test
+beats added as real new steps, verified 1/1 in both modes with a real
+browser) ·
 ⬜ tutorial-playthrough · ⬜ level1-lose-arrest · ⬜ level1-lose-bankruptcy ·
 ⬜ level1-lose-ecology · ⬜ level1-lose-revolt ·
 ⬜ level1-playthrough-revolt · ⬜ level1-playthrough-win ·
@@ -1379,3 +1380,28 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   re-checked this session — all verification remains local. Next:
   Batch 7 (19 files) — the big playthroughs, the 3 stragglers, and the
   tutorial-interactive parity check.
+- 2026-08-07 (cont.) — tutorial-interactive.json parity check closed
+  (Batch 7, 1/19). Started at 29 steps with zero `expect` blocks
+  anywhere despite mirroring tutorial.json's click path almost exactly.
+  Added `expect` to 26/31 steps (2 new steps inserted: split the survey
+  step so `usable:"#bs-survey-run"` checks the instant the panel opens
+  — tutorial.json's own standalone beat, previously missing entirely —
+  and added the "grid tool refuses a wrong rectangle" negative-test
+  beat, dragging (22,22)-(26,26) and checking
+  `blocked:"#bs-tile-select-confirm"`, discovering along the way that
+  the grid tool stays armed after a rejected drag so the following
+  real drag must not re-click the panel/grid-tool buttons, exactly
+  matching tutorial.json's own next-beat structure). Added the missing
+  `blocked:".bs-return-map"` check to the existing hire-surveyor step.
+  All 22 of tutorial.json's beats now have a mirrored assertion; the 5
+  steps left unmarked are test-only `employee assign_skill` bootstraps
+  (no UI control, same class every other file in this project leaves
+  unmarked) and the final wrap-up read. Verified 1/1 in both modes —
+  both passed on the first real-browser run despite the file's length
+  and heavy arrival-gating (real employee walks, vehicle boarding).
+  3 of 4 playtest-parity rows now closed; only research-center-gate.json's
+  #442 prerequisite-gate case remains, deferred to Phase 3. Full local
+  sweep green: typecheck, 124/124 scenarios, full test suite. GitHub
+  Actions still not re-checked this session — all verification remains
+  local. Next: the remaining 18 Batch 7 files (big playthroughs +
+  stragglers).
