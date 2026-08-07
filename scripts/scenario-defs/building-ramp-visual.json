@@ -11,7 +11,12 @@
           "command": "new_game seed:42"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
@@ -43,7 +48,12 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000
+        }
+      }
     },
     {
       "command": "build_ramp origin:20,15 direction:east length:8 depth:6",
@@ -80,7 +90,12 @@
         }
       ],
       "role": "player",
-      "description": "Ramp depth defaults to 8m and only moves via the strip's -/+ stepper (#bs-param-strip .bsx-stepper-btn, the only field this tool shows) -- two decrements land on the scenario's depth:6."
+      "description": "Ramp depth defaults to 8m and only moves via the strip's -/+ stepper (#bs-param-strip .bsx-stepper-btn, the only field this tool shows) -- two decrements land on the scenario's depth:6.",
+      "expect": {
+        "equals": {
+          "cash": 48200
+        }
+      }
     },
     {
       "command": "inspect 5,20,0",

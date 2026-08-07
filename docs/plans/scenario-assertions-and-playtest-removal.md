@@ -410,7 +410,9 @@ already be disabled; asserted the exact negative cash values for real,
 confirming the overdraw rather than just describing it) ·
 ✅ building-placement-visual (4 straightforward builds at different grid
 positions, cash/buildingCount asserted exactly at each — no findings) ·
-⬜ building-ramp-visual ·
+✅ building-ramp-visual (2 ramps at $100/m — 10m south then 8m east —
+cash asserted exactly at each; confirms Finding #13's buildRampCommand
+finance-sync fix still holds for real) ·
 ⬜ building-research-progression-visual (parity check here) ·
 ⬜ building-research-visual (parity check here) ·
 ⬜ building-tier-system-visual · ⬜ building-training-visual ·
