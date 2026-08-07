@@ -10,7 +10,17 @@
           "type": "command",
           "command": "sandbox start biome:alpine_granite seed:777 size:48 depth:24 cash:250000"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 250000,
+          "seed": 777,
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "mineType": "alpine_granite",
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "terrain_info",
@@ -21,7 +31,15 @@
           "command": "terrain_info"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "seed": 777,
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "mineType": "alpine_granite"
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20",
@@ -31,7 +49,13 @@
           "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20"
         }
       ],
-      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above)."
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "expect": {
+        "equals": {
+          "holeCount": 9,
+          "cash": 250000
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -41,7 +65,13 @@
           "command": "charge hole:* explosive:boomite amount:5 stemming:2"
         }
       ],
-      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above)."
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "cash": 250000
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -51,7 +81,12 @@
           "command": "sequence auto delay_step:25"
         }
       ],
-      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above)."
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
@@ -61,7 +96,15 @@
           "type": "command",
           "command": "blast"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "cash": 250000
+        }
+      }
     },
     {
       "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true",
@@ -71,7 +114,17 @@
           "type": "command",
           "command": "sandbox start biome:tropical_karst seed:31337 size:64 depth:32 mixed_rock:true"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "seed": 31337,
+          "worldSizeX": 64,
+          "worldSizeZ": 64,
+          "mineType": "tropical_karst",
+          "holeCount": 0
+        }
+      }
     }
   ]
 }

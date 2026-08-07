@@ -635,7 +635,16 @@ deliberately inert, so the final `equals` check holds for two different
 reasons in the two modes: command mode because nothing ever reverts
 post-blast state that already matches, interaction mode because the
 click genuinely reverts to the pre-blast save; documented in a note on
-the load step) · ⬜ sandbox-mode · ⬜ weather-display-visual ·
+the load step) ·
+✅ sandbox-mode (no findings; every step's `interaction` is a bare
+`command` action identical to its own `command` field — since the real
+Sandbox Mode form panel is out of scope for this batch per the file's
+own pre-existing description — so command and interaction mode run
+byte-identical commands with zero drift risk, confirmed via a full
+real-values trace: `cash`/`seed`/`worldSizeX`/`worldSizeZ`/`mineType`
+after each of the file's two independent `sandbox start` calls,
+`holeCount`/`chargedCount`/`sequencedCount` through the drill→charge→
+sequence→blast pipeline) · ⬜ weather-display-visual ·
 ⬜ weather-flood
 
 ### Batch 7 — big playthroughs + the 3 stragglers (19) — **+ tutorial parity check**
@@ -1278,4 +1287,21 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   local sweep green: typecheck, 124/124 scenarios, 8312/8312 tests.
   GitHub Actions still not re-checked this session — all verification
   remains local. Next: sandbox-mode, weather-display-visual,
+  weather-flood to finish Batch 6.
+- 2026-08-07 (cont.) — sandbox-mode.json done, no findings. Every step's
+  `interaction` is a bare `command` action identical to its own
+  `command` field (the real Sandbox Mode form panel — SandboxPanel.ts —
+  is out of scope for this batch, per the file's own pre-existing
+  description), so command and interaction mode literally run the same
+  commands with zero drift risk — the first file this batch where that
+  held throughout. Full real-values trace confirmed `cash`/`seed`/
+  `worldSizeX`/`worldSizeZ`/`mineType` after each of the file's two
+  independent `sandbox start` calls (250000/777/48/48/alpine_granite,
+  then 100000/31337/64/64/tropical_karst — the second omits `cash:`,
+  proving the default-fallback path), and `holeCount`/`chargedCount`/
+  `sequencedCount` through the drill→charge→sequence→blast pipeline
+  (9 holes throughout, 0 after blast). Verified in both modes. Batch 6:
+  16/18 done. Full local sweep green: typecheck, 124/124 scenarios,
+  8312/8312 tests. GitHub Actions still not re-checked this session —
+  all verification remains local. Next: weather-display-visual,
   weather-flood to finish Batch 6.
