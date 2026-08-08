@@ -66,7 +66,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -102,7 +104,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 1
         }
@@ -134,7 +138,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 2
         }
@@ -238,7 +244,10 @@
         "equals": {
           "holeCount": 0
         },
-        "decreased": ["ecology", "nuisance"]
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ]
       }
     },
     {
@@ -261,7 +270,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "confirmed via direct trace (command mode, seed:42): wellBeing/safety/ecology/nuisance all genuinely increase here, climbing from the two buildings and decaying back from the blast dip -- not asserted with increased on all four, since a real event firing under interaction mode's wall-clock ticking (Finding #12) can swing a score the opposite way (confirmed: a real browser run hit safety with a severe event penalty at this exact step) without the file's premise being wrong"
       }
     },
@@ -269,11 +280,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -295,7 +313,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "confirmed via direct trace (command mode, seed:42): ecology/nuisance reach their neutral cap of 50 exactly by the end of this step, wellBeing/safety keep climbing -- not hard-asserted with increased, per the same real-event risk noted on the tick 10 step above"
       }
     },
@@ -303,11 +323,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -329,7 +356,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "confirmed via direct trace (command mode, seed:42): ecology/nuisance are already capped at 50 by this point and stay there; well-being/safety keep climbing from the two buildings -- not hard-asserted with increased, per the same real-event risk noted on the tick 10 step above"
       }
     },
@@ -337,11 +366,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -363,7 +399,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "confirmed via direct trace (command mode, seed:42): well-being is already at its own cap by this point (unchanged across this step); safety keeps climbing toward its own cap -- not hard-asserted with increased, per the same real-event risk noted on the tick 10 step above"
       }
     },
@@ -371,11 +409,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "scores",

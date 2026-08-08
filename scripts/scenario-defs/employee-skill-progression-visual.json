@@ -54,7 +54,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1,
           "qualificationCount": 1,
@@ -77,7 +79,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2,
           "qualificationCount": 2,
@@ -200,7 +204,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "pendingActionCount": 1
         }
@@ -227,7 +233,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "pendingActionCount": 0
         },
@@ -255,22 +263,33 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
       "command": "event choose 0",
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "seed:42's politics_ev_mandate always fires here (per this file's own checkpoint-3 description) -- option 0 costs $60,000, genuinely applied since Finding #29's fix"
-      }
+      },
+      "role": "player"
     },
     {
       "command": "tick 96",
@@ -283,7 +302,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {

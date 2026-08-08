@@ -1,6 +1,6 @@
 {
   "name": "core-loop-visual",
-  "description": "Visual verification of the full core gameplay loop: survey \u2192 drill plan \u2192 charge \u2192 sequence \u2192 blast \u2192 fragments \u2192 contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
+  "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → sequence → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
   "steps": [
     {
       "command": "new_game seed:42 size:24",
@@ -150,11 +150,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "survey show",

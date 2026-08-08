@@ -1,6 +1,6 @@
 {
   "name": "survey-then-blast-playthrough",
-  "description": "Full playthrough: new game \u2192 hire surveyor \u2192 seismic survey \u2192 confidence overlay visible \u2192 drill + charge + blast \u2192 ore report event \u2192 overlay updates after terrain remesh. FAILS until GameRenderer wires the survey confidence overlay.",
+  "description": "Full playthrough: new game → hire surveyor → seismic survey → confidence overlay visible → drill + charge + blast → ore report event → overlay updates after terrain remesh. FAILS until GameRenderer wires the survey confidence overlay.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -202,7 +202,7 @@
         "equals": {
           "surveyCount": 0
         },
-        "note": "arrival-gated (#437) \u2014 queued and paid for, not yet completed"
+        "note": "arrival-gated (#437) — queued and paid for, not yet completed"
       }
     },
     {
@@ -241,7 +241,7 @@
         "equals": {
           "surveyCount": 0
         },
-        "note": "queued back to back with the seismic survey, same employee, no tick between \u2014 verified via a direct engine trace that both still complete cleanly by round 1 (no Finding #16 drop with only 2 queued)"
+        "note": "queued back to back with the seismic survey, same employee, no tick between — verified via a direct engine trace that both still complete cleanly by round 1 (no Finding #16 drop with only 2 queued)"
       }
     },
     {
@@ -283,11 +283,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -303,11 +310,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -323,11 +337,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -343,11 +364,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "state full",
@@ -378,11 +406,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -398,11 +433,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -418,11 +460,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -438,11 +487,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -602,11 +658,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 5",
@@ -622,11 +685,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "contract list",
@@ -664,7 +734,7 @@
           "command": "contract deliver 1 amount:500"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds what's in stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount at this point is not independently verified. Same class as Finding #2 (contract-panel-visual.json) \u2014 the fix belongs in command-runner.ts's success handling across the whole suite, not one scenario."
+      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds what's in stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount at this point is not independently verified. Same class as Finding #2 (contract-panel-visual.json) — the fix belongs in command-runner.ts's success handling across the whole suite, not one scenario."
     },
     {
       "command": "finances",

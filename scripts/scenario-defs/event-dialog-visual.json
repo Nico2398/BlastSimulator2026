@@ -61,7 +61,7 @@
           "command": "event fire union_coffee_uprising"
         }
       ],
-      "description": "event fire union_coffee_uprising \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
+      "description": "event fire union_coffee_uprising — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
     },
     {
       "command": "event choose 0",
@@ -116,11 +116,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "event fire tutorial_synergy_consultant",
@@ -130,7 +137,7 @@
           "command": "event fire tutorial_synergy_consultant"
         }
       ],
-      "description": "event fire tutorial_synergy_consultant \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
+      "description": "event fire tutorial_synergy_consultant — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
     },
     {
       "command": "event choose 1",
@@ -169,7 +176,7 @@
     },
     {
       "command": "event fire mafia_protection_racket",
-      "description": "Mafia category: 'consulting fee' protection racket, 3 options \u2014 dialog must render the mafia-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Mafia category: 'consulting fee' protection racket, 3 options — dialog must render the mafia-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -213,7 +220,7 @@
     },
     {
       "command": "event fire lawsuit_wrongful_death",
-      "description": "Lawsuit category: wrongful death suit, 3 options \u2014 dialog must render the lawsuit-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Lawsuit category: wrongful death suit, 3 options — dialog must render the lawsuit-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -257,7 +264,7 @@
     },
     {
       "command": "event fire politics_explosive_embargo",
-      "description": "Politics category: explosive embargo, 3 options \u2014 dialog must render the politics-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Politics category: explosive embargo, 3 options — dialog must render the politics-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -301,7 +308,7 @@
     },
     {
       "command": "event fire weather_pit_flood",
-      "description": "Weather category: pit flood, 3 options \u2014 dialog must render the weather-specific tone/consequences \u2014 test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "description": "Weather category: pit flood, 3 options — dialog must render the weather-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -363,11 +370,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "event status",
@@ -398,11 +412,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "scores",

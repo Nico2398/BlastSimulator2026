@@ -73,8 +73,13 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": ["wellBeing"],
-        "decreased": ["cash", "minFatigue"],
+        "increased": [
+          "wellBeing"
+        ],
+        "decreased": [
+          "cash",
+          "minFatigue"
+        ],
         "note": "well-rested bonus: at 100 ticks all gauges are still above 80, morale rises to 100 and wellBeing jumps toward its cap — confirms the file's own claimed bonus, not just the eventual penalty"
       }
     },
@@ -82,11 +87,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -128,7 +140,11 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash", "minFatigue", "wellBeing"],
+        "decreased": [
+          "cash",
+          "minFatigue",
+          "wellBeing"
+        ],
         "note": "gauges have now drained below thresholds — morale and wellBeing both fall from their tick-100 peak, confirming the penalty side of the file's claim"
       }
     },
@@ -136,11 +152,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -182,7 +205,10 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["minFatigue", "wellBeing"],
+        "decreased": [
+          "minFatigue",
+          "wellBeing"
+        ],
         "note": "a real event (verified via direct trace) fires only ~5 ticks into this batch and blocks the rest, so cash doesn't move yet within that short a window (no payroll cycle hit) — minFatigue/wellBeing still confirm the continuing drain"
       }
     },
@@ -190,15 +216,24 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect.",
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
       "expect": {
-        "increased": ["wellBeing"],
+        "increased": [
+          "wellBeing"
+        ],
         "note": "verified via direct trace: the pending event here is union_pet_day, and choosing option 0 genuinely boosts wellBeing back up (30.17→38.17) rather than leaving it at its drained low — a real, surprising effect worth locking in, not assumed"
-      }
+      },
+      "role": "player"
     },
     {
       "command": "needs",

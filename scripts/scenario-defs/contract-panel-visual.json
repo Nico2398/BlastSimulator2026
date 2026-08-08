@@ -108,11 +108,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -133,11 +140,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "contract list",
@@ -199,11 +213,18 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeoutMs": 500
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeoutMs": 500
         }
       ],
-      "description": "event choose 0 \u2014 follows a bare tick, so whether an event is pending is a random roll and there may be no dialog on screen at all. Deliberately left unconverted: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "role": "player"
     },
     {
       "command": "contract deliver 2 amount:300",
@@ -213,7 +234,7 @@
           "command": "contract deliver 2 amount:300"
         }
       ],
-      "description": "BLOCKED FINDING, left unconverted deliberately: this scenario never mines or hauls any ore, so nothing is in storage and the Contracts panel correctly disables Deliver (maxDeliverable <= 0). The console rejects it too \u2014 consumeStoredOre fails \u2014 but it returns success:false rather than throwing, and the command-mode runner only fails a step on a thrown exception, so command mode reports this no-op as a pass (the #445 class). Converting it to a click is what surfaced that; papering over it with a command would hide it again.",
+      "description": "BLOCKED FINDING, left unconverted deliberately: this scenario never mines or hauls any ore, so nothing is in storage and the Contracts panel correctly disables Deliver (maxDeliverable <= 0). The console rejects it too — consumeStoredOre fails — but it returns success:false rather than throwing, and the command-mode runner only fails a step on a thrown exception, so command mode reports this no-op as a pass (the #445 class). Converting it to a click is what surfaced that; papering over it with a command would hide it again.",
       "expect": {
         "equals": {
           "activeContractCount": 2,
