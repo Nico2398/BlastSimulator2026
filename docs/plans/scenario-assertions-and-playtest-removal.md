@@ -168,6 +168,43 @@ against the now-closed UI gaps:
 | Legitimate cheat/setup | 86 | `employee assign_skill`, `weather set/advance`, `event fire`, `vehicle assign`, save/load, `new_game`/`campaign`/`tick`/`time` |
 | Still to classify | 162 | see below |
 
+## ▶ G9 — THREE SELECTION-BAR ACTIONS WERE UNUSABLE WITH A MOUSE (fixed)
+
+Dispatch Here, Move Here and Haul each read `scenePicking.hover` — the LIVE
+hover — to decide their target. The SelectionBar is `position:fixed` over a
+full-viewport canvas, so the cursor cannot reach any of those buttons without
+firing `mouseleave` on the canvas first, and `mouseleave` called `clearHover()`
+unconditionally. The handler then read `null` and took its early return: the
+console was never called at all.
+
+Proven in a real browser, not reasoned about: `mousemove` arms tile (86,38),
+`mouseleave` fires as the cursor enters the bar, the click lands 1 ms later,
+`pendingActionCount` stays 0. The same click issued synthetically (no cursor
+travel, so no `mouseleave`) dispatches correctly — which is exactly why every
+unit test passed.
+
+**Fixed** by splitting the two lifetimes `currentHover` was serving: what to
+highlight now (clears on leave) vs. what the player is aiming at (`lastAim`,
+survives leave, exposed as `.aim`). Regression test verified to fail on the old
+code.
+
+Two lessons worth keeping:
+- **`move_here` was added by this very effort (G4) and inherited the defect by
+  copying `dispatch_here`.** Copying a pattern copies its bugs.
+- **The test written alongside it asserted `scenePicking.hover?.terrain`** —
+  locking the defect in. That is the third test in this effort found asserting
+  broken behaviour rather than catching it, after the two tubing dispatch
+  assertions. When a test mirrors the implementation instead of the contract,
+  it converts a bug into a requirement.
+
+**Still open, separate from the hover fix:** `dispatch_here` hardcodes
+`employee dispatch <id> x:<X> z:<Z>` with no `skill:` argument, and
+`GameLoop.ts` only starts a real task (and only awards XP) when
+`requiredSkill !== null`. So the button cannot drive `skill-progression.json`'s
+40 steps or `employee-skills-visual.json`'s 6 — those exist to accrue XP into a
+named skill. Converting them would silently gut what they test. Needs a UI
+change (a skill selector on the dispatch action), not a scenario edit.
+
 ## ▶ NEW GAPS FOUND WHILE ADDING THE FUNDS GUARD (2026-08-08)
 
 **G7 — five cash-spending commands have no affordability gate on EITHER side.**
