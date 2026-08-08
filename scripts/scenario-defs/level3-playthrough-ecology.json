@@ -491,11 +491,75 @@
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "Charge All commits the panel's current product card / amount / stemming (ChargeStep.chargeAll, Charge.ts), and all three are reachable by click: the krackle product card selects the explosive, 5 amount increments take 5 -> 10kg (krackle's maximum) and 5 stemming decrements take 2.0 -> 1.0m. The explicit [data-step=\"2\"] click is required because the drill step above clicks [data-step=\"1\"] manually, which disarms autoAdvance. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
       "expect": {
         "equals": {
           "cash": 37350,
@@ -508,7 +572,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:10",
@@ -680,11 +745,31 @@
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "Product card and both steppers still hold krackle / 10kg / 1.0m from the first cycle — ChargeStep keeps them as plain instance fields with no reset path, and a blast clearing the plan does not touch them. Asserted before the commit rather than assumed.",
       "expect": {
         "equals": {
           "cash": 37350,
@@ -697,7 +782,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:10",
@@ -1031,11 +1117,43 @@
       "command": "charge hole:* explosive:obliviax amount:8 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:obliviax amount:8 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"obliviax\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"obliviax\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "Switching product mid-file: the obliviax card's own range is [2, 20]kg, so clampAmount leaves the carried-over 10kg untouched on selection and 2 amount decrements reach the declared 8kg. Stemming still holds 1.0m from the krackle cycles.",
       "expect": {
         "equals": {
           "cash": 34350,
@@ -1048,7 +1166,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:10",
@@ -1218,7 +1337,7 @@
           "command": "charge hole:* explosive:krackle amount:12 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "Left as a command, and this is a finding rather than a gap: `amount:12` is not reachable by any click sequence, because it is outside krackle's own valid range. The amount stepper clamps to the selected product's [minChargeKg, maxChargeKg] (ChargeStep.adjustAmount / clampAmount, Charge.ts) and krackle's maxChargeKg is 10, so the panel refuses to go past 10kg while krackle is selected — a player simply cannot build this charge. The console has no such clamp, which is exactly why this step exists: createCharge (ChargePlan.ts) rejects it with \"Amount 12kg out of range [1-10kg] for krackle\", chargedCount stays 0, and the following `blast` fails with \"Invalid plan: Missing charge\" on every hole. That deliberate non-firing outcome is this file's premise (see the expect block) and converting the step to clicks would destroy it: the clicks would top out at a legal 10kg, the charge would succeed, the blast would fire, and every downstream assertion in the file would be describing a different scenario. The other four charge cycles in this file ARE clicked.",
       "expect": {
         "equals": {
           "cash": 34350,
@@ -1557,11 +1676,39 @@
       "command": "charge hole:* explosive:obliviax amount:10 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:obliviax amount:10 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"obliviax\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "obliviax and 1.0m stemming still hold — the rejected 12kg krackle step between this cycle and the last obliviax one never touched the panel (it runs as a console command, and the console does not drive the panel), so the steppers are still where the obliviax cycle left them at 8kg. 2 amount increments reach the declared 10kg.",
       "expect": {
         "equals": {
           "cash": 34350,
@@ -1574,7 +1721,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:10",
@@ -1960,7 +2108,7 @@
           "command": "charge hole:* explosive:krackle amount:15 stemming:1"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "Left as a command, and this is a finding rather than a gap: `amount:15` is not reachable by any click sequence, because it is outside krackle's own valid range. The amount stepper clamps to the selected product's [minChargeKg, maxChargeKg] (ChargeStep.adjustAmount / clampAmount, Charge.ts) and krackle's maxChargeKg is 10, so the panel refuses to go past 10kg while krackle is selected — a player simply cannot build this charge. The console has no such clamp, which is exactly why this step exists: createCharge (ChargePlan.ts) rejects it with \"Amount 15kg out of range [1-10kg] for krackle\", chargedCount stays 0, and the following `blast` fails with \"Invalid plan: Missing charge\" on every hole. That deliberate non-firing outcome is this file's premise (see the expect block) and converting the step to clicks would destroy it: the clicks would top out at a legal 10kg, the charge would succeed, the blast would fire, and every downstream assertion in the file would be describing a different scenario. The other four charge cycles in this file ARE clicked.",
       "expect": {
         "equals": {
           "cash": 34350,

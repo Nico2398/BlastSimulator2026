@@ -81,15 +81,74 @@
       "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:H1 explosive:boomite amount:8 stemming:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "charge hole:H1 explosive:boomite amount:8 stemming:3 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The explicit [data-step=\"2\"] click is required: Charge All above completed the plan, so the still-armed autoAdvance had already moved the panel to Sequence. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach the declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 6
+        },
+        "note": "count is unchanged — Charge All had charged all 6; this proves one row overrides one hole"
+      }
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
@@ -100,7 +159,8 @@
         "equals": {
           "sequencedCount": 6
         }
-      }
+      },
+      "description": "The [data-step=\"3\"] click is new and load-bearing: the per-hole charge step above disarms autoAdvance by clicking a tab, so the panel no longer walks itself to Sequence. delay_step:25 is the panel's own DEFAULT_DELAY_STEP_MS, so no delay-step stepper click is needed."
     },
     {
       "command": "sequence show",
@@ -116,21 +176,39 @@
       "command": "sequence set hole:H1 delay:0",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H1 delay:0"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
         }
       ],
-      "description": "sequence set hole:H1 delay:0 — per-hole delay is only reachable via relative +/- steppers ([data-hole=\"H1\"] [data-action=\"delay-inc\"/\"delay-dec\"]), not a set-to-value click; reaching an exact target would mean replicating Auto Sequence's row algorithm to compute a click count. Left as a command (Finding #9)."
+      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. Auto Sequence left H1 at 25ms with a 25ms step (traced: step-04-sequence.json), so a single decrement lands exactly on the declared 0.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 6
+        },
+        "note": "H1 25ms -> 0"
+      }
     },
     {
       "command": "sequence set hole:H2 delay:50",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H2 delay:50"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"delay-inc\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"delay-inc\"]"
         }
       ],
-      "description": "sequence set hole:H2 delay:50 — per-hole delay is only reachable via relative +/- steppers ([data-hole=\"H1\"] [data-action=\"delay-inc\"/\"delay-dec\"]), not a set-to-value click; reaching an exact target would mean replicating Auto Sequence's row algorithm to compute a click count. Left as a command (Finding #9)."
+      "description": "H2 is Auto Sequence's row-1 lead hole, left at 0ms (traced: step-04-sequence.json), so 2 increments at the 25ms step reach the declared 50.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 6
+        },
+        "note": "H2 0ms -> 25 -> 50"
+      }
     },
     {
       "command": "sequence show",

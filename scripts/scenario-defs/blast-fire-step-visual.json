@@ -51,44 +51,66 @@
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
       "timeout": 30,
-      "description": "Setup, matching the drill/sequence steps around it: the Blast Workshop is not opened until the step below (it auto-lands on Fire once the plan is complete), so charging here still happens off-panel via command rather than a real Charge All click.",
+      "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here rather than three steps later; autoAdvance is untouched (no tab is clicked anywhere in this file), so the panel still walks itself Drill -> Charge -> Sequence -> Fire as the plan completes, which is what the Fire step below checks.",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5kg stemming:2m"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "5 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
       "expect": {
         "equals": {
           "chargedCount": 1
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence set hole:H1 delay:0ms",
       "timeout": 30,
-      "description": "sequence set hole:H1 delay:0ms — per-hole delay only reachable via relative +/- steppers, not a set-to-value click (Finding #9). Left as a command.",
+      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. H1 has no delay at all at this point (Auto Sequence never ran in this file), and adjustHoleDelay reads an absent delay as 0 and floors the result at 0 — so one decrement dispatches exactly the declared `sequence set hole:H1 delay:0ms`. Charging the only hole moved the panel to Sequence by itself, so no tab click is needed.",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H1 delay:0ms"
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
         }
       ],
       "expect": {
         "equals": {
           "sequencedCount": 1
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "state",
       "timeout": 30,
-      "description": "Opening the Blast Workshop auto-lands on step 5 (Fire) since the plan is complete — the danger zone shows clear (nobody nearby), Sound the Horn is disabled, and the pre-flight checklist reads all-clear",
+      "description": "The plan is complete once H1 is sequenced, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire) — the danger zone shows clear (nobody nearby), Sound the Horn is disabled, and the pre-flight checklist reads all-clear. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
         {
           "type": "wait",
           "durationMs": 300
