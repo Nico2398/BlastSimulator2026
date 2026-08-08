@@ -267,14 +267,19 @@ describe('SelectionBar move_here — the command src/main.ts dispatches', () => 
     expect(mainTs).toContain("case 'move_here':");
   });
 
-  it('dispatches `vehicle move <id> to:<x>,<z>` built from the live hover tile', () => {
+  it('dispatches `vehicle move <id> to:<x>,<z>` built from the latched aim tile', () => {
     expect(extractTemplate()).toBe('vehicle move ${entity.id} to:${terrain.tileX},${terrain.tileZ}');
   });
 
-  it('reads the live hover terrain and warns instead of dispatching when there is none', () => {
+  it('reads the LATCHED aim, not the live hover, and warns when there is no target', () => {
     const handler = mainTs.slice(mainTs.indexOf("case 'move_here':"));
     const body = handler.slice(0, handler.indexOf('case \'follow\':'));
-    expect(body).toContain('scenePicking.hover?.terrain');
+    // Must be `aim`, never `hover`. The live hover is cleared by the
+    // canvas mouseleave that firing this very button necessarily causes, so
+    // reading it made the action impossible with a real mouse. This assertion
+    // originally required `hover` and so locked the bug in.
+    expect(body).toContain('scenePicking.aim?.terrain');
+    expect(body).not.toContain('scenePicking.hover?.terrain');
     expect(body).toContain("t('shell.selection.no_move_target')");
     expect(body).toContain("severity: 'warn'");
   });
