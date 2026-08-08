@@ -3,24 +3,25 @@
   "description": "Level 3 (Treranium Depths): 3 surveys, 5 blasts across all 5 explosive types, and 5 contract attempts with a debris_hauler bought but never driven -- named for an $800k win, but `campaign start level:treranium_depths` fails outright (locked, same as Finding #58/#59/#61) and no delivery ever succeeds; see Finding #62 for the real trajectory asserted instead -- including all 10 employees dying across the 5 corrected, much larger blasts.",
   "steps": [
     {
-      "command": "new_game seed:3666",
+      "command": "new_game seed:3666 cash:220000",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:3666"
+          "command": "new_game seed:3666 cash:220000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0
         }
-      }
+      },
+      "description": "cash:220000 sits on `new_game`, not on the `campaign start` below, because that `campaign start` fails outright -- treranium_depths is locked on a fresh campaign (Findings #58/#59/#61/#62) -- so it never replaces this state and a `cash:` on it would be discarded with the rest of the command. The extra $170,000 over the sandbox default is what the five-vehicle fleet at step 42 needs: hiring, surveys and 32 ticks of payroll have spent the run down by then, and $165,000 of vehicles (rock_digger $50,000 + debris_hauler $25,000 + drill_rig $35,000 + building_destroyer $30,000 + a second debris_hauler $25,000) has to fit inside what is left, on enabled dealership rows, instead of being overdrawn."
     },
     {
       "command": "campaign start level:treranium_depths",
@@ -33,14 +34,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0
         }
-      }
+      },
+      "description": "No `cash:` here on purpose: this command fails (level locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it."
     },
     {
       "command": "time resume",
@@ -53,7 +55,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -73,7 +75,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -97,7 +99,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -125,7 +127,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 48800,
+          "cash": 218800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
@@ -149,7 +151,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 47600,
+          "cash": 217600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 2,
@@ -173,7 +175,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 46600,
+          "cash": 216600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 3,
@@ -197,7 +199,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 45600,
+          "cash": 215600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 4,
@@ -221,7 +223,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 44600,
+          "cash": 214600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -245,7 +247,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 43100,
+          "cash": 213100,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 6,
@@ -269,7 +271,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 41600,
+          "cash": 211600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 7,
@@ -293,7 +295,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 40800,
+          "cash": 210800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 8,
@@ -317,7 +319,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 40000,
+          "cash": 210000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 9,
@@ -341,7 +343,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 38000,
+          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -361,7 +363,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 38000,
+          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -381,7 +383,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 38000,
+          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -401,7 +403,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 38000,
+          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -421,7 +423,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 38000,
+          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -465,7 +467,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 35000,
+          "cash": 205000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -505,7 +507,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 34200,
+          "cash": 204200,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -545,7 +547,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 32700,
+          "cash": 202700,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -565,7 +567,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 32700,
+          "cash": 202700,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -585,7 +587,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 32700,
+          "cash": 202700,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -605,7 +607,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 32700,
+          "cash": 202700,
           "tickCount": 8,
           "deathCount": 0,
           "employeeCount": 10,
@@ -625,7 +627,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": 32700,
+          "cash": 202700,
           "tickCount": 8,
           "deathCount": 0,
           "employeeCount": 10,
@@ -645,7 +647,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 25550,
+          "cash": 195550,
           "tickCount": 16,
           "deathCount": 0,
           "employeeCount": 10,
@@ -665,7 +667,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": 25550,
+          "cash": 195550,
           "tickCount": 16,
           "deathCount": 0,
           "employeeCount": 10,
@@ -685,7 +687,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 18400,
+          "cash": 188400,
           "tickCount": 24,
           "deathCount": 0,
           "employeeCount": 10,
@@ -705,7 +707,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": 18400,
+          "cash": 188400,
           "tickCount": 24,
           "deathCount": 0,
           "employeeCount": 10,
@@ -725,7 +727,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -745,7 +747,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -765,7 +767,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -785,7 +787,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -805,7 +807,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -825,7 +827,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -845,7 +847,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -865,7 +867,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -885,7 +887,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -905,7 +907,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -925,7 +927,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -945,7 +947,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11250,
+          "cash": 181250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -958,101 +960,130 @@
       "command": "vehicle buy rock_digger",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy rock_digger"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the rock_digger tier-1 row ($50,000). awaitUsable is the affordability assertion. Opens the Fleet panel first; the four buys below reuse it.",
       "expect": {
         "equals": {
-          "cash": -38750,
+          "cash": 131250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
           "surveyCount": 3
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -63750,
+          "cash": 106250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
           "surveyCount": 3
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy drill_rig"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the drill_rig tier-1 row ($35,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -98750,
+          "cash": 71250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
           "surveyCount": 3
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy building_destroyer",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy building_destroyer"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the building_destroyer tier-1 row ($30,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -128750,
+          "cash": 41250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
           "surveyCount": 3
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
           "surveyCount": 3
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle list",
@@ -1065,7 +1096,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1085,7 +1116,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1131,7 +1162,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1154,7 +1185,7 @@
       "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1181,7 +1212,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1224,7 +1255,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1247,7 +1278,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1267,7 +1298,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1287,7 +1318,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 32,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1311,7 +1342,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1331,7 +1362,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1351,7 +1382,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1371,7 +1402,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1391,7 +1422,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1419,7 +1450,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1439,7 +1470,7 @@
       "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1459,7 +1490,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1505,7 +1536,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1528,7 +1559,7 @@
       "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1564,7 +1595,7 @@
       "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 1 decrement click: 25ms default -> 20 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1607,7 +1638,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1630,7 +1661,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1650,7 +1681,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1670,7 +1701,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1694,7 +1725,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1714,7 +1745,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1734,7 +1765,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1754,7 +1785,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1774,7 +1805,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1802,7 +1833,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1822,7 +1853,7 @@
       "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1842,7 +1873,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1888,7 +1919,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1911,7 +1942,7 @@
       "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1949,7 +1980,7 @@
       "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -1992,7 +2023,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2015,7 +2046,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2035,7 +2066,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2055,7 +2086,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2079,7 +2110,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2099,7 +2130,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2119,7 +2150,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2139,7 +2170,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2159,7 +2190,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2187,7 +2218,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2207,7 +2238,7 @@
       "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2227,7 +2258,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2273,7 +2304,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2296,7 +2327,7 @@
       "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2334,7 +2365,7 @@
       "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2377,7 +2408,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2400,7 +2431,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2420,7 +2451,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2440,7 +2471,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 68,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2464,7 +2495,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 74,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2484,7 +2515,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 74,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2504,7 +2535,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2524,7 +2555,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2544,7 +2575,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2572,7 +2603,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2592,7 +2623,7 @@
       "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2612,7 +2643,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2658,7 +2689,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2681,7 +2712,7 @@
       "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2719,7 +2750,7 @@
       "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2762,7 +2793,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2785,7 +2816,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2805,7 +2836,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2825,7 +2856,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 80,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2849,7 +2880,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 86,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2869,7 +2900,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 86,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2889,7 +2920,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2909,7 +2940,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2929,7 +2960,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2957,7 +2988,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2977,7 +3008,7 @@
       "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2.",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -2997,7 +3028,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -3017,7 +3048,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -3041,7 +3072,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -3065,7 +3096,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -153750,
+          "cash": 16250,
           "tickCount": 92,
           "deathCount": 10,
           "employeeCount": 10,
@@ -3079,7 +3110,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "Finding #62: this file recurs every established finding class from the rest of Batch 7 in one place. `campaign start level:treranium_depths` fails outright (tier-3, locked -- same as Finding #58/#59/#61, not fixed). `employee assign_skill` used the rejected positional syntax (Finding #45/#54/#59) -- fixed. All 6 `build` commands name nonexistent types (`office`/`storage_depot`/`canteen`/`break_room`/`medical_bay`/`bunkhouse`) -- left as documented no-ops. Two `debris_hauler`s are bought but neither is ever assigned a driver nor sent hauling -- `storedMassKg` stays 0 for the entire file and all 5 contract deliveries fail honestly for lack of storage; not fixed, same reasoning as `level1-win-conservative.json`/`level1-win-efficient.json`/`level2-playthrough-win.json` (the mechanism is already proven end-to-end elsewhere). Finding #52's drill-grid class recurred a 5th time across all 5 of this file's grids (declared 12/16/20/20/25 holes vs. real 24/36/30/30/64 once traced against the panel's true defaults) -- fixed the same way. Like the earlier `level2-playthrough-win.json`, this file's own hardcoded contract IDs (1 through 5) all happened to already match the real, currently-available pool at every listing -- no ID-mismatch fix needed. The corrected, dramatically larger grids (the final cycle alone goes from a declared 25 holes to a real 64) are violent enough to kill all 10 hired employees over the course of the file's 5 blasts (deathCount 0→10, `stats` confirms 'Casualties: 10') -- the most severe case yet of the Finding #40/#56/#59 real-consequence class. Unlike `level2-playthrough-win.json`, zero random events fire anywhere in this file's trace (`Total income: $0.00` never changes) -- no Finding #60-style cash softening was needed, `cash` is hard-asserted at every single step and held on the first interaction-mode run (re-run twice for determinism, both clean). No bankruptcy despite cash ending near -$154k -- the file's 92-tick budget is short of the 100-tick sustained grace period from when cash first went deeply negative (tick 32). Verified in both command mode and a real browser, 127/127 steps."
+        "note": "Finding #62: this file recurs every established finding class from the rest of Batch 7 in one place. `campaign start level:treranium_depths` fails outright (tier-3, locked -- same as Finding #58/#59/#61, not fixed). `employee assign_skill` used the rejected positional syntax (Finding #45/#54/#59) -- fixed. All 6 `build` commands name nonexistent types (`office`/`storage_depot`/`canteen`/`break_room`/`medical_bay`/`bunkhouse`) -- left as documented no-ops. Two `debris_hauler`s are bought but neither is ever assigned a driver nor sent hauling -- `storedMassKg` stays 0 for the entire file and all 5 contract deliveries fail honestly for lack of storage; not fixed, same reasoning as `level1-win-conservative.json`/`level1-win-efficient.json`/`level2-playthrough-win.json` (the mechanism is already proven end-to-end elsewhere). Finding #52's drill-grid class recurred a 5th time across all 5 of this file's grids (declared 12/16/20/20/25 holes vs. real 24/36/30/30/64 once traced against the panel's true defaults) -- fixed the same way. Like the earlier `level2-playthrough-win.json`, this file's own hardcoded contract IDs (1 through 5) all happened to already match the real, currently-available pool at every listing -- no ID-mismatch fix needed. The corrected, dramatically larger grids (the final cycle alone goes from a declared 25 holes to a real 64) are violent enough to kill all 10 hired employees over the course of the file's 5 blasts (deathCount 0→10, `stats` confirms 'Casualties: 10') -- the most severe case yet of the Finding #40/#56/#59 real-consequence class. Unlike `level2-playthrough-win.json`, zero random events fire anywhere in this file's trace (`Total income: $0.00` never changes) -- no Finding #60-style cash softening was needed, `cash` is hard-asserted at every single step and held on the first interaction-mode run (re-run twice for determinism, both clean). No bankruptcy. ▸ 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The five vehicle buys used to overdraw to -$153,750 and stay there for the rest of the file; the run is now funded with `new_game seed:3666 cash:220000` and they are `role: 'player'` clicks on enabled dealership rows, so cash never goes negative at all and holds at $16,250 from the last purchase to the end -- flat because the first blast kills all 10 employees, so there is no payroll left to pay. Verified in both command mode and a real browser, 127/127 steps."
       }
     }
   ]

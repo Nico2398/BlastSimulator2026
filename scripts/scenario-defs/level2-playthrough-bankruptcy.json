@@ -1,19 +1,19 @@
 {
   "name": "level2-playthrough-bankruptcy",
-  "description": "Level 2 (Grumpstone Ridge) bankruptcy scenario: heavy overspending on buildings, vehicles, and employees with no profitable blasting to trigger financial collapse. `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default on a fresh campaign) -- runs against the substitute new_game world instead, same class as the already-documented level3-playthrough-ecology.json/treranium_depths issue; see Finding #58. The named bankruptcy outcome is otherwise real: levelEndReason:'bankruptcy' fires for real at tick 105, well within this file's budget.",
+  "description": "Level 2 (Grumpstone Ridge) bankruptcy scenario: buy a management office, a five-vehicle fleet and a ten-strong crew, blast nothing, collapse. `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default on a fresh campaign) -- the run continues against the substitute new_game world instead, same class as the already-documented level3-playthrough-ecology.json/treranium_depths issue; see Finding #58. That is why the funding cheat is on `new_game` here rather than on `campaign start`. The run is funded to exactly the shopping list ($185,800), so every purchase is a click a real player could make and the spree ends on exactly $0 -- under the $5,000 BANKRUPTCY_THRESHOLD from the first tick, with BANKRUPTCY_GRACE_TICKS = 100 ticks of payroll and upkeep and no income finishing the job. The named bankruptcy outcome is unchanged and still real: levelEndReason:'bankruptcy' fires at tick 100, reported by the tick-105 step.",
   "steps": [
     {
-      "command": "new_game seed:2277",
+      "command": "new_game seed:2277 cash:185800",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:2277"
+          "command": "new_game seed:2277 cash:185800"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -21,7 +21,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "description": "cash:185800 sits on `new_game`, not on the `campaign start` below, because that `campaign start` fails outright -- grumpstone_ridge is tier-2 and locked on a fresh campaign (see the file description and Finding #58), so it never replaces this state and a `cash:` on it would be thrown away with the rest of the command. The figure is deliberately exact -- $8,000 management office + $165,000 of vehicles (rock_digger $50,000 + debris_hauler $25,000 + drill_rig $35,000 + building_destroyer $30,000 + a second debris_hauler $25,000) + $12,800 of hires -- so the overspend this scenario is about happens on enabled buttons and lands the player on exactly $0, with nothing left over to postpone the collapse."
     },
     {
       "command": "campaign start level:grumpstone_ridge",
@@ -34,7 +35,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -42,7 +43,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "description": "No `cash:` here on purpose: this command fails (tier-2 level, locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it."
     },
     {
       "command": "time resume",
@@ -55,7 +57,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -76,7 +78,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -101,7 +103,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -122,7 +124,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -143,7 +145,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -164,7 +166,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -185,7 +187,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -206,7 +208,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -227,7 +229,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -268,7 +270,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 42000,
+          "cash": 177800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -289,7 +291,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 42000,
+          "cash": 177800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -310,7 +312,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 42000,
+          "cash": 177800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -324,14 +326,22 @@
       "command": "vehicle buy rock_digger",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy rock_digger"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the rock_digger tier-1 row ($50,000). awaitUsable is the affordability assertion. Opens the Fleet panel first; the four buys below reuse it.",
       "expect": {
         "equals": {
-          "cash": -8000,
+          "cash": 127800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -339,20 +349,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -33000,
+          "cash": 102800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -360,20 +375,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy drill_rig"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the drill_rig tier-1 row ($35,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -68000,
+          "cash": 67800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -381,20 +401,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy building_destroyer",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy building_destroyer"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the building_destroyer tier-1 row ($30,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -98000,
+          "cash": 37800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -402,20 +427,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -123000,
+          "cash": 12800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -423,7 +453,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle list",
@@ -436,7 +467,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -123000,
+          "cash": 12800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -457,7 +488,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -123000,
+          "cash": 12800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -471,14 +502,22 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driller row ($1,000). Opens the Crew panel first; the nine hires below reuse it.",
       "expect": {
         "equals": {
-          "cash": -124000,
+          "cash": 11800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
@@ -486,20 +525,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driller row ($1,000).",
       "expect": {
         "equals": {
-          "cash": -125000,
+          "cash": 10800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 2,
@@ -507,20 +551,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driller row ($1,000).",
       "expect": {
         "equals": {
-          "cash": -126000,
+          "cash": 9800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 3,
@@ -528,20 +577,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the blaster row ($1,500).",
       "expect": {
         "equals": {
-          "cash": -127500,
+          "cash": 8300,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 4,
@@ -549,20 +603,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the blaster row ($1,500).",
       "expect": {
         "equals": {
-          "cash": -129000,
+          "cash": 6800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -570,20 +629,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driver row ($800).",
       "expect": {
         "equals": {
-          "cash": -129800,
+          "cash": 6000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 6,
@@ -591,20 +655,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driver row ($800).",
       "expect": {
         "equals": {
-          "cash": -130600,
+          "cash": 5200,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 7,
@@ -612,20 +681,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the surveyor row ($1,200).",
       "expect": {
         "equals": {
-          "cash": -131800,
+          "cash": 4000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 8,
@@ -633,20 +707,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:manager"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the manager row ($2,000).",
       "expect": {
         "equals": {
-          "cash": -133800,
+          "cash": 2000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 9,
@@ -654,20 +733,25 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:manager"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the manager row ($2,000).",
       "expect": {
         "equals": {
-          "cash": -135800,
+          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -675,7 +759,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee list",
@@ -688,7 +773,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -135800,
+          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -709,7 +794,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -135800,
+          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -730,7 +815,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -135800,
+          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -751,7 +836,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -142850,
+          "cash": -7050,
           "tickCount": 10,
           "deathCount": 0,
           "employeeCount": 10,
@@ -772,7 +857,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -142850,
+          "cash": -7050,
           "tickCount": 10,
           "deathCount": 0,
           "employeeCount": 10,
@@ -793,7 +878,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -149900,
+          "cash": -14100,
           "tickCount": 20,
           "deathCount": 0,
           "employeeCount": 10,
@@ -814,7 +899,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -149900,
+          "cash": -14100,
           "tickCount": 20,
           "deathCount": 0,
           "employeeCount": 10,
@@ -835,7 +920,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -156950,
+          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
@@ -856,7 +941,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -156950,
+          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
@@ -877,7 +962,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -156950,
+          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
@@ -898,7 +983,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -156950,
+          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
@@ -923,7 +1008,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -164125,
+          "cash": -28325,
           "tickCount": 45,
           "deathCount": 0,
           "employeeCount": 10,
@@ -944,7 +1029,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -164125,
+          "cash": -28325,
           "tickCount": 45,
           "deathCount": 0,
           "employeeCount": 10,
@@ -965,7 +1050,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -178100,
+          "cash": -42300,
           "tickCount": 60,
           "deathCount": 0,
           "employeeCount": 10,
@@ -986,7 +1071,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -178100,
+          "cash": -42300,
           "tickCount": 60,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1007,7 +1092,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -185275,
+          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1028,7 +1113,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -185275,
+          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1049,7 +1134,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -185275,
+          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1070,7 +1155,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -185275,
+          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1095,7 +1180,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -199250,
+          "cash": -63450,
           "tickCount": 90,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1116,7 +1201,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -199250,
+          "cash": -63450,
           "tickCount": 90,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1137,14 +1222,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -206425,
+          "cash": -70625,
           "tickCount": 105,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "confirmed via direct trace: `[tick 100] BANKRUPTCY! The mine is seized.` Funding the run for its shopping list did not save it and did not move the bankruptcy tick -- the spree ends on exactly $0, under the $5,000 BANKRUPTCY_THRESHOLD, so the 100-tick BANKRUPTCY_GRACE_TICKS window expires at tick 100 exactly as it did when the purchases overdrew. Payroll and upkeep against zero income do the killing now, which is a truer test than an overdraw no player could perform."
       }
     },
     {
@@ -1158,7 +1244,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -206425,
+          "cash": -70625,
           "tickCount": 105,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1179,7 +1265,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -220400,
+          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1200,7 +1286,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -220400,
+          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1221,7 +1307,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -220400,
+          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1242,7 +1328,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -220400,
+          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1267,7 +1353,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -227450,
+          "cash": -91650,
           "tickCount": 130,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1288,7 +1374,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -267450,
+          "cash": -131650,
           "tickCount": 130,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1309,7 +1395,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -274625,
+          "cash": -138825,
           "tickCount": 145,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1330,7 +1416,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -274625,
+          "cash": -138825,
           "tickCount": 145,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1351,7 +1437,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -288600,
+          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1372,7 +1458,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -288600,
+          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1393,7 +1479,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -288600,
+          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1414,7 +1500,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -288600,
+          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1439,7 +1525,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -295650,
+          "cash": -159850,
           "tickCount": 170,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1460,7 +1546,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -295650,
+          "cash": -159850,
           "tickCount": 170,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1481,7 +1567,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -302700,
+          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1502,7 +1588,7 @@
       "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15).",
       "expect": {
         "equals": {
-          "cash": -302700,
+          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1523,7 +1609,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -302700,
+          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1544,7 +1630,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -302700,
+          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1569,7 +1655,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -302700,
+          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1594,7 +1680,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -302700,
+          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1608,7 +1694,7 @@
           "surveyCount": 0,
           "activeContractCount": 0
         },
-        "note": "Finding #58: `campaign start level:grumpstone_ridge` fails outright ('Level \"grumpstone_ridge\" is locked. Complete previous levels first.') on a fresh campaign -- `createCampaignState()` only unlocks difficulty-tier-1 levels by default, and grumpstone_ridge is tier 2. `ctx.state` stays whatever `new_game seed:2277` alone produced (64x64x64 desert_badlands, $50,000 cash), never grumpstone_ridge's actual grid/biome/economics. Same class as the already-documented, already-merged `level3-playthrough-ecology.json`/`treranium_depths` finding (PR #497) -- not fixed here either, for the same reason: properly unlocking a level is a scenario-design decision, not a drive-by. 6 of the file's 7 `build` commands (`office`/`storage_depot`/`medical_bay`/`canteen`/`break_room`/`bunkhouse`) name building types that don't exist -- only `management_office` is real ($8,000) -- matching the established Finding #5/#47 no-op pattern, correctly left unmarked already by the #479 conversion pass. All 5 vehicle purchases and all 10 employee hires were already correctly left command-only by that same pass, anticipating exactly the Finding #1/#16/#46 affordability-guard class (cash goes negative on the very first vehicle purchase and never recovers, so a real Buy/Hire button would be disabled for every purchase from that point on) -- no fix needed here, already right. One cosmetic discrepancy worth noting, not fixing: the `finances` command's own text prints 'Bankrupt: YES' the instant cash goes negative (a simple `cash<0` check), well before the structured `state.bankrupt` flag actually flips true -- that flag (and `levelEndReason`) requires `Bankruptcy.ts`'s real `BANKRUPTCY_GRACE_TICKS=100` consecutive ticks below `BANKRUPTCY_THRESHOLD=5000`, which is what every `expect.equals` here asserts against, never the text. The named outcome is otherwise completely real and un-dramatic to verify: cash never recovers from tick 0 onward (10 employees with zero work, zero income, draining payroll every cycle), so bankruptcy is guaranteed once the grace period elapses -- fires for real at tick 105 (`[tick 100] BANKRUPTCY! The mine is seized.`), stays true through the rest of the file's 180-tick budget. wellBeing and safety both climb toward their ceiling despite the collapse, same non-neglect mechanic as Findings #43/#44 (no blasting happens anywhere in this file, so none of the 10 hires is ever dispatched into harm). Verified in both command mode and a real browser, 74/74 steps, 0 failures."
+        "note": "Finding #58: `campaign start level:grumpstone_ridge` fails outright ('Level \"grumpstone_ridge\" is locked. Complete previous levels first.') on a fresh campaign -- `createCampaignState()` only unlocks difficulty-tier-1 levels by default, and grumpstone_ridge is tier 2. `ctx.state` stays whatever `new_game seed:2277 cash:185800` alone produced (64x64x64 desert_badlands), never grumpstone_ridge's actual grid/biome/economics -- which is also why the funding cheat has to sit on `new_game` here rather than on `campaign start`. Same class as the already-documented, already-merged `level3-playthrough-ecology.json`/`treranium_depths` finding (PR #497) -- not fixed here either, for the same reason: properly unlocking a level is a scenario-design decision, not a drive-by. 6 of the file's 7 `build` commands (`office`/`storage_depot`/`medical_bay`/`canteen`/`break_room`/`bunkhouse`) name building types that don't exist -- only `management_office` is real ($8,000) -- matching the established Finding #5/#47 no-op pattern, correctly left unmarked already by the #479 conversion pass. All 5 vehicle purchases and all 10 employee hires used to be command-only, because cash went negative on the very first vehicle purchase and never recovered, so every real Buy/Hire button after it was disabled -- the Finding #1/#16/#46 affordability-guard class. ▸ 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The run is funded to exactly its shopping list ($185,800 = $8,000 office + $165,000 of vehicles + $12,800 of hires), so all 15 of those steps are now `role: 'player'` clicks on enabled controls and land the player on exactly $0 -- no headroom to postpone anything. One cosmetic discrepancy worth noting, not fixing: the `finances` command's own text prints 'Bankrupt: YES' the instant cash goes negative (a simple `cash<0` check), well before the structured `state.bankrupt` flag actually flips true -- that flag (and `levelEndReason`) requires `Bankruptcy.ts`'s real `BANKRUPTCY_GRACE_TICKS=100` consecutive ticks below `BANKRUPTCY_THRESHOLD=5000`, which is what every `expect.equals` here asserts against, never the text. The named outcome is otherwise completely real and un-dramatic to verify: cash never recovers from tick 0 onward (10 employees with zero work, zero income, draining payroll every cycle), so bankruptcy is guaranteed once the grace period elapses -- fires for real at tick 105 (`[tick 100] BANKRUPTCY! The mine is seized.`), stays true through the rest of the file's 180-tick budget. wellBeing and safety both climb toward their ceiling despite the collapse, same non-neglect mechanic as Findings #43/#44 (no blasting happens anywhere in this file, so none of the 10 hires is ever dispatched into harm). The bankruptcy tick did not move: BANKRUPTCY_THRESHOLD is $5,000, the spree ends on $0, so the run is under the threshold from the first tick exactly as it was when it overdrew, and BANKRUPTCY_GRACE_TICKS = 100 still expires at tick 100. Verified in both command mode and a real browser, 74/74 steps, 0 failures."
       }
     }
   ]

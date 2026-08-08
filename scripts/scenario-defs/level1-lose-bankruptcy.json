@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-bankruptcy",
-  "description": "Level 1 losing scenario: overspend on buildings and employees with no income",
+  "description": "Level 1 losing scenario: buy the whole fleet and a full crew, earn nothing, go bankrupt on running costs. The level is funded to exactly the shopping list ($147,500 on `campaign start`) so every purchase is a click a real player could make -- the scenario no longer reaches its loss by overdrawing on a purchase the UI would have refused. It reaches it the way the game intends: BANKRUPTCY_THRESHOLD is $5,000 (balance.ts), the spree ends on $0, and BANKRUPTCY_GRACE_TICKS = 100 ticks of payroll and upkeep with zero income finish the job at tick 100.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -18,19 +18,20 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:147500",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:147500"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 147500
         }
-      }
+      },
+      "description": "cash:147500 sits on `campaign start` because that is the step that decides the level's cash: createGameForLevel builds a brand-new GameState from dusty_hollow's own $50,000, so a bump on the preceding `new_game` would be discarded. The figure is deliberately exact -- $140,000 of vehicles (rock_digger $50,000 + debris_hauler $25,000 + drill_rig $35,000 + building_destroyer $30,000) plus $7,500 of hires ($1,000 + $1,000 + $1,500 + $800 + $1,200 + $2,000) -- so the shopping spree this scenario is about completes on enabled buttons and lands the player on exactly $0. Not a penny of slack: BANKRUPTCY_THRESHOLD is $5,000 (balance.ts), so the player is under it from the first tick and payroll, not an overdraw the UI would have refused, is what finishes them."
     },
     {
       "command": "time resume",
@@ -43,7 +44,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 147500
         }
       }
     },
@@ -68,7 +69,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 147500,
           "buildingCount": 0
         }
       }
@@ -84,7 +85,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 147500,
           "buildingCount": 0
         }
       }
@@ -100,7 +101,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 147500,
           "buildingCount": 0
         }
       }
@@ -116,7 +117,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 147500,
           "buildingCount": 0
         }
       }
@@ -132,7 +133,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 147500,
           "buildingCount": 0
         }
       }
@@ -148,7 +149,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`).",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 147500,
           "buildingCount": 0
         },
         "note": "confirmed via direct trace: all six declared building types are invalid, none of them ever exist -- this file's own \"overspend on buildings\" half of its premise never actually happens, only vehicles and employees genuinely drive the overspend below."
@@ -183,7 +184,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 0,
+          "cash": 97500,
           "vehicleCount": 1
         }
       }
@@ -192,49 +193,64 @@
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the level is funded for the full fleet, so this is a real click on the debris_hauler tier-1 row ($25,000) in the panel already open from the rock_digger buy. awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -25000,
+          "cash": 72500,
           "vehicleCount": 2
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy drill_rig"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the level is funded for the full fleet, so this is a real click on the drill_rig tier-1 row ($35,000) in the panel already open from the rock_digger buy. awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -60000,
+          "cash": 37500,
           "vehicleCount": 3
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy building_destroyer",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy building_destroyer"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the level is funded for the full fleet, so this is a real click on the building_destroyer tier-1 row ($30,000) in the panel already open from the rock_digger buy. awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": -90000,
+          "cash": 7500,
           "vehicleCount": 4
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "finances",
@@ -250,97 +266,131 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the driller row ($1,000). Opens the Crew panel first; the five hires below reuse it.",
       "expect": {
         "equals": {
-          "cash": -91000,
+          "cash": 6500,
           "employeeCount": 1
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the driller row ($1,000).",
       "expect": {
         "equals": {
-          "cash": -92000,
+          "cash": 5500,
           "employeeCount": 2
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the blaster row ($1,500).",
       "expect": {
         "equals": {
-          "cash": -93500,
+          "cash": 4000,
           "employeeCount": 3
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the driver row ($800).",
       "expect": {
         "equals": {
-          "cash": -94300,
+          "cash": 3200,
           "employeeCount": 4
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the surveyor row ($1,200).",
       "expect": {
         "equals": {
-          "cash": -95500,
+          "cash": 2000,
           "employeeCount": 5
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:manager"
+          "type": "awaitUsable",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the manager row ($2,000).",
       "expect": {
         "equals": {
-          "cash": -97500,
+          "cash": 0,
           "employeeCount": 6
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "finances",
@@ -363,7 +413,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -101660,
+          "cash": -4160,
           "tickCount": 10,
           "bankrupt": false
         }
@@ -390,7 +440,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -105820,
+          "cash": -8320,
           "tickCount": 20
         }
       }
@@ -416,7 +466,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -109980,
+          "cash": -12480,
           "tickCount": 30
         }
       }
@@ -452,7 +502,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -114220,
+          "cash": -16720,
           "tickCount": 45
         }
       }
@@ -478,7 +528,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -122460,
+          "cash": -24960,
           "tickCount": 60
         }
       }
@@ -504,7 +554,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -126700,
+          "cash": -29200,
           "tickCount": 75
         }
       }
@@ -540,7 +590,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -134940,
+          "cash": -37440,
           "tickCount": 90
         }
       }
@@ -566,13 +616,13 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -139180,
+          "cash": -41680,
           "tickCount": 105,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "note": "confirmed via direct trace: this is the tick where cumulative overspend on vehicles/employees with no offsetting income finally crosses BANKRUPTCY_THRESHOLD -- the file's own premise, proven for real."
+        "note": "confirmed via direct trace: `[tick 100] BANKRUPTCY! The mine is seized.` Cash sat under the $5,000 BANKRUPTCY_THRESHOLD from the first tick -- the spree ends on exactly $0 -- so the 100-tick grace window (BANKRUPTCY_GRACE_TICKS) expires at tick 100 and this `tick 15` step is the one that crosses it. Funding the level for its purchases did not save it and did not move the bankruptcy tick: it is payroll and upkeep against no income that does the killing, which is a truer test than an overdraw no player could perform."
       }
     },
     {
@@ -596,7 +646,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -147420,
+          "cash": -49920,
           "tickCount": 120,
           "bankrupt": true
         }
@@ -653,7 +703,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -147420,
+          "cash": -49920,
           "tickCount": 120,
           "bankrupt": true,
           "levelEnded": true,

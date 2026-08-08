@@ -3,11 +3,11 @@
   "description": "Level 2 (Grumpstone Ridge): 3 surveys, 4 blasts, and 5 contract attempts with a debris_hauler bought but never driven -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and no delivery ever succeeds; see Findings #59-#60 for the real trajectory asserted instead.",
   "steps": [
     {
-      "command": "new_game seed:2277",
+      "command": "new_game seed:2277 cash:150000",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:2277"
+          "command": "new_game seed:2277 cash:150000"
         }
       ],
       "role": "setup",
@@ -18,9 +18,10 @@
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 50000
+          "cash": 150000
         }
-      }
+      },
+      "description": "cash:150000 sits on `new_game`, not on the `campaign start` below, because that `campaign start` fails outright -- grumpstone_ridge is tier-2 and locked on a fresh campaign (Finding #59) -- so it never replaces this state and a `cash:` on it would be discarded with the rest of the command. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs: by then hiring, surveys and 32 ticks of payroll have spent the level down, and $110,000 of vehicles (rock_digger $50,000 + debris_hauler $25,000 + drill_rig $35,000) has to fit inside what is left, on enabled dealership rows, instead of being overdrawn."
     },
     {
       "command": "campaign start level:grumpstone_ridge",
@@ -38,9 +39,10 @@
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 50000
+          "cash": 150000
         }
-      }
+      },
+      "description": "No `cash:` here on purpose: this command fails (tier-2 level, locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it."
     },
     {
       "command": "time resume",
@@ -58,7 +60,7 @@
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 50000
+          "cash": 150000
         }
       }
     },
@@ -78,7 +80,7 @@
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 50000,
+          "cash": 150000,
           "wellBeing": 50,
           "safety": 50,
           "ecology": 50,
@@ -102,7 +104,7 @@
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 50000
+          "cash": 150000
         }
       }
     },
@@ -130,7 +132,7 @@
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 48800
+          "cash": 148800
         }
       }
     },
@@ -154,7 +156,7 @@
           "employeeCount": 2,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 47600
+          "cash": 147600
         }
       }
     },
@@ -178,7 +180,7 @@
           "employeeCount": 3,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 46600
+          "cash": 146600
         }
       }
     },
@@ -202,7 +204,7 @@
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 45600
+          "cash": 145600
         }
       }
     },
@@ -226,7 +228,7 @@
           "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 44100
+          "cash": 144100
         }
       }
     },
@@ -250,7 +252,7 @@
           "employeeCount": 6,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 42600
+          "cash": 142600
         }
       }
     },
@@ -274,7 +276,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 41800
+          "cash": 141800
         }
       }
     },
@@ -294,7 +296,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 41800
+          "cash": 141800
         }
       }
     },
@@ -314,7 +316,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 41800
+          "cash": 141800
         }
       }
     },
@@ -334,7 +336,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 41800
+          "cash": 141800
         }
       }
     },
@@ -354,7 +356,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 41800
+          "cash": 141800
         }
       }
     },
@@ -398,7 +400,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 38800
+          "cash": 138800
         }
       }
     },
@@ -438,7 +440,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 38000
+          "cash": 138000
         }
       }
     },
@@ -478,7 +480,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 36500
+          "cash": 136500
         }
       }
     },
@@ -498,7 +500,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 36500
+          "cash": 136500
         }
       }
     },
@@ -518,7 +520,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 36500
+          "cash": 136500
         }
       }
     },
@@ -538,7 +540,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 36500
+          "cash": 136500
         }
       }
     },
@@ -558,7 +560,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 36500
+          "cash": 136500
         }
       }
     },
@@ -578,7 +580,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 31680
+          "cash": 131680
         }
       }
     },
@@ -598,7 +600,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
-          "cash": 31680
+          "cash": 131680
         }
       }
     },
@@ -618,7 +620,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 26860
+          "cash": 126860
         }
       }
     },
@@ -638,7 +640,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 26860
+          "cash": 126860
         }
       }
     },
@@ -658,7 +660,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -678,7 +680,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -698,7 +700,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -718,7 +720,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -738,7 +740,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -758,7 +760,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -778,7 +780,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -798,7 +800,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -818,7 +820,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 22040
+          "cash": 122040
         }
       }
     },
@@ -826,11 +828,19 @@
       "command": "vehicle buy rock_digger",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy rock_digger"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the fleet, so this is a real click on the rock_digger tier-1 row ($50,000). awaitUsable is the affordability assertion. Opens the Fleet panel first; the two buys below reuse it.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -838,19 +848,24 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -27960
+          "cash": 72040
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -858,19 +873,24 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -52960
+          "cash": 47040
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy drill_rig"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost at this point, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the fleet, so this is a real click on the drill_rig tier-1 row ($35,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -878,9 +898,10 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960
+          "cash": 12040
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "vehicle list",
@@ -898,7 +919,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960
+          "cash": 12040
         }
       }
     },
@@ -918,7 +939,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960
+          "cash": 12040
         }
       }
     },
@@ -964,7 +985,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960,
+          "cash": 12040,
           "holeCount": 24,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -991,7 +1012,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960,
+          "cash": 12040,
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 0
@@ -1018,7 +1039,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960,
+          "cash": 12040,
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 24
@@ -1061,7 +1082,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960,
+          "cash": 12040,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -1084,7 +1105,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960
+          "cash": 12040
         }
       }
     },
@@ -1104,7 +1125,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960
+          "cash": 12040
         }
       }
     },
@@ -1124,7 +1145,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960,
+          "cash": 12040,
           "wellBeing": 63.4000000000001,
           "safety": 50,
           "ecology": 50,
@@ -1148,7 +1169,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -87960
+          "cash": 12040
         }
       }
     },
@@ -1168,7 +1189,7 @@
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -77960
+          "cash": 22040
         }
       }
     },
@@ -2548,7 +2569,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "Findings #59-#60: `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default -- same class as Finding #58/the already-documented treranium_depths issue), so this file runs against the substitute new_game world throughout; not fixed here for the same reason. `employee assign_skill` used the same rejected positional syntax as Finding #45/#54 -- fixed to `skill:geology level:N`. All 5 of the `build` commands (`office`/`storage_depot`/`canteen`/`medical_bay`/`break_room`) name nonexistent building types, matching the established Finding #5/#47/#58 no-op pattern -- left unmarked rather than fixed, consistent with precedent. A `debris_hauler` is bought (along with a rock_digger and drill_rig) but never assigned a driver and never sent on a single `vehicle haul` -- despite 4 real blasts, `storedMassKg` stays 0 for the whole file and all 5 contract deliveries fail honestly for lack of storage; not fixed here either, since the hauling mechanism is already proven end-to-end by `level1-playthrough-win.json` and re-proving it here would cost the same again for no new verification value (Finding #59). Unusually for this batch, the file's own hardcoded contract IDs (1, 2, 3, 4, 5) all happened to match the real, currently-available pool at every listing -- no ID-mismatch fix was needed here, unlike every other multi-cycle-contract file this session. Finding #52's drill-grid class recurred a 4th time across all 4 of this file's grids (declared 12/16/20/20 holes vs. real 24/25/30/48) -- fixed the same way. The corrected, far larger grids are violent enough to kill 2 employees during the very first blast (deathCount 0→2, tick 32) -- a real, reproducible consequence, not a scenario bug. Discovered while investigating an unexplained $10,000-per-cycle income jump in `finances` output despite every delivery failing: some random events (at least `lucky_strike`) resolve silently and instantly inside a `tick` call -- the tick command's own output says 'No events fired' even as the event's transaction (`category:'contracts', description:'Event: lucky_strike'`) is added to the finance log -- a materially different mechanic from every other file's pending-choice events (`[tick N] EVENT: Name` + a required `event choose`). Because this file has real (if silent) events firing, `cash` is hard-asserted only through tick 32 (the first such event) and left unasserted after that, per Ground rule #12/Finding #34's established treatment, rather than assumed safe just because no `event choose` step was ever needed (Finding #60). No bankruptcy, revolt, or ecological shutdown within this file's 62-tick budget -- cash ends around -$67k but never crosses the sustained-100-tick grace threshold; safety and nuisance both bottom out at 0 from the accumulated real blast violence, matching the pattern from `level1-win-efficient.json`. Verified in both command mode and a real browser (interaction mode re-run twice for determinism, both clean), 108/108 steps."
+        "note": "Findings #59-#60: `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default -- same class as Finding #58/the already-documented treranium_depths issue), so this file runs against the substitute new_game world throughout; not fixed here for the same reason. `employee assign_skill` used the same rejected positional syntax as Finding #45/#54 -- fixed to `skill:geology level:N`. All 5 of the `build` commands (`office`/`storage_depot`/`canteen`/`medical_bay`/`break_room`) name nonexistent building types, matching the established Finding #5/#47/#58 no-op pattern -- left unmarked rather than fixed, consistent with precedent. A `debris_hauler` is bought (along with a rock_digger and drill_rig) but never assigned a driver and never sent on a single `vehicle haul` -- despite 4 real blasts, `storedMassKg` stays 0 for the whole file and all 5 contract deliveries fail honestly for lack of storage; not fixed here either, since the hauling mechanism is already proven end-to-end by `level1-playthrough-win.json` and re-proving it here would cost the same again for no new verification value (Finding #59). Unusually for this batch, the file's own hardcoded contract IDs (1, 2, 3, 4, 5) all happened to match the real, currently-available pool at every listing -- no ID-mismatch fix was needed here, unlike every other multi-cycle-contract file this session. Finding #52's drill-grid class recurred a 4th time across all 4 of this file's grids (declared 12/16/20/20 holes vs. real 24/25/30/48) -- fixed the same way. The corrected, far larger grids are violent enough to kill 2 employees during the very first blast (deathCount 0→2, tick 32) -- a real, reproducible consequence, not a scenario bug. Discovered while investigating an unexplained $10,000-per-cycle income jump in `finances` output despite every delivery failing: some random events (at least `lucky_strike`) resolve silently and instantly inside a `tick` call -- the tick command's own output says 'No events fired' even as the event's transaction (`category:'contracts', description:'Event: lucky_strike'`) is added to the finance log -- a materially different mechanic from every other file's pending-choice events (`[tick N] EVENT: Name` + a required `event choose`). Because this file has real (if silent) events firing, `cash` is hard-asserted only through tick 32 (the first such event) and left unasserted after that, per Ground rule #12/Finding #34's established treatment, rather than assumed safe just because no `event choose` step was ever needed (Finding #60). No bankruptcy, revolt, or ecological shutdown within this file's 62-tick budget; safety and nuisance both bottom out at 0 from the accumulated real blast violence, matching the pattern from `level1-win-efficient.json`. ▸ 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The three vehicle buys used to overdraw to -$87,960 and stay there; the run is now funded with `new_game seed:2277 cash:150000` and they are `role: 'player'` clicks on enabled dealership rows, so cash never goes negative at all and ends at $32,530. Bankruptcy was never in play here before and still is not. Verified in both command mode and a real browser (interaction mode re-run twice for determinism, both clean), 108/108 steps."
       }
     }
   ]
