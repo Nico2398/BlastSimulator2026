@@ -205,6 +205,40 @@ more confident and more wrong than the first guess.
 Always: `npm run scenarios > <file> 2>&1; echo "EXIT: $?"` — then analyse the
 complete file. Same for `npm run test` and any scenario run.
 
+## ✅ DELIVERABLE 2c COMPLETE — 11 scenarios funded, suite 126/126
+
+All fallout from the console funds guard is closed. Verified independently:
+`npm run scenarios` → **126/126 passed, 0 failed, exit 0** (full log captured,
+not piped through `tail` — see the measurement note above).
+
+**Where the cash cheat goes depends on whether `campaign start` succeeds** —
+the DELIVERABLE 2c table below oversimplifies this, and the correction matters:
+
+| Case | Put `cash:` on | Why |
+|---|---|---|
+| File enters a campaign level that is UNLOCKED | `campaign start` | `createGameForLevel` rebuilds state from `level.startingCash`, discarding any `new_game cash:N` |
+| File's `campaign start` targets a LOCKED level (so the command fails) | `new_game` | The whole command is rejected, so a `cash:` on it is discarded along with everything else. True of `level2-playthrough-bankruptcy`, `level2-playthrough-win` (grumpstone_ridge) and `level3-playthrough-win` (treranium_depths) — Findings #58/#59 |
+| File never enters a campaign at all | `new_game` | It is the only step that sets cash |
+
+Each affected file now records which case it is in its own step description, so
+a later reader does not "fix" it back to the wrong one.
+
+**The losing scenarios still lose, on their original ticks** — this was the
+real risk of funding them and it was checked, not assumed:
+`level1-lose-bankruptcy` funded to land on exactly $0 after its fleet, so it
+stays under the $5,000 `BANKRUPTCY_THRESHOLD` from tick 1 and the 100-tick
+grace window expires unchanged; `level2-playthrough-bankruptcy` likewise, and
+there **only `cash` values changed** — every `tickCount`, `wellBeing`,
+`safety` and `levelEndReason` matched the previous trace, which is the
+strongest available evidence the fix did not distort what the file tests.
+`level1-lose-arrest` still sets `arrested` on its original tick.
+
+**Side benefit: 36 steps became `role: "player"`** across the six, plus 11 in
+the vehicle batch. They had been unmarked on the grounds that no player could
+reach the state — true while the scenario was broke and the button correctly
+disabled, false once funded. That is 47 steps off Finding #74's untagged count
+as a by-product.
+
 ## ▶ DELIVERABLE 2c — scenario fallout from the console funds guard
 
 The user chose option (a): the console must refuse an unaffordable purchase
