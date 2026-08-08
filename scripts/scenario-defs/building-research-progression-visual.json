@@ -1,25 +1,60 @@
 {
   "name": "building-research-progression-visual",
-  "description": "Visual check of the research tier-gate: Tier 1 Research Center placed, a direct Tier 2 attempt rejected, Tier 2 researched instantly (cost-only), an early Tier 3 attempt rejected by the conditions gate, then Tier 3 progresses over ticks and becomes buildable once its own Tier 2 research has completed",
+  "description": "Visual check of the research tier-gate and the full T1 -> T2 -> T3 progression: Tier 1 Research Center placed, a direct Tier 2 attempt rejected before research, Tier 2 researched instantly (cost-only), an early Tier 3 attempt rejected by the conditions gate, then Tier 2 built for real once researched, Tier 3 research queued and progressed over its 50-tick duration, and finally a Tier 3 Research Center built. Starting cash is a setup cheat sized to cover the whole chain ($25,000 + $5,000 + $60,000 + $12,000 + $120,000 = $222,000 plus upkeep), the same treatment its sibling building-research-visual.json uses — every purchase here is one the player could genuinely afford and click.",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:230000",
+      "description": "Setup cheat: the whole T1->T2->T3 chain costs $222,000 in construction and research, so the default $50,000 start cannot reach the end of this file. $230,000 funds every purchase legitimately — the console refuses what a player could not afford, so an underfunded start would stop this scenario at the Tier 2 build.",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:230000"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 230000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build research_center at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 205000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build list",
@@ -28,17 +63,25 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build research_center at:15,5 tier:2",
-      "description": "Rejected — tier 2 has not been researched yet.",
+      "description": "Left unmarked: the Place button is genuinely disabled here because Tier 2 is not researched yet (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`), so a real player could not click it. Cash is not the reason — $205,000 comfortably covers the $60,000 Tier 2 cost; only the research lock blocks it. The console command reproduces the same rejection the disabled button would.",
       "interaction": [
         {
           "type": "command",
           "command": "build research_center at:15,5 tier:2"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 205000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 not yet researched (funds are ample)"
+      }
     },
     {
       "command": "build list",
@@ -47,36 +90,71 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "research queue type:research_center tier:2",
       "description": "Tier-2 (first upgrade) is cost-only — no duration, no conditions.",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 200000
+        }
+      }
     },
     {
       "command": "research queue type:research_center tier:3",
       "description": "Rejected (conditions_not_met) — tier-3's own condition (tier-2 research completed) is not yet satisfied: tier-2 is only queued, not yet processed by a tick. Demonstrates the conditions gate before the flow below completes tier-2 and queues tier-3 successfully.",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 research is only queued, not yet completed"
+      }
     },
     {
       "command": "research status",
+      "description": "Tier-2 research is queued and still pending — nothing has ticked yet.",
       "interaction": [
         {
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 1",
@@ -86,26 +164,62 @@
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "tiny ambient drain from the tick itself, separate from the research (paid in full at queue time) — decreased not equals per Finding #12"
+      }
     },
     {
       "command": "research status",
+      "description": "Tier-2 research has completed — the queue is empty again and the Tier 2 Research Center is unlocked.",
       "interaction": [
         {
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build research_center at:15,5 tier:2",
-      "description": "Now succeeds — tier 2 was just researched.",
+      "description": "A real player click now: Tier 2 is researched and the $60,000 cost is affordable, so the Place button is enabled and the tile picker completes the purchase. This is the step the old, underfunded version of this file could only pass by overdrawing through the console — with the funds guard in place and enough starting cash, the same build succeeds legitimately through the UI.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:15,5 tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "tier 2 now buildable — real unlock. cash uses decreased not equals since this follows a tick step (Finding #12)"
+      }
     },
     {
       "command": "build list",
@@ -114,74 +228,129 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "research queue type:research_center tier:3",
-      "description": "Now succeeds — tier-3's condition (tier-2 research completed) is satisfied. This task carries real duration (50 ticks), unlike the cost-only tier-2 task above.",
+      "description": "Now succeeds — tier-3's condition (tier-2 research completed) is satisfied and the $12,000 cost is affordable. Unlike tier-2, tier-3 research has a real 50-tick duration, which the two tick steps below advance.",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "queued for real — cash uses decreased not equals since building upkeep has been accruing since the tick step (Finding #12)"
+      }
     },
     {
       "command": "research status",
+      "description": "Tier-3 research is in progress — queued this tick, 50 ticks still to run.",
       "interaction": [
         {
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
+      "description": "First slice of tier-3's 50-tick research duration.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "research status",
-      "description": "Tier-3 task still in progress — ticksRemaining has decreased by 10 but has not reached 0.",
+      "description": "Tier-3 research is still in progress — 10 of its 50 ticks are done.",
       "interaction": [
         {
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 40",
+      "description": "Remaining 40 ticks — carries tier-3 research to its full 50-tick duration.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 40"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "research status",
-      "description": "Tier-3 research has now completed (50 ticks total) — queue is empty again.",
+      "description": "Tier-3 research has completed at the 50-tick mark — the queue is empty and the Tier 3 Research Center is unlocked.",
       "interaction": [
         {
           "type": "command",
           "command": "research status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build research_center at:25,5 tier:3",
-      "description": "Now succeeds — tier 3 was just researched.",
+      "description": "A real player click: tier 3 is researched, so the Place button is enabled and the $120,000 build completes. The full T1->T2->T3 progression this file is named for now genuinely runs end to end.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:25,5 tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        },
+        "note": "tier 3 built for real — the progression completes, matching this file's own name"
+      }
     },
     {
       "command": "build list",
@@ -190,7 +359,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -199,7 +369,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -208,7 +379,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

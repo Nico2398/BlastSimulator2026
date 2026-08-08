@@ -13,34 +13,128 @@
           "type": "keypress",
           "key": "KeyN"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "holeCount": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:5,5",
+      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (5,5)-(10,10) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle — the command and the click were silently testing two different grids. Caught by adding expect.equals.holeCount (issue #479 follow-up); fixed by describing what the click actually produces instead of an unverified guess.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 5,
+          "x2": 10,
+          "z2": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        }
+      }
     },
     {
       "command": "build management_office at:2,2",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:2,2"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 2
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "increased": ["buildingCount"],
+        "equals": {
+          "cash": 42000
+        },
+        "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost)"
+      }
     },
     {
       "command": "build_ramp origin:1,20 direction:south length:10 depth:8",
       "interaction": [
         {
-          "type": "command",
-          "command": "build_ramp origin:1,20 direction:south length:10 depth:8"
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 1,
+          "z1": 20,
+          "x2": 1,
+          "z2": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 41000
+        },
+        "note": "confirmed against the real state dump (1000 for this 10-tile ramp), not computed from the pricing formula"
+      }
     },
     {
       "command": "state full",
@@ -49,7 +143,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -58,7 +153,11 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": ["tickCount"]
+      }
     }
   ],
   "shots": [

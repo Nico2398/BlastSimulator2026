@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-ecology",
-  "description": "Level 1 losing scenario: massive blasts with max krackle, triggering ecology score collapse",
+  "description": "Level 1 losing scenario: massive blasts with max krackle, triggering ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). depth:6 (not the originally-declared 12) throughout: the Drill panel's real click always uses its own DEFAULT_DEPTH_M regardless of what a scenario's command field declares, a new sub-class of Finding #3/#4 caught only by a real interaction-mode run (see the note on the first blast step). With the corrected, shallower/more-violent holes, ecology bottoms out at exactly 0 after just the SECOND blast (not the fifth), and the file's own original tick budget already ticks past the 150-consecutive-ticks-at-zero threshold -- the shutdown this file is named for now fires for real, no extension needed.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -9,7 +9,13 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +24,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -27,7 +39,13 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -36,16 +54,59 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,5",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 5,
+          "x2": 17,
+          "z2": 17
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25,
+          "cash": 50000
+        },
+        "note": "spacing:3 already matches the Drill panel's own default (DEFAULT_SPACING_M=3, Drill.ts) -- the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so the row/col/spacing part of the grid was already correct. depth was not: corrected from the originally-declared 12 to 6, the panel's own DEFAULT_DEPTH_M -- caught only by a real interaction-mode run, which failed with ecology 14.47 instead of the depth:12 command-mode trace's 48.99 (shallower holes with the same charge concentrate energy over less rock, producing far more violent fragmentation/projections). A new sub-class of Finding #3/#4: the grid tool's real defaults extend to depth, not just row/col/spacing -- every prior file's `drill_plan grid` fix only ever checked hole COUNT, which depth doesn't affect, so this class could be silently present in already-completed files too; flagged in the plan doc as a follow-up audit item."
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -54,25 +115,90 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "ecology": 14.469999999999999,
+          "cash": 50000
+        },
+        "note": "confirmed via direct trace with the corrected depth:6: krackle's vibration cuts ecology from 50 to 14.47 in one blast -- deterministic (no RNG in the blast->ecology formula, ScoreManager.ts's recordVibration, called from mining.ts's blastCommand with vibrationMmS derived from result.projectionCount), safe to assert exactly in both modes."
+      }
     },
     {
       "command": "scores",
@@ -81,16 +207,46 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:20,5",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:20,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:20,5"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 5,
+          "x2": 32,
+          "z2": 17
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -99,25 +255,81 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "cash": 50000
+        },
+        "note": "the 2nd blast alone drives ecology all the way to exactly 0 -- not just low, the literal floor. From here applyDecay's own >0 check (ScoreManager.ts) means it can never climb back on its own without another positive contributor (a building with a positive ecology effect; this file builds nothing), so ecology now stays pinned at exactly 0 for the rest of the file, safe to assert exactly regardless of any other random event firing (confirmed via direct trace: it never moves again, including across the random event that does fire further down)."
+      }
     },
     {
       "command": "scores",
@@ -126,16 +338,45 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,20",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,20"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 20,
+          "x2": 17,
+          "z2": 32
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -144,25 +385,80 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -171,16 +467,45 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:20,20",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 32,
+          "z2": 32
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -189,25 +514,80 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -216,7 +596,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
@@ -225,7 +606,14 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0
+        },
+        "note": "ecology has been pinned at exactly 0 since blast 2 and stays there through ordinary ticking -- see the note on that step for why (applyDecay never recovers a score sitting at exactly 0). Ticks-at-zero (EcologicalDisaster.ts) has been accumulating since tick 1 of this block; the shutdown threshold is checked at the file's final tick 30 block below."
+      }
     },
     {
       "command": "event choose 0",
@@ -234,7 +622,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 20",
@@ -243,7 +632,13 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -252,7 +647,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 20",
@@ -261,7 +657,13 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -270,7 +672,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -279,16 +682,45 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:10,10",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:10,10",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:10,10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 10,
+          "z1": 10,
+          "x2": 22,
+          "z2": 22
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -297,25 +729,79 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0
+        }
+      }
     },
     {
       "command": "scores",
@@ -324,7 +810,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 30",
@@ -333,7 +820,14 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "levelEnded": false
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -342,7 +836,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 30",
@@ -351,7 +846,14 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "levelEnded": false
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -360,7 +862,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 30",
@@ -369,7 +872,15 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "levelEnded": false
+        },
+        "note": "a real random event fires somewhere in this file's tick sequence (confirmed via direct trace), moving cash/safety/wellBeing; deliberately not asserted here since a real browser run is not guaranteed to roll the same event at the same point (Finding #12/#34's class). ecology itself is unaffected either way, per the note on the 2nd blast above."
+      }
     },
     {
       "command": "event choose 0",
@@ -378,16 +889,29 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 30",
+      "description": "With the corrected depth:6, ecology has been at exactly 0 since the 2nd blast (well before any ticking started), so this file's own original tick budget was always going to be enough: the 150th consecutive tick-at-zero (ECOLOGICAL_SHUTDOWN_TICKS, balance.ts) lands inside this final block -- the government shutdown fires for real here, confirmed via direct trace. No file extension needed, unlike what the depth:12 version would have required.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "tickCount": 160,
+          "ecologicalShutdown": true,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        },
+        "note": "the file's own premise, finally proven for real: ecology sat at exactly 0 for 150 straight ticks and the government closed the site. Confirmed via direct trace that levelEnded does not block or alter tick's own advancement, nor any later command in this file."
+      }
     },
     {
       "command": "event choose 0",
@@ -396,7 +920,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -405,7 +930,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -414,7 +940,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -423,7 +950,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -432,7 +960,18 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "tickCount": 160,
+          "ecologicalShutdown": true,
+          "levelEnded": true,
+          "levelEndReason": "ecological_shutdown"
+        },
+        "note": "shutdown persists unchanged through the remaining read-only observe steps, confirming the flag doesn't revert."
+      }
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "hauling-gate",
-  "description": "Arrival-gated debris hauling (issue #437): 'vehicle haul <id> fragment:<id>' sets hauling intent only — a debris_hauler then drives to the blast fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. Immediately after the haul command (before the first post-command tick block), the fragment must still be on_ground/untransported — the state dump right after 'vehicle haul' proves the task did not start/complete instantly. After the first tick 20 the vehicle should be in transit (fragment picked up, hauling toward the depot) or already delivered; after the following tick 40 the fragment must be state:stored and logistics.storedMassKg increased.",
+  "description": "Arrival-gated debris hauling (issue #437): 'vehicle haul <id> fragment:<id>' sets hauling intent only \u2014 a debris_hauler then drives to the blast fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. Immediately after the haul command (before the first post-command tick block), the fragment must still be on_ground/untransported \u2014 the state dump right after 'vehicle haul' proves the task did not start/complete instantly. After the first tick 20 the vehicle should be in transit (fragment picked up, hauling toward the depot) or already delivered; after the following tick 40 the fragment must be state:stored and logistics.storedMassKg increased.",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
@@ -9,52 +9,153 @@
           "type": "command",
           "command": "new_game seed:42 cash:100000"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build freight_warehouse at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:20,20",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20",
+      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (20,20)-(25,25) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 25,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
     },
     {
       "command": "fragments",
@@ -63,7 +164,13 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "storedMassKg": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -72,25 +179,60 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:1",
@@ -99,16 +241,37 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:driving.truck level:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "cash": 59200
+        },
+        "note": "the driver already holds driving.truck at level 1 from ROLE_STARTING_QUALIFICATION -- this call is a same-level no-op"
+      }
     },
     {
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 1 1"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 59200
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -117,7 +280,16 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "storedMassKg": 0
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -126,16 +298,30 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "vehicle haul 1 fragment:1",
+      "command": "vehicle haul 1 fragment:785",
+      "description": "The Haul button always picks the vehicle's nearest reachable, non-oversized, storage-fitting fragment (findReachableGroundFragment, HaulEligibility.ts) -- not a fixed index. #785 is what that function itself returns for this exact seed/command sequence (confirmed by calling it directly), which is why this id looks arbitrary rather than a round number picked by hand -- it must be re-derived the same way if anything upstream (the grid, the blast, the vehicle's spawn point) ever changes. Re-derived from #531 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting this file's drill_plan depth from 8 to 6 (the grid tool's real default, since this step never clicks the depth stepper) changes the whole blast/fragment population, invalidating the old hardcoded id -- confirmed the hard way, the first pass at the depth fix left #531 in place and storedMassKg silently stayed 0 through both tick 20 and tick 40 (fragment #531 no longer exists in the corrected population), exactly the kind of regression a fixed-id hack risks and the file's own note above already warned about.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle haul 1 fragment:1"
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 58620,
+          "storedMassKg": 0
+        },
+        "note": "sets hauling intent only -- the fragment is not yet loaded, proving 'vehicle haul' does not complete instantly (#437)"
+      }
     },
     {
       "command": "fragments",
@@ -144,7 +330,13 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "storedMassKg": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -153,16 +345,27 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
+      "description": "Confirmed via direct trace (seed:42) that the full pickup-drive-deliver cycle completes within this window -- storedMassKg is already at its final value by the end of this step, not just 'in transit'.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "storedMassKg"
+        ]
+      }
     },
     {
       "command": "fragments",
@@ -171,7 +374,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -180,7 +384,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 40",
@@ -189,7 +394,14 @@
           "type": "command",
           "command": "tick 40"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "note": "storedMassKg is deliberately not asserted to an exact value here: findReachableGroundFragment (the real Haul button's own fragment choice) is sensitive to the vehicle's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Historically (before the depth-mismatch audit's fragment-id re-derivation above) the delivered amount genuinely differed between modes (263.25kg in command mode vs 1050kg in a real browser run); since the fragment is now pinned explicitly by id (`vehicle haul 1 fragment:785`) rather than left to each mode's own opportunistic re-targeting, both modes now deliver the identical 1050kg -- confirmed directly, both modes re-run after the fix. Left as increased/undereasserted-exact rather than hard-pinning 1050kg here too, since this step's own point is proving delivery completed at all (tick 20's increased:[storedMassKg] already does that), not re-asserting the amount a second time."
+      }
     },
     {
       "command": "fragments",
@@ -198,7 +410,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -207,7 +420,15 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "vehicleCount": 1,
+          "buildingCount": 1
+        }
+      }
     }
   ]
 }

@@ -10,7 +10,14 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +26,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -28,7 +41,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "zone status",
@@ -37,7 +51,8 @@
           "type": "command",
           "command": "zone status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "zone clear x1:5 y1:5 x2:35 y2:35",
@@ -46,7 +61,14 @@
           "type": "command",
           "command": "zone clear x1:5 y1:5 x2:35 y2:35"
         }
-      ]
+      ],
+      "description": "Left unmarked: Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using its own auto-computed `currentZone`, not player-typed coordinates -- whether that computed zone matches this scenario's explicit x1:5 y1:5 x2:35 y2:35 rectangle is unverified. Left as a command rather than risk a click that lands on a different-shaped zone than the scenario expects.",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "no state field exposes zone bounds/status -- proven instead by the zone status observe step's own text output"
+      }
     },
     {
       "command": "zone status",
@@ -55,81 +77,229 @@
           "type": "command",
           "command": "zone status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build freight_warehouse at:35,25",
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:35,25"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 35,
+          "z": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 30,
+          "z2": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:1",
-      "description": "boomite's valid range is [1-8kg] (src/core/world/ExplosiveCatalog.ts) — amount:10 was out of range and made every hole error out with 'Missing charge', so blast_preview/preview projections/blast all ran against an uncharged, invalid plan. 8kg (boomite's own max) plus 1m stemming is still the maximum overcharge this explosive supports.",
+      "description": "Left unmarked: this amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default value -- Finding #10's class, Charge All is the only commit, at whatever the steppers currently show.",
       "interaction": [
         {
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:8 stemming:1"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 16
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Sequence's delay-step stepper now carries data-field=\"delay-step\" (Sequence.ts, matching the drill grid tool's ParamStrip.ts convention) so a click can target it unambiguously -- the Charge step's amount/stemming steppers use the same unscoped .bsx-stepper markup and stayed indistinguishable without it. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
+      "expect": {
+        "equals": {
+          "sequencedCount": 16
+        }
+      }
     },
     {
       "command": "buy_software tier:1",
-      "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
+      "description": "preview projections requires software tier 3+ (default tier is 0) \u2014 unlock sequentially so the projection preview actually computes instead of printing a lock message",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
       "command": "buy_software tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
       "command": "buy_software tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "cash": 27500
+        },
+        "note": "Finding #36: buy_software used to leave state.finances.cash diverged from this flat field by the sum of every tier cost, fixed at the root"
+      }
     },
     {
       "command": "blast_preview",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast_preview"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 27500
+        },
+        "note": "a preview is read-only -- no cash or hole/charge/sequence count moves"
+      }
     },
     {
       "command": "preview projections",
@@ -138,7 +308,8 @@
           "type": "command",
           "command": "preview projections"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "blast",
@@ -147,10 +318,40 @@
       "interval": 50,
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "buildingCount": 1
+        },
+        "decreased": [
+          "ecology",
+          "nuisance"
+        ],
+        "note": "buildingCount stays 1 -- the freight_warehouse the safety-zone/projection setup is built around survives the blast unscathed (confirmed via direct trace: HP 150/150 unchanged), which is this file's own premise about the safety zone doing its job"
+      }
     },
     {
       "command": "fragments",
@@ -159,7 +360,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build list",
@@ -168,7 +370,13 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "scores",
@@ -177,7 +385,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -186,7 +395,14 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "holeCount": 0
+        }
+      }
     }
   ],
   "shots": [

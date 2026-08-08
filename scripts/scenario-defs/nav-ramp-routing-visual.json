@@ -9,27 +9,55 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "description": "Purchase a vehicle before the ramp exists.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle move 1 to:8,20",
-      "description": "Request a route across freshly-generated (single-bench, flat) terrain — the vehicle routes and walks there via real NavGrid A* pathfinding (#407), progressing gradually tick over tick rather than teleporting.",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
       "interaction": [
         {
           "type": "command",
           "command": "vehicle move 1 to:8,20"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 25000
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -38,7 +66,11 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "state full",
@@ -48,45 +80,100 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
       "interaction": [
         {
-          "type": "command",
-          "command": "build_ramp origin:5,15 direction:south length:10 depth:8"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 15,
+          "x2": 5,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "vehicle move 1 to:8,20",
-      "description": "Re-request the same route after build_ramp — still resolves via real A* routing; the ramp construction runs cleanly alongside vehicle movement without breaking navigation.",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
       "interaction": [
         {
           "type": "command",
           "command": "vehicle move 1 to:8,20"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 23960
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee dispatch 1 x:8 z:20",
-      "description": "Send the hired driller walking toward (8,20) via the same real A*-routed, tick-by-tick NavGrid movement as the vehicle above (#407 review round 2) — this is what the scenario's own description claims but the driller previously never received a destination.",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
       "interaction": [
         {
           "type": "command",
           "command": "employee dispatch 1 x:8 z:20"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 22960
+        }
+      }
     },
     {
       "command": "employee list",
@@ -95,16 +182,25 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 30",
+      "description": "Both the vehicle and the driller route through the ramp toward (8,20) -- confirmed via direct trace neither ever goes stuck across the full budget.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "stuckEmployeeCount": 0
+        }
+      }
     },
     {
       "command": "inspect 8,20,0",
@@ -113,7 +209,8 @@
           "type": "command",
           "command": "inspect 8,20,0"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -122,7 +219,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

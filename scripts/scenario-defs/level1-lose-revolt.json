@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-revolt",
-  "description": "Level 1 losing scenario: neglect employee well-being with massive blasting",
+  "description": "Level 1 losing scenario: neglect employee well-being with massive blasting. The premise does not hold in the current implementation, confirmed via direct trace: wellBeing does not crash from idle neglect -- it RISES to 99.95 and stays there, because avgMorale (events.ts) only drops from active negative events (accidents, specific bad event outcomes), never from mere passive neglect, and this file's 6 hired employees are never dispatched anywhere or otherwise harmed. `revolted` (WorkerRevolt.ts, wellBeing<=0 for REVOLT_TICKS consecutive ticks) never triggers as a direct consequence -- it structurally cannot, since wellBeing never even approaches 0. Unlike level1-lose-ecology.json's fix (more ticks of an already-collapsing score), there is no small extension that reaches revolt here, since wellBeing is trending the wrong direction entirely; documenting the real, verified trajectory instead, per the same treatment as Findings #20/#21/#26/#27/#41. depth:6 (not the originally-declared 12) on both drill_plan grid steps, Finding #42/Ground rule #15's class.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -9,7 +9,13 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +24,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -27,61 +39,137 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48000,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47000,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 45500,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44700,
+          "employeeCount": 5
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43500,
+          "employeeCount": 6
+        }
+      }
     },
     {
       "command": "employee list",
@@ -90,7 +178,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -99,7 +188,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -108,7 +206,15 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wellBeing": 50.95000000000002,
+          "tickCount": 5
+        },
+        "note": "confirmed via direct trace: wellBeing rises here, not falls -- avgMorale (events.ts) starts above 50 for freshly-hired, undispatched employees, and nothing negative has happened to them yet. This is the first sign the file's own \"neglect\" premise does not hold in the current implementation (see the top-level description)."
+      }
     },
     {
       "command": "event choose 0",
@@ -117,7 +223,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15). Confirmed via direct trace: zero random events fire anywhere in this file's entire run, making the whole trajectory fully deterministic."
     },
     {
       "command": "tick 5",
@@ -126,7 +233,15 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 40000,
+          "wellBeing": 52.400000000000034,
+          "tickCount": 10
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -135,7 +250,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -144,16 +260,51 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,5",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5",
+      "description": "depth corrected from the originally-declared 12 to 6, the Drill panel's own DEFAULT_DEPTH_M (Drill.ts) -- Finding #42/Ground rule #15's class, caught here before it could fail on a real interaction-mode run (as it first did on level1-lose-ecology.json). spacing:3 already matched the panel's own default; the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so row/col/spacing was already correct.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 5,
+          "x2": 17,
+          "z2": 17
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25,
+          "cash": 40000
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -162,25 +313,88 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 14.469999999999999,
+          "cash": 40000,
+          "deathCount": 0
+        },
+        "note": "none of the 6 employees are standing in the blast zone -- confirmed via direct trace, deathCount stays 0 through both blasts in this file (contrast tutorial-playthrough.json, Finding #40, where the equivalent blast does kill nearby employees)."
+      }
     },
     {
       "command": "scores",
@@ -189,7 +403,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -198,7 +413,14 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "wellBeing": 54.350000000000044,
+          "tickCount": 15
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -207,7 +429,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 5",
@@ -216,7 +439,15 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 36500,
+          "wellBeing": 56.80000000000006,
+          "tickCount": 20
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -225,7 +456,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -234,16 +466,47 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:15,15",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15",
+      "description": "depth corrected from the originally-declared 12 to 6, the Drill panel's own DEFAULT_DEPTH_M -- same fix as the first drill_plan step above. spacing:3 already matched the panel's default; the (15,15)-(27,27) drag is a 12-unit span, round(12/3)+1=5, so row/col/spacing was already correct.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 27,
+          "z2": 27
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25,
+          "cash": 36500
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -252,25 +515,82 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts), constructed once by UIManager at page load with no reset path -- it persists across the blast/re-drill between the two delay_step:10 occurrences in this file, so this occurrence's stepper already reads 10ms from the first occurrence's 3 decrement clicks. Asserted rather than assumed, so a wrong persistence assumption fails loudly instead of silently charging the wrong delay (the bug class blast-detonation-sequence-ui.json had, Finding #75).",
+      "expect": {
+        "equals": {
+          "sequencedCount": 25
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "cash": 36500,
+          "deathCount": 0
+        },
+        "note": "the 2nd blast drives ecology to exactly 0, same mechanism as level1-lose-ecology.json's Finding #42 -- pinned there for the rest of the file per applyDecay's own >0 check (ScoreManager.ts). This file doesn't tick far enough afterward to reach ECOLOGICAL_SHUTDOWN_TICKS (150) though; ecology collapsing is incidental here, not this file's own point."
+      }
     },
     {
       "command": "scores",
@@ -279,7 +599,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -288,7 +609,16 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 33000,
+          "wellBeing": 63.20000000000009,
+          "ecology": 0,
+          "tickCount": 30
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -297,7 +627,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -306,7 +637,15 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 29500,
+          "wellBeing": 71.60000000000011,
+          "tickCount": 40
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -315,7 +654,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -324,7 +664,15 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 26000,
+          "wellBeing": 81.10000000000014,
+          "tickCount": 50
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -333,7 +681,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -342,7 +691,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -351,7 +701,15 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 22500,
+          "wellBeing": 90.60000000000016,
+          "tickCount": 60
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -360,7 +718,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -369,7 +728,17 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 19000,
+          "wellBeing": 99.95,
+          "tickCount": 70,
+          "revolted": false
+        },
+        "note": "wellBeing reaches its own natural ceiling here (99.95, not the clamp's 100) and stays flat for the rest of the file -- the opposite direction from the revolt trigger (wellBeing<=0 for REVOLT_TICKS consecutive ticks, WorkerRevolt.ts), confirming the file's own premise never holds and cannot without a fundamentally different action sequence (see the top-level description)."
+      }
     },
     {
       "command": "event choose 0",
@@ -378,7 +747,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -387,7 +757,15 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 15500,
+          "wellBeing": 99.95,
+          "tickCount": 80
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -396,7 +774,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -405,7 +784,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -414,7 +794,15 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 12000,
+          "wellBeing": 99.95,
+          "tickCount": 90
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -423,7 +811,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -432,7 +821,15 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 8500,
+          "wellBeing": 99.95,
+          "tickCount": 100
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -441,7 +838,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "tick 10",
@@ -450,7 +848,17 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 5000,
+          "wellBeing": 99.95,
+          "tickCount": 110,
+          "revolted": false,
+          "levelEnded": false
+        }
+      }
     },
     {
       "command": "event choose 0",
@@ -459,7 +867,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -468,7 +877,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -477,7 +887,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -486,7 +897,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -495,7 +907,21 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 5000,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "tickCount": 110,
+          "revolted": false,
+          "levelEnded": false,
+          "deathCount": 0,
+          "employeeCount": 6
+        },
+        "note": "final state confirms the file's own premise never holds: revolted stays false and the level never ends, since wellBeing spent this whole file climbing toward its own ceiling instead of collapsing toward the revolt trigger. Same treatment as Findings #20/#21/#26/#27/#41 -- documented as the real, verified behavior rather than the originally-intended-but-unreachable one."
+      }
     }
   ]
 }

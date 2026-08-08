@@ -275,4 +275,102 @@ describe('SavesModal', () => {
     modal.dispose();
     expect(container.querySelector('#bs-saves-modal')).toBeNull();
   });
+
+  // These slots already carried `data-slot` + `data-action` (save-here/load/
+  // delete) before the selector sweep; the names are load-bearing for
+  // save-load-visual.json and i18n-live-locale-switch.json, so they are pinned
+  // here rather than renamed. `:not([data-action])` is how the latter isolates
+  // the close button — that only holds while every slot button carries one.
+  describe('stable selectors', () => {
+    // Queries run from `modal.root` rather than through `#bs-saves-modal …`:
+    // earlier tests in this file leave their (disposed but still id-bearing)
+    // containers in document.body, and an id-prefixed selector resolves
+    // against the first match in the document, not this modal. `root.id` is
+    // asserted once so the selectors below still stand for the real
+    // `#bs-saves-modal [data-slot="…"] [data-action="…"]` a scenario clicks.
+    it('every empty manual slot is addressable by slot id, and the auto slot offers no save button', async () => {
+      const { container, modal } = mount();
+      modal.setBackend(makeBackend());
+      modal.show();
+      await flush();
+      const root = modal.root;
+      expect(root.id).toBe('bs-saves-modal');
+
+      for (let n = 1; n <= 5; n++) {
+        expect(
+          root.querySelector(`[data-slot="slot_${n}"] [data-action="save-here"]`),
+          `no save-here button for slot_${n}`,
+        ).not.toBeNull();
+      }
+      expect(root.querySelector('[data-slot="auto"]')).not.toBeNull();
+      expect(root.querySelector('[data-slot="auto"] [data-action="save-here"]')).toBeNull();
+      modal.dispose();
+      container.remove();
+    });
+
+    it('saving through one slot\'s selector writes that slot, not the first one', async () => {
+      const backend = makeBackend();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      state.cash = 777;
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      modal.setGetState(() => state);
+      modal.show();
+      await flush();
+
+      modal.root.querySelector<HTMLButtonElement>('[data-slot="slot_3"] [data-action="save-here"]')!.click();
+      await flush();
+      expect(backend.store.has('slot_3')).toBe(true);
+      expect(backend.store.has('slot_1')).toBe(false);
+      modal.dispose();
+      container.remove();
+    });
+
+    it('a filled slot exposes load and delete under its own data-slot', async () => {
+      const backend = makeBackend();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      await backend.save('slot_2', 'Slot 2', serialize(state), '$1,000 — Day 2', null);
+      let loaded: GameState | null = null;
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      modal.setOnLoad(s => { loaded = s; });
+      modal.show();
+      await flush();
+
+      expect(modal.root.querySelector('[data-slot="slot_2"] [data-action="save-here"]')).toBeNull();
+      modal.root.querySelector<HTMLButtonElement>('[data-slot="slot_2"] [data-action="load"]')!.click();
+      await flush();
+      expect(loaded).not.toBeNull();
+
+      modal.show();
+      await flush();
+      modal.root.querySelector<HTMLButtonElement>('[data-slot="slot_2"] [data-action="delete"]')!.click();
+      await flush();
+      expect(backend.store.has('slot_2')).toBe(false);
+      modal.dispose();
+      container.remove();
+    });
+
+    it('the close button stays the only data-action-less button ahead of the slot list', async () => {
+      const backend = makeBackend();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      await backend.save('slot_1', 'Slot 1', serialize(state), '$1,000 — Day 2', null);
+      const { container, modal } = mount();
+      modal.setBackend(backend);
+      modal.show();
+      await flush();
+
+      // i18n-live-locale-switch.json closes this modal with
+      // `#bs-saves-modal button:not([data-action])` — export/import are also
+      // action-less, so that selector only works while the close button comes
+      // first in DOM order.
+      const bare = modal.root.querySelectorAll<HTMLButtonElement>('button:not([data-action])');
+      expect(bare.length).toBeGreaterThan(0);
+      expect(bare[0]!.querySelector('bs-icon[name="x"]')).not.toBeNull();
+      bare[0]!.click();
+      expect(modal.visible).toBe(false);
+      modal.dispose();
+      container.remove();
+    });
+  });
 });

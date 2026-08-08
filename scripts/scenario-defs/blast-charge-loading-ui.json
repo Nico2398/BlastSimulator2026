@@ -4,22 +4,67 @@
   "steps": [
     {
       "command": "new_game seed:42",
-      "timeout": 10,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(25,25) rectangle computes the declared 3x3 instead of the default-spacing 4x4 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 25,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        },
+        "note": "3 rows x 3 cols = 9"
+      }
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:3 stemming:2",
@@ -28,7 +73,8 @@
           "type": "command",
           "command": "charge hole:H1 explosive:boomite amount:3 stemming:2"
         }
-      ]
+      ],
+      "description": "charge hole:H1 explosive:boomite amount:3 stemming:2 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "charge hole:H2 explosive:boomite amount:8 stemming:2",
@@ -37,7 +83,8 @@
           "type": "command",
           "command": "charge hole:H2 explosive:boomite amount:8 stemming:2"
         }
-      ]
+      ],
+      "description": "charge hole:H2 explosive:boomite amount:8 stemming:2 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "charge hole:H3 explosive:boomite amount:5 stemming:1",
@@ -46,16 +93,24 @@
           "type": "command",
           "command": "charge hole:H3 explosive:boomite amount:5 stemming:1"
         }
-      ]
+      ],
+      "description": "charge hole:H3 explosive:boomite amount:5 stemming:1 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        },
+        "note": "Charge All applies uniformly to every hole, overwriting the 3 individual per-hole charges set above — the H5 override below then re-charges just that one hole again after this"
+      }
     },
     {
       "command": "charge hole:H5 explosive:boomite amount:7 stemming:3",
@@ -64,7 +119,8 @@
           "type": "command",
           "command": "charge hole:H5 explosive:boomite amount:7 stemming:3"
         }
-      ]
+      ],
+      "description": "charge hole:H5 explosive:boomite amount:7 stemming:3 — no per-hole charging in the UI by design (Charge.ts's own header: \"per-hole charging isn't a feature here anyway\"); only Charge All exists. Left as a command (Finding #10)."
     }
   ],
   "shots": [

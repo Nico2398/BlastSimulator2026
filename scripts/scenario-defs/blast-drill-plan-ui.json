@@ -10,16 +10,61 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:12,12",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts) — dragging this rectangle at that default would compute a different rows/cols than this command declares (round(15/3)+1=6 cols, round(10/3)+1=4 rows, not 4x3). Two increment clicks on the strip's own spacing stepper (data-field=\"spacing\", added so this is reachable at all) raise it 3->5 before dragging, so the click reaches the exact grid the command names.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:12,12"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 12,
+          "z1": 12,
+          "x2": 27,
+          "z2": 22
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 12
+        },
+        "note": "3 rows x 4 cols = 12, matching the command's declared pattern now that the click actually uses spacing:5"
+      }
     },
     {
       "command": "drill_plan show",
@@ -28,16 +73,62 @@
           "type": "command",
           "command": "drill_plan show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:10 start:20,20",
+      "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:10 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 28,
+          "z2": 28
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 BlastWorkshop auto-advances Drill -> Charge once holes exist, so re-using the grid tool needs an explicit click back to the Drill tab ([data-step=\"1\"]) first. The spacing stepper also carries its value over from the first grid above (now 5, not the 3m default) — 3 more increments reach this step's declared spacing:8 (round(8/8)+1=2 cols/rows, matching rows:2 cols:2) before dragging. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. Only holeCount is asserted here (depth-insensitive), so this is a metadata-only correction.",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        }
+      }
     },
     {
       "command": "drill_plan show",
@@ -46,7 +137,8 @@
           "type": "command",
           "command": "drill_plan show"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

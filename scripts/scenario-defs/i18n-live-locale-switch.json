@@ -6,49 +6,101 @@
       "command": "new_game seed:42",
       "timeout": 15,
       "interaction": [
-        { "type": "command", "command": "new_game seed:42" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
-        { "type": "command", "command": "campaign start level:dusty_hollow" }
-      ]
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
       "interaction": [
-        { "type": "command", "command": "time resume" }
-      ]
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
       "description": "Open the Settings panel via the toolbar — English baseline, panel now open.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
-        { "type": "waitForSelector", "selector": "#bs-settings-panel" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-settings-panel"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-settings-panel [data-lang=\"fr\"]"
+      }
     },
     {
       "command": "state full",
       "description": "Click FR inside the still-open Settings panel WITHOUT closing it. Core Bug 1 regression: title, English/French buttons, Close button, and toolbar captions must switch to French in place.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-settings-panel [data-lang=\"fr\"]" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel [data-lang=\"fr\"]"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-settings-panel",
+        "note": "the panel itself must still be usable (not torn down/rebuilt broken) after switching locale in place — the actual French text is verified visually via screenshot, not state, since expect has no text-content field"
+      }
     },
     {
       "command": "state full",
       "description": "Open the Build menu (Settings auto-hides via the toolbar's mutual-exclusion) — panel opened fresh while locale is already French, confirming the switch persists beyond the panel that triggered it.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
-        { "type": "waitForSelector", "selector": "#bs-build-panel, .bs-build-panel" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel, .bs-build-panel"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-settings-panel [data-lang=\"fr\"]",
+        "note": "toolbar panels are mutually exclusive — opening Build must hide Settings"
+      }
     },
     {
       "command": "event fire union_coffee_uprising",
-      "description": "Fire an event while locale is French — dialog title/description/option labels must render in French, not English.",
+      "description": "Fire an event while locale is French — dialog title/description/option labels must render in French, not English. — `event fire` is a test hook with no UI and none intended. Left unmarked.",
       "interaction": [
-        { "type": "command", "command": "event fire union_coffee_uprising" }
+        {
+          "type": "command",
+          "command": "event fire union_coffee_uprising"
+        }
       ]
     },
     {

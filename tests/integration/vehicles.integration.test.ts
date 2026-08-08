@@ -27,10 +27,19 @@ import { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS } from '../../src/core/
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
-/** Build a fresh context with a real GameState (seed=42, desert biome). */
+/**
+ * Build a fresh context with a real GameState (seed=42, desert biome).
+ *
+ * `cash:` is raised well above the $50,000 default because `vehicle buy` now
+ * refuses an unaffordable purchase instead of overdrawing, and this file's
+ * fleets cost more than the default balance: all five T1 roles come to
+ * $172,000 and a single T3 drill_rig is $140,000. Money is never what these
+ * tests are about — every cash assertion here is relative to `cashBefore` —
+ * so the fix is to fund the fixture, not to weaken the guard.
+ */
 function makeCtx(): GameContext {
   const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '1000000' });
   return ctx;
 }
 

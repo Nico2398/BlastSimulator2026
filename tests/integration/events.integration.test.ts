@@ -207,6 +207,19 @@ describe('Event system', () => {
     expect(sentenceIdx).toBeLessThan(consequencesIdx);
   });
 
+  it('event choose applies cashDelta to the flat state.cash field, not just state.finances.cash', () => {
+    ctx.state!.events.pendingEvent = { eventId: 'union_coffee_uprising', firedAtTick: ctx.state!.tickCount };
+    const cashBefore = ctx.state!.cash;
+
+    const result = eventCommand(ctx, ['choose', '0'], {});
+
+    // Option 0 of union_coffee_uprising is cashDelta: -8000 with no
+    // probability field, so the plain (non-alt) consequence always applies.
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(cashBefore - 8000);
+    expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
+  });
+
   // ── 3c. event dismiss clears lastOutcome (P8) ──────────────────────────────
 
   it('event dismiss fails when there is no resolved outcome to dismiss', () => {

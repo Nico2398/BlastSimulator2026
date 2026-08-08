@@ -10,7 +10,19 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "employeeCount": 0,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +31,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -28,7 +46,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "scores",
@@ -37,7 +56,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -46,7 +66,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract list",
@@ -55,7 +76,8 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "time status",
@@ -64,7 +86,8 @@
           "type": "command",
           "command": "time status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -73,7 +96,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build list",
@@ -82,7 +106,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "inspect 15,15,0",
@@ -91,7 +116,8 @@
           "type": "command",
           "command": "inspect 15,15,0"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -100,7 +126,20 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "employeeCount": 0,
+          "buildingCount": 0
+        },
+        "note": "this whole file is read-only (scores/finances/contract list/time status/employee list/build list/inspect) -- nothing in state ever moves between the setup and this final check, since its purpose is visual i18n text verification, not gameplay"
+      }
     }
   ],
   "shots": [

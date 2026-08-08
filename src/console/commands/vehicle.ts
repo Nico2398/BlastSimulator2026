@@ -9,11 +9,13 @@ import {
   unassignDriver,
   destroyVehicle,
   getAllVehicleRoles,
+  getVehicleDefByTier,
   computeScrapResidualValue,
   type VehicleRole,
   type VehicleTask,
   type VehicleTier,
 } from '../../core/entities/Vehicle.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
 import { requestBoardVehicle } from '../../core/entities/VehicleBoarding.js';
 import { requestHaulFragment } from '../../core/economy/HaulingTask.js';
 import { requestBreakBoulder } from '../../core/economy/BoulderBreaking.js';
@@ -69,6 +71,18 @@ export function vehicleCommand(
       if (tier === null) {
         return { success: false, output: 'Usage: vehicle buy <role> tier:(1|2|3)' };
       }
+      // Checked before purchaseVehicle, which *mutates* — it pushes the
+      // vehicle and bumps nextId before it can report a cost. Same predicate
+      // and same cost source as the UI: FleetPanel disables the per-tier
+      // dealership button on `cash < getVehicleDefByTier(role, tier).purchaseCost`,
+      // and that is exactly the `cost` purchaseVehicle returns.
+      const cost = getVehicleDefByTier(type, tier).purchaseCost;
+      if (state.cash < cost) {
+        return {
+          success: false,
+          output: `Insufficient funds: need $${formatMoney(cost)}, have $${formatMoney(state.cash)}`,
+        };
+      }
       // Spawn near grid centre, staggered per fleet index so newly purchased
       // vehicles land on distinct tiles instead of stacking on the depot
       // point — every prior purchase overlapped at one tile, occluding all
@@ -89,7 +103,9 @@ export function vehicleCommand(
       const { x: spawnX, z: spawnZ } = state.navGrid
         ? NavGrid.findNearestReachableCell(state.navGrid, 0, 0, rawSpawnX, rawSpawnZ)
         : { x: rawSpawnX, z: rawSpawnZ };
-      const { vehicle, cost } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
+      // Deducts the same `cost` the guard above tested, so the checked amount
+      // and the charged amount can never drift apart.
+      const { vehicle } = purchaseVehicle(state.vehicles, type, spawnX, spawnZ, tier);
       state.cash -= cost;
       addExpense(state.finances, cost, 'equipment', `Buy ${type}`, state.tickCount);
       return { success: true, output: `Purchased ${type} #${vehicle.id}. Cost: $${cost}` };

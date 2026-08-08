@@ -9,7 +9,15 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:tutorial_pit",
@@ -18,7 +26,13 @@
           "type": "command",
           "command": "campaign start level:tutorial_pit"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 80000
+        }
+      }
     },
     {
       "command": "finances",
@@ -27,34 +41,100 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build freight_warehouse at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build vehicle_depot at:15,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build vehicle_depot at:15,5"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "finances",
@@ -63,7 +143,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -72,7 +153,11 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "finances",
@@ -81,7 +166,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -90,7 +176,11 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "finances",
@@ -99,7 +189,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -108,7 +199,11 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "finances",
@@ -117,7 +212,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -126,7 +222,11 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "finances",
@@ -135,7 +235,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -144,7 +245,14 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "vehicleCount": 1
+        }
+      }
     }
   ]
 }

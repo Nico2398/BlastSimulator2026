@@ -1,6 +1,6 @@
 {
   "name": "rock-fragmenter-breaking",
-  "description": "Chapter 5/2 (#484): an undercharged blast leaves an oversized boulder a debris_hauler must refuse; a crewed rock_fragmenter drives to it, breaks it via 'vehicle break', and a resulting sub-fragment is then hauled and stored — both through console commands and real Vehicles-panel clicks (buy, driver assign, .bs-vehicle-haul-btn, .bs-vehicle-break-btn).",
+  "description": "Chapter 5/2 (#484): an undercharged blast leaves an oversized boulder a debris_hauler must refuse; a crewed rock_fragmenter drives to it, breaks it via 'vehicle break', and a resulting sub-fragment is then hauled and stored \u2014 both through console commands and real Vehicles-panel clicks (buy, driver assign, .bs-vehicle-haul-btn, .bs-vehicle-break-btn).",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
@@ -9,41 +9,106 @@
           "type": "command",
           "command": "new_game seed:42 cash:100000"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "holeCount": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:18,19",
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:18,19",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (18,19)-(23,24) rectangle (5x5) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:18,19"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 18,
+          "z1": 19,
+          "x2": 23,
+          "z2": 24
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        },
+        "note": "2 rows x 2 cols = 4"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:2 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
           "type": "waitForSelector",
@@ -53,17 +118,27 @@
           "type": "clickSelector",
           "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero; undercharged 2kg boomite at wide 5m spacing leaves oversized boulders on the ground (verified via the fragments step below), setting up the fragmenter's real job"
+      }
     },
     {
       "command": "fragments",
-      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens — otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
+      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments \u2014 this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens \u2014 otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
       "interaction": [
         {
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -72,20 +147,38 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #1 — will be crewed onto the debris_hauler.",
+      "description": "Employee #1 \u2014 will be crewed onto the debris_hauler.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 99200
+        },
+        "note": "HIRING_COSTS.driver = 800 (balance.ts)"
+      }
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:5",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "interaction": [
         {
           "type": "command",
@@ -105,11 +198,15 @@
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Vehicle #1 — a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
+      "description": "Vehicle #1 \u2014 a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -119,16 +216,20 @@
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "vehicleCount": 1,
+          "cash": 74200
+        },
+        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts)"
+      }
     },
     {
       "command": "vehicle driver 1 1",
-      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #1 — the assign button click alone boards them.",
+      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #1 \u2014 the assign button click alone boards them.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "vehicle driver 1 1"
-        },
         {
           "type": "waitForSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
@@ -137,7 +238,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -147,17 +249,24 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
-      "command": "vehicle haul 1 fragment:1",
-      "description": "Must be refused: fragment #1 is oversized. No .bs-vehicle-haul-btn exists to click for it in interaction mode — the eligibility cache (findReachableGroundFragment) excludes oversized fragments outright, so the button never renders for this boulder; the command-mode attempt is what proves the rejection.",
+      "command": "vehicle haul 1 fragment:0",
+      "description": "Must be refused: fragment #0 is oversized. No .bs-vehicle-haul-btn exists to click for it in interaction mode \u2014 the eligibility cache (findReachableGroundFragment) excludes oversized fragments outright, so the button never renders for this boulder; the command-mode attempt is what proves the rejection. Re-derived from a previously-hardcoded fragment #1 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting this file's drill_plan depth from 8 to 6 changed the whole fragment population, and fragment #1 (volume exactly 0.5, the OVERSIZED_FRAGMENT_THRESHOLD itself, not > 0.5) is no longer oversized in the corrected blast -- requestHaulFragment (HaulingTask.ts) checks isOversized before the freight-warehouse-exists check, so the refusal reason silently changed to 'No active freight warehouse available' with the old id, testing a different (and, at this point in the file, coincidental) rejection path instead of the one this step is actually about. Fragment #0 (volume 0.75) is genuinely oversized in the corrected population -- confirmed the refusal reason is 'Fragment is oversized and needs a Rock Fragmenter first' again.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle haul 1 fragment:1"
+          "command": "vehicle haul 1 fragment:0"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "storedMassKg": 0
+        },
+        "note": "the refused haul must not move anything into storage \u2014 the real proof is the command's own 'Fragment is oversized' rejection text, checked nowhere else this mechanism reaches; storedMassKg staying 0 is the closest state-level corroboration"
+      }
     },
     {
       "command": "fragments",
@@ -166,20 +275,40 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #2 — will be crewed onto the rock_fragmenter.",
+      "description": "Employee #2 \u2014 will be crewed onto the rock_fragmenter.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 2
+        },
+        "decreased": [
+          "cash"
+        ],
+        "note": "HIRING_COSTS.driver = 800 plus salary/maintenance drained by the tick 10 above. Not an exact-cash check: unlike a hire with no ticks in between, new_game runs with isPaused:false by default, so interaction mode's real wall-clock during the tick 10 step's click round-trip advances the sim beyond exactly 10 ticks \u2014 command mode has no such drift (no timers, only explicit tick N). decreased is the only cross-mode-robust check here."
+      }
     },
     {
       "command": "employee assign_skill 2 skill:driving.excavator level:5",
+      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #2 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow). Left as a test-only bootstrap since this file's focus is the rock_fragmenter break/haul flow, not re-proving excavator licensing.",
       "interaction": [
         {
           "type": "command",
@@ -189,8 +318,12 @@
     },
     {
       "command": "vehicle buy rock_fragmenter",
-      "description": "Vehicle #2 — a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
+      "description": "Vehicle #2 \u2014 a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
         {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
@@ -199,16 +332,22 @@
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "vehicleCount": 2
+        },
+        "decreased": [
+          "cash"
+        ],
+        "note": "rock_fragmenter tier-1 purchaseCost = 32000 (balance.ts) \u2014 decreased, not an exact value, since this step's baseline (hire2's real cash) already carries the previous step's real-time drift (see hire2's note)"
+      }
     },
     {
       "command": "vehicle driver 2 2",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 2 2"
-        },
-        {
           "type": "waitForSelector",
           "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         },
@@ -216,7 +355,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -226,11 +366,12 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
-      "command": "vehicle break 2 fragment:1",
-      "description": "Sets break intent only — the fragmenter must still drive to the boulder before breaking it. Command mode dispatches directly. In interaction mode, a reachable oversized fragment makes .bs-vehicle-break-btn render for vehicle #2, and the request is dispatched by a real click on that button — the button's own handler picks the fragment id (the eligibility cache's best reachable oversized fragment, which is fragment #1, the only oversized boulder on the ground) and calls the exact same console command the click handler in breakEligibility.ts fires.",
+      "command": "vehicle break 2 fragment:60",
+      "description": "Sets break intent only \u2014 the fragmenter must still drive to the boulder before breaking it. Command mode dispatches directly. In interaction mode, a reachable oversized fragment makes .bs-vehicle-break-btn render for vehicle #2, and the request is dispatched by a real click on that button \u2014 the button's own handler picks the fragment id (the eligibility cache's best reachable oversized fragment) and calls the exact same console command the click handler in breakEligibility.ts fires. Re-derived from a previously-hardcoded fragment #1 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting the drill_plan depth from 8 to 6 produces a different fragment population with many oversized pieces (not just one), and fragment #1 specifically landed exactly at the oversized threshold (0.5 m3, not > 0.5) rather than above it -- confirmed by calling findReachableOversizedFragment directly against the corrected blast, which returns #60 (volume 0.75).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -241,7 +382,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-break-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 30",
@@ -251,7 +393,14 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "note": "50 ticks of salary/maintenance drain since the last checkpoint \u2014 decreased, not an exact value; interaction mode's real wall-clock ticking (isPaused:false by default, no explicit pause in this file) advances the sim beyond exactly N ticks during every click round-trip, a drift command mode's headless tick N can't reproduce"
+      }
     },
     {
       "command": "fragments",
@@ -261,21 +410,56 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build freight_warehouse at:13,13",
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:13,13"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 13,
+          "z": 13
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        },
+        "decreased": [
+          "cash"
+        ],
+        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) \u2014 decreased, not an exact value, since this step's baseline already carries the tick 30 step's real-time drift (see that step's note)"
+      }
     },
     {
-      "command": "vehicle haul 1 fragment:64",
-      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. Command mode dispatches the hardcoded fragment:64 directly — the first sub-fragment produced by the break at step 20/21 (seed 42, this exact command sequence), not the stale fragment #2 left over from the original blast, which stays oversized and un-haulable; the scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded, and needs re-deriving (via a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it. In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1, and the request is dispatched by a real click on that button — the button's own handler picks the fragment id (the eligibility cache's nearest reachable on-ground fragment) and calls the exact same console command the click handler in haulEligibility.ts fires.",
+      "command": "vehicle haul 1 fragment:56",
+      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. Command mode dispatches the hardcoded fragment:56 directly \u2014 one of the sub-fragments produced by breaking fragment #60 (seed 42, this exact command sequence), not a stale oversized fragment left over from the original blast; the scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded, and needs re-deriving (via findReachableGroundFragment, or a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it \u2014 as it did during the depth-mismatch audit (Ground rule #15/Finding #42), where correcting the drill_plan depth from 8 to 6 changed the whole fragment population and the previously-hardcoded #64 was no longer haul-eligible (confirmed: storedMassKg silently stayed 0). In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1, and the request is dispatched by a real click on that button \u2014 the button's own handler picks the fragment id (the eligibility cache's nearest reachable on-ground fragment) and calls the exact same console command the click handler in haulEligibility.ts fires.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
         {
           "type": "waitForSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn",
@@ -285,7 +469,8 @@
           "type": "clickSelector",
           "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tick 30",
@@ -295,17 +480,28 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "storedMassKg"
+        ],
+        "decreased": [
+          "cash"
+        ],
+        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check \u2014 storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this 'tick 30' step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical to command mode's \u2014 increased is the cross-mode-robust proof."
+      }
     },
     {
       "command": "state full",
-      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass.",
+      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass \u2014 checked on the tick 30 step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
       "interaction": [
         {
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

@@ -55,7 +55,103 @@ export type InteractionStepAction =
   // Drives the loading screen's debug preview bridge directly, bypassing a
   // real level entry, so a scenario can assert the new comp blocks (eyebrow,
   // briefing, stage row, tip) without paying for terrain generation.
-  | { type: 'loadingScreenDebug'; action: 'preview' | 'hide'; kind?: 'level' | 'sandbox'; locale?: 'en' | 'fr' };
+  | { type: 'loadingScreenDebug'; action: 'preview' | 'hide'; kind?: 'level' | 'sandbox'; locale?: 'en' | 'fr' }
+  // ── Ported from the playability harness (issue #479) ──────────────────
+  // A player step can only be expressed in clicks if the vocabulary covers
+  // everything a player does, and the scenario vocabulary did not: there was
+  // no way to set a <select>, so a step like `charge hole:* explosive:X
+  // amount:Y` had no click-equivalent and stayed a console command. Each of
+  // these delegates to `runAction` in `playtest-driver.ts` — the same
+  // implementation the playtest channel uses, rather than a second copy that
+  // can drift from it.
+  /** Set a form control's value the way typing or picking would. */
+  | { type: 'set'; selector: string; value: string }
+  /** Click the first usable control whose label matches (case-insensitive). */
+  | { type: 'clickLabel'; label: string; region?: string }
+  /** Wait for a selector to exist and be genuinely usable, not merely present. */
+  | { type: 'awaitUsable'; selector: string; timeoutMs?: number }
+  /** Scroll the wheel out N ticks, to bring an off-screen tile into view. */
+  | { type: 'zoomOut'; ticks?: number }
+  /** Re-aim the camera at a world tile before clicking it. */
+  | { type: 'focusTile'; x: number; z: number; distance?: number }
+  /** Click a live scene entity by kind + id rather than a baked coordinate. */
+  | { type: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
+  /**
+   * Click a control **only if** it is on screen and usable; do nothing when it
+   * is absent. Models a player who answers a dialog when one appears and
+   * carries on when none does.
+   *
+   * Exists for genuinely nondeterministic beats — overwhelmingly `event choose`
+   * after a bare `tick`, where whether an event fired is a random roll. A hard
+   * `clickSelector` fails on every run where nothing appeared, which is why 339
+   * such steps across 47 files were left as console commands instead (the
+   * single largest block of un-clicked steps in the suite). The console command
+   * they fell back to no-ops in exactly the same circumstances ("No pending
+   * event or invalid option."), so this is strictly stronger: when a dialog IS
+   * up, a real click has to work.
+   *
+   * Not an escape hatch for a control that is merely hard to reach: if the
+   * target is deterministic, use `clickSelector` so a missing control fails
+   * loudly. `timeoutMs` (default 0) allows a brief settle for a dialog that
+   * animates in; 0 checks once, immediately.
+   */
+  | { type: 'clickIfPresent'; selector: string; timeoutMs?: number };
+
+/**
+ * Whether a step's `interaction` models something the player must do by
+ * clicking, or setup/observation the harness may still drive by console
+ * command.
+ *
+ * The three categories are the ones issue #479 measured the suite against:
+ *
+ * - `player` — something a player does. May not reach the console at all.
+ * - `setup` — world bootstrapping and time control. May run a command, but
+ *   only one `isAllowedSetupCommand` admits, so this cannot quietly become a
+ *   hatch for gameplay commands.
+ * - `observe` — read-only inspection (`state`, `scores`, `vehicle list`).
+ *   This is how the harness records what happened, and it has no UI
+ *   equivalent by design, so it stays a command — but only a command on
+ *   `OBSERVATION_COMMANDS`, which is checked, not assumed.
+ *
+ * Omitted means the step predates this distinction and is unconstrained.
+ * A step opts in by setting this explicitly; nothing infers it from the
+ * step's command, because inference is exactly the kind of convention a
+ * future edit can quietly violate.
+ */
+export type ScenarioStepRole = 'player' | 'setup' | 'observe';
+
+/**
+ * What must be true after a step's actions ran. A scenario with no `expect`
+ * anywhere only proves "nothing threw" — the playtest harness's whole
+ * argument was that this is not the same as "the step actually happened"
+ * (a click that silently no-ops still throws nothing). Field-for-field
+ * mirror of `PlaytestGoal` (scripts/shared/playtest-types.ts) so interaction
+ * mode reuses `checkGoal` from `playtest-driver.ts` directly — one evaluator,
+ * not two that can drift apart.
+ *
+ * `usable`/`blocked`/`tutorialStep` need a live page and are only checked
+ * when the scenario runs in interaction mode; command mode has no DOM, so it
+ * checks `equals`/`increased`/`decreased` only (`scenario-goal.ts`'s
+ * `checkGoalAgainstState`). This is the same asymmetry the rest of the dual
+ * -play mechanism already has — interaction mode is strictly the stronger
+ * proof, command mode the faster one.
+ */
+export interface ScenarioStepGoal {
+  /** These numeric fields of the state dump must have grown since before this step's actions ran. */
+  increased?: string[];
+  /** These numeric fields of the state dump must have shrunk since before this step's actions ran. */
+  decreased?: string[];
+  /** Field/value pairs the state dump must match exactly after this step's actions ran. */
+  equals?: Record<string, unknown>;
+  /** A control that must be usable after this step (interaction mode only). */
+  usable?: string;
+  /** A control that must NOT be reachable after this step (interaction mode only). For guard/rejection proofs. */
+  blocked?: string;
+  /** The tutorial card must show this step id after this step (interaction mode only). */
+  tutorialStep?: string;
+  /** Free-text note shown in failure reports. */
+  note?: string;
+}
 
 /**
  * Object form of a scenario step with command and optional interaction array.
@@ -67,6 +163,10 @@ export interface ScenarioStepDef {
   frames?: number;
   interval?: number;
   interaction?: InteractionStepAction[];
+  /** See {@link ScenarioStepRole}. */
+  role?: ScenarioStepRole;
+  /** See {@link ScenarioStepGoal}. */
+  expect?: ScenarioStepGoal;
 }
 
 /**

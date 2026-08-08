@@ -269,4 +269,132 @@ describe('ShadyPanel', () => {
     panel.dispose();
     expect(container.querySelector('#bs-shady-panel')).toBeNull();
   });
+
+  // Every control below was reachable only by button text or an `nth-of-type`
+  // position before these attributes existed — both break the moment a label
+  // is retranslated or a card is reordered. The selectors asserted here are
+  // the ones an interaction-mode scenario is meant to click.
+  describe('stable selectors', () => {
+    it('each arrangement card is addressable by target id, and its call button by data-action', () => {
+      const { container, panel } = mount();
+      panel.update(createGame({ seed: 1, mineType: 'desert' }));
+      panel.show();
+
+      const calls: string[] = [];
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
+
+      for (const id of ['judge', 'union_leader', 'inspector', 'politician', 'witness'] as const) {
+        const btn = container.querySelector<HTMLButtonElement>(`#bs-shady-panel [data-target="${id}"] [data-action="corrupt"]`);
+        expect(btn, `no corrupt button for target ${id}`).not.toBeNull();
+        btn!.click();
+        requested!.onConfirm();
+      }
+      expect(calls).toEqual([
+        'corrupt target:judge',
+        'corrupt target:union_leader',
+        'corrupt target:inspector',
+        'corrupt target:politician',
+        'corrupt target:witness',
+      ]);
+      panel.dispose();
+    });
+
+    it('[data-action="mafia-smuggle"] resolves to the smuggling toggle in both its states', () => {
+      const { container, panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      panel.update(state);
+      panel.show();
+      const calls: string[] = [];
+      panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
+
+      const startBtn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"]');
+      expect(startBtn!.textContent).toBe(t('ui.shady.smuggling_start'));
+      startBtn!.click();
+
+      // The button is rebuilt (label + variant change) once smuggling runs —
+      // the selector has to survive that rebuild, not just the first render.
+      state.mafia.smugglingActive = true;
+      panel.update(state);
+      const stopBtn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"]');
+      expect(stopBtn!.textContent).toBe(t('ui.shady.smuggling_stop'));
+      stopBtn!.click();
+
+      expect(calls).toEqual(['mafia smuggle', 'mafia smuggle']);
+      panel.dispose();
+    });
+
+    it('[data-action="mafia-accident"] plus its employee select drive the real accident command', () => {
+      const { container, panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      const calls: string[] = [];
+      panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
+
+      const select = container.querySelector<HTMLSelectElement>('#bs-shady-panel [data-action="mafia-accident-employee"]');
+      expect(select).not.toBeNull();
+      select!.value = String(employee.id);
+      const goBtn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-accident"]');
+      goBtn!.click();
+      requested!.onConfirm();
+      expect(calls).toEqual([`mafia accident employee:${employee.id}`]);
+      panel.dispose();
+    });
+
+    it('[data-action="mafia-frame-start"] plus its employee select start the frame', () => {
+      const { container, panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      const calls: string[] = [];
+      panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
+
+      const select = container.querySelector<HTMLSelectElement>('#bs-shady-panel [data-action="mafia-frame-employee"]');
+      expect(select).not.toBeNull();
+      select!.value = String(employee.id);
+      container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-frame-start"]')!.click();
+      requested!.onConfirm();
+      expect(calls).toEqual([`mafia frame employee:${employee.id}`]);
+      panel.dispose();
+    });
+
+    it('a ready frame row is addressable by data-frame-id, and completes through data-action', () => {
+      const { container, panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      const a = hireEmployee(state.employees, 'driller', new Random(1)).employee;
+      const b = hireEmployee(state.employees, 'driller', new Random(2)).employee;
+      state.tickCount = 20;
+      state.mafia.pendingFrames = [
+        { employeeId: a.id, startTick: 5, readyTick: 30 }, // still pending — no button
+        { employeeId: b.id, startTick: 5, readyTick: 15 }, // ready
+      ];
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      const calls: string[] = [];
+      panel.setGameConsole((cmd) => { calls.push(cmd); return { success: true, output: '' }; });
+
+      expect(container.querySelector(`#bs-shady-panel [data-frame-id="${a.id}"] [data-action="mafia-frame-complete"]`)).toBeNull();
+      const useBtn = container.querySelector<HTMLButtonElement>(
+        `#bs-shady-panel [data-frame-id="${b.id}"] [data-action="mafia-frame-complete"]`,
+      );
+      expect(useBtn).not.toBeNull();
+      useBtn!.click();
+      requested!.onConfirm();
+      expect(calls).toEqual([`mafia frame employee:${b.id}`]);
+      panel.dispose();
+    });
+  });
 });

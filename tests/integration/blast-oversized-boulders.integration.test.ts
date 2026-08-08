@@ -23,9 +23,16 @@ import {
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 
+/**
+ * `cash:` is raised above the $50,000 default because `vehicle buy` now
+ * refuses an unaffordable purchase instead of overdrawing: this test crews
+ * both a debris_hauler ($25,000) and a rock_fragmenter ($32,000), which the
+ * default balance cannot cover once payroll and upkeep have run. Nothing here
+ * asserts anything about money.
+ */
 function makeCtx(): GameContext {
   const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '1000000' });
   return ctx;
 }
 

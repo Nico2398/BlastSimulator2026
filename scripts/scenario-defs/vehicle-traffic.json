@@ -1,6 +1,6 @@
 {
   "name": "vehicle-traffic",
-  "description": "Chapter 2: Add 4 haulers with drivers on narrow ramp and verify TrafficJamEvent triggers",
+  "description": "Chapter 2: Add 4 haulers with drivers, converge 3 of them on one tile. Finding #21: TrafficJamEvent never actually fires here, at any tick budget — a direct engine trace confirms why: the redirect happens only 5 ticks after the initial move commands, nowhere near enough travel time from the shared vehicle spawn point to reach the 3 separate staging tiles first, so all 3 vehicles travel in perfect lockstep the whole way and arrive together with no contention. detectTrafficJam (EventEngine.ts) also requires TRAFFIC_JAM_MIN_VEHICLES=3 vehicles simultaneously in the 'waiting' state on the same target tile for TRAFFIC_JAM_MIN_TICKS=10+ ticks; with only 3 vehicles converging (1 occupies the tile, at most 2 can ever be blocked waiting on it), that threshold is structurally out of reach regardless of timing — a real jam would need a 4th vehicle also converging on the same point. This file exercises real vehicle pathing/redirection but does not exercise TrafficJamEvent; assertions reflect that.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -9,16 +9,33 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "Plain new_game at the sandbox default. The `cash:150000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash.",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:150000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:150000"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "campaign start replaces the whole GameState (createGameForLevel), cash included, so `cash:` belongs here and nowhere earlier. $150,000 covers 4 drivers ($800 each) plus 4 tier-1 debris haulers ($25,000 each) = $103,200, which is what the convergence test itself needs: 4 vehicles bought through 4 enabled dealership rows, not 1 bought and 3 overdrawn.",
+      "expect": {
+        "equals": {
+          "cash": 150000,
+          "vehicleCount": 0
+        },
+        "note": "the cash: override replaces dusty_hollow's $50,000 default outright"
+      }
     },
     {
       "command": "time resume",
@@ -27,79 +44,180 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 149200,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 148400,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 147600,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 146800,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Opens the Fleet panel and buys hauler #1 by clicking its tier-1 dealership row. The three buys below reuse the open panel.",
+      "expect": {
+        "equals": {
+          "cash": 121800,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Hauler #2, bought by clicking the same dealership row again: $121,800 in hand against $25,000. awaitUsable is the affordability assertion -- FleetPanel disables a tier row on cash < purchaseCost, so an underfunded run fails here instead of buying anyway.",
+      "expect": {
+        "equals": {
+          "cash": 96800,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Hauler #3, same row again: $96,800 in hand against $25,000.",
+      "expect": {
+        "equals": {
+          "cash": 71800,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Hauler #4, same row again: $71,800 in hand against $25,000. Fourth and last, and the fleet the move commands below converge.",
+      "expect": {
+        "equals": {
+          "cash": 46800,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle move 2 to:21,20",
@@ -108,7 +226,8 @@
           "type": "command",
           "command": "vehicle move 2 to:21,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 3 to:20,21",
@@ -117,7 +236,8 @@
           "type": "command",
           "command": "vehicle move 3 to:20,21"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 4 to:19,20",
@@ -126,7 +246,8 @@
           "type": "command",
           "command": "vehicle move 4 to:19,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "tick 5",
@@ -135,7 +256,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle move 2 to:20,20",
@@ -144,7 +266,8 @@
           "type": "command",
           "command": "vehicle move 2 to:20,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 3 to:20,20",
@@ -153,7 +276,8 @@
           "type": "command",
           "command": "vehicle move 3 to:20,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle move 4 to:20,20",
@@ -162,7 +286,8 @@
           "type": "command",
           "command": "vehicle move 4 to:20,20"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
     },
     {
       "command": "vehicle list",
@@ -171,7 +296,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
@@ -180,7 +306,14 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleCount": 4
+        },
+        "note": "Finding #21 still holds now that all 4 haulers are bought with real money: the step's own console output at tick 25 is \"Advanced 20 tick(s). Now at tick 25. No events fired.\" — no TrafficJamEvent, for the reasons in the file's top-level description. No scalar field exists to assert the negative directly (pendingEvent isn't in SerializableGameState), so this anchors on the one thing that IS externally checkable: the fleet stays at 4, undisturbed."
+      }
     },
     {
       "command": "state full",
@@ -189,7 +322,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

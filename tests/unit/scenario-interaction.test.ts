@@ -1,0 +1,167 @@
+// BlastSimulator2026 — Scenario interaction mechanism tests (issue #479)
+//
+// Interaction mode used to let any step reach the console instead of
+// clicking — 94% of interaction actions across the suite were `command`,
+// measured in #479. These tests cover the mechanism that closes that gap:
+// a player-marked step's interaction may never fall back to a console
+// command, and a step whose click cannot actually complete fails the
+// scenario and names the control, the way `npm run playtest` already does.
+//
+// No real Puppeteer browser is involved — `Page` is faked at the I/O
+// boundary (`evaluate`, `click`, `waitForSelector`) so these stay in the
+// `logic` channel (tests/unit/, no browser) while still exercising the real
+// control flow in interaction-executor.ts and scenario-interaction-runner.ts.
+
+import { describe, it, expect, vi } from 'vitest';
+import type { Page } from 'puppeteer';
+import { executeActionOnPage } from '../../scripts/shared/interaction-executor.js';
+import { describeStepFailure } from '../../scripts/scenario-interaction-runner.js';
+import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
+
+function fakePage(overrides: Partial<Record<'evaluate' | 'click' | 'waitForSelector', unknown>> = {}): Page {
+  return {
+    waitForSelector: vi.fn().mockResolvedValue(undefined),
+    evaluate: vi.fn(),
+    click: vi.fn(),
+    ...overrides,
+  } as unknown as Page;
+}
+
+describe('executeActionOnPage — player steps never fall back to a console command (issue #479)', () => {
+  it('throws for a command action inside a player-marked step, naming the step, before touching the page', async () => {
+    const page = fakePage();
+    const step: ScenarioStepDef = {
+      command: 'vehicle driver 1 4',
+      description: 'vehicle-buy-assign complete',
+      role: 'player',
+      interaction: [{ type: 'command', command: 'vehicle driver 1 4' }],
+    };
+
+    await expect(
+      executeActionOnPage(page, { type: 'command', command: 'vehicle driver 1 4' }, step),
+    ).rejects.toThrow(/vehicle-buy-assign complete/);
+    expect(page.evaluate).not.toHaveBeenCalled();
+  });
+
+  it('runs a command action inside a setup-marked step when it is on the reused allowlist', async () => {
+    const page = fakePage();
+    const step: ScenarioStepDef = {
+      command: 'new_game seed:42',
+      role: 'setup',
+      interaction: [{ type: 'command', command: 'new_game seed:42' }],
+    };
+
+    await executeActionOnPage(page, { type: 'command', command: 'new_game seed:42' }, step);
+    expect(page.evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a command action inside a setup-marked step when it is not on the allowlist', async () => {
+    const page = fakePage();
+    const cheat = 'employee assign_skill 1 skill:geology level:3';
+    const step: ScenarioStepDef = {
+      command: cheat,
+      role: 'setup',
+      interaction: [{ type: 'command', command: cheat }],
+    };
+
+    await expect(
+      executeActionOnPage(page, { type: 'command', command: cheat }, step),
+    ).rejects.toThrow(/not on the setup allowlist/);
+    expect(page.evaluate).not.toHaveBeenCalled();
+  });
+
+  it('runs a command action when the step carries no role (legacy, unconstrained)', async () => {
+    const page = fakePage();
+    const step: ScenarioStepDef = {
+      command: 'build freight_warehouse at:4,4',
+      interaction: [{ type: 'command', command: 'build freight_warehouse at:4,4' }],
+    };
+
+    await executeActionOnPage(page, { type: 'command', command: 'build freight_warehouse at:4,4' }, step);
+    expect(page.evaluate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a player step whose click cannot complete fails and names the selector', () => {
+  it('clickSelector refused by the browser throws an error naming the selector and the reason, which the runner then attributes to the player step', async () => {
+    const evaluate = vi.fn()
+      // __probeSelector call: reports usable, so the loop proceeds to click —
+      // the click itself is what gets refused (a control can flip disabled
+      // between the probe and the click; #481).
+      .mockResolvedValueOnce(null)
+      // inspectSelector's report, read back after page.click rejects.
+      .mockResolvedValueOnce({
+        found: true,
+        pointerEvents: 'auto',
+        display: 'block',
+        visibility: 'visible',
+        disabled: true,
+        width: 80,
+        height: 24,
+        matchCount: 1,
+      });
+    const page = fakePage({
+      evaluate,
+      click: vi.fn().mockRejectedValue(new Error('Node is either not clickable or not an Element')),
+    });
+    const selector = '#bs-vehicle-panel .bs-vehicle-assign-btn';
+    const step: ScenarioStepDef = {
+      command: 'vehicle driver 1 4',
+      description: 'vehicle-buy-assign complete',
+      role: 'player',
+      interaction: [{ type: 'clickSelector', selector }],
+    };
+
+    let caught: unknown;
+    try {
+      await executeActionOnPage(page, { type: 'clickSelector', selector }, step);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    const rawMessage = (caught as Error).message;
+    expect(rawMessage).toContain(selector);
+    expect(rawMessage).toContain('element is disabled');
+
+    // scenario-interaction-runner.ts's framing on top: unambiguous that this
+    // was a player step, and it did not complete — not merely "an error".
+    const reported = describeStepFailure(step, caught);
+    expect(reported).toContain('player step "vehicle-buy-assign complete" did not complete');
+    expect(reported).toContain(selector);
+    expect(reported).toContain('element is disabled');
+  });
+});
+
+describe('describeStepFailure', () => {
+  it('prefixes a player step\'s error with its label', () => {
+    const step: ScenarioStepDef = { command: 'blast', description: 'fire the blast', role: 'player' };
+    expect(describeStepFailure(step, new Error('boom'))).toBe(
+      'player step "fire the blast" did not complete: boom',
+    );
+  });
+
+  it('falls back to the command as the label when no description is set', () => {
+    const step: ScenarioStepDef = { command: 'blast', role: 'player' };
+    expect(describeStepFailure(step, new Error('boom'))).toBe(
+      'player step "blast" did not complete: boom',
+    );
+  });
+
+  it('leaves a setup step\'s error message unchanged', () => {
+    const step: ScenarioStepDef = { command: 'new_game seed:1', role: 'setup' };
+    expect(describeStepFailure(step, new Error('boom'))).toBe('boom');
+  });
+
+  it('leaves an unmarked (legacy) step\'s error message unchanged', () => {
+    const step: ScenarioStepDef = { command: 'state' };
+    expect(describeStepFailure(step, new Error('boom'))).toBe('boom');
+  });
+
+  it('stringifies a non-Error throw', () => {
+    const step: ScenarioStepDef = { command: 'blast', role: 'player' };
+    expect(describeStepFailure(step, 'raw string throw')).toBe(
+      'player step "blast" did not complete: raw string throw',
+    );
+  });
+});

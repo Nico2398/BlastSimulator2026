@@ -1,12 +1,15 @@
 // BlastSimulator2026 — Blast Workshop: Drill step (redesign P4)
 // Grid tool (rect placement) + Add Hole (point placement), both via the P3
 // placement kit; a live pattern/spacing/depth/diameter strip; the hole list
-// with a WET/TUBED/DRY status chip per row and a per-hole delete button.
+// with a WET/TUBED/DRY status chip per row and a per-hole delete button; and
+// the Saved Plans block (gap G6, `blast_plan save|load`) below it — the plan is
+// built here, so this is where it is banked and brought back.
 
 import { t } from '../../../core/i18n/I18n.js';
 import { el, chip, emptyState, type ChipTone } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
+import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
 import type { DrillHole } from '../../../core/mining/DrillPlan.js';
@@ -31,6 +34,7 @@ export class DrillStep {
   private readonly holeListEl: HTMLElement;
   private readonly clearRowEl: HTMLElement;
   private readonly clearBtn: HTMLButtonElement;
+  private readonly savedPlans: SavedPlansList;
 
   private gameConsole?: GameConsoleFn;
   private placementKit: PlacementKit | null = null;
@@ -108,7 +112,12 @@ export class DrillStep {
     this.holeListEl = el('div');
     this.holeListEl.style.cssText = 'display:flex;flex-direction:column;gap:3px';
 
-    this.el.append(gridBtn, toolRow, this.clearRowEl, statStrip, holesHeader, this.holeListEl);
+    this.savedPlans = new SavedPlansList(
+      name => this.gameConsole?.(`blast_plan save name:${name}`),
+      name => this.gameConsole?.(`blast_plan load name:${name}`),
+    );
+
+    this.el.append(gridBtn, toolRow, this.clearRowEl, statStrip, holesHeader, this.holeListEl, this.savedPlans.root);
     container.appendChild(this.el);
   }
 
@@ -129,6 +138,7 @@ export class DrillStep {
       pattern: this.lastGridPattern,
       spacing: this.gridSpacing, depth: this.gridDepth, diameter: this.gridDiameter,
       confirmingClear: this.confirmingClear,
+      savedPlans: savedPlansSignature(state.savedPlans),
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
@@ -142,6 +152,7 @@ export class DrillStep {
     this.clearBtn.disabled = holes.length === 0;
 
     this.renderClearRow(holes.length);
+    this.savedPlans.render(state.savedPlans);
 
     if (holes.length === 0) {
       this.holeListEl.replaceChildren(emptyState(t('ui.blast_workshop.drill.no_holes')));
@@ -152,6 +163,7 @@ export class DrillStep {
 
   refreshLocale(): void {
     this.locale.refresh();
+    this.savedPlans.refreshLocale();
     this.lastSignature = ''; // forces the next update() to re-t() the hole-status chips and empty state
   }
 

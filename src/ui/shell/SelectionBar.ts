@@ -10,9 +10,12 @@ import type { GameState } from '../../core/state/GameState.js';
 import type { EntityPick } from '../scene/ScenePicking.js';
 import { holeNumericId } from '../../core/mining/DrillPlan.js';
 
+// 'move_here' (vehicle, drive to the hovered tile) is deliberately distinct
+// from 'move' (building, relocate via the Build panel) — same English verb,
+// two unrelated flows, so they never share an action name or a data-action.
 export type SelectionAction =
   | 'detail' | 'dispatch_here' | 'train'
-  | 'haul' | 'unassign' | 'follow'
+  | 'haul' | 'unassign' | 'follow' | 'move_here'
   | 'upgrade' | 'move' | 'demolish'
   | 'focus';
 
@@ -117,6 +120,7 @@ export class SelectionBar {
       case 'vehicle':
         return [
           button('ghost', t('shell.selection.follow'), { icon: 'eye', dataAction: 'follow', onClick: () => fire('follow') }),
+          button('ghost', t('shell.selection.move_here'), { icon: 'locate', dataAction: 'move_here', onClick: () => fire('move_here') }),
           button('ghost', t('shell.selection.haul'), { icon: 'ore', dataAction: 'haul', onClick: () => fire('haul') }),
           button('danger', t('shell.selection.unassign'), { icon: 'x', dataAction: 'unassign', onClick: () => fire('unassign') }),
         ];

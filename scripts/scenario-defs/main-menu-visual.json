@@ -14,16 +14,17 @@
           "type": "waitForSelector",
           "selector": "#bs-main-menu"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-new-campaign",
+        "note": "no game state exists yet, so only usable/blocked (DOM-only, interaction mode) can check anything here -- confirms the New Campaign button genuinely renders before any command runs"
+      }
     },
     {
       "command": "state",
       "description": "Click New Campaign: reveals the world map with 3 level cards. Dusty Hollow (tier 1) is unlocked with a Start button; Grumpstone Ridge and Treranium Depths are locked, showing the lock icon and the profit threshold required on the prior level. No game exists yet, so 'state' is the paired command (it fails gracefully with 'No game loaded' — this step is UI-only, the command exists only to satisfy the command/interaction pairing convention).",
       "interaction": [
-        {
-          "type": "command",
-          "command": "state"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-main-menu #bs-menu-new-campaign"
@@ -32,16 +33,18 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-world-map-back",
+        "blocked": "#bs-main-menu #bs-menu-new-campaign",
+        "note": "the world map genuinely replaced the main menu -- Back is now reachable, New Campaign is not"
+      }
     },
     {
       "command": "state",
       "description": "Click Back on the world map: returns to the main menu button list, confirming the round trip does not leave stray DOM behind.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "state"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-world-map-back"
@@ -50,7 +53,13 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-main-menu #bs-menu-new-campaign",
+        "blocked": "#bs-world-map-back",
+        "note": "the round trip genuinely returns to the main menu, not a leftover world map still in the DOM"
+      }
     },
     {
       "command": "new_game seed:42",
@@ -60,7 +69,15 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -69,7 +86,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -78,7 +101,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "tick 5",
@@ -87,7 +111,14 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "confirmed via direct trace: cash stays flat with no employees/buildings/vehicles to drain it"
+      }
     },
     {
       "command": "event choose 0",
@@ -96,7 +127,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -105,7 +137,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -114,7 +147,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -123,7 +157,8 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -132,7 +167,14 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "tickCount": 5
+        }
+      }
     }
   ],
   "shots": [

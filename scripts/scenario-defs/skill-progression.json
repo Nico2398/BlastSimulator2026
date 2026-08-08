@@ -9,7 +9,14 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +25,11 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
@@ -27,25 +38,47 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 49000
+        }
+      }
     },
     {
-      "command": "employee assign_skill id:1 skill:driving.excavator level:1",
+      "command": "employee assign_skill 1 skill:driving.excavator level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill id:1 skill:driving.excavator level:1"
+          "command": "employee assign_skill 1 skill:driving.excavator level:1"
         }
-      ]
+      ],
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step. (Also fixes a Finding #15-class bug: the original step used `id:1` for the employee id, but assign_skill's id argument is positional, not named -- it silently failed with the Usage message.)",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 2
+        }
+      }
     },
     {
       "command": "employee list",
@@ -54,16 +87,616 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "tick 700",
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 700"
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ],
+      "description": "Test-only bootstrap, not a player action: `employee dispatch` exists (per its own doc comment in employees.ts) purely so console/scenario driving can put an employee to genuine, ticksWorked-incrementing work without a full drill/haul pipeline -- there is no UI control for it and none should exist. Repeated 40 times here (queued back to back before any tick, all targeted at employee #1) so the driller has continuous excavator work queued through the full 700-tick budget below; each dispatched task only lasts ~20-45 ticks depending on proficiency and fatigue, so a single dispatch would leave the employee idle (and gaining no XP -- XP only accrues via tickTaskProgress while a task is actively in progress) for most of the 700 ticks. Verified via a real dump that 40 is enough to keep the driller continuously busy through tick 700 with none left over."
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
       ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
+        }
+      ]
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "description": "A single `tick 700` step silently under-runs: a random event can fire mid-batch and the tick command stops advancing right there (`Advanced N of 700 requested ticks`) rather than queuing the remainder, and `tick` itself refuses to advance at all while an event is pending. Chunked into 14× (tick 50, event choose 0) instead, the same pattern already used everywhere else in this file's sibling scenarios, so no requested ticks are silently dropped waiting on an unresolved dialog."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 6
+        },
+        "note": "1 (blasting, unraised) + 5 (driving.excavator, reached its cap) — the original scenario name/goal: Level 5 after 700 ticks of real, continuous work"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "employee list",
@@ -72,7 +705,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -81,7 +715,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

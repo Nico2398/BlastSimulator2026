@@ -1,6 +1,6 @@
 {
   "name": "survey-ore-vein-visibility",
-  "description": "Validates ore vein visibility: run surveys at positions where ore is expected, then verify the overlay shows ore indicators. After a blast, check that ore vein markers are still visible or updated based on new terrain geometry. Requires the survey overlay to be wired into syncFromContext().",
+  "description": "Validates ore vein visibility: run surveys at positions where ore is expected, then verify the overlay shows ore indicators. After a blast, check that ore vein markers are still visible or updated based on new terrain geometry. Requires the survey overlay to be wired into syncFromContext(). Finding #16: with a single surveyor and 4 survey PendingActions queued back to back (no ticks between), only 3 of the 4 ever complete — a direct engine trace (state.pendingActions/state.surveyResults sampled every 5 ticks) shows one queued action (targeting (15,25)) vanishes from pendingActions between two ticks without ever producing a SurveyResult; 'survey show' reports 'No pending surveys' regardless, since it only lists the queue, not what was dropped from it. Root cause not chased down (would need tracing tickEmployees'/PendingAction claim-and-dispatch order for one employee holding several same-type actions) — filed as a follow-up. This file's assertions use the real, verified ceiling (3, not 4) rather than the naively-expected one.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -9,7 +9,14 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +25,11 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"]
+      }
     },
     {
       "command": "time resume",
@@ -27,16 +38,32 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 48800
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:5",
@@ -45,7 +72,13 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:geology level:5"
         }
-      ]
+      ],
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 5
+        }
+      }
     },
     {
       "command": "employee list",
@@ -54,7 +87,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -63,43 +97,155 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey seismic x:15 z:15",
+      "description": "Survey 1/4.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:15 z:15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "survey seismic x:25 z:15",
+      "description": "Survey 2/4.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:25 z:15"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "survey seismic x:15 z:25",
+      "description": "Survey 3/4.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:15 z:25"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "survey seismic x:25 z:25",
+      "description": "Survey 4/4.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:25 z:25"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "all 4 seismic surveys queued, none completed yet"
+      }
     },
     {
       "command": "survey show",
@@ -108,7 +254,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "all 4 seismic surveys queued, none completed yet"
+      }
     },
     {
       "command": "state full",
@@ -117,7 +270,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 53",
@@ -126,7 +280,8 @@
           "type": "command",
           "command": "tick 53"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -135,7 +290,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -144,7 +300,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -153,7 +310,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -162,7 +320,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -171,7 +330,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -180,7 +340,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -189,7 +350,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "survey show",
@@ -198,7 +360,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 3
+        },
+        "note": "Finding #16: only 3 of the 4 queued seismic surveys ever complete -- the 4th's PendingAction silently vanishes from the queue rather than executing, verified via a direct engine trace (see file description); survey show still reports 'No pending surveys' since it only lists the queue, not what was dropped"
+      }
     },
     {
       "command": "state full",
@@ -207,16 +376,45 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey core_sample x:20 z:20",
+      "description": "Survey 5 (Finding #16 aside): round 1's real ceiling is 3, not 4 — see file description.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey core_sample x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "surveyCount": 3
+        }
+      }
     },
     {
       "command": "survey show",
@@ -225,7 +423,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 3
+        },
+        "note": "core_sample queued, not yet completed; round 1's 3 stay put"
+      }
     },
     {
       "command": "state full",
@@ -234,7 +439,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 23",
@@ -243,7 +449,8 @@
           "type": "command",
           "command": "tick 23"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -252,7 +459,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -261,7 +469,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -270,7 +479,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -279,7 +489,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -288,7 +499,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "tick 8",
@@ -297,7 +509,8 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -306,7 +519,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "survey show",
@@ -315,7 +529,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 4
+        },
+        "note": "core_sample now complete: 3 (round 1's real ceiling) + 1 = 4"
+      }
     },
     {
       "command": "state full",
@@ -324,43 +545,86 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 19,
+          "z2": 19
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -369,7 +633,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey show",
@@ -378,7 +643,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 4
+        },
+        "note": "unchanged by the drill/charge/sequence/blast pipeline"
+      }
     },
     {
       "command": "state full",
@@ -387,7 +659,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

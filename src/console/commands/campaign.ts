@@ -97,6 +97,21 @@ export function campaignStartCommand(
   ctx.state = newState;
   ctx.state.campaign = savedCampaign;
 
+  // `cash:` override, mirroring new_game's own knob (world.ts). Without it a
+  // scenario cannot fund itself at all on a campaign level: createGameForLevel
+  // builds a brand-new GameState from `level.startingCash`, so a
+  // `new_game cash:N` bump on the preceding step is silently discarded here.
+  // That matters now that the console refuses unaffordable purchases — a
+  // scenario that legitimately needs a bigger fleet than the level's default
+  // cash allows has nowhere else to get it. Debug grant, same class as
+  // new_game's, and deliberately applied to both the flat field and the
+  // ledger so they cannot disagree (Finding #36's class).
+  const cashOverride = named['cash'] !== undefined ? parseInt(named['cash'], 10) : NaN;
+  if (!isNaN(cashOverride)) {
+    ctx.state.cash = cashOverride;
+    ctx.state.finances.cash = cashOverride;
+  }
+
   // Generate terrain
   const level = getLevel(levelId)!;
   const biome = getBiome(level.biome);
@@ -117,9 +132,12 @@ export function campaignStartCommand(
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
   generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount);
 
+  // Report the cash actually in hand, not the level default — an override that
+  // took effect but printed the default would be indistinguishable from one
+  // that was silently ignored, which is the bug this override exists to fix.
   return {
     success: true,
-    output: `Started level "${levelId}". Grid: ${level.gridX}×${level.gridY}×${level.gridZ}. Cash: $${level.startingCash.toLocaleString('en-US')}.`,
+    output: `Started level "${levelId}". Grid: ${level.gridX}×${level.gridY}×${level.gridZ}. Cash: $${ctx.state.cash.toLocaleString('en-US')}.`,
   };
 }
 

@@ -21,6 +21,7 @@ import {
   captureFrame,
   suspendDrawing,
 } from './shared/puppeteer-utils.js';
+import { checkGoal, gameState, PlaytestFailure } from './shared/playtest-driver.js';
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -32,6 +33,28 @@ export interface ShotDef {
   target?: [number, number];
   /** Camera distance from `target`, in world units. Ignored unless `target` is also set. */
   distance?: number;
+}
+
+/**
+ * Turns a raw step error into a report line. A player-marked step's failure
+ * is the mechanism working (issue #479) — it means no click could finish
+ * what the step asked, the same conclusion `npm run playtest` reaches — so
+ * it is called out rather than left to read like any other broken step.
+ * `err`'s own message already names the blocking control the way
+ * `describeUnclickable` (interaction-executor.ts) reports it; this only adds
+ * the step-level framing on top.
+ */
+export function describeStepFailure(step: ScenarioStepDef, err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const label = step.description ?? step.command;
+  const base = step.role === 'player'
+    ? `player step "${label}" did not complete: ${raw}`
+    : raw;
+  // PlaytestFailure (thrown by checkGoal for a failed `expect`, or by a
+  // reused playtest-driver action like `set`/`clickEntity`) carries a
+  // diagnosis — what was usable/blocked at the moment of failure — that a
+  // bare message loses. Surface it the same way `npm run playtest` does.
+  return err instanceof PlaytestFailure ? `${base}\n${err.diagnosis}` : base;
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -84,10 +107,23 @@ export async function runScenarioInteraction(
       try {
         await Promise.race([
           (async () => {
+            // Captured before the step's own actions run, so `expect.increased`
+            // (below) measures this step's effect and not everything before it.
+            const before = step.expect ? await gameState(page) : {};
+
             const interactionResult = await executeInteractionActions(
               page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
             );
             stepScreenshotPaths.push(...interactionResult.screenshotPaths);
+
+            // Real DOM/tutorial checks, not just "nothing threw" — reuses
+            // playtest-driver.ts's checkGoal so a step's `expect` and a
+            // playtest beat's `expect` are proven the same way (issue #479
+            // follow-up: scenarios gained assertions instead of staying a
+            // pass/fail-on-exception-only channel).
+            if (step.expect) {
+              await checkGoal(page, step.expect, before);
+            }
 
             let screenshotPath = '';
             let sizeWarn: string | undefined;
@@ -163,7 +199,7 @@ export async function runScenarioInteraction(
           timeoutPromise,
         ]);
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = describeStepFailure(step, err);
         console.error(`  ERROR: ${errorMsg}`);
         results.push({
           step: i,
@@ -175,10 +211,15 @@ export async function runScenarioInteraction(
           statePath: '',
           error: errorMsg,
         });
-        if (timedOut) {
-          console.error('  Step timed out. Skipping remaining steps.');
-          break;
-        }
+        // Stop at the first failed step, timeout or not. A step that did not
+        // complete leaves the game in a state later steps never asked for —
+        // continuing past it, as this used to, produced cascading unrelated
+        // failures and (scenario-test.ts always exiting 0 regardless) a run
+        // that reported success no matter what this loop actually did.
+        console.error(timedOut
+          ? '  Step timed out. Stopping — a step must complete to prove anything.'
+          : '  Step failed. Stopping — a step must complete to prove anything.');
+        break;
       }
     }
 

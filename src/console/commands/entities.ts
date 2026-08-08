@@ -15,6 +15,7 @@ import {
   type BuildingTier,
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
 import { syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import type { BlastRegion } from '../../core/mining/BlastExecution.js';
@@ -189,7 +190,37 @@ export function buildCommand(
       }
       const tierParam = parseInt(named['tier'] ?? '1', 10);
       const tier = ([1, 2, 3].includes(tierParam) ? tierParam : 1) as BuildingTier;
-      const { sizeX: footprintX, sizeZ: footprintZ } = getDefSize(getBuildingDef(type, tier));
+      // BuildMenu gates the catalog buy button on
+      // `cash < def.constructionCost || locked` — both terms are decided
+      // before the player ever picks a tile, and only then does placement
+      // check the location. The console mirrors that two-stage order here:
+      // research gate, then funds, then (inside claimForAction/placeBuilding)
+      // bounds and occupancy.
+      //
+      // Both checks sit ahead of claimForAction and placeBuilding because both
+      // of those *mutate*: the first claims off-site land and rebuilds the
+      // navgrid, the second pushes the building and bumps nextId before it can
+      // report a cost. Refusing later would leave land bought for a building
+      // that was never placed.
+      //
+      // Research before cash follows the precedence `research queue` already
+      // documents — cash is checked only once every other precondition passes,
+      // so a refusal names the reason the player can actually act on. The
+      // message is identical to the one placeBuilding produces, which still
+      // holds the same check as a backstop.
+      if (isPlacementBlockedByResearch(state.buildings, type, tier)) {
+        return { success: false, output: `Tier ${tier} ${type} is not researched — research required before placement.` };
+      }
+      // Same cost source as the UI: `getBuildingDef(type, tier).constructionCost`
+      // is exactly the `cost` placeBuilding goes on to report.
+      const placeDef = getBuildingDef(type, tier);
+      if (state.cash < placeDef.constructionCost) {
+        return {
+          success: false,
+          output: `Insufficient funds: need $${formatMoney(placeDef.constructionCost)}, have $${formatMoney(state.cash)}`,
+        };
+      }
+      const { sizeX: footprintX, sizeZ: footprintZ } = getDefSize(placeDef);
       const placeClaim = claimForAction(
         ctx,
         cellsInRect(atCoords[0]!, atCoords[1]!, atCoords[0]! + footprintX - 1, atCoords[1]! + footprintZ - 1),

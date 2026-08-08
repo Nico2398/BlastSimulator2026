@@ -10,35 +10,107 @@
           "type": "command",
           "command": "new_game seed:42 cash:200000"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build research_center at:30,5",
       "description": "Placed before any research is queued — a placed research_center is a hard prerequisite (#442) to queue a research task at all.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:30,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 30,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 175000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build living_quarters at:5,5 tier:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:5,5 tier:1"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 165000,
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "research queue type:living_quarters tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:living_quarters tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 160000
+        }
+      }
     },
     {
       "command": "tick 50",
@@ -47,25 +119,63 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build living_quarters at:12,5 tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:12,5 tier:2"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        },
+        "note": "cash uses decreased, not equals, because this build follows a tick step — real browser interaction mode keeps ticking on wall-clock time (Finding #12), so the exact post-tick cash value can drift"
+      }
     },
     {
       "command": "research queue type:living_quarters tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:living_quarters tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "tick 50",
@@ -74,16 +184,40 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build living_quarters at:20,5 tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:20,5 tier:3"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 4
+        }
+      }
     },
     {
       "command": "build list",
@@ -92,34 +226,72 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee list",
@@ -128,7 +300,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "needs",
@@ -137,7 +310,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 5",
@@ -146,7 +320,12 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["minFatigue"],
+        "note": "fatigue accrues even while idle — minFatigue (100=rested) drops from tick 5 alone with no work assigned"
+      }
     },
     {
       "command": "needs",
@@ -155,7 +334,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -164,7 +344,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -173,7 +354,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

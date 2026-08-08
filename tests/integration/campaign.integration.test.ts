@@ -367,6 +367,41 @@ describe('Campaign', () => {
     expect(ctx.grid!.sizeZ).toBe(32);
   });
 
+  // ── 10b. campaign start honours a cash: override ──────────────────────────
+
+  it('campaign start applies a cash: override to both cash fields and reports it', () => {
+    // createGameForLevel builds a brand-new GameState from level.startingCash,
+    // so a `new_game cash:N` bump on the preceding step is discarded. Scenarios
+    // on a campaign level had no way to fund themselves at all — which only
+    // became load-bearing once the console started refusing unaffordable
+    // purchases.
+    const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', cash: '200000' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(200000);
+    // Both fields, or they diverge the way Finding #36 documented for
+    // buy_software.
+    expect(ctx.state!.finances.cash).toBe(200000);
+    // Reported, not the level default — an override that took effect but
+    // printed the default would look identical to one silently ignored.
+    expect(result.output).toContain('$200,000');
+  });
+
+  it('campaign start without cash: still uses the level default', () => {
+    const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
+    expect(ctx.state!.finances.cash).toBe(TUTORIAL_START_CASH);
+  });
+
+  it('campaign start ignores a non-numeric cash: value rather than zeroing cash', () => {
+    const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', cash: 'lots' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
+  });
+
   // ── 11. Starting a locked level returns error ──────────────────────────────
 
   it('campaign start command rejects locked levels', () => {

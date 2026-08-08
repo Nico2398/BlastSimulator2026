@@ -1914,6 +1914,18 @@ describe('deductRestCost', () => {
     expect(deducted).toBe(NEED_REST_COSTS.hunger);
   });
 
+  // ── Test 6b: Edge: cash already negative is left untouched, not reset to 0 ──
+  it('does not reset already-negative cash back up to 0 (a prior bankruptcy-territory balance is not erased)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    state.cash = -48870;
+
+    const deducted = deductRestCost(state, 'hunger');
+
+    expect(state.cash).toBe(-48870);
+    expect(deducted).toBe(NEED_REST_COSTS.hunger);
+    expect(state.finances.transactions.find(t => t.category === 'needs')).toBeUndefined();
+  });
+
   // ── Test 7: Positive: records a 'needs'-category expense in state.finances ──
   it('records a needs-category expense transaction in state.finances', () => {
     const state = createGame({ seed: DEDUCT_SEED });

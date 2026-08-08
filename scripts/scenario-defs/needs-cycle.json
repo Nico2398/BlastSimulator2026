@@ -9,7 +9,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +19,14 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "time resume",
@@ -27,16 +35,32 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:hauler",
@@ -45,16 +69,35 @@
           "type": "command",
           "command": "employee hire role:hauler"
         }
-      ]
+      ],
+      "description": "Left unmarked: \"hauler\" isn't a real hire role (commandOutput: \"Usage: employee hire role:(driller|blaster|driver|surveyor|manager)\") -- there is no hire button for it, this step is a genuine no-op in both modes.",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        },
+        "note": "confirms the fake-role hire is a real no-op, not a silent success"
+      }
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47800,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "build canteen at:5,5",
@@ -63,7 +106,15 @@
           "type": "command",
           "command": "build canteen at:5,5"
         }
-      ]
+      ],
+      "description": "Left unmarked: \"canteen\" isn't a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes.",
+      "expect": {
+        "equals": {
+          "cash": 47800,
+          "buildingCount": 0
+        },
+        "note": "confirms the fake building type is a real no-op — this file's title promise (\"verify canteen auto-queue\") is unreachable since no canteen building type exists in this game; only the 2 real hires above and idle need-decay over the following ticks are actually testable"
+      }
     },
     {
       "command": "tick 40",
@@ -72,7 +123,21 @@
           "type": "command",
           "command": "tick 40"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash", "minFatigue"]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
+        }
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked: a player step must name a control that is actually there, and forcing a click here would fail on the roll rather than on a defect."
     },
     {
       "command": "employee list",
@@ -81,7 +146,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -90,7 +156,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

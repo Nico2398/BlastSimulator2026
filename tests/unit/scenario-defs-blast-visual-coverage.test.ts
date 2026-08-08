@@ -41,12 +41,14 @@ describe('blast-execution-visual — collapse / projection / large-blast coverag
     expect(commands).toContain('charge hole:* explosive:boomite amount:2 stemming:2');
   });
 
-  it('includes a max-charge, zero-stemming blast guaranteed to produce projected fragments', () => {
+  it('includes a max-charge, min-stemming blast guaranteed to produce projected fragments', () => {
     const scenario = loadScenarioDef(SCENARIO_NAME, SCENARIO_DIR);
     const commands = commandsOf(scenario.steps);
     // boomite's valid range is [1-8]kg (src/core/world/ExplosiveCatalog.ts) — 8kg with
-    // zero stemming maximises surfaceProximityFactor and stemming efficiency together.
-    const heavyOvercharges = commands.filter(c => c === 'charge hole:* explosive:boomite amount:8 stemming:0');
+    // minimal stemming maximises surfaceProximityFactor and stemming efficiency together.
+    // 0.5m, not 0, because the stemming stepper floors there (Charge.ts adjustStemming,
+    // Math.max(0.5, ...)) — the command must match what interaction mode can actually click.
+    const heavyOvercharges = commands.filter(c => c === 'charge hole:* explosive:boomite amount:8 stemming:0.5');
     // Used once for the dedicated projection demo, once again for the large blast.
     expect(heavyOvercharges.length).toBeGreaterThanOrEqual(2);
   });

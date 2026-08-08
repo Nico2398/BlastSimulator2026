@@ -10,16 +10,33 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "Plain new_game at the sandbox default. The `cash:200000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash.",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "campaign start replaces the whole GameState (createGameForLevel), cash included, so `cash:` belongs here and nowhere earlier. $200,000 covers all 5 tier-1 roles ($172,000 in total) -- same reasoning as vehicle-3d-rendering-visual, and the same reason every dealership row in the shots below reads as enabled rather than greyed out.",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "vehicleCount": 0
+        },
+        "note": "the cash: override replaces dusty_hollow's $50,000 default outright"
+      }
     },
     {
       "command": "vehicle list",
@@ -28,52 +45,117 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Opens the Fleet panel and buys the hauler by clicking its tier-1 dealership row. Every later buy reuses the open panel.",
+      "expect": {
+        "equals": {
+          "cash": 175000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy rock_digger",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy rock_digger"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Real click on the rock_digger tier-1 row: $175,000 in hand against $50,000, so the row is enabled. awaitUsable is the affordability assertion -- FleetPanel disables a tier row on cash < purchaseCost, so an underfunded run fails here instead of buying anyway.",
+      "expect": {
+        "equals": {
+          "cash": 125000,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy drill_rig"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Real click on the drill_rig tier-1 row: $125,000 in hand against $35,000.",
+      "expect": {
+        "equals": {
+          "cash": 90000,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy building_destroyer",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy building_destroyer"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"building_destroyer\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Real click on the building_destroyer tier-1 row: $90,000 in hand against $30,000.",
+      "expect": {
+        "equals": {
+          "cash": 60000,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle buy rock_fragmenter",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy rock_fragmenter"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Real click on the rock_fragmenter tier-1 row: $60,000 in hand against $32,000. Fifth and last role, so the roles-panel shot shows the dealership with one card of every type already owned.",
+      "expect": {
+        "equals": {
+          "cash": 28000,
+          "vehicleCount": 5
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -82,12 +164,9 @@
         {
           "type": "command",
           "command": "vehicle list"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -96,7 +175,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

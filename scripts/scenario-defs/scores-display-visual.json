@@ -10,7 +10,17 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "wellBeing": 50,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +29,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -28,45 +44,139 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
       "description": "Hire crew and build the two score-linked buildings the scenario had no way to demonstrate decay without: management_office (safety +2/tick) and living_quarters (well-being +2/tick), plus a small blast below (immediate vibration hit to ecology/nuisance) — otherwise all four gauges sit flat at their neutral 50 default for the whole run.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "build management_office at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build living_quarters at:12,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:12,5"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20",
       "description": "Four holes at minimal spacing/stemming (vs. the wider, well-stemmed grids used elsewhere) so their energy overlaps enough to actually throw fragments (isProjection) — a single lightly-charged hole clears rock cleanly with zero projections and never moves Ecology/Nuisance at all.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 24,
+          "z2": 24
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0",
@@ -75,26 +185,61 @@
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:8 stemming:0"
         }
-      ]
+      ],
+      "description": "Left unmarked: this amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default value -- Finding #10's class, Charge All is the only commit, at whatever the steppers currently show.",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
       "description": "Vibration from this blast dips Ecology and Nuisance immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above.",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        },
+        "decreased": ["ecology", "nuisance"]
+      }
     },
     {
       "command": "scores",
@@ -103,7 +248,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -112,7 +258,12 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "confirmed via direct trace (command mode, seed:42): wellBeing/safety/ecology/nuisance all genuinely increase here, climbing from the two buildings and decaying back from the blast dip -- not asserted with increased on all four, since a real event firing under interaction mode's wall-clock ticking (Finding #12) can swing a score the opposite way (confirmed: a real browser run hit safety with a severe event penalty at this exact step) without the file's premise being wrong"
+      }
     },
     {
       "command": "event choose 0",
@@ -121,7 +272,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -130,7 +282,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
@@ -139,7 +292,12 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "confirmed via direct trace (command mode, seed:42): ecology/nuisance reach their neutral cap of 50 exactly by the end of this step, wellBeing/safety keep climbing -- not hard-asserted with increased, per the same real-event risk noted on the tick 10 step above"
+      }
     },
     {
       "command": "event choose 0",
@@ -148,7 +306,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -157,7 +316,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 30",
@@ -166,7 +326,12 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "confirmed via direct trace (command mode, seed:42): ecology/nuisance are already capped at 50 by this point and stay there; well-being/safety keep climbing from the two buildings -- not hard-asserted with increased, per the same real-event risk noted on the tick 10 step above"
+      }
     },
     {
       "command": "event choose 0",
@@ -175,7 +340,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -184,7 +350,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 50",
@@ -193,7 +360,12 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "confirmed via direct trace (command mode, seed:42): well-being is already at its own cap by this point (unchanged across this step); safety keeps climbing toward its own cap -- not hard-asserted with increased, per the same real-event risk noted on the tick 10 step above"
+      }
     },
     {
       "command": "event choose 0",
@@ -202,7 +374,8 @@
           "type": "command",
           "command": "event choose 0"
         }
-      ]
+      ],
+      "description": "event choose 0 -- follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen. Deliberately left unmarked (Finding #15)."
     },
     {
       "command": "scores",
@@ -211,7 +384,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -220,7 +394,16 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "employeeCount/buildingCount are deliberately not asserted here -- confirmed via a real browser run that a severe random event over this file's 110-tick budget can destroy a building (and, separately, crash a score) as a real consequence of the always-pick-option-0 event choose steps; the roster/building counts genuinely aren't stable across a run this long, unlike the deterministic checks earlier in the file (right after each hire/build/blast, before any tick could let an event fire)"
+      }
     }
   ],
   "shots": [

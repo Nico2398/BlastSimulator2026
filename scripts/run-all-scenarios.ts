@@ -35,6 +35,8 @@ import {
   DEFAULT_STEP_TIMEOUT,
   SCREENSHOT_DIR,
 } from './shared/puppeteer-utils.js';
+import { describeStepFailure } from './scenario-interaction-runner.js';
+import { checkGoal, gameState } from './shared/playtest-driver.js';
 
 const DEV_SERVER_PORT = 5173;
 
@@ -96,7 +98,11 @@ async function runBatchInteraction(
         // tutorial stalled. Every other interaction harness (initBrowser,
         // scenario-test) already navigates with it; this batch runner did not.
         await page.goto(`http://localhost:${port}/?scenarioMode=1`, { waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('#game-canvas, canvas', { timeout: 10000 });
+        // 30s, not 10s: a fresh tab boots the renderer with no GPU, and the
+        // first scenario of a batch pays that cold start on top. At 10s this
+        // flaked as "Waiting for selector `#game-canvas, canvas` failed",
+        // which reads like a broken page rather than a slow one.
+        await page.waitForSelector('#game-canvas, canvas', { timeout: 30000 });
         // Main menu starts visible, same as initBrowser() — each scenario's
         // own `new_game` first step tears it down (main.ts console bridge).
         // Batch mode passes enableScreenshots=false, so nothing here reads
@@ -117,9 +123,17 @@ async function runBatchInteraction(
           try {
             await Promise.race([
               (async () => {
+                // Before this step's own actions run, so `expect.increased`
+                // measures this step's effect, not everything before it.
+                const before = step.expect ? await gameState(page) : {};
+
                 const interactionResult = await executeInteractionActions(
                   page, step, false, outDir, paddedIdx, cmdSlug,
                 );
+
+                if (step.expect) {
+                  await checkGoal(page, step.expect, before);
+                }
 
                 // Save state JSON
                 const stateData = {
@@ -146,7 +160,7 @@ async function runBatchInteraction(
             ]);
           } catch (err: unknown) {
             failed = true;
-            errorMsg = err instanceof Error ? err.message : String(err);
+            errorMsg = describeStepFailure(step, err);
             break;
           }
         }

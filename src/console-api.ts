@@ -19,7 +19,16 @@ export interface SerializableGameState {
   time: number;
   tickCount: number;
   isPaused: boolean;
+  /** Simulation speed multiplier (1/2/4/8) set by `time speed` — the HUD's speed buttons. */
+  timeScale: number;
   mineType: string;
+  /** Current weather state (WeatherCycle.ts) — null until `ctx.weatherCycle` exists, which happens lazily on the first `weather`/`weather set`/`weather advance` command or eagerly whenever `ctx.state` is replaced (new_game, campaign start, sandbox start — main.ts). */
+  weather: string | null;
+  /** The site's live bounding box (#473 — a bounding box, not a fixed size, once the site has grown). */
+  worldSizeX: number | null;
+  worldSizeZ: number | null;
+  worldMinX: number | null;
+  worldMinZ: number | null;
   drillHoles: unknown[];
   chargesByHole: Record<string, unknown>;
   sequenceDelays: Record<string, unknown>;
@@ -27,9 +36,27 @@ export interface SerializableGameState {
   holeCount: number;
   chargedCount: number;
   sequencedCount: number;
+  /** Completed survey results (SurveyResult[], state.surveyResults). */
+  surveyCount: number;
+  /** Queued-but-not-yet-claimed PendingActions (state.pendingActions) — includes auto-inserted rest tasks. */
+  pendingActionCount: number;
   buildingCount: number;
   vehicleCount: number;
   employeeCount: number;
+  /** Qualifications the roster holds — proves a skill was actually obtained, not just clicked at. */
+  qualificationCount: number;
+  proficiencyTotal: number;
+  trainingCount: number;
+  /** Employees currently in the `collapsing` state (needs mechanics, Employee.ts). */
+  collapsedCount: number;
+  /** Lowest `fatigue` (0-100, 100 = fully rested) across the roster — the employee closest to collapse. 100 with no employees. */
+  minFatigue: number;
+  /** Employees currently in the `isMoveStuck` state — pathfinding has failed STUCK_THRESHOLD consecutive times (EntityMovementTick.ts). */
+  stuckEmployeeCount: number;
+  /** Contracts currently accepted and in progress (state.contracts.active) — proves accept/deliver-completion actually moved a contract, not just clicked at. */
+  activeContractCount: number;
+  /** Employees killed so far (state.damage.deathCount) — a blast's projections can kill anyone standing in the cleared columns; proves a fatality genuinely happened rather than being inferred from a flat employeeCount. */
+  deathCount: number;
   levelEnded: boolean;
   levelEndReason: string | null;
   bankrupt: boolean;
@@ -38,8 +65,15 @@ export interface SerializableGameState {
   arrested: boolean;
   cash: number;
   profit: number;
+  /** The four 0-100 scores (ScoreState) that gate events and contracts. */
+  wellBeing: number;
+  safety: number;
+  ecology: number;
+  nuisance: number;
   /** The rock a blast left on the ground; null before a world exists. */
   muckPile: MuckPileSummary | null;
+  /** Mass (kg) currently held in warehouse storage (LogisticsState.storedMassKg). */
+  storedMassKg: number;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -51,7 +85,13 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     time: s.time,
     tickCount: s.tickCount,
     isPaused: s.isPaused,
+    timeScale: s.timeScale,
     mineType: s.mineType,
+    weather: ctx.weatherCycle?.current ?? null,
+    worldSizeX: s.world?.sizeX ?? null,
+    worldSizeZ: s.world?.sizeZ ?? null,
+    worldMinX: s.world?.minX ?? null,
+    worldMinZ: s.world?.minZ ?? null,
     drillHoles: s.drillHoles,
     chargesByHole: s.chargesByHole as Record<string, unknown>,
     sequenceDelays: s.sequenceDelays as Record<string, unknown>,
@@ -59,9 +99,21 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     holeCount: s.drillHoles.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
+    surveyCount: s.surveyResults.length,
+    pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
+    qualificationCount: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.length, 0),
+    proficiencyTotal: s.employees.employees
+      .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
+    trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
+    collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
+    minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
+    activeContractCount: s.contracts.active.length,
+    deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     bankrupt: s.bankruptcy.bankrupt,
@@ -70,8 +122,13 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     arrested: s.arrest.arrested,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
+    wellBeing: s.scores.wellBeing,
+    safety: s.scores.safety,
+    ecology: s.scores.ecology,
+    nuisance: s.scores.nuisance,
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
+    storedMassKg: s.logistics.storedMassKg,
   };
 }

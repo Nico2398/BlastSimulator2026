@@ -54,7 +54,7 @@ export class SequenceStep {
     const fieldLabelStyle = 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-micro)';
     const dstepStepperEl = stepper(`${this.dstepMs} ms`, () => this.adjustDelayStep(-DELAY_STEP_INCREMENT), () => this.adjustDelayStep(DELAY_STEP_INCREMENT));
     this.dstepValueEl = dstepStepperEl.querySelector('.bsx-stepper-value') as HTMLElement;
-    const dstepField = el('div', { children: [
+    const dstepField = el('div', { attrs: { 'data-field': 'delay-step' }, children: [
       this.locale.bindText(el('span', { attrs: { style: fieldLabelStyle } }), 'ui.blast_workshop.sequence.delay_step'),
       dstepStepperEl,
     ] });

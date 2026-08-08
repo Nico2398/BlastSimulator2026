@@ -707,6 +707,20 @@ describe('SurveyCalc — runSurvey (4.6)', () => {
     expect(state.cash).toBe(startCash - SURVEY_COSTS.core_sample);
   });
 
+  it('mirrors the deduction in state.finances.cash, not just the flat field', () => {
+    const startCash = SURVEY_COSTS.seismic + 1000;
+    const state = makeState(startCash);
+    addGeologySurveyor(state);
+
+    runSurvey(state, { method: 'seismic', centerX: 5, centerZ: 5 });
+
+    expect(state.finances.cash).toBe(state.cash);
+    const entry = state.finances.transactions.find(t => t.category === 'materials');
+    expect(entry).toBeDefined();
+    expect(entry!.type).toBe('expense');
+    expect(entry!.amount).toBe(SURVEY_COSTS.seismic);
+  });
+
   // ── Pending action enqueue ───────────────────────────────────────────────────
 
   it("enqueues a PendingAction with type 'survey' and requiredSkill 'geology'", () => {
