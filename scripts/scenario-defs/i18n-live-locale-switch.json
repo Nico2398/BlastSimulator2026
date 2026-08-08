@@ -107,7 +107,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Answered through the event dialog's own buttons. A HARD click, not clickIfPresent: the preceding step fires this event explicitly (event fire), so the dialog is guaranteed on screen and a permissive click would be too weak -- if it silently found nothing, the dialog would stay up and cover the next step's target, which is exactly how this file broke when a blanket conversion treated every event choose as a random roll.",
+      "description": "Resolve the event through its own buttons, then open the top-bar Save/Load panel (opened via main.ts, outside UIManager) while the locale is French -- checks whether that panel picked up the live-switch fix too. Hard clicks, not clickIfPresent: the preceding step fires this event explicitly, so the dialog is guaranteed. The trailing #bs-saveload-btn click is what opens the saves modal the NEXT step asserts against -- a blanket conversion replaced this whole interaction array and silently dropped it, which is what broke this file.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -126,6 +126,10 @@
         {
           "type": "clickSelector",
           "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
         }
       ],
       "role": "player"
