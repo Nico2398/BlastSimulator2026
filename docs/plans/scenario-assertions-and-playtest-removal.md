@@ -900,16 +900,29 @@ of each session, in case main added/removed a file.)
 
 Two independent gates, not one — closing the parity table proves playtest's
 *content* is covered; it does not by itself prove interaction mode is a
-click-only substitute for it. Finding #74 measured the second gate directly:
-806 of 2924 steps (27.6%) across the 125-file suite are still untagged
-(`role` unset), and 803 of those still run a `command` action in interaction
-mode rather than a click — only 33/125 files are fully role-tagged, and 12
-files (list in Finding #74) currently prove zero player-authored clicks at
-all. `role:'player'` steps are enforced command-free already (0 violations
-found), so this is not a hole in the mechanism — it's unfinished coverage,
-the same #479 effort this table's batches never took on. Do not start Phase
-3 on parity-table-closed alone; re-run Finding #74's count and confirm it is
-at (or accepted-exception-only) zero first.
+click-only substitute for it. Finding #74 measured the second gate as a raw
+count (803 of 2924 steps still untagged+command); **Finding #75 audited every
+one of those 803 against its own stated reason** and found the great
+majority — 740 — are permanent, correct exceptions (no UI exists for the
+command, a button is genuinely disabled with no funds guard, an event follows
+a bare tick and may have no dialog, `contract deliver` can't be independently
+verified in command mode, and several more established classes, all listed in
+Finding #75). Do not re-run Finding #74's raw count as the gate — it counts
+permanent exceptions as if they were debt. **The actual remaining work is two
+scoped items**, both closed out or explicitly deferred with a confirmed
+technical reason in Finding #75:
+1. The `sequence auto delay_step:N` stepper class (~8 large playthrough
+   files) — needs a way to scope a click to the active Blast-panel step tab
+   (all 5 stay mounted, only `display` toggles; `SequenceStep`'s root has no
+   distinguishing selector), or an accepted risk to click it anyway.
+2. `tutorial-steps-visual.json` (32 steps) — needs a `box-cut` step inserted
+   to match the tutorial's real rail sequence, verified depth-stepper clicks
+   to reproduce its intentional death outcome through a real grid drag
+   (command mode's `depth:8` vs. the panel's real `depth:6` default), and
+   recomputation of ~15 cascading cash values through the rest of the file.
+
+Do not start Phase 3 until both are closed, or formally accepted as
+permanent exceptions the same way Finding #75's other 740 steps are.
 
 1. Delete `scripts/playtest.ts`, `scripts/playtests/*.json`,
    `scripts/shared/playtest-utils.ts`.
@@ -2354,4 +2367,9 @@ got, whether main was merged, and whether GitHub Actions is back up yet.
   recovering with the building already present) — fixed by raising
   starting cash to $100,000 instead, the same pattern two other files
   already use. Verified 1/1 in both modes, pushed (`fd16107`).
-  without a check-in first.
+
+75. **Finding #74's raw count (803 untagged+command steps, 92 files) conflated two different things — closed the real gaps, and the audit that separates them from the permanent ones.** Scanned every one of the 803 steps' own `description` field: 740 already carry a substantive, specific rationale: no per-hole charging/delay UI exists (Finding #10/#9's class), a button is genuinely disabled by cash/tier/research state with no funds guard (Finding #1/#16's class), `event choose 0` follows a bare tick and may have no dialog on screen at all (Finding #15's class — by far the most common, appearing in nearly every playthrough), `employee assign_skill`/`employee dispatch` have no UI and none should exist, `contract deliver` returns `success:false` rather than throwing so command mode can't independently verify the exact amount, a building/hire-role string isn't real (genuine no-op both modes), `vehicle move`/`vehicle assign` have no UI (FleetPanel.ts only wires buy/driver/scrap), ShadyPanel's mafia/corruption buttons carry no per-target selector, or weather has no player-facing control at all. Sampled ~25 of these files in full depth first (every "1 untagged step" file in the size-sorted list) to calibrate: 25/25 held up against direct source verification (button disabled states, command implementations, UI wiring greps) before trusting the pattern-match for the rest. This is not a hole in the mechanism — it's the mechanism doing exactly what `role:'player'` steps are for, correctly applied to steps that were never mistagged, just never explained until now in a few cases.
+    - **Real gaps found and closed**: `multi-deck-blast.json`'s `sequence auto delay_step:25` — matches the Sequence panel's own default, panel already open from the drill step, straightforward click, verified 1/1 interaction mode. `survey-overlay-toggle.json` — a whole file that landed fully untagged via a mid-session merge (Finding #73's sibling), converted end to end (hire, both survey runs, both overlay-toggle clicks), the trickiest part being that the Survey panel stays open across the entire tick/event padding sequence so the second `survey show` step must NOT re-click the toolbar toggle (`togglePanel` in UIManager.ts closes an already-open panel on a second click) — verified 25/25 steps in interaction mode, screenshots confirm the actual overlay-hidden/shown states, not just that no click errored. Three `blast-*-step-visual.json` files' shared charge step looked convertible (its params match the Charge panel's real defaults) but the Blast panel isn't opened until a later step in all three — added the missing rationale instead of a click that would have closed a panel that was never open, avoiding a `togglePanel` mistake before it shipped. `rock-fragmenter-breaking.json`'s two `assign_skill` steps got the standard rationale added (one needed a non-standard explanation: `driving.excavator` has no `ROLE_STARTING_QUALIFICATION` at all, unlike every other assign_skill instance in the suite, so the usual "raises an existing level" text would have been wrong).
+    - **Investigated and correctly left alone, with the real reason now on record**: the `sequence auto delay_step:N` pattern (≠25, ~8 large playthrough files) looked like a stepper that "just hasn't been click-tested" — traced it to source and confirmed real risk, not just untested: `BlastWorkshop.ts`'s `setActiveStep` keeps all 5 step panels (Drill/Charge/Sequence/Preview/Fire) mounted simultaneously, only toggling `display:none`, and `SequenceStep`'s root `div` carries no id/class/data-attribute to scope a selector to it — `page.click()` (Puppeteer) resolves the first DOM match only, so an unscoped `.bsx-stepper-btn` selector risks hitting a hidden earlier-step element and throwing. Left as documented commands; the existing rationale already said this correctly, just without the confirmed mechanism. `tutorial-steps-visual.json` (32 steps, the largest single file) turned out to need more than a click conversion: its command sequence skips the tutorial's own `box-cut` stage entirely (present between `hire-driller` and `drill-plan` in `tutorial-interactive.json`'s verified real sequence), and its blast is written to kill a worker via `depth:8`, but a real drill-grid click always produces the panel's `depth:6` default unless the depth stepper is *also* clicked a verified number of times — unknown here. A faithful conversion means inserting a new step, reproducing the death through unverified stepper mechanics, and recomputing roughly 15 cascading hardcoded cash values through the rest of the file — a standalone piece of engineering with its own verification burden, not a batch item. Not attempted this session; left with its existing accurate description plus this entry as the pointer to what a real attempt requires.
+    - **Verified**: JSON valid across all 126 files, 3116/3116 structural tests, 126/126 scenarios command mode throughout. Interaction mode run for real on every step that changed (multi-deck-blast, survey-overlay-toggle) rather than assumed from the command-mode pass.
+    - **Net effect on the Phase 3 gate**: the two-gate rule below still holds — `role:'player'` coverage is not total, so Phase 3 remains blocked — but the number worth tracking is no longer "803 untagged," which counted permanent, correct exceptions as if they were debt. The real remaining work is exactly two items, both scoped above: the delay_step stepper class (needs a reliable way to scope a selector to the active step tab, or an accepted risk to click it anyway) and `tutorial-steps-visual.json` (needs the box-cut insertion and depth-stepper verification). Everything else audited this pass is done.
