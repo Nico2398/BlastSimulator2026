@@ -138,7 +138,7 @@ describe('ChargeStep', () => {
     expect(installBtn.textContent).toContain('Install on 2');
   });
 
-  it('Buy Tubing dispatches tubing buy amount:10', () => {
+  it('Buy Tubing dispatches the registered buy command', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     addHole(state.drillHoles, 10, 10, 8, 0.15);
@@ -146,7 +146,7 @@ describe('ChargeStep', () => {
 
     (step.root.querySelector('[data-action="tubing-buy"]') as HTMLButtonElement).click();
 
-    expect(gameConsole).toHaveBeenCalledWith('tubing buy amount:10');
+    expect(gameConsole).toHaveBeenCalledWith('buy amount:10');
   });
 
   it('the Buy Tubing button shows the real cost (10 × TUBING_COST), not a stale price', () => {
@@ -159,7 +159,7 @@ describe('ChargeStep', () => {
     expect(buyBtn.textContent).toContain(`$${10 * TUBING_COST}`);
   });
 
-  it('Install Tubing dispatches one tubing install per wet hole', () => {
+  it('Install Tubing dispatches one install_tubing per wet hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
     const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
@@ -169,8 +169,8 @@ describe('ChargeStep', () => {
 
     (step.root.querySelector('[data-action="tubing-install"]') as HTMLButtonElement).click();
 
-    expect(gameConsole).toHaveBeenCalledWith(`tubing install hole:${h1.id}`);
-    expect(gameConsole).toHaveBeenCalledWith(`tubing install hole:${h2.id}`);
+    expect(gameConsole).toHaveBeenCalledWith(`install_tubing hole:${h1.id}`);
+    expect(gameConsole).toHaveBeenCalledWith(`install_tubing hole:${h2.id}`);
     expect(gameConsole).toHaveBeenCalledTimes(2);
   });
 

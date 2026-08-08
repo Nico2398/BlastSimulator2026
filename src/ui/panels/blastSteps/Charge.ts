@@ -294,11 +294,16 @@ export class ChargeStep {
     this.gameConsole?.(`charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m`);
   }
 
+  // `buy` / `install_tubing`, not `tubing buy` / `tubing install`: there is no
+  // `tubing` command in the registry (createRunner.ts:150,153 register the two
+  // verbs separately and pass the subcommand in themselves). Both buttons sent
+  // the non-existent form and silently did nothing — the runner answers
+  // `Unknown command: "tubing"`, and neither caller checks the result.
   private buyTubing(): void {
-    this.gameConsole?.(`tubing buy amount:${TUBING_BUY_AMOUNT}`);
+    this.gameConsole?.(`buy amount:${TUBING_BUY_AMOUNT}`);
   }
 
   private installTubing(wetIds: string[]): void {
-    for (const holeId of wetIds) this.gameConsole?.(`tubing install hole:${holeId}`);
+    for (const holeId of wetIds) this.gameConsole?.(`install_tubing hole:${holeId}`);
   }
 }
