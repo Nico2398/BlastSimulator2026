@@ -5,13 +5,64 @@ truth for this task. Update the status table and findings log as you go,
 commit this file alongside the scenario changes it tracks.
 
 **▶ STANDING INSTRUCTION (user-given, 2026-08-08): work autonomously until
-Finding #74's conversion is 100% done. Do not stop to ask whether to
+the mandate below is 100% done. Do not stop to ask whether to
 continue, and do not treat silence or an automated check-in as a reason to
-pause — keep converting files, verifying each in both modes, committing, and
+pause — keep working, verifying each change in both modes, committing, and
 pushing, exactly like the batches already in the Findings Log below. Only
 stop for a genuine blocker (a real, reproducible failure you cannot resolve,
 or a required decision only the user can make) — not for scope or pacing.
+Use subagents for bulk investigation so the main context does not overflow.
 This line must survive every context reset; do not remove or soften it.**
+
+**▶ THE MANDATE — UI/COMMAND PARITY IS A GAME REQUIREMENT, NOT A TEST
+CONCERN (user-given, 2026-08-08, restated forcefully after several partial
+answers). Read this before concluding anything about "acceptable exceptions":**
+
+> "Why is there some commands that have no UI equivalent? If an action is
+> available through commands, it should be accessible to the player through
+> UI, the only exception is 'cheat' commands (eg give money to help with the
+> scenario, loading a save state, or so) which should be rare and mostly on
+> scenario start. For the remaining, any action should be accessible through
+> command AND through UI. If that's not the case, this is a bug that must be
+> fixed. […] I want the interactive tests to functionaly replace the playtest
+> since they are redundant in my opinion, they can be merged into the
+> interactive tests."
+
+This **overrides** the earlier treatment (Findings #75/#76/#77, old ground
+rule #6) that classified "no UI exists for this command" as a *permanent,
+correct exception* documented in a step description. That classification was
+wrong and is now retired. The correct classification is:
+
+| Command class | Verdict | Action |
+|---|---|---|
+| Genuine setup/cheat: `new_game`, `campaign start`, `tick`, `time`, save/load, debug cash grants | Legitimate exception, keep as command | Must be **rare** and **mostly at scenario start** |
+| Read-only observation (`scores`, `finances`, `state`, `… list/status/show`) | Legitimate, no button needed to *read* | Keep as `observe` |
+| **Everything else** — any command that performs a game action | **BUG in the game** | **Add the missing UI, then convert the scenario step to a real click** |
+
+"There is no button for this, so the step stays a command" is no longer an
+acceptable finding. It is a defect report, and the defect must be fixed.
+
+**Three deliverables, in order. None is done until all three are:**
+1. **Audit** every registered console command against the UI, producing a
+   definitive gap list (command → has UI? → which control, or MISSING).
+2. **Fix every gap** — build the missing UI controls in `src/ui/`, with
+   tests, i18n keys in both `en.json`/`fr.json`, and visual verification.
+3. **Merge playtest into the interactive scenario suite and delete it** —
+   port playtest's stricter guarantee (see below), then remove
+   `scripts/playtest.ts`, `scripts/playtests/*.json`,
+   `scripts/shared/playtest-utils.ts`, and the CI job.
+
+**The playtest guarantee that must survive the merge** (this is the one real
+reason playtest was not already redundant, and the merge must not lose it):
+playtest allows **only** `new_game`/`campaign`/`tutorial_start`/`tick`/`time`
+— zero other commands, no `observe` allowance, no untagged escape hatch. The
+scenario suite's `role` system is looser in three ways (an `observe` role, and
+729 still-untagged legacy steps with no enforcement at all). Merging means
+scenario-defs must become *as strict as* playtest for the flows playtest
+covered — not merely cover the same content. Practically: drive the untagged
+count to zero, so every step is `player` (clicked), `setup` (5-verb
+allowlist), or `observe` (read-only), each enforced by
+`checkStepActionAllowed`.
 
 Follow-on to `docs/plans/issue-479-interaction-conversion.md` (#479, merged:
 all 124 scenario definitions convert their player-facing steps to real UI
@@ -80,11 +131,16 @@ deleted, not after.
    own interaction did, so this proves the guard is real without touching
    the underlying cash-guard game-logic gap (Findings #1/#16/#26 in the
    #479 plan doc, still out of scope — "wide blast radius", its own change).
-6. **A genuinely UI-less step stays unmarked, but should still usually get
-   an `expect`** proving what it bootstrapped, if a `setup`/observe-shaped
-   assertion is cheap and meaningful (e.g. `employee assign_skill`'s effect
-   on `qualificationCount`/proficiency is real and checkable even though the
-   *command* itself has no button).
+6. **RETIRED 2026-08-08 — superseded by THE MANDATE at the top of this
+   file.** This rule used to read: "A genuinely UI-less step stays unmarked,
+   but should still usually get an `expect` proving what it bootstrapped."
+   That is no longer the policy. A gameplay command with no UI is a **bug to
+   fix in `src/ui/`**, not a step to document and leave. The only commands
+   that may remain as commands are the setup/cheat allowlist and read-only
+   observations — see the mandate's table. Every `description` in the suite
+   that says some variant of "no UI exists for this, left as a command" is a
+   **defect report awaiting a fix**, not a closed exception; Findings
+   #75/#76/#77's "740 permanent exceptions" figure is retired with it.
 7. **`git fetch origin main && git merge origin/main`** every so often —
    GitHub being down doesn't change this once it's back; check at the start
    of each resumed session.
