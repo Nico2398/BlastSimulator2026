@@ -75,7 +75,27 @@ export type InteractionStepAction =
   /** Re-aim the camera at a world tile before clicking it. */
   | { type: 'focusTile'; x: number; z: number; distance?: number }
   /** Click a live scene entity by kind + id rather than a baked coordinate. */
-  | { type: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number };
+  | { type: 'clickEntity'; kind: 'building' | 'vehicle' | 'employee' | 'fragment'; id: number; distance?: number }
+  /**
+   * Click a control **only if** it is on screen and usable; do nothing when it
+   * is absent. Models a player who answers a dialog when one appears and
+   * carries on when none does.
+   *
+   * Exists for genuinely nondeterministic beats — overwhelmingly `event choose`
+   * after a bare `tick`, where whether an event fired is a random roll. A hard
+   * `clickSelector` fails on every run where nothing appeared, which is why 339
+   * such steps across 47 files were left as console commands instead (the
+   * single largest block of un-clicked steps in the suite). The console command
+   * they fell back to no-ops in exactly the same circumstances ("No pending
+   * event or invalid option."), so this is strictly stronger: when a dialog IS
+   * up, a real click has to work.
+   *
+   * Not an escape hatch for a control that is merely hard to reach: if the
+   * target is deterministic, use `clickSelector` so a missing control fails
+   * loudly. `timeoutMs` (default 0) allows a brief settle for a dialog that
+   * animates in; 0 checks once, immediately.
+   */
+  | { type: 'clickIfPresent'; selector: string; timeoutMs?: number };
 
 /**
  * Whether a step's `interaction` models something the player must do by

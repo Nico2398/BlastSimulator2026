@@ -23,6 +23,9 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   // implementations, so a converted step and its playtest counterpart do the
   // same thing. See InteractionStepAction in scripts/shared/scenario-types.ts.
   'set', 'clickLabel', 'awaitUsable', 'zoomOut', 'focusTile', 'clickEntity',
+  // Conditional click for genuinely nondeterministic beats (`event choose`
+  // after a bare tick). Not an escape hatch — see InteractionStepAction.
+  'clickIfPresent',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [

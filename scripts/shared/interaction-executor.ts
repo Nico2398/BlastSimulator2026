@@ -306,6 +306,36 @@ export async function executeActionOnPage(
     case 'waitForSelector':
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
+    case 'clickIfPresent': {
+      // Poll for the control to become usable, but treat "never showed up" as a
+      // legitimate outcome rather than a failure — see the type's own doc
+      // comment for why this is not an escape hatch. Reuses the same
+      // `__probeSelector` usability gate `clickSelector` clicks through, so a
+      // control that IS present but inert still counts as not-clickable here
+      // (a tutorial rail blocking it is a real block, and silently clicking
+      // through it would prove nothing).
+      const settleMs = action.timeoutMs ?? 0;
+      const deadline = Date.now() + settleMs;
+      for (;;) {
+        const usable = await page.evaluate((sel: string) => {
+          const el = document.querySelector(sel);
+          if (el === null) return false;
+          const probe = (window as unknown as {
+            __probeSelector?: (s: string) => string | null;
+          }).__probeSelector;
+          if (probe === undefined) return true;
+          el.scrollIntoView({ block: 'center', inline: 'nearest' });
+          return probe(sel) === null;
+        }, action.selector);
+        if (usable) {
+          await page.click(action.selector);
+          break;
+        }
+        if (Date.now() >= deadline) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      break;
+    }
     case 'waitForTutorialStep': {
       const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
       const deadline = Date.now() + (action.timeout ?? 30000);
