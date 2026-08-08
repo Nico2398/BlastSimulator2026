@@ -165,6 +165,50 @@ describe('WorldMap', () => {
     container.remove();
   });
 
+  // Before `data-action`/`data-level`, the only way to reach one specific
+  // level's button was its translated label or its position in the grid.
+  describe('stable selectors', () => {
+    it('every unlocked level exposes its own start button keyed by level id', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign());
+
+      for (const id of ['dusty_hollow', 'grumpstone_ridge']) {
+        const btn = container.querySelector(`#bs-world-map [data-level="${id}"] [data-action="start-level"]`);
+        expect(btn, `no start button for ${id}`).not.toBeNull();
+      }
+      // treranium_depths is locked — its card exists but carries no start button.
+      expect(container.querySelector('#bs-world-map [data-level="treranium_depths"]')).not.toBeNull();
+      expect(container.querySelector('#bs-world-map [data-level="treranium_depths"] [data-action="start-level"]')).toBeNull();
+      map.dispose();
+      container.remove();
+    });
+
+    it('clicking the selector-addressed start button routes to that exact level, not the first card', () => {
+      const { container, map } = mount();
+      const cb = vi.fn();
+      map.setOnStartLevel(cb);
+      map.show(makeCampaign());
+
+      container.querySelector<HTMLButtonElement>('#bs-world-map [data-level="grumpstone_ridge"] [data-action="start-level"]')!.click();
+      expect(cb).toHaveBeenCalledWith('grumpstone_ridge');
+
+      container.querySelector<HTMLButtonElement>('#bs-world-map [data-level="dusty_hollow"] [data-action="start-level"]')!.click();
+      expect(cb).toHaveBeenLastCalledWith('dusty_hollow');
+      map.dispose();
+      container.remove();
+    });
+
+    it('the start button keeps its selector after a locale refresh rebuilds the cards', () => {
+      const { container, map } = mount();
+      map.show(makeCampaign());
+      setLocale('fr');
+      map.refreshLocale();
+      expect(container.querySelector('#bs-world-map [data-level="dusty_hollow"] [data-action="start-level"]')).not.toBeNull();
+      map.dispose();
+      container.remove();
+    });
+  });
+
   it('dispose removes the screen from the DOM', () => {
     const { container, map } = mount();
     map.dispose();

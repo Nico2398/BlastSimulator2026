@@ -45,7 +45,12 @@ describe('en.json / fr.json — key-set parity', () => {
   });
 
   it('both locale files declare exactly the same key count, pinned to the current key-complete baseline', () => {
-    // Baseline is 3228 (down from 3234): the sandbox setup screen collapse
+    // Baseline is 3233 (up from 3228): the per-hole charge controls (gap G3,
+    // `charge hole:<id> …` had no button) added 5 new
+    // `ui.blast_workshop.charge.*` keys — holes_section, charge_hole,
+    // hole_charged, hole_uncharged, no_holes — all translated in fr.json, not
+    // carried over in English.
+    // Before that, baseline was 3228 (down from 3234): the sandbox setup screen collapse
     // (#504) removed 10 `sandbox.*` keys for the deleted controls and added
     // 4 new ones — sandbox.field.difficulty, sandbox.difficulty.easy,
     // sandbox.difficulty.normal, sandbox.difficulty.hard — net -6, both
@@ -69,7 +74,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // ORPHAN_KEYS in src/core/i18n/glossary.ts. Update this baseline only
     // alongside a deliberate key addition/removal, not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3228);
+    expect(Object.keys(en).length).toBe(3233);
   });
 });
 

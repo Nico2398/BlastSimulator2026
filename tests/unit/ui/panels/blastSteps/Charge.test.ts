@@ -4,6 +4,7 @@ import { ChargeStep } from '../../../../../src/ui/panels/blastSteps/Charge.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import { addHole, resetHoleIds } from '../../../../../src/core/mining/DrillPlan.js';
 import { getExplosive } from '../../../../../src/core/world/ExplosiveCatalog.js';
+import { t } from '../../../../../src/core/i18n/I18n.js';
 import { TUBING_COST } from '../../../../../src/core/mining/Tubing.js';
 
 function makeState() {
@@ -89,6 +90,86 @@ describe('ChargeStep', () => {
     expect(cmd).toContain('explosive:krackle');
     expect(cmd).toContain('amount:5kg');
     expect(cmd).toContain('stemming:2m');
+  });
+
+  it('renders one per-hole row per drill hole, keyed by data-hole, each with its own charge button', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(state.drillHoles, 13, 10, 8, 0.15);
+    step.update(state, 'sunny');
+
+    expect(step.root.querySelectorAll('[data-action="charge-hole"]')).toHaveLength(2);
+    expect(step.root.querySelector(`[data-hole="${h1.id}"] [data-action="charge-hole"]`)).not.toBeNull();
+    expect(step.root.querySelector(`[data-hole="${h2.id}"] [data-action="charge-hole"]`)).not.toBeNull();
+  });
+
+  it('a per-hole Charge button dispatches charge for that hole alone, with the panel\'s selected explosive/amount/stemming', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(state.drillHoles, 13, 10, 8, 0.15);
+    step.update(state, 'sunny');
+    card(step, 'krackle').click();
+
+    (step.root.querySelector(`[data-hole="${h2.id}"] [data-action="charge-hole"]`) as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledTimes(1);
+    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h2.id} explosive:krackle amount:5kg stemming:2m`);
+  });
+
+  it('a per-hole Charge button picks up the amount/stemming steppers, not the defaults', () => {
+    const { step, gameConsole } = makeStep();
+    const state = makeState();
+    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state, 'sunny');
+
+    const amountIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[1] as HTMLButtonElement;
+    amountIncBtn.click(); // 5 kg → 6 kg
+    const stemmingIncBtn = step.root.querySelectorAll('.bsx-stepper-btn')[3] as HTMLButtonElement;
+    stemmingIncBtn.click(); // 2.0 m → 2.2 m
+
+    (step.root.querySelector(`[data-hole="${h1.id}"] [data-action="charge-hole"]`) as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledWith(`charge hole:${h1.id} explosive:boomite amount:6kg stemming:2.2m`);
+  });
+
+  it('marks a charged hole distinguishable from an uncharged one and shows its charge', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const h2 = addHole(state.drillHoles, 13, 10, 8, 0.15);
+    state.chargesByHole[h1.id] = { explosiveId: 'krackle', amountKg: 7, stemmingM: 2 };
+    step.update(state, 'sunny');
+
+    const chargedRow = step.root.querySelector(`[data-hole="${h1.id}"]`) as HTMLElement;
+    const uncharged = step.root.querySelector(`[data-hole="${h2.id}"]`) as HTMLElement;
+    expect(chargedRow.dataset['charged']).toBe('true');
+    expect(uncharged.dataset['charged']).toBe('false');
+    expect(chargedRow.textContent).toContain('7 kg');
+    expect(chargedRow.textContent).toContain(t(getExplosive('krackle')!.nameKey));
+    expect(uncharged.textContent).toContain('Not charged');
+  });
+
+  it('re-renders the hole rows once a charge lands, so a row cannot go stale', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    const h1 = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    step.update(state, 'sunny');
+    expect((step.root.querySelector(`[data-hole="${h1.id}"]`) as HTMLElement).dataset['charged']).toBe('false');
+
+    state.chargesByHole[h1.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    step.update(state, 'sunny');
+
+    expect((step.root.querySelector(`[data-hole="${h1.id}"]`) as HTMLElement).dataset['charged']).toBe('true');
+  });
+
+  it('shows an empty state instead of hole rows when no hole is drilled yet', () => {
+    const { step } = makeStep();
+    step.update(makeState(), 'sunny');
+
+    expect(step.root.querySelector('[data-action="charge-hole"]')).toBeNull();
+    expect(step.root.textContent).toContain('No holes to charge yet');
   });
 
   it('amount stepper clamps to the selected explosive\'s min/max charge', () => {

@@ -191,7 +191,7 @@ export class ShadyPanel {
       el('span', { text: `${rate}%`, attrs: { style: 'margin-left:auto;font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-ore)' } }),
     ] });
     const noteEl = el('span', { text: t(target.noteKey), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
-    const callBtn = button('ghost', t('ui.shady.make_the_call'));
+    const callBtn = button('ghost', t('ui.shady.make_the_call'), { dataAction: 'corrupt' });
     callBtn.style.cssText = 'margin-left:auto;border-color:rgba(169,140,255,.4);background:rgba(169,140,255,.1);color:#c4aeff';
     callBtn.addEventListener('click', () => {
       this.onConfirmRequestCb?.({
@@ -206,7 +206,12 @@ export class ShadyPanel {
       el('span', { text: `$${cost.toLocaleString('en-US')}`, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-amber)' } }),
       callBtn,
     ] });
-    return card([headRow, noteEl, footRow]);
+    // `data-target` scopes the card so a test can reach one specific
+    // arrangement (`[data-target="judge"] [data-action="corrupt"]`) instead of
+    // counting `nth-of-type` positions across five identical cards.
+    const wrap = card([headRow, noteEl, footRow]);
+    wrap.dataset['target'] = target.id;
+    return wrap;
   }
 
   private lockedServicesTeaser(): HTMLElement {
@@ -234,7 +239,11 @@ export class ShadyPanel {
     });
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [label, status] });
     const note = el('span', { text: t('ui.shady.smuggling_note'), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
-    const toggleBtn = button(active ? 'danger' : 'ghost', t(active ? 'ui.shady.smuggling_stop' : 'ui.shady.smuggling_start'));
+    const toggleBtn = button(
+      active ? 'danger' : 'ghost',
+      t(active ? 'ui.shady.smuggling_stop' : 'ui.shady.smuggling_start'),
+      { dataAction: 'mafia-smuggle' },
+    );
     toggleBtn.style.width = '100%';
     toggleBtn.addEventListener('click', () => this.gameConsole?.('mafia smuggle'));
     return card([headRow, note, toggleBtn]);
@@ -246,7 +255,8 @@ export class ShadyPanel {
     const note = el('span', { text: t('ui.shady.accident_note', { rate: successRate }), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
     const alive = state.employees.employees.filter(e => e.alive);
     const select = this.employeeSelect(alive);
-    const goBtn = button('ghost', t('ui.shady.accident_button'));
+    select.dataset['action'] = 'mafia-accident-employee';
+    const goBtn = button('ghost', t('ui.shady.accident_button'), { dataAction: 'mafia-accident' });
     goBtn.style.cssText = 'border-color:rgba(255,91,76,.35);color:var(--bsx-critical-text)';
     goBtn.disabled = alive.length === 0;
     goBtn.addEventListener('click', () => {
@@ -279,9 +289,12 @@ export class ShadyPanel {
       if (!emp) continue;
       const ready = state.tickCount >= frame.readyTick;
       const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
+      // Pending frames are keyed by the framed employee — `data-frame-id`
+      // scopes the row so a test targets one frame, not "the third row".
+      row.dataset['frameId'] = String(frame.employeeId);
       row.appendChild(el('span', { text: emp.name, attrs: { style: 'font:500 10px/1 var(--bsx-font-ui);flex:1' } }));
       if (ready) {
-        const useBtn = button('ghost', t('ui.shady.frame_complete_button'));
+        const useBtn = button('ghost', t('ui.shady.frame_complete_button'), { dataAction: 'mafia-frame-complete' });
         useBtn.style.cssText = 'border-color:rgba(255,91,76,.35);color:var(--bsx-critical-text)';
         useBtn.addEventListener('click', () => {
           this.onConfirmRequestCb?.({
@@ -305,7 +318,8 @@ export class ShadyPanel {
     const framedIds = new Set(state.mafia.pendingFrames.map(f => f.employeeId));
     const eligible = state.employees.employees.filter(e => e.alive && !framedIds.has(e.id));
     const select = this.employeeSelect(eligible);
-    const startBtn = button('ghost', t('ui.shady.frame_start_button'));
+    select.dataset['action'] = 'mafia-frame-employee';
+    const startBtn = button('ghost', t('ui.shady.frame_start_button'), { dataAction: 'mafia-frame-start' });
     startBtn.disabled = eligible.length === 0;
     startBtn.addEventListener('click', () => {
       const empId = Number(select.value);

@@ -257,6 +257,77 @@ describe('LevelEndScreen', () => {
     container.remove();
   });
 
+  // Both footers were reachable only by their translated label ('REPLAY',
+  // 'CONTINUE TO …', 'RETRY …'), which no test in another locale can match.
+  describe('stable selectors', () => {
+    it('victory footer exposes replay and continue by data-action, wired to the real callbacks', () => {
+      const { container, screen } = mount();
+      let replayedId: string | null = null;
+      let nextId: string | null = null;
+      screen.setOnReplay(id => { replayedId = id; });
+      screen.setOnContinue(id => { nextId = id; });
+      screen.update(stateAtLevelEnd(ONE_STAR, 'dusty_hollow'));
+
+      const replay = container.querySelector<HTMLButtonElement>('#bs-level-end-screen [data-action="replay"]');
+      expect(replay).not.toBeNull();
+      replay!.click();
+      expect(replayedId).toBe('dusty_hollow');
+
+      const cont = container.querySelector<HTMLButtonElement>('#bs-level-end-screen [data-action="continue"]');
+      expect(cont).not.toBeNull();
+      cont!.click();
+      expect(nextId).toBe('grumpstone_ridge');
+      screen.dispose();
+      container.remove();
+    });
+
+    it('the continue button keeps its data-action after its label is cleared and rebuilt', () => {
+      const { container, screen } = mount();
+      // levelEndReason back to null is what resets the render gate between levels.
+      const inPlay = createGame({ seed: 42, mineType: 'desert' });
+      screen.update(stateAtLevelEnd(THREE_STAR, 'dusty_hollow'));
+      // A defeat render clears the victory labels; switching back rebuilds them.
+      screen.update(inPlay);
+      screen.update(stateAtDefeat('bankruptcy'));
+      screen.update(inPlay);
+      screen.update(stateAtLevelEnd(THREE_STAR, 'dusty_hollow'));
+      expect(container.querySelector('#bs-level-end-screen [data-action="continue"]')).not.toBeNull();
+      screen.dispose();
+      container.remove();
+    });
+
+    it('defeat footer exposes retry and back-to-portfolio by data-action', () => {
+      const { container, screen } = mount();
+      let replayedId: string | null = null;
+      let backCalled = false;
+      screen.setOnReplay(id => { replayedId = id; });
+      screen.setOnBackToPortfolio(() => { backCalled = true; });
+      screen.update(stateAtDefeat('bankruptcy', 'dusty_hollow'));
+
+      const retry = container.querySelector<HTMLButtonElement>('#bs-level-end-screen [data-action="retry"]');
+      expect(retry).not.toBeNull();
+      retry!.click();
+      expect(replayedId).toBe('dusty_hollow');
+
+      const back = container.querySelector<HTMLButtonElement>('#bs-level-end-screen [data-action="back-to-portfolio"]');
+      expect(back).not.toBeNull();
+      back!.click();
+      expect(backCalled).toBe(true);
+      screen.dispose();
+      container.remove();
+    });
+
+    it('the selectors resolve in French too, where every label differs', () => {
+      const { container, screen } = mount();
+      setLocale('fr');
+      screen.update(stateAtLevelEnd(ONE_STAR, 'dusty_hollow'));
+      expect(container.querySelector('#bs-level-end-screen [data-action="replay"]')).not.toBeNull();
+      expect(container.querySelector('#bs-level-end-screen [data-action="continue"]')).not.toBeNull();
+      screen.dispose();
+      container.remove();
+    });
+  });
+
   describe('defeat variants', () => {
     it('each of the 4 loss reasons renders a distinct title', () => {
       const reasons: DefeatReason[] = ['bankruptcy', 'arrest', 'ecological_shutdown', 'worker_revolt'];
