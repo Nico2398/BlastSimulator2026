@@ -115,6 +115,20 @@ design), `event fire` (debug force-fire), `employee assign_skill` (free
 instant qualification; the player-facing path is `employee train`, which
 does have UI at #30).
 
+### ✅ DELIVERABLE 2 COMPLETE — all six gaps closed (2026-08-08)
+
+Every mutating console command in the game is now reachable by a player
+click, except the setup/cheat carve-out above. G1/G2 fixed (dead tubing
+buttons), G3 built (per-hole charge, visually verified), G4 built (vehicle
+Move Here), G5 resolved as a debug primitive, G6 built (Saved Plans,
+visually verified). Stable selectors added to the ShadyPanel / WorldMap /
+LevelEndScreen controls that existed but could not be click-targeted.
+
+Three real bugs surfaced doing it: the two dead tubing buttons, and Dispatch
+Here showing the haul error text ("No fragment nearby to haul") on a terrain
+miss. `tests/unit/lint/UiCommandsAreRegistered.test.ts` now fails the build
+if any UI control is ever wired to an unregistered command again.
+
 ### CONFIRMED GAPS — real bugs to fix
 
 | # | Command | Status | Fix |
