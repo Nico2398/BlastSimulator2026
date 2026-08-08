@@ -227,7 +227,7 @@
           "command": "vehicle move 2 to:21,20"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 3 to:20,21",
@@ -237,7 +237,7 @@
           "command": "vehicle move 3 to:20,21"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 4 to:19,20",
@@ -247,7 +247,7 @@
           "command": "vehicle move 4 to:19,20"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "tick 5",
@@ -267,7 +267,7 @@
           "command": "vehicle move 2 to:20,20"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 3 to:20,20",
@@ -277,7 +277,7 @@
           "command": "vehicle move 3 to:20,20"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 4 to:20,20",
@@ -287,7 +287,7 @@
           "command": "vehicle move 4 to:20,20"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle list",

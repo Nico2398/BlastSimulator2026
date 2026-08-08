@@ -565,11 +565,21 @@
       "command": "contract deliver 1 amount:200",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract deliver 1 amount:200"
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-amount"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-contract-panel .bs-contract-amount",
+          "value": "200"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. Unlike contract-negotiation.json/economy-display-visual.json, this file's hauled stock (1050kg, well over the 200kg requested) makes delivery genuinely succeed -- the whole pipeline this file exists to demonstrate.",
+      "role": "player",
+      "description": "Real click path: type 200 into the ACTIVE card's amount box and press DELIVER, so the kilograms the click sends are the same 200 the `command` field declares. The panel is already open from the accept step above, and contract #1 is the only active card, so the unqualified `.bs-contract-amount`/`.bs-contract-deliver` selectors are unambiguous here. awaitUsable is the real assertion: ContractsPanel disables the input, MAX and DELIVER together whenever min(remaining, stored) is 0, so a run that hauled nothing fails here instead of quietly delivering nothing. Traced maxDeliverable at this step: 262.5 kg of rubble against 430 kg remaining, so 200 is genuinely deliverable.",
       "expect": {
         "increased": [
           "cash"

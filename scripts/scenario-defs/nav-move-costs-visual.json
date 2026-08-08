@@ -124,11 +124,36 @@
       "command": "vehicle move 1 to:5,9",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 1 to:5,9"
+          "type": "clickEntity",
+          "kind": "vehicle",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 5.5,
+          "z": 9.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
+      "description": "Real click path: select hauler #1 in the 3D scene, rest the cursor on (5,9), then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre here, which is where the camera ray lands on this flat stretch; it was measured in a real browser (dispatched command read `vehicle move 1 to:5,9`), not assumed -- other tiles need an offset, so re-measure rather than copy.",
+      "role": "player",
       "expect": {
         "equals": {
           "cash": 17000

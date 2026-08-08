@@ -222,13 +222,38 @@
     },
     {
       "command": "vehicle move 1 to:37,33",
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
+      "description": "Real click path for the one hauler a mouse can actually pick: select #1 in the 3D scene, rest the cursor on (37,33), press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre, measured in a real browser until the dispatched command read `vehicle move 1 to:37,33`. The three steps below stay console commands for a reason recorded there.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 1 to:37,33"
+          "type": "clickEntity",
+          "kind": "vehicle",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 37.5,
+          "z": 33.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle move 2 to:37,33",
@@ -238,7 +263,7 @@
           "command": "vehicle move 2 to:37,33"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. MOVE HERE exists and works -- the `vehicle move 1` step above clicks it for real -- but no mouse can select haulers #2, #3 or #4 here: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting this step would silently re-order hauler #1 instead of #2. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 3 to:37,33",
@@ -248,7 +273,7 @@
           "command": "vehicle move 3 to:37,33"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. MOVE HERE exists and works -- the `vehicle move 1` step above clicks it for real -- but no mouse can select haulers #2, #3 or #4 here: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting this step would silently re-order hauler #1 instead of #2. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 4 to:37,33",
@@ -258,7 +283,7 @@
           "command": "vehicle move 4 to:37,33"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z."
+      "description": "Left as a command, and this is a defect report rather than a closed exception. MOVE HERE exists and works -- the `vehicle move 1` step above clicks it for real -- but no mouse can select haulers #2, #3 or #4 here: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting this step would silently re-order hauler #1 instead of #2. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "tick 6",

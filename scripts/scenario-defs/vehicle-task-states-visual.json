@@ -64,14 +64,39 @@
       "role": "observe"
     },
     {
-      "command": "vehicle move 1 to:2,2",
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
+      "command": "vehicle move 1 to:37,33",
+      "description": "Real click path: select hauler #1 in the 3D scene, rest the cursor on the destination, press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). DESTINATION CHANGED from (2,2) to (37,33): (2,2) sits in dusty_hollow's far corner behind a rise, and no camera-ray aim from the default orbit can land on it -- a focus sweep along x=2.5 jumps straight from tile z=0 to z=3, skipping 1 and 2, so the tile is occluded. This file tests idle -> moving -> transport task transitions, not one particular destination, so it aims at a tile a player can actually point at. (37,33) is the same tile vehicle-traffic-routing-visual drives to on this level, and its focus point was measured in a real browser until the dispatched command read `vehicle move 1 to:37,33`.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 1 to:2,2"
+          "type": "clickEntity",
+          "kind": "vehicle",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 37.5,
+          "z": 33.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
+      "role": "player",
       "expect": {
         "equals": {
           "cash": 25000,
@@ -121,7 +146,7 @@
           "command": "vehicle assign 1 task:transport"
         }
       ],
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- FleetPanel.ts only wires vehicle buy/driver/scrap to the console (grep confirms no `vehicle move`/`vehicle assign` call site anywhere in src/ui) -- vehicles move autonomously via task/haul assignment, never by a player teleporting one to a raw x,z.",
+      "description": "Left unmarked: `vehicle assign <id> task:<task>` writes the VehicleTask enum straight onto the vehicle, skipping the drive/load/unload sequence ArrivalGate drives, so it reaches a state no real flow produces -- classified as a test-only state poke alongside `employee assign_skill` (gap G5). Every player-meaningful task has its own control: transport/loading -> Haul, clearing -> Break, moving -> the selection bar's MOVE HERE, which the step above now clicks.",
       "expect": {
         "equals": {
           "vehicleCount": 1

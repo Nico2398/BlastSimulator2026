@@ -453,11 +453,13 @@
           "command": "contract deliver 1 amount:5000"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. This file never hauls anything into storage (no `vehicle haul` call anywhere), so delivery genuinely fails every time -- confirmed via direct trace (\"Not enough stored material: 0.0 kg available\").",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 430 kg contract -- this file never hauls anything into storage (no `vehicle haul` call anywhere). The console command is no better: it returns success:false (\"Not enough stored material: 0.0 kg available\") and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:5000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
       "expect": {
         "equals": {
           "activeContractCount": 1
         },
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel .bs-contract-deliver",
         "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery."
       }
     },
@@ -601,11 +603,13 @@
           "command": "contract deliver 2 amount:5000"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. This file never hauls anything into storage -- delivery genuinely fails every time.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble #1, sparkium #2), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. The console command returns success:false (\"Not enough sparkium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
         "equals": {
           "activeContractCount": 2
-        }
+        },
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel .bs-contract-deliver"
       }
     },
     {
@@ -719,11 +723,13 @@
           "command": "contract deliver 3 amount:5000"
         }
       ],
-      "description": "Left unmarked (legacy): `contract deliver` returns success:false rather than throwing when the amount exceeds stock, and command-mode's runner only fails a step on a thrown exception, so the exact deliverable amount here is not independently verified. Same class as Finding #2. This file never hauls anything into storage -- delivery genuinely fails every time.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough rustite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard.",
       "expect": {
         "equals": {
           "activeContractCount": 3
-        }
+        },
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel .bs-contract-deliver"
       }
     },
     {

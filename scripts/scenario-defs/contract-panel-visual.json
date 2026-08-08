@@ -213,12 +213,14 @@
           "command": "contract deliver 2 amount:300"
         }
       ],
-      "description": "BLOCKED FINDING, left unconverted deliberately: this scenario never mines or hauls any ore, so nothing is in storage and the Contracts panel correctly disables Deliver (maxDeliverable <= 0). The console rejects it too — consumeStoredOre fails — but it returns success:false rather than throwing, and the command-mode runner only fails a step on a thrown exception, so command mode reports this no-op as a pass (the #445 class). Converting it to a click is what surfaced that; papering over it with a command would hide it again.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows both active cards at 0.0 kg stored (dirtite #1, rubble #2) -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 2 amount:300` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
           "activeContractCount": 2,
           "cash": 50000
         },
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel .bs-contract-deliver",
         "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
       }
     },
