@@ -856,7 +856,7 @@ selectionBar.setActionHandler((action, entity) => {
     case 'dispatch_here': {
       // "Here" = wherever the player is currently pointing on the ground —
       // the live hover state, read at the moment the button is clicked.
-      const terrain = scenePicking.hover?.terrain;
+      const terrain = scenePicking.aim?.terrain;
       if (!terrain) {
         // `no_move_target` ("point at the ground…"), not `no_haul_target`
         // ("no fragment nearby to haul") — this step fails because the cursor
@@ -874,7 +874,7 @@ selectionBar.setActionHandler((action, entity) => {
       // player is currently pointing at. Note the parser's coordinate form
       // here is `to:x,z` (one comma-joined argument), not the `x:… z:…` pair
       // `employee dispatch` takes — see src/console/commands/vehicle.ts.
-      const terrain = scenePicking.hover?.terrain;
+      const terrain = scenePicking.aim?.terrain;
       if (!terrain) {
         uiManager.notify({ severity: 'warn', title: t('shell.selection.move_here'), body: t('shell.selection.no_move_target') });
         break;
@@ -891,7 +891,7 @@ selectionBar.setActionHandler((action, entity) => {
     case 'haul': {
       // Same live-hover pattern as Dispatch Here: haul whichever fragment the
       // player is currently pointing at.
-      const hovered = scenePicking.hover?.entity;
+      const hovered = scenePicking.aim?.entity;
       if (!hovered || hovered.kind !== 'fragment') {
         uiManager.notify({ severity: 'warn', title: t('shell.selection.haul'), body: t('shell.selection.no_haul_target') });
         break;

@@ -104,6 +104,22 @@ export class ScenePicking {
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private lastHoverKey: string | null = null;
   private currentHover: PickResult | null = null;
+  /**
+   * The last thing the cursor was genuinely over, which — unlike
+   * {@link currentHover} — SURVIVES the mouse leaving the canvas.
+   *
+   * `currentHover` answers two different questions that need opposite
+   * lifetimes: "what should be highlighted right now" (clear it the moment the
+   * cursor leaves) and "what is the player aiming at" (must outlive the trip to
+   * a HUD button). Using it for both made every SelectionBar action that reads
+   * the aim — Dispatch Here, Move Here, Haul — impossible to use with a mouse:
+   * the bar is `position:fixed` over a full-viewport canvas, so reaching the
+   * button always fires `mouseleave` first, and the handler then read `null` and
+   * bailed one millisecond later. Proven in a real browser: the identical click
+   * dispatched synchronously (no cursor travel) worked; via a real mouse it
+   * never called the console at all.
+   */
+  private lastAim: PickResult | null = null;
   private currentSelection: EntityPick | null = null;
 
   private pointerDown = false;
@@ -176,9 +192,19 @@ export class ScenePicking {
     }
     this.hoverTimer = setTimeout(() => {
       this.currentHover = pick;
+      // Latch the aim too. Only a new pick replaces it — clearHover() must not,
+      // or the trip to a HUD button destroys what the button is meant to act on.
+      this.lastAim = pick;
       this.onHoverChangeHandler?.(pick);
     }, HOVER_DELAY_MS);
   }
+
+  /**
+   * What the player is aiming at, for HUD actions that act on a scene target
+   * (Dispatch Here, Move Here, Haul). Outlives the cursor leaving the canvas;
+   * see {@link lastAim}. Use {@link hover} for highlighting, never for aiming.
+   */
+  get aim(): PickResult | null { return this.lastAim; }
 
   private clearHover(): void {
     if (this.hoverTimer !== null) { clearTimeout(this.hoverTimer); this.hoverTimer = null; }
