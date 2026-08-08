@@ -107,17 +107,25 @@
     },
     {
       "command": "event choose 0",
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Answered through the event dialog's own buttons. A HARD click, not clickIfPresent: the preceding step fires this event explicitly (event fire), so the dialog is guaranteed on screen and a permissive click would be too weak -- if it silently found nothing, the dialog would stay up and cover the next step's target, which is exactly how this file broke when a blanket conversion treated every event choose as a random roll.",
       "interaction": [
         {
-          "type": "clickIfPresent",
+          "type": "waitForSelector",
           "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
+          "timeout": 15000
         },
         {
-          "type": "clickIfPresent",
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "waitForSelector",
           "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "timeout": 15000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
       "role": "player"
@@ -164,17 +172,25 @@
     },
     {
       "command": "event choose 0",
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Answered through the event dialog's own buttons. A HARD click, not clickIfPresent: the preceding step fires this event explicitly (event fire), so the dialog is guaranteed on screen and a permissive click would be too weak -- if it silently found nothing, the dialog would stay up and cover the next step's target, which is exactly how this file broke when a blanket conversion treated every event choose as a random roll.",
       "interaction": [
         {
-          "type": "clickIfPresent",
+          "type": "waitForSelector",
           "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
+          "timeout": 15000
         },
         {
-          "type": "clickIfPresent",
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "waitForSelector",
           "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "timeout": 15000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
       "role": "player"
