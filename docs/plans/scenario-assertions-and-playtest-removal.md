@@ -168,6 +168,30 @@ against the now-closed UI gaps:
 | Legitimate cheat/setup | 86 | `employee assign_skill`, `weather set/advance`, `event fire`, `vehicle assign`, save/load, `new_game`/`campaign`/`tick`/`time` |
 | Still to classify | 162 | see below |
 
+## ▶ NEW GAPS FOUND WHILE ADDING THE FUNDS GUARD (2026-08-08)
+
+**G7 — five cash-spending commands have no affordability gate on EITHER side.**
+`build destroy` / `build upgrade` / `build move` (`entities.ts:89,123,161`) and
+`corrupt` / `mafia accident` / `mafia frame` (`events.ts:489,538,557`) all
+deduct cash, but `BuildMenu.ts:445,472` and `ShadyPanel.ts` never disable on
+affordability either. Guarding only the console would have made it *stricter*
+than the UI — the inverse of the divergence being fixed — so they were
+deliberately left alone and recorded here instead. The correct fix touches both
+sides: disable the buttons AND guard the commands, in one change.
+
+**G8 — `ShadyPanel` discards every command result, so its failures are silent.**
+`onConfirm: () => this.gameConsole?.(...)` throws the `CommandResult` away. A
+refused bribe — for any reason, funds or otherwise — produces no message, no
+toast, nothing: the player clicks and the game appears to ignore them. This is
+the **same class as the tubing bug** (G1/G2): a control wired to a command
+whose failure nobody checks. `BuildMenu` by contrast surfaces
+`cmdResult.output` through `setStatus`, which is the pattern ShadyPanel should
+adopt. **Fix G8 before G7's console guard**, or the guard's refusal message
+would be swallowed and the button would simply do nothing.
+
+Neither is a regression from this work — both predate it. They are recorded
+because the mandate's audit is only honest if it names what it found.
+
 ## ▶ DELIVERABLE 2c — scenario fallout from the console funds guard
 
 The user chose option (a): the console must refuse an unaffordable purchase
