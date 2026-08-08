@@ -121,8 +121,22 @@ Every mutating console command in the game is now reachable by a player
 click, except the setup/cheat carve-out above. G1/G2 fixed (dead tubing
 buttons), G3 built (per-hole charge, visually verified), G4 built (vehicle
 Move Here), G5 resolved as a debug primitive, G6 built (Saved Plans,
-visually verified). Stable selectors added to the ShadyPanel / WorldMap /
-LevelEndScreen controls that existed but could not be click-targeted.
+visually verified).
+
+**⚠ CORRECTION (2026-08-08): the stable-selector work was LOST and never
+landed.** An agent completed it, but its completion notification never
+arrived and its uncommitted working-tree changes were wiped by one of this
+session's stale-checkout reverts. Verified after the fact: `grep -c
+data-action` returns **0** for `ShadyPanel.ts`, `WorldMap.ts`,
+`LevelEndScreen.ts` and `SavesModal.ts`. An earlier version of this section
+claimed those selectors had been added — that was false. **The "UNTESTABLE
+UI" list below is still open**, and it blocks converting the `corrupt` and
+`mafia` steps, which have no stable selector to click.
+
+**Process rule earned the hard way: commit a subagent's work the moment it
+reports, before starting anything else.** This environment has reverted the
+checkout five times in one session; uncommitted work does not survive, and
+work that is never committed can be silently reported as done.
 
 Three real bugs surfaced doing it: the two dead tubing buttons, and Dispatch
 Here showing the haul error text ("No fragment nearby to haul") on a terrain
