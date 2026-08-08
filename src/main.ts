@@ -864,6 +864,19 @@ selectionBar.setActionHandler((action, entity) => {
       reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
       break;
     }
+    case 'move_here': {
+      // Vehicle counterpart of Dispatch Here: drive to whatever tile the
+      // player is currently pointing at. Note the parser's coordinate form
+      // here is `to:x,z` (one comma-joined argument), not the `x:… z:…` pair
+      // `employee dispatch` takes — see src/console/commands/vehicle.ts.
+      const terrain = scenePicking.hover?.terrain;
+      if (!terrain) {
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.move_here'), body: t('shell.selection.no_move_target') });
+        break;
+      }
+      reportIfFailed(t('shell.selection.move_here'), window.__gameConsole(`vehicle move ${entity.id} to:${terrain.tileX},${terrain.tileZ}`));
+      break;
+    }
     case 'follow':
     case 'focus': {
       const pos = gameRenderer.entityWorldPosition(entity.kind, entity.id);

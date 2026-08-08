@@ -45,7 +45,11 @@ describe('en.json / fr.json — key-set parity', () => {
   });
 
   it('both locale files declare exactly the same key count, pinned to the current key-complete baseline', () => {
-    // Baseline is 3233 (up from 3228): the per-hole charge controls (gap G3,
+    // Baseline is 3235 (up from 3233): the vehicle "Move Here" selection-bar
+    // action (gap G4, `vehicle move <id> to:<x,z>` had no button) added 2 new
+    // keys — shell.selection.move_here and shell.selection.no_move_target —
+    // both translated in fr.json, not carried over in English.
+    // Before that, baseline was 3233 (up from 3228): the per-hole charge controls (gap G3,
     // `charge hole:<id> …` had no button) added 5 new
     // `ui.blast_workshop.charge.*` keys — holes_section, charge_hole,
     // hole_charged, hole_uncharged, no_holes — all translated in fr.json, not
@@ -74,7 +78,7 @@ describe('en.json / fr.json — key-set parity', () => {
     // ORPHAN_KEYS in src/core/i18n/glossary.ts. Update this baseline only
     // alongside a deliberate key addition/removal, not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3233);
+    expect(Object.keys(en).length).toBe(3235);
   });
 });
 

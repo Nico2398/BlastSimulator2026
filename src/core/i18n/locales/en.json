@@ -3039,6 +3039,8 @@
   "shell.selection.move": "Move",
   "shell.selection.demolish": "Demolish",
   "shell.selection.focus": "Focus",
+  "shell.selection.move_here": "Move Here",
+  "shell.selection.no_move_target": "Point at the ground to pick a destination",
   "shell.selection.no_haul_target": "No fragment nearby to haul",
   "role.driller": "Driller",
   "role.blaster": "Blaster",

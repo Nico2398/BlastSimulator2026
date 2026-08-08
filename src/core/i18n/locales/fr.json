@@ -3039,6 +3039,8 @@
   "shell.selection.move": "Déplacer",
   "shell.selection.demolish": "Démolir",
   "shell.selection.focus": "Centrer",
+  "shell.selection.move_here": "Aller ici",
+  "shell.selection.no_move_target": "Visez le sol pour choisir une destination",
   "shell.selection.no_haul_target": "Aucun fragment à proximité à transporter",
   "role.driller": "Foreur",
   "role.blaster": "Artificier",
