@@ -51,6 +51,7 @@
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
       "timeout": 30,
+      "description": "Setup, matching the drill/sequence steps around it: the Blast Workshop is not opened until the step below (switching straight to the Preview step), so charging here still happens off-panel via command rather than a real Charge All click.",
       "interaction": [
         {
           "type": "command",

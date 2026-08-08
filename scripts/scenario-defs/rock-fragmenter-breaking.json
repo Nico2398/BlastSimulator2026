@@ -178,6 +178,7 @@
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:5",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "interaction": [
         {
           "type": "command",
@@ -307,6 +308,7 @@
     },
     {
       "command": "employee assign_skill 2 skill:driving.excavator level:5",
+      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #2 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow). Left as a test-only bootstrap since this file's focus is the rock_fragmenter break/haul flow, not re-proving excavator licensing.",
       "interaction": [
         {
           "type": "command",
