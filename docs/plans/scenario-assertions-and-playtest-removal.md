@@ -4,6 +4,15 @@
 truth for this task. Update the status table and findings log as you go,
 commit this file alongside the scenario changes it tracks.
 
+**▶ STANDING INSTRUCTION (user-given, 2026-08-08): work autonomously until
+Finding #74's conversion is 100% done. Do not stop to ask whether to
+continue, and do not treat silence or an automated check-in as a reason to
+pause — keep converting files, verifying each in both modes, committing, and
+pushing, exactly like the batches already in the Findings Log below. Only
+stop for a genuine blocker (a real, reproducible failure you cannot resolve,
+or a required decision only the user can make) — not for scope or pacing.
+This line must survive every context reset; do not remove or soften it.**
+
 Follow-on to `docs/plans/issue-479-interaction-conversion.md` (#479, merged:
 all 124 scenario definitions convert their player-facing steps to real UI
 clicks). That work proved the UI is *reachable*. This one proves the UI

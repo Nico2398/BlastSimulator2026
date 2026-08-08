@@ -5,6 +5,7 @@
     {
       "command": "new_game seed:42",
       "timeout": 30,
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "new_game seed:42" }
       ]
@@ -12,49 +13,66 @@
     {
       "command": "campaign start level:dusty_hollow",
       "timeout": 30,
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "campaign start level:dusty_hollow" }
       ]
     },
     {
       "command": "time resume",
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "time resume" }
       ]
     },
     {
       "command": "employee hire role:surveyor",
+      "role": "player",
       "interaction": [
-        { "type": "command", "command": "employee hire role:surveyor" }
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"surveyor\"]" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"surveyor\"]" }
       ]
     },
     {
       "command": "employee assign_skill 1 skill:geology level:3",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for tighter survey estimates -- the player-facing path is `employee train`.",
       "interaction": [
         { "type": "command", "command": "employee assign_skill 1 skill:geology level:3" }
       ]
     },
     {
       "command": "survey seismic x:20 z:20",
+      "description": "Real click path: open the Survey panel, pick seismic (the method a geology-skilled surveyor can actually run), dispatch, target the tile.",
+      "role": "player",
       "interaction": [
-        { "type": "command", "command": "survey seismic x:20 z:20" }
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"survey\"]" },
+        { "type": "waitForSelector", "selector": "#bs-survey-panel [data-method=\"seismic\"]" },
+        { "type": "clickSelector", "selector": "#bs-survey-panel [data-method=\"seismic\"]" },
+        { "type": "clickSelector", "selector": "#bs-survey-run" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 20, "z": 20 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ]
     },
     {
       "command": "tick 25",
       "description": "Padding for the seismic survey to resolve",
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "tick 25" }
       ]
     },
     {
       "command": "event choose 0",
+      "description": "Follows a bare tick, so whether an event is pending is a random roll; there may be no dialog on screen at all. Deliberately left unmarked (Finding #15's class, same as main-menu-visual.json) -- the six occurrences of this pattern in this file (after each of the two surveys' padding ticks) are all the same case, not repeated individually below.",
       "interaction": [
         { "type": "command", "command": "event choose 0" }
       ]
     },
     {
       "command": "tick 10",
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "tick 10" }
       ]
@@ -67,6 +85,7 @@
     },
     {
       "command": "tick 10",
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "tick 10" }
       ]
@@ -79,10 +98,10 @@
     },
     {
       "command": "survey show",
-      "description": "Open the Survey panel and screenshot the overlay visible by default — colour-coded confidence quads over the surveyed area",
+      "description": "Screenshot the overlay visible by default, colour-coded confidence quads over the surveyed area. `survey show` (command mode) only lists pending surveys -- read-only, unrelated to overlay visibility -- so it's paired here rather than driving the step; the Survey panel opened by the survey click above stays open across the tick/event padding steps, so this step only needs to re-frame the camera and capture, not reopen anything (clicking the toolbar toggle again would close it -- togglePanel in UIManager.ts).",
+      "role": "player",
       "interaction": [
-        { "type": "command", "command": "survey show" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"survey\"]" },
+        { "type": "waitForSelector", "selector": "[data-role=\"overlay-toggle\"]" },
         { "type": "cameraFocus", "x": 20, "z": 20, "distance": 25 },
         { "type": "wait", "durationMs": 300 },
         { "type": "screenshot" }
@@ -90,9 +109,9 @@
     },
     {
       "command": "state full",
-      "description": "Click the overlay toggle button — the overlay disappears, leaving clean terrain, while survey results stay in the panel",
+      "description": "Click the overlay toggle button — the overlay disappears, leaving clean terrain, while survey results stay in the panel. `state full` (command mode) is a plain read paired with the click, same convention as other pure-UI steps across this suite.",
+      "role": "player",
       "interaction": [
-        { "type": "command", "command": "state full" },
         { "type": "clickSelector", "selector": "[data-role=\"overlay-toggle\"]" },
         { "type": "wait", "durationMs": 300 },
         { "type": "screenshot" }
@@ -100,14 +119,19 @@
     },
     {
       "command": "survey seismic x:30 z:30",
-      "description": "A second survey is run while the toggle is off",
+      "description": "A second survey is run while the toggle is off. The Survey panel is already open (from the first survey, never closed since), so this reuses the run flow directly rather than reopening the panel.",
+      "role": "player",
       "interaction": [
-        { "type": "command", "command": "survey seismic x:30 z:30" }
+        { "type": "clickSelector", "selector": "#bs-survey-run" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 30, "z": 30 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ]
     },
     {
       "command": "tick 25",
       "description": "Padding for the second seismic survey to resolve",
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "tick 25" }
       ]
@@ -120,6 +144,7 @@
     },
     {
       "command": "tick 10",
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "tick 10" }
       ]
@@ -132,6 +157,7 @@
     },
     {
       "command": "tick 10",
+      "role": "setup",
       "interaction": [
         { "type": "command", "command": "tick 10" }
       ]
@@ -144,9 +170,10 @@
     },
     {
       "command": "survey show",
-      "description": "The new survey's data must not silently re-show the overlay — screenshot still shows clean terrain",
+      "description": "The new survey's data must not silently re-show the overlay — screenshot still shows clean terrain. Same command/click split as the first survey-show step above.",
+      "role": "player",
       "interaction": [
-        { "type": "command", "command": "survey show" },
+        { "type": "waitForSelector", "selector": "[data-role=\"overlay-toggle\"]" },
         { "type": "cameraFocus", "x": 25, "z": 25, "distance": 30 },
         { "type": "wait", "durationMs": 300 },
         { "type": "screenshot" }
@@ -154,9 +181,9 @@
     },
     {
       "command": "state full",
-      "description": "Click the toggle again — the overlay reappears showing every survey's current data, both the first and second",
+      "description": "Click the toggle again — the overlay reappears showing every survey's current data, both the first and second.",
+      "role": "player",
       "interaction": [
-        { "type": "command", "command": "state full" },
         { "type": "clickSelector", "selector": "[data-role=\"overlay-toggle\"]" },
         { "type": "wait", "durationMs": 300 },
         { "type": "screenshot" }
@@ -164,12 +191,14 @@
     },
     {
       "command": "finances",
+      "role": "observe",
       "interaction": [
         { "type": "command", "command": "finances" }
       ]
     },
     {
       "command": "scores",
+      "role": "observe",
       "interaction": [
         { "type": "command", "command": "scores" }
       ]
