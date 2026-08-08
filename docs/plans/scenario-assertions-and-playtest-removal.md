@@ -143,6 +143,46 @@ Fixed by the `clickIfPresent` action (`scenario-types.ts`), which clicks only
 when the dialog is genuinely present and usable — strictly stronger than the
 console command it replaced, which no-ops in exactly the same case.
 
+## ▶ DELIVERABLE 3a SIZING (measured 2026-08-08, after the gap fixes)
+
+726 untagged steps still run a command in interaction mode. Reclassified
+against the now-closed UI gaps:
+
+| Class | Count | Disposition |
+|---|---|---|
+| **Now convertible to real clicks** | **472** | `event choose` (339, via `clickIfPresent`), `charge hole:<id>` (58, G3), `employee dispatch` (54, SelectionBar), `vehicle move` (15, G4), `corrupt`/`mafia*` (6, new stable selectors) |
+| Legitimate cheat/setup | 86 | `employee assign_skill`, `weather set/advance`, `event fire`, `vehicle assign`, save/load, `new_game`/`campaign`/`tick`/`time` |
+| Still to classify | 162 | see below |
+
+### ⚠ OPEN DECISION FOR THE USER — the console has no funds guard, the UI does
+
+The largest remaining block is `vehicle buy` (32), `employee hire` (19) and
+`blast` (8) — 59 steps whose **button is disabled for insufficient funds while
+the console command happily overdraws**. Under the mandate ("any action should
+be accessible through command AND through UI") this is a genuine
+inconsistency, but it is the *console* that is too permissive, not the UI that
+is missing something. Two ways to resolve it, and they are not equivalent:
+
+- **(a) Add the funds guard to the console commands.** Makes the two agree, and
+  is arguably the correct game rule — a player should not be able to buy what
+  they cannot afford. **But it changes game behaviour**: the intentional
+  bankruptcy/arrest losing scenarios currently reach their loss by overdrawing
+  on a purchase. They would have to reach it through running costs (salaries,
+  upkeep) instead — more realistic, but a real balance change affecting several
+  scenario files.
+- **(b) Leave the asymmetry and mark these steps as negative tests** — keep them
+  as commands with `expect.blocked` on the disabled button, proving the UI guard
+  is real. Cheaper, no balance change, but leaves console and UI disagreeing.
+
+**Do not pick unilaterally — this is a game-design/balance decision.** Ask.
+
+The rest of the 162: `contract deliver` (26), `sequence set` (9),
+`drill_plan grid` (4) all HAVE UI and convert normally. `weather` (7) and
+`state` (6) are read-only and should simply become `role: 'observe'`.
+`build office`/`medical_bay`/`canteen`/`storage_depot`/`break_room` (~25) need
+checking against the real building catalog — earlier findings claim several are
+not real building types at all, making those steps genuine no-ops in both modes.
+
 ## Ground rules (do not violate these)
 
 1. **Never guess a state value.** `employee hire role:surveyor` costs
