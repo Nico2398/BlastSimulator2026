@@ -96,6 +96,53 @@ every one of playtest's 4 definitions' unique proofs needs a scenario
 equivalent (or better) BEFORE playtest.ts/scripts/playtests/*.json are
 deleted, not after.
 
+## ▶ DELIVERABLE 1 — THE COMMAND→UI GAP TABLE (audited 2026-08-08, two subagents)
+
+Every MUTATING console command cross-referenced against every UI control that
+dispatches a command. Read-only commands are excluded (the mandate's `observe`
+class needs no button to *read*). **The gap list is far smaller than the
+"740 permanent exceptions" figure Findings #75-#77 claimed** — most commands
+already have UI; the earlier count was inflated by treating scenario-authoring
+convenience as a game limitation.
+
+### Legitimate exceptions — stay command-only (mandate's own carve-out)
+`new_game`, `campaign start`, `campaign complete` (debug force-complete),
+`sandbox start` (also has UI, #53), `save`/`load` (console quicksave —
+distinct from the UI's own SavesModal, which does its own serialization),
+`tutorial_start`, `tick`, `time pause|resume|speed`, `weather advance`,
+`weather set` (both debug — weather is environmental, no player control by
+design), `event fire` (debug force-fire), `employee assign_skill` (free
+instant qualification; the player-facing path is `employee train`, which
+does have UI at #30).
+
+### CONFIRMED GAPS — real bugs to fix
+
+| # | Command | Status | Fix |
+|---|---|---|---|
+| G1 | `buy amount:<N>` (tubing) | **BROKEN UI — button exists but is wired to a command that does not exist.** `Charge.ts:298` dispatches `tubing buy amount:N`; the real registered command is `buy amount:N` (`createRunner.ts:150`). Verified against the live runner: `Unknown command: "tubing"`. The button silently does nothing. | Fix the dispatch string |
+| G2 | `install_tubing hole:<id>` | **BROKEN UI — same class.** `Charge.ts:302` dispatches `tubing install hole:X`; real command is `install_tubing hole:X` (`createRunner.ts:153`). | Fix the dispatch string |
+| G3 | `charge hole:<id> …` (per-hole) | **NO UI.** Only Charge All (`[data-action="charge-all"]`) exists. Asymmetric with the Sequence step, which *does* have per-hole controls (`[data-hole="H1"] [data-action="delay-inc"]`). | Add per-hole charge controls |
+| G4 | `vehicle move <id> to:<x,z>` | **NO UI.** SelectionBar has `dispatch_here` for employees (#45) but no equivalent for vehicles. | Add a vehicle "move here" SelectionBar action |
+| G5 | `vehicle assign <id> task:<task>` | **NO UI.** | Add, or retire the command if genuinely redundant with haul/break |
+| G6 | `blast_plan save` / `blast_plan load` | **NO UI at all.** Saving/reusing a blast pattern is a real feature with no button. | Add save/load controls to the Blast panel |
+
+### UNTESTABLE UI — control exists but has no stable selector
+Not "missing feature" bugs, but they block click-conversion and make the
+suite fragile. Give each a `data-action`:
+- ShadyPanel `corrupt target:` buttons (5 cards, `nth-of-type` only) — `ShadyPanel.ts:194-204`
+- ShadyPanel `mafia smuggle` toggle — `ShadyPanel.ts:237-239`
+- WorldMap per-level START — `WorldMap.ts:186-193`
+- LevelEndScreen REPLAY/CONTINUE/RETRY — `LevelEndScreen.ts:95,101,142`
+- SavesModal per-slot LOAD/SAVE/DELETE — `SavesModal.ts:179,214,225`
+
+### Not a UI gap — a scenario-mechanism gap (fixed)
+`event choose` (339 steps, 47 files, the largest single block) already has
+real buttons (`#bs-event-dialog .bs-event-choice`). The blocker was
+nondeterminism: after a bare `tick`, whether an event fired is a random roll.
+Fixed by the `clickIfPresent` action (`scenario-types.ts`), which clicks only
+when the dialog is genuinely present and usable — strictly stronger than the
+console command it replaced, which no-ops in exactly the same case.
+
 ## Ground rules (do not violate these)
 
 1. **Never guess a state value.** `employee hire role:surveyor` costs
