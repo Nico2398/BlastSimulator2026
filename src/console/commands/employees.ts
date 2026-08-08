@@ -8,9 +8,11 @@ import {
   giveRaise,
   fireEmployee,
   assignSkill,
+  HIRING_COSTS,
   type EmployeeRole,
   type SkillCategory,
 } from '../../core/entities/Employee.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
 import {
   enrolInTraining,
   planTraining,
@@ -59,6 +61,19 @@ export function employeeCommand(
       if (!validRoles.includes(role)) {
         return { success: false, output: `Usage: employee hire role:(${validRoles.join('|')})` };
       }
+      // Affordability is checked here, not after hireEmployee, because
+      // hireEmployee *mutates* — it pushes the employee and bumps nextId
+      // before it can report a cost. Same predicate and same cost source as
+      // the UI: CrewPanel disables the hire button on
+      // `state.cash < HIRING_COSTS[role]`, and hireEmployee's returned
+      // hiringCost is exactly `HIRING_COSTS[role]`.
+      const hiringCost = HIRING_COSTS[role];
+      if (state.cash < hiringCost) {
+        return {
+          success: false,
+          output: `Insufficient funds: need $${formatMoney(hiringCost)}, have $${formatMoney(state.cash)}`,
+        };
+      }
       const rawEmpX = state.world ? state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
       const rawEmpZ = state.world ? state.world.sizeZ / 2 : 32;
       // Same void/isolated-pocket hazard as vehicle purchase spawn (#437): a
@@ -75,7 +90,9 @@ export function employeeCommand(
       // same name pair (this is what the design mock's own CREW fixture data
       // shows — two "Walt Diggins" hired the same day).
       const rng = new Random(state.seed + state.tickCount + state.employees.nextId);
-      const { employee, hiringCost } = hireEmployee(state.employees, role, rng, empX, empZ, state.tickCount);
+      // Deducts the same `hiringCost` the guard above tested, so the checked
+      // amount and the charged amount can never drift apart.
+      const { employee } = hireEmployee(state.employees, role, rng, empX, empZ, state.tickCount);
       state.cash -= hiringCost;
       addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);
       return { success: true, output: `Hired ${employee.name} (${role}). Cost: $${hiringCost}` };
