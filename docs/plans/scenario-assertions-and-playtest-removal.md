@@ -192,6 +192,19 @@ would be swallowed and the button would simply do nothing.
 Neither is a regression from this work — both predate it. They are recorded
 because the mandate's audit is only honest if it names what it found.
 
+## ▶ MEASUREMENT DISCIPLINE — a mistake made twice in this session
+
+**Never pipe a suite run through `tail`/`head` when you need its verdict.**
+`npm run scenarios | tail -60` reports **`tail`'s** exit code (always 0) and
+discards the summary, so a red suite reads as green and the failure list is
+truncated. This produced two wrong counts in a row here: the funds-guard
+fallout was reported first as 18 (a heuristic guess), then "corrected" to 5
+(a truncated log), when the real number was **11**. The second correction was
+more confident and more wrong than the first guess.
+
+Always: `npm run scenarios > <file> 2>&1; echo "EXIT: $?"` — then analyse the
+complete file. Same for `npm run test` and any scenario run.
+
 ## ▶ DELIVERABLE 2c — scenario fallout from the console funds guard
 
 The user chose option (a): the console must refuse an unaffordable purchase
