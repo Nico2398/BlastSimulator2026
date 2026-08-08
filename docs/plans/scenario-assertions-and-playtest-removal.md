@@ -168,7 +168,45 @@ against the now-closed UI gaps:
 | Legitimate cheat/setup | 86 | `employee assign_skill`, `weather set/advance`, `event fire`, `vehicle assign`, save/load, `new_game`/`campaign`/`tick`/`time` |
 | Still to classify | 162 | see below |
 
-### ⚠ OPEN DECISION FOR THE USER — the console has no funds guard, the UI does
+## ▶ DELIVERABLE 2c — scenario fallout from the console funds guard
+
+The user chose option (a): the console must refuse an unaffordable purchase
+(see the resolved decision below). 18 scenarios currently reach their state BY
+overdrawing and will break. Each gets its money as a **setup cheat**
+(`new_game cash:N`) so the purchase succeeds legitimately.
+
+Confirmed negative-cash trajectories (first negative value shown):
+
+| Scenario | first neg. cash | care needed |
+|---|---|---|
+| `event-dialog-visual` | -163,000 | plain top-up |
+| `level3-playthrough-win` | -38,750 | plain top-up |
+| `level2-playthrough-win` | -27,960 | plain top-up |
+| `vehicle-3d-rendering-visual`, `vehicle-roles-panel-visual` | -25,000 | plain top-up |
+| `level1-lose-bankruptcy` | -25,000 | **must still go bankrupt** |
+| `level1-playthrough-win` | -23,814 | plain top-up |
+| `building-menu-visual` | -15,000 | plain top-up |
+| `vehicle-purchase-visual` | -10,000 | plain top-up |
+| `level2-playthrough-bankruptcy` | -8,000 | **must still go bankrupt** |
+| `level3-playthrough-ecology` | -5,650 | plain top-up |
+| `level1-lose-arrest` | -5,000 | loss is corruption-driven, top-up safe |
+| `vehicle-traffic`, `vehicle-traffic-routing-visual` | -3,200 | plain top-up |
+| `level1-playthrough-revolt` | -1,750 | plain top-up |
+| `building-research-progression-visual`, `needs-collapse-visual`, `vehicle-purchase-tier-ui-visual` | (no neg. assert, but reference the guard) | verify |
+
+**The two bankruptcy scenarios are the delicate ones**: topping them up must
+not prevent the bankruptcy they exist to prove. Give only enough to complete
+the purchases, then let payroll/upkeep drain them — extending tick count if
+needed. Losing to running costs is a truer test of bankruptcy than losing to a
+purchase the UI would have refused anyway.
+
+**Method (ground rule #1 — never guess a state value):** changing starting
+cash shifts every downstream `expect.equals.cash`. Do NOT hand-adjust them by
+the delta — a purchase that previously failed now succeeds, so the trajectory
+genuinely diverges. Change the setup cash, re-run the scenario in command
+mode, and re-derive every cash assertion from the real per-step dumps.
+
+### ✅ RESOLVED BY THE USER (2026-08-08) — option (a): add the console guard
 
 The largest remaining block is `vehicle buy` (32), `employee hire` (19) and
 `blast` (8) — 59 steps whose **button is disabled for insufficient funds while
