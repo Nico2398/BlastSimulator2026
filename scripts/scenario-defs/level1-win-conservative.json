@@ -194,11 +194,24 @@
       "command": "sequence auto delay_step:30",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:30"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "role": "player",
+      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 1 increment click: 25ms default -> 30 (DELAY_STEP_INCREMENT=5ms, Sequence.ts). dstepMs is a plain instance field with no reset path (Finding #75/level1-lose-revolt.json) -- this file's later delay_step:25 occurrences (already role:player) were relying on it staying at the page's 25ms default, which this step now moves away from; both were fixed to compensate (see their own descriptions).",
       "expect": {
         "equals": {
           "cash": 50000,
@@ -515,11 +528,20 @@
           "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
       "role": "player",
+      "description": "1 decrement click added (Finding #75 follow-up): the earlier delay_step:30 occurrence in this file now really moves dstepMs to 30 (it used to be a bare command, invisible to the UI's stepper state), so this step no longer starts from the page's untouched 25ms default -- it starts from 30 and must click back down to 25, or it would silently fire at 30ms while declaring 25.",
       "expect": {
         "equals": {
           "cash": 50000,
@@ -817,11 +839,22 @@
           "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "25 ms"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
       "role": "player",
+      "description": "Asserted rather than assumed (Finding #75 follow-up): the preceding delay_step:25 occurrence's added decrement click (line ~511) should have already left dstepMs at 25 here, matching this step's own declared value with 0 further clicks needed -- a wrong assumption now fails loudly instead of silently firing at the wrong delay.",
       "expect": {
         "equals": {
           "cash": 50000,
@@ -1134,11 +1167,24 @@
       "command": "sequence auto delay_step:20",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:20"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "role": "player",
+      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 1 decrement click: dstepMs is 25 here (the preceding delay_step:25 occurrence left it unchanged), so one click reaches 20 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
       "expect": {
         "equals": {
           "cash": 49804,
