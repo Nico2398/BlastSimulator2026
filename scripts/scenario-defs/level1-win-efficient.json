@@ -1240,11 +1240,24 @@
       "command": "sequence auto delay_step:20",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:20"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "description": "Left unmarked: this delay_step doesn't match the Sequence panel's default (25ms), and the stepper that changes it has never been click-tested in this conversion (Batch 6's safety-projection-visual note) -- left as a command rather than guessing at an unproven selector.",
+      "role": "player",
+      "description": "Explicitly switches to the Sequence tab (data-step=\"3\") first -- relying on the panel's own autoAdvance to land there was unverified and, per a real interaction-mode run, wrong here (element present but zero-size, i.e. a hidden inactive tab). Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) so a click can target it unambiguously. 1 decrement click: 25ms default -> 20 (DELAY_STEP_INCREMENT=5ms).",
       "expect": {
         "equals": {
           "cash": 39260,

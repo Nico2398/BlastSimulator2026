@@ -175,11 +175,32 @@
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "description": "Left unmarked: delay_step:10ms doesn't match the Sequence panel's default (25ms). The stepper that changes it (Sequence.ts's dstepMs, +/-5ms per click) has never been click-tested in this conversion --  unlike the ramp tool's single-field #bs-param-strip, the Sequence tab shares DOM space with other blast steps whose tab-visibility isn't verified here, so left as a command rather than guessing at an unproven selector.",
+      "role": "player",
+      "description": "Sequence's delay-step stepper now carries data-field=\"delay-step\" (Sequence.ts, matching the drill grid tool's ParamStrip.ts convention) so a click can target it unambiguously -- the Charge step's amount/stemming steppers use the same unscoped .bsx-stepper markup and stayed indistinguishable without it. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
       "expect": {
         "equals": {
           "sequencedCount": 16
