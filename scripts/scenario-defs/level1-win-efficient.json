@@ -342,17 +342,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 44180,
@@ -389,17 +382,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 43360,
@@ -436,17 +422,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 42540,
@@ -483,17 +462,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 41720,
@@ -570,17 +542,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 41720,
@@ -617,17 +582,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 40900,
@@ -664,17 +622,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 40080,
@@ -711,17 +662,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 39260,
@@ -1032,17 +976,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 39260,
@@ -1079,17 +1016,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 39260,
@@ -1497,17 +1427,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 39260,
@@ -1544,17 +1467,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 39260,
@@ -1913,17 +1829,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 46760,
@@ -1960,17 +1869,10 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
-      "description": "Answered through the event dialog's own buttons (EventModal). clickIfPresent, not clickSelector: this step follows a bare tick, so whether an event fired is a random roll and the dialog may not be on screen at all -- the console command it replaced no-ops in exactly that case. When a dialog IS up, a real click has to work, and the usability gate is the same one clickSelector uses, so an inert control still counts as unclickable. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
           "cash": 46760,

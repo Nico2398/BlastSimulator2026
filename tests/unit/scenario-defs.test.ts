@@ -26,6 +26,9 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   // Conditional click for genuinely nondeterministic beats (`event choose`
   // after a bare tick). Not an escape hatch — see InteractionStepAction.
   'clickIfPresent',
+  // Resolves a pending event via its dialog, deciding from game state rather
+  // than DOM render timing. See InteractionStepAction.
+  'resolveEventIfPending',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [

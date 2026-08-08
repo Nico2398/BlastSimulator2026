@@ -111,17 +111,10 @@
     },
     {
       "command": "event choose 0",
-      "description": "Answered through the event dialog's own buttons, not the console. Uses clickIfPresent because this step follows a bare tick: whether an event fired is a random roll, so the dialog may not be on screen at all (the console command it replaced no-ops in exactly the same case). When a dialog IS up, a real click has to work -- strictly stronger than the command it replaced. Second click dismisses the outcome panel the choice opens.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "player"
@@ -140,18 +133,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "player",
-      "description": "Answered through the event dialog's own buttons, not the console. Uses clickIfPresent because this step follows a bare tick: whether an event fired is a random roll, so the dialog may not be on screen at all (the console command it replaced no-ops in exactly the same case). When a dialog IS up, a real click has to work -- strictly stronger than the command it replaced. Second click dismisses the outcome panel the choice opens."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
     },
     {
       "command": "tick 10",
@@ -167,18 +153,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "player",
-      "description": "Answered through the event dialog's own buttons, not the console. Uses clickIfPresent because this step follows a bare tick: whether an event fired is a random roll, so the dialog may not be on screen at all (the console command it replaced no-ops in exactly the same case). When a dialog IS up, a real click has to work -- strictly stronger than the command it replaced. Second click dismisses the outcome panel the choice opens."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
     },
     {
       "command": "survey show",
@@ -261,18 +240,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "player",
-      "description": "Answered through the event dialog's own buttons, not the console. Uses clickIfPresent because this step follows a bare tick: whether an event fired is a random roll, so the dialog may not be on screen at all (the console command it replaced no-ops in exactly the same case). When a dialog IS up, a real click has to work -- strictly stronger than the command it replaced. Second click dismisses the outcome panel the choice opens."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
     },
     {
       "command": "tick 10",
@@ -288,18 +260,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "player",
-      "description": "Answered through the event dialog's own buttons, not the console. Uses clickIfPresent because this step follows a bare tick: whether an event fired is a random roll, so the dialog may not be on screen at all (the console command it replaced no-ops in exactly the same case). When a dialog IS up, a real click has to work -- strictly stronger than the command it replaced. Second click dismisses the outcome panel the choice opens."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
     },
     {
       "command": "tick 10",
@@ -315,18 +280,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeoutMs": 500
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-event-dialog .bs-event-dismiss",
-          "timeoutMs": 500
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "player",
-      "description": "Answered through the event dialog's own buttons, not the console. Uses clickIfPresent because this step follows a bare tick: whether an event fired is a random roll, so the dialog may not be on screen at all (the console command it replaced no-ops in exactly the same case). When a dialog IS up, a real click has to work -- strictly stronger than the command it replaced. Second click dismisses the outcome panel the choice opens."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
     },
     {
       "command": "survey show",

@@ -306,6 +306,34 @@ export async function executeActionOnPage(
     case 'waitForSelector':
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
+    case 'resolveEventIfPending': {
+      // Ask the game, not the DOM. `event status` is read-only
+      // (isObservationCommand admits it) and this is the harness deciding
+      // whether to wait — the resolution itself is a real click below.
+      const pending = await page.evaluate(() => {
+        const run = (window as unknown as {
+          __gameConsole?: (c: string) => { output?: unknown };
+        }).__gameConsole;
+        if (run === undefined) return false;
+        const out = String(run('event status').output ?? '');
+        return !/no pending event/i.test(out);
+      });
+      if (!pending) break;
+
+      // Something IS pending, so the dialog must appear — wait properly rather
+      // than probing briefly, and fail loudly if it never does.
+      const evTimeout = action.timeoutMs ?? 30000;
+      await page.waitForSelector('#bs-event-dialog .bs-event-choice', { timeout: evTimeout });
+      await page.click('#bs-event-dialog .bs-event-choice');
+      // The outcome panel replaces the choices; dismiss it if it appears.
+      try {
+        await page.waitForSelector('#bs-event-dialog .bs-event-dismiss', { timeout: evTimeout });
+        await page.click('#bs-event-dialog .bs-event-dismiss');
+      } catch {
+        // Some events resolve without an outcome panel — not a failure.
+      }
+      break;
+    }
     case 'clickIfPresent': {
       // Poll for the control to become usable, but treat "never showed up" as a
       // legitimate outcome rather than a failure — see the type's own doc

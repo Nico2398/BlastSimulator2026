@@ -95,7 +95,27 @@ export type InteractionStepAction =
    * loudly. `timeoutMs` (default 0) allows a brief settle for a dialog that
    * animates in; 0 checks once, immediately.
    */
-  | { type: 'clickIfPresent'; selector: string; timeoutMs?: number };
+  | { type: 'clickIfPresent'; selector: string; timeoutMs?: number }
+  /**
+   * Resolve a pending event through the dialog's own buttons — but decide
+   * whether one is pending from **authoritative game state**, not from whether
+   * the DOM happens to have rendered yet.
+   *
+   * `clickIfPresent` is the wrong tool here and shipping it was a real bug:
+   * `event choose 0` resolved the event straight from state, while a DOM probe
+   * only fires once the modal has painted. Without a GPU a frame costs ~6s
+   * (#475), so a short probe silently found nothing, the event stayed pending,
+   * later `tick` steps halted on it, and the whole trajectory diverged —
+   * `needs-proactive-queue-visual` had an employee rest early and the run went
+   * green in command mode while being wrong in the browser.
+   *
+   * Asking the game whether an event is pending is instant and exact: no wait
+   * when there is nothing (the common case, so the suite stays fast), and a
+   * generous wait when there genuinely is. The state read is harness
+   * bookkeeping deciding whether to wait — the actual resolution is still a
+   * real click, which is the thing under test.
+   */
+  | { type: 'resolveEventIfPending'; timeoutMs?: number };
 
 /**
  * Whether a step's `interaction` models something the player must do by
