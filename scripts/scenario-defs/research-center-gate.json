@@ -1,0 +1,110 @@
+{
+  "name": "research-center-gate",
+  "description": "Closes the research-center-gate playtest's #442 parity gap (docs/plans/scenario-assertions-and-playtest-removal.md): clicking Queue Research on an already-placed building must be rejected on screen — not silently accepted — while zero Research Centers exist anywhere on site, and the identical click must succeed once one is placed. building-research-visual.json/building-research-progression-visual.json only ever exercise this after a Research Center already exists, so neither covers the no_research_center precondition (getQueueBlockCode, BuildingResearch.ts) at all.",
+  "steps": [
+    {
+      "command": "new_game seed:42 size:24",
+      "description": "Setup: matches the research-center-gate playtest's own beat 1 exactly.",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 size:24" }
+      ],
+      "expect": {
+        "equals": { "cash": 50000 }
+      }
+    },
+    {
+      "command": "campaign start level:tutorial_pit",
+      "description": "Setup: load the Tutorial Pit terrain — tutorial_start is never called, so no rail restricts tile picks below.",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "campaign start level:tutorial_pit" }
+      ],
+      "expect": {
+        "equals": { "cash": 80000, "buildingCount": 0 }
+      }
+    },
+    {
+      "command": "build living_quarters at:5,5",
+      "description": "Place a living quarters, tier 1, with no Research Center on site — the building this scenario will try (and fail, then succeed) to queue research on.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 5, "z": 5 },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "expect": {
+        "equals": { "buildingCount": 1, "cash": 70000 }
+      }
+    },
+    {
+      "command": "research queue type:living_quarters tier:2",
+      "description": "Click Queue Research on the placed living quarters' own row — no Research Center exists yet, so getQueueBlockCode must return no_research_center and the click must be rejected on screen, not silently swallowed.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-research-btn" }
+      ],
+      "expect": {
+        "equals": { "buildingCount": 1, "cash": 70000 },
+        "note": "Cash unchanged and no research queued proves the click was rejected (#442's prerequisite gate), not silently swallowed."
+      }
+    },
+    {
+      "command": "build research_center at:14,14",
+      "description": "Place a Research Center, tier 1 — the prerequisite the previous step was missing.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 14, "z": 14 },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "expect": {
+        "equals": { "buildingCount": 2, "cash": 45000 }
+      }
+    },
+    {
+      "command": "research queue type:living_quarters tier:2",
+      "description": "Click the identical Queue Research control on the living quarters again — now that a Research Center is placed, the tier-2 cost-only task must actually queue.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-research-btn" }
+      ],
+      "expect": {
+        "equals": { "cash": 40000 },
+        "note": "Cash dropped by exactly the tier-2 cost-only research price ($5,000, 0 ticks, no conditions per RESEARCH_TASK_DEFS) — the task actually queued this time, purely from clicking."
+      }
+    },
+    {
+      "command": "tick 2",
+      "description": "Let the cost-only research task resolve — 0-tick research resolves on the first tick processed after queueing.",
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "tick 2" }
+      ]
+    },
+    {
+      "command": "build living_quarters at:22,22 tier:2",
+      "description": "Proof the unlock is real, not just queued: tier 2 living quarters actually builds now, in both modes. Goes one step further than the playtest's own beat 7 (which stops at asserting the Place button is usable) so command mode has a real completion to check against — equals/increased have no interaction-only exemption (unlike usable/blocked/tutorialStep, scenario-types.ts's ScenarioStepGoal), so a step whose interaction only set the tier selector without clicking Buy would assert a buildingCount increase interaction mode never produced.",
+      "role": "player",
+      "interaction": [
+        { "type": "set", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel", "value": "2" },
+        { "type": "waitForSelector", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn:not([disabled])" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 22, "z": 22 },
+        { "type": "screenshot" },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "expect": {
+        "equals": { "buildingCount": 3 },
+        "decreased": ["cash"],
+        "note": "Tier-2 living_quarters construction cost is $25,000 (BuildingDefs.ts), on top of two ticks' worth of operatingCostPerTick from the living_quarters+research_center already placed — cash uses decreased not an exact equals since this follows a tick step (same class as building-research-visual.json's Finding #12). isTierUnlocked is genuinely true, not merely queued, or this build would still be rejected the same way the pre-Research-Center attempt was."
+      }
+    }
+  ]
+}

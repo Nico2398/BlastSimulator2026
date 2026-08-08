@@ -39,6 +39,7 @@ const PLAYTHROUGH_SCENARIO_NAMES = [
 const FEATURE_SCENARIO_NAMES = [
   'survey-then-blast',
   'building-lifecycle',
+  'research-center-gate',
   'skill-progression',
   'multi-deck-blast',
   'presplit-wall',
