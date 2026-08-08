@@ -858,7 +858,12 @@ selectionBar.setActionHandler((action, entity) => {
       // the live hover state, read at the moment the button is clicked.
       const terrain = scenePicking.hover?.terrain;
       if (!terrain) {
-        uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_haul_target') });
+        // `no_move_target` ("point at the ground…"), not `no_haul_target`
+        // ("no fragment nearby to haul") — this step fails because the cursor
+        // is not over terrain, which has nothing to do with fragments. The
+        // haul-specific text was copied here and told the player to look for
+        // the wrong thing.
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_move_target') });
         break;
       }
       reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
