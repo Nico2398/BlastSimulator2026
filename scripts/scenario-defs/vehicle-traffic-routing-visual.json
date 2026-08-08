@@ -3,38 +3,39 @@
   "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert. Confirmed via direct engine trace (Finding #22) that the traffic_jam event genuinely fires at tick 25 once the tick budget was corrected — see the tick 26 step for detail.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000",
+      "command": "new_game seed:42",
       "timeout": 10,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000"
+          "command": "new_game seed:42"
         }
       ],
       "role": "setup",
-      "description": "Bumped cash from the 50k default to 150k -- same reasoning as vehicle-traffic: all 4 debris_haulers need to exist for the routing test.",
-      "expect": {
-        "equals": {
-          "cash": 150000,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
-      "command": "campaign start level:dusty_hollow",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "campaign start level:dusty_hollow"
-        }
-      ],
-      "role": "setup",
-      "description": "campaign start replaces the whole GameState including cash, reset to the level's own startingCash -- a `new_game ... cash:N` override does not survive this step (tried, reverted; see vehicle-3d-rendering-visual for the same finding).",
+      "description": "Plain new_game at the sandbox default. The `cash:150000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash.",
       "expect": {
         "equals": {
           "cash": 50000,
           "vehicleCount": 0
         }
+      }
+    },
+    {
+      "command": "campaign start level:dusty_hollow cash:150000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow cash:150000"
+        }
+      ],
+      "role": "setup",
+      "description": "campaign start replaces the whole GameState (createGameForLevel), cash included, so `cash:` belongs here and nowhere earlier. $150,000 covers 4 drivers ($800 each) plus 4 tier-1 debris haulers ($25,000 each) = $103,200 — and all 4 haulers converging on one tile is precisely what makes this scenario's jam fire, so underfunding it would take the feature under test with it.",
+      "expect": {
+        "equals": {
+          "cash": 150000,
+          "vehicleCount": 0
+        },
+        "note": "the cash: override replaces dusty_hollow's $50,000 default outright"
       }
     },
     {
@@ -56,7 +57,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 49200,
+          "cash": 149200,
           "employeeCount": 1
         }
       }
@@ -76,7 +77,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 48400,
+          "cash": 148400,
           "employeeCount": 2
         }
       }
@@ -96,7 +97,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 47600,
+          "cash": 147600,
           "employeeCount": 3
         }
       }
@@ -116,7 +117,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 46800,
+          "cash": 146800,
           "employeeCount": 4
         }
       }
@@ -129,18 +130,19 @@
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
       "role": "player",
+      "description": "Opens the Fleet panel and buys hauler #1 by clicking its tier-1 dealership row. The three buys below reuse the open panel.",
       "expect": {
         "equals": {
-          "cash": 21800,
+          "cash": 121800,
           "vehicleCount": 1
         }
       }
@@ -149,14 +151,19 @@
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "role": "player",
+      "description": "Hauler #2, bought by clicking the same dealership row again: $121,800 in hand against $25,000. awaitUsable is the affordability assertion -- FleetPanel disables a tier row on cash < purchaseCost, so an underfunded run fails here instead of buying anyway.",
       "expect": {
         "equals": {
-          "cash": -3200,
+          "cash": 96800,
           "vehicleCount": 2
         }
       }
@@ -165,14 +172,19 @@
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "role": "player",
+      "description": "Hauler #3, same row again: $96,800 in hand against $25,000.",
       "expect": {
         "equals": {
-          "cash": -28200,
+          "cash": 71800,
           "vehicleCount": 3
         }
       }
@@ -181,14 +193,19 @@
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: cash is already at or below cost, so the buy button is disabled (Finding #1/#16's class) -- the console command has no funds guard and overdraws anyway.",
+      "role": "player",
+      "description": "Hauler #4, same row again: $71,800 in hand against $25,000. This is the vehicle that makes the jam reachable -- detectTrafficJam needs 3 vehicles waiting on a tile a 4th already occupies.",
       "expect": {
         "equals": {
-          "cash": -53200,
+          "cash": 46800,
           "vehicleCount": 4
         }
       }
@@ -284,7 +301,7 @@
         "equals": {
           "vehicleCount": 4
         },
-        "note": "confirmed via direct engine trace that state.events.pendingEvent is {eventId:'traffic_jam', firedAtTick:25} at this point — no scalar field exists in SerializableGameState to assert that directly, so this anchors on the fleet staying intact at 4 while the jam condition is met"
+        "note": "the step's own console output is the direct evidence: \"[tick 25] EVENT: Traffic Jam ... (Advanced 19 of 26 requested ticks)\" — the tick loop stops on the pending event, which is why tickCount lands on 25 rather than 32. No scalar field exists in SerializableGameState to assert the event directly, so this anchors on the fleet staying intact at 4 while the jam condition is met."
       }
     },
     {

@@ -20,19 +20,21 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:100000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:100000"
         }
       ],
       "role": "setup",
+      "description": "cash:100000 is set here, on `campaign start`, because this is the step that decides the level's cash: createGameForLevel builds a fresh GameState from dusty_hollow's own $50,000, so a bump on the preceding `new_game` would be discarded. $100,000 covers both purchases below (debris_hauler $25,000 + drill_rig $35,000) with headroom, so the Fleet panel's dealership buttons for both are enabled and a real player click lands.",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 100000,
+          "vehicleCount": 0
         },
-        "note": "dusty_hollow keeps the base $50,000 (unlike tutorial_pit's $80,000)"
+        "note": "the cash: override replaces dusty_hollow's $50,000 default outright"
       }
     },
     {
@@ -54,11 +56,11 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
         {
           "type": "screenshot"
@@ -67,7 +69,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 25000,
+          "cash": 75000,
           "vehicleCount": 1
         },
         "note": "real click on the Fleet panel's debris_hauler tier-1 row -- vehicle buy debris_hauler with no tier: arg defaults to tier 1 too (parseVehicleTierArg, vehicle.ts), so command mode and this click target the same purchase"
@@ -102,17 +104,25 @@
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy drill_rig"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "screenshot"
         }
       ],
-      "description": "BLOCKED FINDING, left unconverted deliberately: no player can reach this state. After the hauler above, cash is short of a drill rig, so the Fleet panel correctly disables its buy button \u2014 but `vehicle buy` subtracts the cost unconditionally and drives cash negative, so command mode succeeds where the UI refuses. `research queue`, `employee train` and `survey` all reject an unaffordable purchase; `vehicle buy`, `employee hire` and `build` do not. Filed as a separate finding rather than papered over with a click that cannot land (.claude/rules/playability.md).",
+      "role": "player",
+      "description": "A second real purchase from the same open panel: $75,000 in hand against a $35,000 drill rig, so the dealership row is enabled and clicking it buys the rig. The awaitUsable ahead of the click is the affordability assertion -- the Fleet panel disables a tier row whenever cash < purchaseCost (setTierButtonAffordable, FleetPanel.ts), so a run that had underfunded this step would fail here rather than quietly buying anyway. No toolbar click: the Vehicles panel is already open from the hauler purchase, and re-clicking the toolbar entry would close it.",
       "expect": {
         "equals": {
-          "cash": -10000,
+          "cash": 40000,
           "vehicleCount": 2
         },
-        "note": "left as a command deliberately (see this step's own description) -- the Fleet panel disables the drill_rig buy button once cash can't cover it, but `vehicle buy` itself has no affordability guard and drives cash negative; asserting the real, uncapped consequence rather than a state no player could reach"
+        "note": "$75,000 - $35,000; both purchases stay in the black, which is the whole point of funding the level properly instead of overdrawing"
       }
     },
     {
@@ -141,7 +151,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -10000,
+          "cash": 40000,
           "vehicleCount": 2
         }
       }
