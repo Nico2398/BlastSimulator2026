@@ -219,6 +219,39 @@ Two lessons worth keeping:
 named skill. Converting them would silently gut what they test. Needs a UI
 change (a skill selector on the dispatch action), not a scenario edit.
 
+## ▶ G9 / G10 — two defects found converting vehicle-move and contract-deliver
+
+**G9 — vehicles 2, 3 and 4 cannot be selected in the scene at all.**
+`vehicle buy` staggers spawn positions by fleet index, and then
+`NavGrid.findNearestReachableCell` snaps every one of them back to the same
+tile — (82,34) in dusty_hollow. All four haulers therefore occupy one point,
+and `clickEntity` for vehicle 2, 3 or 4 selects **hauler #1** every time (the
+SelectionBar reads "Debris Hauler#1" in all three cases, verified in a
+browser). Nothing in `src/ui` calls `ScenePicking.select`, so there is no
+panel row offering an alternative route either. A player with a four-vehicle
+fleet can only ever select one of them by clicking. 9 `vehicle move` steps
+are blocked on this and stay commands; converting them would have silently
+re-ordered vehicle #1 four times while appearing to pass.
+
+**G10 — contract cards carry no id, so only the FIRST offer can be accepted,
+and the two modes silently diverge.** `ContractsPanel` renders `#<id>` as
+text but puts no id attribute on the card, so `.bs-contract-accept` can only
+reach the first offer. `level1-playthrough-win` declares `contract accept 2`
+(rubble); the browser accepts contract **#1** (dirtite). Downstream, command
+mode holds 550 kg of rubble against a rubble contract and completes it, while
+the browser holds the same rubble against a dirtite contract and
+`maxDeliverable` is 0. The two channels have been testing different things.
+Fix: put a `data-contract-id` on each card. Two conversions were attempted
+and reverted rather than papered over with `expect.blocked`, which would have
+enshrined the divergence instead of asserting a real guard.
+
+**Standing finding (not new, now measured): 23 `contract deliver` steps are
+silent no-ops in BOTH modes.** `contract deliver` returns `success:false`
+rather than throwing, and the command runner only fails a step on a thrown
+exception — so a delivery that never happens reads as a passing step. They
+now carry `expect.blocked` on the deliver button so the guard is at least
+asserted.
+
 ## ▶ NEW GAPS FOUND WHILE ADDING THE FUNDS GUARD (2026-08-08)
 
 **G7 — five cash-spending commands have no affordability gate on EITHER side.**
