@@ -368,6 +368,77 @@ None of #510-#515 carry the `ready` label — filed for tracking per the
 user's request, left for deliberate triage/queueing rather than
 auto-entering the pipeline.
 
+## ▶ 2026-08-09 (continued) — playtest-parity re-check, a duplicate caught, a second CI regression fixed
+
+The user asked directly: are all the playtest↔scenario gaps closed or
+referenced in the filed issues, so playtest can be deleted once #497 merges
+and #510-#515 resolve, with zero coverage loss? Re-auditing to answer that
+precisely surfaced two more rounds of the session's recurring stale-checkout
+bug, this time silently, before either failure was obvious:
+
+**The parity table and Phase 3 conclusion were read stale, not just the
+files that later showed literal conflict markers.** A first pass concluded
+`tutorial-fr.json` (a 5th playtest def) was missing from the parity table
+entirely, and `research-center-gate.json`'s #442 prerequisite-gate case was
+still open — both wrong. The real, origin-true parity table (confirmed after
+`git merge --abort && git reset --hard origin/<branch>`, done with the
+user's explicit go-ahead once the corruption was flagged) already shows
+**5 of 5 rows closed**, including a dedicated `research-center-gate.json`
+scenario file already committed (`33f9013`) that closes the exact gap a
+newly-written duplicate (`research-center-prerequisite-gate.json`) was built
+to close in this session, before the mistake was caught and the duplicate
+deleted. The G7-G10 gap-table section the 6 filed issues (#510-#515) draw on
+sits earlier in this doc, unchanged between the stale commit and origin's
+true tip, so those issues were never affected — confirmed by re-diffing that
+section against origin post-reset. Only the parity-table conclusion, added
+in a later commit than the stale HEAD, was actually read wrong.
+
+Two small, genuinely additive assertions survived the mistake and are worth
+keeping: `i18n-live-locale-switch.json` gained an `expect.blocked` check
+that the Settings toggle goes inert right after `tutorial_start` (matching
+`tutorial-fr.json` beat 2, which the existing "no gap" verdict didn't
+explicitly re-verify), and an `assert` on the hire-surveyor tutorial card's
+French title (`"Embaucher Prospecteur"`, matching beat 4). Both verified in
+both modes; neither duplicates or contradicts the already-closed row.
+
+**A second CI regression, distinct from the `skill-progression` one, was
+found and fixed the same way — real state diff, not guessing.**
+`needs-proactive-queue-visual` started failing in interaction mode right
+after the first `createRunner.ts` fix (exempting `event status`/`event
+dismiss` from action-cooldown counting), then failed in COMMAND mode too
+once the second fix landed — both a sign the fix was correct, not that it
+regressed anything. Root cause: command-mode scenario steps issue `event
+choose 0` unconditionally, on a fixed schedule, whether or not a dialog
+would actually be showing; a real player (and `resolveEventIfPending`)
+never "chooses" when nothing is pending. Command mode's no-op `event choose`
+calls were still counting toward `MIN_EVENT_INTERVAL_ACTIONS`, giving it a
+head start toward the cooldown threshold that interaction mode's correctly
+-skipped no-ops never got. Fixed by only counting `event choose` when
+`result.success` is true. Verified: command and interaction mode now
+produce a **bit-identical trace** for this file (confirmed step-by-step,
+same as `skill-progression`'s fix), which is what exposed that the file's
+own final-step assertions (`decreased: minFatigue`) had been accidentally
+"protected" by the old bug — the true, now-consistent behavior is a genuine
+employee collapse and recovery, not a gentle pre-collapse "proactive" queue
+as the file's name implies. Corrected the assertions to match reality
+(`increased`/`pendingActionCount:0`/`collapsedCount:0`), not the old,
+bug-dependent expectation. Full local sweep after both fixes: typecheck,
+8630 tests, 127/127 command-mode scenarios, both affected files re-verified
+in both modes.
+
+**Answer to the user's actual question, now on solid ground:** content
+parity is 5/5 closed (pre-existing, reconfirmed). Strictness (the untagged
+-step / N-verb enforcement gate) is fully scoped in #515. The four confirmed
+UI/game bugs blocking full click-only coverage are #510-#513. The one
+remaining mechanically-convertible gap is #514. Two real CI regressions
+surfaced by today's own fixes are closed, not just found. Nothing is both
+unaddressed and unreferenced — once PR #497 merges and #510-#515 resolve
+(#515 last, since it depends on the others), playtest's removal per Phase 3
+above should lose no coverage. The one thing that is NOT yet re-verified:
+a full CI run (both browser jobs) on the current HEAD, since the local
+sweep is a local proxy, not the channel of record for the full suite —
+push and read CI before treating this as finally closed.
+
 ## ▶ MEASUREMENT DISCIPLINE — a mistake made twice in this session
 
 **Never pipe a suite run through `tail`/`head` when you need its verdict.**
@@ -1374,6 +1445,17 @@ as remaining work are now closed** (Finding #76 and its follow-up entry):
 player-facing steps are either real clicks or a documented permanent
 exception (Finding #75's 740 + the two structural ones above). Phase 3 may
 proceed.
+
+**⚠ SUPERSEDED (2026-08-08, later the same day) — this verdict does not
+stand.** THE MANDATE at the top of this doc explicitly overrides Findings
+#75-#77's classification: "no UI exists for this command" being a
+*permanent, correct exception* was the wrong call, not a closed gate. Most
+of the 740 turned out on re-audit to be either real bugs (G1-G10, several
+now fixed, the rest tracked as dedicated issues — see the 2026-08-09 section
+below) or simply not-yet-converted, not legitimate permanent exceptions.
+**Do not read "Phase 3 may proceed" above as current status.** The mandate's
+own three deliverables, and issue #515 (the structural click-only
+enforcement gate), are what actually gate Phase 3 now.
 
 1. Delete `scripts/playtest.ts`, `scripts/playtests/*.json`,
    `scripts/shared/playtest-utils.ts`.
