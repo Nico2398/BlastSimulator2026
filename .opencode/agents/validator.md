@@ -47,7 +47,7 @@ Zero failures.
 ```bash
 npm run scenarios
 ```
-All 99 scenarios pass in command mode. Required for gameplay, console, economy, and campaign changes.
+All 126 scenarios pass in command mode. Required for gameplay, console, economy, and campaign changes.
 
 ### Step 4: build
 ```bash
@@ -85,7 +85,7 @@ Type check → coverage → integration → scenario definitions → build. Does
 ✅ VALIDATION PASSED
 - static:   0 type errors (src/ + scripts/)
 - logic:    X passed, 0 failed
-- scenario: X/99 passed (command mode)
+- scenario: X/126 passed (command mode)
 - build:    success
 - visual:   {PASS via @visual-tester | OUTSTANDING — renderer/UI changed | N/A — no player-visible change}
 ```
