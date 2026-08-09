@@ -1,21 +1,21 @@
-// BlastSimulator2026 — playtest-types.ts direct coverage (issue #515)
+// BlastSimulator2026 — interaction-types.ts direct coverage (issue #515)
 //
 // playtest.ts and playtest-utils.ts were removed once every scenario step
-// carried a structurally-enforced role (issue #515), but playtest-types.ts
-// survives: `isAllowedSetupCommand`/`SETUP_COMMAND_ALLOWLIST` are the
-// allowlist interaction-executor.ts's `role: 'setup'` branch reuses for
-// scenario steps (see scripts/shared/interaction-executor.ts and
+// carried a structurally-enforced role (issue #515), but this module's
+// predecessor (playtest-types.ts, renamed in #516) survives:
+// `isAllowedSetupCommand`/`SETUP_COMMAND_ALLOWLIST` are the allowlist
+// interaction-executor.ts's `role: 'setup'` branch reuses for scenario steps
+// (see scripts/shared/interaction-executor.ts and
 // tests/unit/scenario-interaction.test.ts for the reuse). These tests were
-// previously carried inside the playtest test suite, deleted alongside
-// playtest.ts (issue #515); moved here so the still-load-bearing function
-// keeps direct unit coverage rather than only the two cases
-// scenario-interaction exercises indirectly.
+// previously carried inside the deleted playtest test suite; moved here so
+// the still-load-bearing function keeps direct unit coverage rather than
+// only the two cases scenario-interaction exercises indirectly.
 
 import { describe, it, expect } from 'vitest';
 import {
   SETUP_COMMAND_ALLOWLIST,
   isAllowedSetupCommand,
-} from '../../scripts/shared/playtest-types.js';
+} from '../../scripts/shared/interaction-types.js';
 
 describe('isAllowedSetupCommand', () => {
   it('allows world setup and time control', () => {
@@ -47,8 +47,8 @@ describe('isAllowedSetupCommand', () => {
   });
 
   // Issue #515: interaction-executor.ts's `setup`-role branch reuses this
-  // same allowlist for scenario steps (not just playtest beats), and
-  // scenario-defs retagging needs save/load/sandbox admitted as world
+  // same allowlist for scenario steps, and scenario-defs retagging needs
+  // save/load/sandbox admitted as world
   // bootstrapping so a scenario can set up a save-game state without being
   // forced to click through it.
   it('allows save/load/sandbox as setup commands (#515)', () => {

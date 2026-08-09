@@ -2,7 +2,7 @@
 //
 // checkGoalAgainstState is the command-mode half of a step's `expect`: no
 // DOM, so only `equals`/`increased` are checkable — the interaction-mode
-// half (`usable`/`blocked`/`tutorialStep`) is playtest-driver.ts's checkGoal,
+// half (`usable`/`blocked`/`tutorialStep`) is interaction-driver.ts's checkGoal,
 // exercised in tests/unit/scenario-interaction.test.ts instead. Both modes
 // check the fields they can; neither is a no-op channel.
 
