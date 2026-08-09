@@ -9,6 +9,9 @@ import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
 import type { EntityPick } from '../../../../src/ui/scene/ScenePicking.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createRunner } from '../../../../src/console-api.js';
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -46,7 +49,7 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Train'))).toBe(true);
   });
 
-  it('shows the vehicle action set (Follow, Haul, Unassign)', () => {
+  it('shows the vehicle action set (Follow, Move Here, Haul, Unassign)', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
@@ -54,6 +57,7 @@ describe('SelectionBar', () => {
     bar.show(entity('vehicle', vehicle.id), state);
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
     expect(labels.some(l => l?.includes('Follow'))).toBe(true);
+    expect(labels.some(l => l?.includes('Move Here'))).toBe(true);
     expect(labels.some(l => l?.includes('Haul'))).toBe(true);
     expect(labels.some(l => l?.includes('Unassign'))).toBe(true);
   });
@@ -178,9 +182,125 @@ describe('SelectionBar', () => {
     expect(labels.some(l => l?.includes('Haul'))).toBe(true);
   });
 
+  // ── vehicle "Move Here" (gap G4: `vehicle move <id> to:<x,z>` had no button) ──
+
+  it('the vehicle set carries a move_here data-action selector', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(root.querySelector('[data-action="move_here"]')).not.toBeNull();
+  });
+
+  it('move_here is offered for vehicles only — not for employees, buildings, fragments or holes', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
+    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+
+    for (const pick of [
+      entity('employee', employee.id),
+      entity('building', building.id),
+      entity('fragment', 42),
+      entity('hole', holeNumericId(hole.id)),
+    ]) {
+      bar.show(pick, state);
+      expect(root.querySelector('[data-action="move_here"]'), `${pick.kind} must not offer move_here`).toBeNull();
+    }
+  });
+
+  it('keeps move_here distinct from the building move action', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 34, 34, 1, 0, 0) as { building: { id: number } };
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+
+    bar.show(entity('building', building.id), state);
+    expect(root.querySelector('[data-action="move"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="move_here"]')).toBeNull();
+
+    bar.show(entity('vehicle', vehicle.id), state);
+    expect(root.querySelector('[data-action="move_here"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="move"]')).toBeNull();
+  });
+
+  it('clicking Move Here fires the handler with move_here and the vehicle entity', () => {
+    const { bar, root } = makeBar();
+    const state = makeState();
+    const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
+    const onAction = vi.fn();
+    bar.setActionHandler(onAction);
+
+    bar.show(entity('vehicle', vehicle.id), state);
+    root.querySelector<HTMLButtonElement>('[data-action="move_here"]')?.click();
+
+    expect(onAction).toHaveBeenCalledWith('move_here', expect.objectContaining({ kind: 'vehicle', id: vehicle.id }));
+  });
+
   it('dispose() removes the bar from the DOM', () => {
     const { bar, root, container } = makeBar();
     bar.dispose();
     expect(container.contains(root)).toBe(false);
+  });
+});
+
+// main.ts owns what each SelectionBar action *does*, and it can't be imported
+// in a unit test (it wires a full SceneManager/Three.js canvas, audio and
+// IndexedDB at import time), so the handler is checked statically — same
+// approach as tests/unit/ui/TutorialBridge.test.ts. The template it dispatches
+// is then substituted and run through the *real* console runner, so a wrong
+// coordinate form (`x:… z:…` instead of `to:x,z`) fails here rather than
+// silently doing nothing in the browser.
+describe('SelectionBar move_here — the command src/main.ts dispatches', () => {
+  const mainTs = readFileSync(join(process.cwd(), 'src/main.ts'), 'utf8');
+
+  /** The `vehicle move …` template literal handed to window.__gameConsole. */
+  function extractTemplate(): string {
+    const match = /__gameConsole\(`(vehicle move [^`]*)`\)/.exec(mainTs);
+    expect(match, 'src/main.ts dispatches no `vehicle move …` command').not.toBeNull();
+    return match![1]!;
+  }
+
+  it('handles the move_here action at all', () => {
+    expect(mainTs).toContain("case 'move_here':");
+  });
+
+  it('dispatches `vehicle move <id> to:<x>,<z>` built from the latched aim tile', () => {
+    expect(extractTemplate()).toBe('vehicle move ${entity.id} to:${terrain.tileX},${terrain.tileZ}');
+  });
+
+  it('reads the LATCHED aim, not the live hover, and warns when there is no target', () => {
+    const handler = mainTs.slice(mainTs.indexOf("case 'move_here':"));
+    const body = handler.slice(0, handler.indexOf('case \'follow\':'));
+    // Must be `aim`, never `hover`. The live hover is cleared by the
+    // canvas mouseleave that firing this very button necessarily causes, so
+    // reading it made the action impossible with a real mouse. This assertion
+    // originally required `hover` and so locked the bug in.
+    expect(body).toContain('scenePicking.aim?.terrain');
+    expect(body).not.toContain('scenePicking.hover?.terrain');
+    expect(body).toContain("t('shell.selection.no_move_target')");
+    expect(body).toContain("severity: 'warn'");
+  });
+
+  it('the dispatched string is accepted by the real vehicle command parser and moves the vehicle', () => {
+    const { runner, ctx } = createRunner();
+    runner.run('new_game mine_type:desert seed:1 size:32');
+    const { vehicle } = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 0, 0);
+
+    const command = extractTemplate()
+      .replace('${entity.id}', String(vehicle.id))
+      .replace('${terrain.tileX}', '12')
+      .replace('${terrain.tileZ}', '7');
+    expect(command).toBe(`vehicle move ${vehicle.id} to:12,7`);
+
+    const result = runner.run(command);
+    expect(result.success, result.output).toBe(true);
+
+    const moved = ctx.state!.vehicles.vehicles.find(v => v.id === vehicle.id)!;
+    expect(moved.task).toBe('moving');
+    expect(moved.targetX).toBe(12);
+    expect(moved.targetZ).toBe(7);
   });
 });

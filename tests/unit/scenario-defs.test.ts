@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import type { ScenarioDef, ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
 import { getAllVehicleRoles } from '../../src/core/entities/Vehicle.js';
+import { checkStepActionAllowed } from '../../scripts/shared/interaction-executor.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +19,16 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   'wait', 'waitForSelector', 'waitForTutorialStep', 'type',
   'assert', 'viewport', 'command', 'screenshot',
   'loadingScreenDebug',
+  // Shared with the playability harness (issue #479) — same names, same
+  // implementations, so a converted step and its playtest counterpart do the
+  // same thing. See InteractionStepAction in scripts/shared/scenario-types.ts.
+  'set', 'clickLabel', 'awaitUsable', 'zoomOut', 'focusTile', 'clickEntity',
+  // Conditional click for genuinely nondeterministic beats (`event choose`
+  // after a bare tick). Not an escape hatch — see InteractionStepAction.
+  'clickIfPresent',
+  // Resolves a pending event via its dialog, deciding from game state rather
+  // than DOM render timing. See InteractionStepAction.
+  'resolveEventIfPending',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [
@@ -34,6 +45,7 @@ const PLAYTHROUGH_SCENARIO_NAMES = [
 const FEATURE_SCENARIO_NAMES = [
   'survey-then-blast',
   'building-lifecycle',
+  'research-center-gate',
   'skill-progression',
   'multi-deck-blast',
   'presplit-wall',
@@ -621,18 +633,25 @@ describe('Every scenario step has a dual-play interaction array', () => {
       }
     });
 
-    it(`${name} — command-mirror steps replay step.command as their first action`, () => {
-      // UI-driven scenarios deliberately click real controls instead of
-      // replaying the command, so they are exempt; their `command` field is the
-      // command-mode equivalent, not a script for interaction mode.
-      if (UI_DRIVEN_SCENARIO_NAMES.includes(name as never)) return;
+    it(`${name} — unconverted steps still replay step.command as their first action`, () => {
+      // A role-marked step drives the UI instead of replaying the command, so
+      // it is exempt — its `command` field is the command-mode equivalent, not
+      // a script for interaction mode. Derived from the data rather than a
+      // hardcoded name list so that converting a scenario (issue #479) does not
+      // also require remembering to edit this test's exemption list; a step
+      // that is still unconverted is still held to the mirror rule.
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      if (UI_DRIVEN_SCENARIO_NAMES.includes(name as never)) return;
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i] as ScenarioStepDef;
         expect(step.interaction).toBeDefined();
         expect(step.interaction!.length).toBeGreaterThan(0);
+        if (step.role !== undefined) continue;
         const firstAction = step.interaction![0];
-        expect(firstAction.type).toBe('command');
+        expect(
+          firstAction.type,
+          `step[${i}] ("${step.command}") is unconverted, so its interaction must still mirror the command`,
+        ).toBe('command');
         if (firstAction.type === 'command') {
           expect(firstAction.command).toBe(step.command);
         }
@@ -665,6 +684,180 @@ describe('UI-driven scenarios click real controls', () => {
             expect(action.selector.length).toBeGreaterThan(0);
           }
         }
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// 13. Step role, when present, is a recognized value (issue #479)
+// ──────────────────────────────────────────────
+describe('Step role field is a recognized value when present', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — every step's role, if set, is "player", "setup" or "observe"`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        if (step.role === undefined) continue;
+        expect(
+          ['player', 'setup', 'observe'],
+          `step[${i}] role "${step.role}" must be "player", "setup" or "observe"`,
+        ).toContain(step.role);
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// 14. Role-marked steps never reach the console for anything but an
+// allowlisted setup command (issue #479). A step with no role tag predates
+// the distinction and is unconstrained — true of every definition here
+// except the pilot conversion, tutorial-interactive.json.
+// ──────────────────────────────────────────────
+describe('Role-marked steps obey checkStepActionAllowed (issue #479)', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — no role-marked step's interaction runs a disallowed console command`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      const violations: string[] = [];
+      for (const step of scenario.steps as ScenarioStepDef[]) {
+        if (step.role === undefined) continue;
+        for (const action of step.interaction ?? []) {
+          if (action.type !== 'command') continue;
+          const violation = checkStepActionAllowed(step, action);
+          if (violation !== null) violations.push(violation);
+        }
+      }
+      expect(violations).toEqual([]);
+    });
+  }
+
+  it('a player-marked step carrying a command action is rejected, naming the step', () => {
+    const step: ScenarioStepDef = {
+      command: 'vehicle driver 1 4',
+      description: 'vehicle-buy-assign complete',
+      role: 'player',
+      interaction: [{ type: 'command', command: 'vehicle driver 1 4' }],
+    };
+    const violation = checkStepActionAllowed(step, { type: 'command', command: 'vehicle driver 1 4' });
+    expect(violation).not.toBeNull();
+    expect(violation).toContain('vehicle-buy-assign complete');
+    expect(violation).toContain('vehicle driver 1 4');
+  });
+
+  it('a setup-marked step may still use an allowlisted command', () => {
+    const step: ScenarioStepDef = {
+      command: 'tick 6',
+      role: 'setup',
+      interaction: [{ type: 'command', command: 'tick 6' }],
+    };
+    expect(checkStepActionAllowed(step, { type: 'command', command: 'tick 6' })).toBeNull();
+    expect(checkStepActionAllowed(step, { type: 'command', command: 'new_game seed:1' })).toBeNull();
+  });
+
+  it('a setup-marked step is rejected for a command outside the allowlist', () => {
+    const cheat = 'employee assign_skill 1 skill:geology level:3';
+    const step: ScenarioStepDef = {
+      command: cheat,
+      role: 'setup',
+      interaction: [{ type: 'command', command: cheat }],
+    };
+    const violation = checkStepActionAllowed(step, { type: 'command', command: cheat });
+    expect(violation).not.toBeNull();
+    expect(violation).toContain(cheat);
+  });
+
+  it('an observe-marked step may run a read-only command', () => {
+    for (const readOnly of ['state full', 'scores', 'vehicle list', 'contract status', 'drill_plan show']) {
+      const step: ScenarioStepDef = { command: readOnly, role: 'observe' };
+      expect(
+        checkStepActionAllowed(step, { type: 'command', command: readOnly }),
+        `"${readOnly}" reports state and must be allowed`,
+      ).toBeNull();
+    }
+  });
+
+  it('an observe-marked step is rejected for a command that changes state', () => {
+    for (const mutating of ['vehicle buy debris_hauler', 'build freight_warehouse at:4,4', 'contract accept 1']) {
+      const step: ScenarioStepDef = { command: mutating, role: 'observe' };
+      const violation = checkStepActionAllowed(step, { type: 'command', command: mutating });
+      expect(violation, `"${mutating}" changes state and must be refused`).not.toBeNull();
+      expect(violation).toContain('changes state rather than reporting it');
+    }
+  });
+
+  it('a step with no role tag is unconstrained (predates the distinction)', () => {
+    const step: ScenarioStepDef = {
+      command: 'build freight_warehouse at:4,4',
+      interaction: [{ type: 'command', command: 'build freight_warehouse at:4,4' }],
+    };
+    expect(checkStepActionAllowed(
+      step, { type: 'command', command: 'build freight_warehouse at:4,4' },
+    )).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────
+// 15. A step's `expect`, when present, is shaped correctly and checkable
+// (issue #479 follow-up: scenarios gained assertions instead of proving only
+// "the command didn't throw" — mirrors playtest-defs.test.ts's equivalent
+// rule for beats). Checked in BOTH modes: command mode via
+// checkGoalAgainstState (equals/increased only — no DOM), interaction mode
+// via checkGoal (all fields) — scripts/shared/scenario-goal.ts and
+// scripts/shared/playtest-driver.ts respectively.
+// ──────────────────────────────────────────────
+describe('Step expect field is shaped correctly when present', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — every step's expect, if set, has well-typed fields`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        const e = step.expect;
+        if (e === undefined) continue;
+        if (e.increased !== undefined) {
+          expect(Array.isArray(e.increased), `step[${i}] expect.increased must be an array`).toBe(true);
+          for (const field of e.increased) {
+            expect(typeof field, `step[${i}] expect.increased entries must be field names`).toBe('string');
+            expect(field.length, `step[${i}] expect.increased has an empty field name`).toBeGreaterThan(0);
+          }
+        }
+        if (e.decreased !== undefined) {
+          expect(Array.isArray(e.decreased), `step[${i}] expect.decreased must be an array`).toBe(true);
+          for (const field of e.decreased) {
+            expect(typeof field, `step[${i}] expect.decreased entries must be field names`).toBe('string');
+            expect(field.length, `step[${i}] expect.decreased has an empty field name`).toBeGreaterThan(0);
+          }
+        }
+        if (e.equals !== undefined) {
+          expect(typeof e.equals, `step[${i}] expect.equals must be an object`).toBe('object');
+          expect(Object.keys(e.equals).length, `step[${i}] expect.equals is empty`).toBeGreaterThan(0);
+        }
+        for (const field of ['usable', 'blocked', 'tutorialStep'] as const) {
+          if (e[field] === undefined) continue;
+          expect(typeof e[field], `step[${i}] expect.${field} must be a string`).toBe('string');
+          expect((e[field] as string).length, `step[${i}] expect.${field} is empty`).toBeGreaterThan(0);
+        }
+        if (e.note !== undefined) {
+          expect(typeof e.note, `step[${i}] expect.note must be a string`).toBe('string');
+        }
+      }
+    });
+
+    it(`${name} — every step's expect, if set, carries at least one checkable field`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        const e = step.expect;
+        if (e === undefined) continue;
+        const checkable = e.tutorialStep !== undefined
+          || (e.increased?.length ?? 0) > 0
+          || (e.decreased?.length ?? 0) > 0
+          || e.equals !== undefined
+          || e.usable !== undefined
+          || e.blocked !== undefined;
+        expect(
+          checkable,
+          `step[${i}] expect has no checkable field (equals/increased/decreased/usable/blocked/tutorialStep) — a note alone proves nothing`,
+        ).toBe(true);
       }
     });
   }

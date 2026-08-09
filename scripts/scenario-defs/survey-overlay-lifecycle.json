@@ -26,7 +26,14 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -35,7 +42,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "worldSizeX"
+        ]
+      }
     },
     {
       "command": "time resume",
@@ -44,43 +57,78 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 48800
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 2,
+          "cash": 47600
+        }
+      }
     },
     {
-      "command": "employee assign_skill 1 geology 5",
+      "command": "employee assign_skill 1 skill:geology level:5",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 geology 5"
+          "command": "employee assign_skill 1 skill:geology level:5"
         }
-      ]
+      ],
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step. Finding #15 class: the original command used positional args (`employee assign_skill 1 geology 5`) — assignSkillCommand requires the named form and silently rejected it ('Usage: employee assign_skill <id> skill:<category> level:1-5', never thrown), so this call and the one below failed on every run in this file's history. Fixed to the correct syntax.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 6
+        },
+        "note": "employee 1 (Rookie 1) -> level 5, employee 2 stays Rookie 1: 5+1=6"
+      }
     },
     {
-      "command": "employee assign_skill 2 geology 1",
+      "command": "employee assign_skill 2 skill:geology level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 2 geology 1"
+          "command": "employee assign_skill 2 skill:geology level:1"
         }
-      ]
+      ],
+      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for the Finding #15 class fix."
     },
     {
       "command": "employee list",
@@ -89,7 +137,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -98,25 +147,91 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey seismic x:20 z:20",
+      "description": "Survey 1/2, round 1. Two surveyors, so both round-1 surveys are worked in parallel (unlike Finding #16's single-employee case) — real run confirms both complete cleanly.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0
+        }
+      }
     },
     {
       "command": "survey core_sample x:20 z:20",
+      "description": "Survey 2/2, round 1.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey core_sample x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "both round-1 surveys queued, neither completed yet"
+      }
     },
     {
       "command": "survey show",
@@ -125,7 +240,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "both round-1 surveys queued, neither completed yet"
+      }
     },
     {
       "command": "state full",
@@ -134,7 +256,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 40",
@@ -143,16 +266,18 @@
           "type": "command",
           "command": "tick 40"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -161,16 +286,18 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -179,16 +306,18 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -197,16 +326,18 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -215,7 +346,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 2
+        },
+        "note": "both round-1 surveys complete after 70 ticks of padding"
+      }
     },
     {
       "command": "state full",
@@ -224,16 +362,47 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey aerial x:20 z:20",
+      "description": "Round 2: a stale-vs-fresh comparison against the round-1 surveys.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey aerial x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"aerial\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 2
+        }
+      }
     },
     {
       "command": "survey show",
@@ -242,7 +411,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 2
+        },
+        "note": "round 2's aerial survey queued, not yet completed; round 1's 2 stay put"
+      }
     },
     {
       "command": "state full",
@@ -251,7 +427,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 25",
@@ -260,16 +437,18 @@
           "type": "command",
           "command": "tick 25"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -278,16 +457,18 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -296,16 +477,18 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -314,16 +497,18 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -332,7 +517,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 3
+        },
+        "note": "round 2's aerial survey complete after 55 ticks of padding: 2+1=3"
+      }
     },
     {
       "command": "state full",
@@ -341,43 +533,111 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20",
+      "description": "The (20,20)-(24,24) rectangle (4x4) computes round(4/3)+1=2 per axis at the panel's default 3m spacing (never touched in this file) — the declared 2x2 by coincidence, no stepper click needed.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 24,
+          "z2": 24
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        },
+        "note": "2 rows x 2 cols = 4"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      }
     },
     {
       "command": "state full",
@@ -386,7 +646,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -395,7 +656,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -404,7 +666,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -413,7 +676,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

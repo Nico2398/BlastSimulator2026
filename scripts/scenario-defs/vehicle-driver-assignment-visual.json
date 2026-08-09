@@ -10,7 +10,8 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,25 +20,62 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 25000,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 24200,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:driving.truck level:1",
@@ -46,7 +84,14 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:driving.truck level:1"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 1
+        },
+        "note": "unchanged from before — driving.truck was already the driver role's Rookie starting qualification at level 1; this command reproduces the same level, not a change"
+      }
     },
     {
       "command": "vehicle list",
@@ -55,21 +100,34 @@
         {
           "type": "command",
           "command": "vehicle list"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 1 1"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 24200,
+          "vehicleCount": 1
+        },
+        "note": "arrival-gated like surveys — the driver walks to the vehicle before boarding, `vehicle list` still shows driver:none right after this click"
+      }
     },
     {
       "command": "tick 5",
@@ -78,7 +136,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -87,16 +146,32 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 22685,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "vehicle driver 1 2",
@@ -105,7 +180,15 @@
           "type": "command",
           "command": "vehicle driver 1 2"
         }
-      ]
+      ],
+      "description": "Left unmarked: vehicle #1 already has a driver, so FleetPanel shows only an Unassign control here, not the assign picker -- and even that picker would never have listed employee #2 (a blaster has no driving.truck licence). Confirmed by the console command itself failing with \"Employee lacks licence for this role\": genuinely unreachable by a click, not a conversion gap.",
+      "expect": {
+        "equals": {
+          "cash": 22685,
+          "employeeCount": 2
+        },
+        "note": "rejected: Employee lacks licence for this role"
+      }
     },
     {
       "command": "tick 5",
@@ -114,7 +197,8 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "vehicle list",
@@ -123,7 +207,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -132,7 +217,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

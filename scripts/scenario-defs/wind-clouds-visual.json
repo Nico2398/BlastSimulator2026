@@ -5,35 +5,62 @@
     {
       "command": "new_game seed:42",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
       "description": "A real (non-tutorial) level so the landscape zone + cloud disc are big enough to read clearly.",
       "interaction": [
-        { "type": "command", "command": "campaign start level:dusty_hollow" }
-      ]
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": ["worldSizeX"],
+        "note": "dusty_hollow's terrain (96) replaces the sandbox default (64) — DEFAULT_GRID_SIZE, world.ts"
+      }
     },
     {
       "command": "time resume",
       "description": "Frame capture needs the render loop actually ticking dt forward for wind/cloud drift to animate.",
       "interaction": [
-        { "type": "command", "command": "time resume" }
-      ]
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "weather set sunny",
-      "description": "Baseline: sparse coverage (0.25), clouds should still visibly drift frame to frame.",
+      "description": "Baseline: sparse coverage (0.25), clouds should still visibly drift frame to frame. — weather has no player-facing control; test-only forcing hook. Left unmarked.",
       "interaction": [
-        { "type": "command", "command": "weather set sunny" }
+        {
+          "type": "command",
+          "command": "weather set sunny"
+        }
       ]
     },
     {
       "command": "weather set storm",
-      "description": "Coverage lerps toward 1.0 and cloud material darkens — captured frames should show the layer thickening/darkening over the sequence, not snapping instantly.",
+      "description": "Coverage lerps toward 1.0 and cloud material darkens — captured frames should show the layer thickening/darkening over the sequence, not snapping instantly. — weather has no player-facing control; test-only forcing hook. Left unmarked.",
       "interaction": [
-        { "type": "command", "command": "weather set storm" }
+        {
+          "type": "command",
+          "command": "weather set storm"
+        }
       ]
     }
   ]

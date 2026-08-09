@@ -6,79 +6,168 @@
       "command": "new_game seed:42",
       "timeout": 15,
       "interaction": [
-        { "type": "command", "command": "new_game seed:42" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
-        { "type": "command", "command": "campaign start level:dusty_hollow" }
-      ]
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "worldSizeX"
+        ]
+      }
     },
     {
       "command": "time resume",
       "interaction": [
-        { "type": "command", "command": "time resume" }
-      ]
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "state full",
       "description": "Open the Settings panel via the toolbar — English baseline, panel now open.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
-        { "type": "waitForSelector", "selector": "#bs-settings-panel" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-settings-panel"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-settings-panel [data-lang=\"fr\"]"
+      }
     },
     {
       "command": "state full",
       "description": "Click FR inside the still-open Settings panel WITHOUT closing it. Core Bug 1 regression: title, English/French buttons, Close button, and toolbar captions must switch to French in place.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-settings-panel [data-lang=\"fr\"]" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-settings-panel [data-lang=\"fr\"]"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "usable": "#bs-settings-panel",
+        "note": "the panel itself must still be usable (not torn down/rebuilt broken) after switching locale in place — the actual French text is verified visually via screenshot, not state, since expect has no text-content field"
+      }
     },
     {
       "command": "state full",
       "description": "Open the Build menu (Settings auto-hides via the toolbar's mutual-exclusion) — panel opened fresh while locale is already French, confirming the switch persists beyond the panel that triggered it.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
-        { "type": "waitForSelector", "selector": "#bs-build-panel, .bs-build-panel" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel, .bs-build-panel"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "blocked": "#bs-settings-panel [data-lang=\"fr\"]",
+        "note": "toolbar panels are mutually exclusive — opening Build must hide Settings"
+      }
     },
     {
       "command": "event fire union_coffee_uprising",
-      "description": "Fire an event while locale is French — dialog title/description/option labels must render in French, not English.",
+      "description": "Fire an event while locale is French — dialog title/description/option labels must render in French, not English. — `event fire` is a test hook with no UI and none intended. Left unmarked.",
       "interaction": [
-        { "type": "command", "command": "event fire union_coffee_uprising" }
+        {
+          "type": "command",
+          "command": "event fire union_coffee_uprising"
+        }
       ]
     },
     {
       "command": "event choose 0",
-      "description": "Resolve the event, then open the top-bar Save/Load panel (opened via main.ts, outside UIManager) while locale is French — checks whether this panel picked up the live-switch fix too.",
+      "description": "Resolve the event through its own buttons, then open the top-bar Save/Load panel (opened via main.ts, outside UIManager) while the locale is French -- checks whether that panel picked up the live-switch fix too. Hard clicks, not clickIfPresent: the preceding step fires this event explicitly, so the dialog is guaranteed. The trailing #bs-saveload-btn click is what opens the saves modal the NEXT step asserts against -- a blanket conversion replaced this whole interaction array and silently dropped it, which is what broke this file.",
       "interaction": [
-        { "type": "command", "command": "event choose 0" },
-        { "type": "clickSelector", "selector": "#bs-saveload-btn" }
-      ]
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeout": 15000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeout": 15000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "state",
       "description": "Close the Save/Load modal opened above via its own close button before continuing — its .bs-confirm-overlay backdrop otherwise stays on top of the page and blocks every later click (toolbar/Settings recheck, tutorial start), the same class of gap documented in rock-fragmenter-breaking.json for the Blast Report modal. SavesModal's header is a plain div (not a <header> element), and its close button is the only button in the modal without a data-action attribute (slot buttons all carry save-here/load/delete) — :not([data-action]) is what actually isolates it.",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-saves-modal button:not([data-action])" }
-      ]
+        {
+          "type": "command",
+          "command": "state"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saves-modal button:not([data-action])"
+        }
+      ],
+      "role": "observe"
     },
     {
       "command": "time pause",
       "description": "Issue #492 section 3 extension: pause so a fired event's CLOCK HELD chip is visible, then fire the tutorial consultant event (its 3 options carry no risky/probabilistic hints, so its only bsx-chip-warn is the CLOCK HELD chip itself — see TutorialEvents.ts). EventModal.clockChip is built with a raw t() call at construction and never registered with the panel's own LocaleTextRegistry (bug 3 of #492 section 3): this must read the French translation, not the English text baked in when the app booted.",
       "interaction": [
-        { "type": "command", "command": "time pause" }
-      ]
+        {
+          "type": "command",
+          "command": "time pause"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "event fire tutorial_synergy_consultant",
       "description": "CLOCK HELD chip must read the French translation of ui.event.clock_held ('HORLOGE ARRÊTÉE'), not the English text EventModal's constructor baked in at app boot.",
       "interaction": [
-        { "type": "command", "command": "event fire tutorial_synergy_consultant" },
+        {
+          "type": "command",
+          "command": "event fire tutorial_synergy_consultant"
+        },
         {
           "type": "assert",
           "selector": "#bs-event-dialog .bsx-chip-warn",
@@ -89,28 +178,63 @@
     },
     {
       "command": "event choose 0",
-      "description": "Dismiss the consultant dialog and resume the clock before moving on.",
+      "description": "Answered through the event dialog's own buttons. A HARD click, not clickIfPresent: the preceding step fires this event explicitly (event fire), so the dialog is guaranteed on screen and a permissive click would be too weak -- if it silently found nothing, the dialog would stay up and cover the next step's target, which is exactly how this file broke when a blanket conversion treated every event choose as a random roll.",
       "interaction": [
-        { "type": "command", "command": "event choose 0" },
-        { "type": "command", "command": "time resume" }
-      ]
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeout": 15000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss",
+          "timeout": 15000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
       "description": "Reopen Settings and confirm the active-language pill matches the current locale (French) — syncLangPills toggles the `active` class onto whichever pill matches the live locale.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"settings\"]" },
-        { "type": "waitForSelector", "selector": "#bs-settings-panel" },
-        { "type": "assert", "selector": "#bs-settings-panel [data-lang=\"fr\"].active" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"settings\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-settings-panel"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-settings-panel [data-lang=\"fr\"].active"
+        }
       ]
     },
     {
       "command": "tutorial_start",
       "description": "Start the tutorial while locale is already French. TutorialOverlay is constructed once at app boot (always in English, before the player can switch locale) — its coach card must not still be showing the English text baked in at construction. Bug 1 of #492 section 3: pausedEl.title and pausedChipEl.textContent are only ever set at construction, never re-applied by TutorialOverlay.refreshLocale() (a no-op stub) or reached by main.ts's language-change fan-out.",
       "interaction": [
-        { "type": "command", "command": "tutorial_start" },
-        { "type": "waitForSelector", "selector": "#bs-tutorial-overlay" },
-        { "type": "waitForTutorialStep", "stepId": "time-speed" },
+        {
+          "type": "command",
+          "command": "tutorial_start"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tutorial-overlay"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "time-speed"
+        },
         {
           "type": "assert",
           "selector": ".bs-tutorial-box .bs-panel-title",
@@ -129,23 +253,48 @@
           "property": "textContent",
           "expectedValue": "HORLOGE EN PAUSE"
         }
-      ]
+      ],
+      "expect": {
+        "blocked": "#bs-toolbar [data-panel=\"settings\"]",
+        "note": "tutorial rails (src/ui/tutorialGuide.ts) make every control but the current step's own target inert, including the Settings toggle -- confirms a player cannot switch language again once the tutorial has engaged, matching playtest's tutorial-fr.json beat 2 (checked there before tutorial_start; checked here after, on the toggle itself rather than the panel it opens)."
+      }
     },
     {
       "command": "time speed:2",
       "description": "Advance past the time-speed step (its own target, always reachable) so the Crew panel — the hire-surveyor step's rails target — becomes clickable, proving a panel can be opened mid-tutorial while the locale switch made earlier is still in effect.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-hud-top .bs-speed-btn" },
-        { "type": "waitForTutorialStep", "stepId": "hire-surveyor" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "hire-surveyor"
+        },
+        {
+          "type": "assert",
+          "selector": ".bs-tutorial-box .bs-panel-title",
+          "property": "textContent",
+          "expectedValue": "Embaucher Prospecteur"
+        }
       ]
     },
     {
       "command": "state full",
       "description": "Open the Crew panel — a second panel, open at the same time as the tutorial card. CrewPanel's title is already registered with its own LocaleTextRegistry (unlike EventModal's clockChip), so this is a locked-in green check confirming a second panel keeps reading French while the tutorial overlay is up alongside it, not just the panel that made the switch.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
-        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"surveyor\"]" },
-        { "type": "assert", "selector": "#bs-employee-panel" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-employee-panel"
+        }
       ]
     }
   ]

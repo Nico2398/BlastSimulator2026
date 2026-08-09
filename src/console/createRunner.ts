@@ -70,6 +70,20 @@ export interface RunnerWithContext {
 export const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
 
 /**
+ * `event` subcommands that are harness/UI bookkeeping rather than a player
+ * decision, exempted the same way META_COMMANDS is: `status` is a pure read
+ * (interaction mode's `resolveEventIfPending` polls it every step, pending or
+ * not, to decide whether to wait for a real click — command-mode scenarios
+ * never issue an equivalent poll, so counting it inflates interaction mode's
+ * actionCountSinceEvent for a call no real player ever makes); `dismiss`
+ * closes an already-resolved outcome panel — command-mode scenarios never
+ * model it either, since nothing downstream depends on it. `fire` is a real
+ * (debug) decision and still counts unconditionally. `choose` is handled
+ * separately below — it counts only when it actually resolved something.
+ */
+const META_EVENT_SUBCOMMANDS = ['status', 'dismiss'] as const;
+
+/**
  * Run a command through the runner and apply the same action-count gating
  * every command entry point must apply — browser (`window.__gameConsole`),
  * CLI (`console.ts`), and headless scenario runners alike. Centralized here
@@ -77,11 +91,30 @@ export const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
  * this increment, `EventSystem`'s `MIN_EVENT_INTERVAL_ACTIONS` cooldown gate
  * never opens, and timer-based events (e.g. politics_ev_mandate) can fire in
  * one mode and never in the other despite an identical seed and command list.
+ * The same divergence resurfaces two different ways: a mode-specific
+ * bookkeeping call (like `event status`) counting on one side with no
+ * equivalent on the other (META_EVENT_SUBCOMMANDS), or the same call
+ * counting on both sides but at a different real/no-op rate. The second is
+ * exactly what happened here: command-mode scenario steps issue `event
+ * choose 0` unconditionally, on a fixed schedule, whether or not a dialog
+ * would actually be showing — a real player only ever clicks a choice when
+ * one is; interaction mode's `resolveEventIfPending` mirrors that correctly
+ * (skips the console entirely when nothing is pending), so an `event choose`
+ * that resolves nothing (`success: false`, "No pending event or invalid
+ * option") gave command mode free, uncontested credit toward the cooldown
+ * that interaction mode never got for the identical no-op moment. Fixed by
+ * only counting `event choose` when it actually resolved an event.
  */
 export function runCommand(engine: RunnerWithContext, cmd: string): CommandResult {
   const result = engine.runner.run(cmd);
-  const cmdName = parseCommand(cmd).command;
-  if (engine.ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
+  const parsed = parseCommand(cmd);
+  const sub = parsed.args[0] ?? '';
+  const isMetaEvent = parsed.command === 'event'
+    && (META_EVENT_SUBCOMMANDS as readonly string[]).includes(sub);
+  const isNoOpChoose = parsed.command === 'event' && sub === 'choose' && !result.success;
+  const isExempt = META_COMMANDS.includes(parsed.command as typeof META_COMMANDS[number])
+    || isMetaEvent || isNoOpChoose;
+  if (engine.ctx.state && !isExempt) {
     incrementActionCount(engine.ctx.state.events);
   }
   return result;

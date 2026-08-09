@@ -144,7 +144,7 @@ export async function executeInteractionActions(
       console.log(`  Screenshot [${screenshotIndex}]: ${ssPath}`);
       screenshotIndex++;
     } else if (action.type !== 'screenshot') {
-      await executeActionOnPage(page, action);
+      await executeActionOnPage(page, action, step);
       // A click that mutates the DOM — opening a panel, then clicking a control
       // inside it — needs the panel's next-frame `uiManager.update` to run
       // before the following action reads or clicks that control. The playtest

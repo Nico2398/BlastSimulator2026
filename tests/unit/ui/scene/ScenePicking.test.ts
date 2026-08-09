@@ -198,6 +198,52 @@ describe('ScenePicking (class — canvas wiring, debounce, click-vs-drag)', () =
 
   const SAMPLE_HIT: EntityPick = { kind: 'employee', id: 5, point: new THREE.Vector3(1, 0, 1), distance: 10 };
 
+  // ── aim latch (the SelectionBar-unreachable bug) ──────────────────────────
+  //
+  // The SelectionBar is position:fixed over a full-viewport canvas, so a mouse
+  // can never reach Dispatch Here / Move Here / Haul without firing mouseleave
+  // on the canvas first. While those handlers read the live hover, mouseleave
+  // cleared it and every one of them bailed — the action was impossible with a
+  // mouse, though a synthetic click (no cursor travel) worked, which is why no
+  // test caught it.
+
+  it('keeps the aim after the cursor leaves the canvas, even though hover clears', () => {
+    vi.useFakeTimers();
+    const canvas = makeCanvas();
+    stubHit(SAMPLE_HIT);
+    const sp = new ScenePicking(canvas, new THREE.PerspectiveCamera(), makeStubRenderer());
+
+    fireMouse(canvas, 'mousemove', 400, 300);
+    vi.advanceTimersByTime(100);
+    expect(sp.hover).not.toBeNull();
+    expect(sp.aim).not.toBeNull();
+
+    // Walking the cursor up to the HUD button.
+    canvas.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+
+    // Highlight goes, aim stays — that is the whole point.
+    expect(sp.hover).toBeNull();
+    expect(sp.aim).not.toBeNull();
+    expect(sp.aim?.entity?.id).toBe(SAMPLE_HIT.id);
+  });
+
+  it('replaces the aim on the next real pick', () => {
+    vi.useFakeTimers();
+    const canvas = makeCanvas();
+    stubHit(SAMPLE_HIT);
+    const sp = new ScenePicking(canvas, new THREE.PerspectiveCamera(), makeStubRenderer());
+
+    fireMouse(canvas, 'mousemove', 400, 300);
+    vi.advanceTimersByTime(100);
+    expect(sp.aim?.entity?.id).toBe(SAMPLE_HIT.id);
+
+    const OTHER: EntityPick = { kind: 'employee', id: 9, point: new THREE.Vector3(2, 0, 2), distance: 12 };
+    stubHit(OTHER);
+    fireMouse(canvas, 'mousemove', 401, 301);
+    vi.advanceTimersByTime(100);
+    expect(sp.aim?.entity?.id).toBe(OTHER.id);
+  });
+
   it('does not fire the hover handler before the 60ms delay elapses', () => {
     vi.useFakeTimers();
     const canvas = makeCanvas();

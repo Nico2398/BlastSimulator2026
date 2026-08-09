@@ -10,24 +10,38 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "pendingActionCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee dispatch 1 x:10 z:10",
@@ -36,7 +50,14 @@
           "type": "command",
           "command": "employee dispatch 1 x:10 z:10"
         }
-      ]
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 1
+        },
+        "note": "the dispatched work task itself, queued and not yet claimed"
+      }
     },
     {
       "command": "tick 40",
@@ -45,7 +66,27 @@
           "type": "command",
           "command": "tick 40"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash",
+          "minFatigue"
+        ],
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -54,7 +95,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -63,17 +105,48 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build living_quarters at:15,15",
       "description": "Placed away from the (10,10) dispatch target (#437) — building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build living_quarters at:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 1,
+          "pendingActionCount": 1
+        }
+      }
     },
     {
       "command": "needs",
@@ -82,7 +155,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 80",
@@ -91,7 +165,28 @@
           "type": "command",
           "command": "tick 80"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash",
+          "minFatigue"
+        ],
+        "equals": {
+          "pendingActionCount": 0
+        },
+        "note": "minFatigue is now near the collapse threshold (~5); the earlier dispatch task has been claimed and completed"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -100,7 +195,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -109,7 +205,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 20",
@@ -118,7 +215,29 @@
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash",
+          "minFatigue"
+        ],
+        "equals": {
+          "pendingActionCount": 1,
+          "collapsedCount": 1
+        },
+        "note": "minFatigue hits the collapse floor mid-batch (5.0 -> 1.4) and tickCollapse fires before autoInsertNeedTasks ever gets a chance at its own, earlier warning-threshold insertion (25) -- this is a genuine collapse forcing the rest task, not the calm pre-collapse insertion the file's own name implies. pendingActionCount 0->1 is real, but it is collapse recovery, not proactive queuing; not fixed here since it is a game-balance question (why the proactive threshold never preempts it), not a command/UI divergence."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -127,7 +246,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -136,7 +256,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 30",
@@ -145,7 +266,31 @@
           "type": "command",
           "command": "tick 30"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "minFatigue"
+        ],
+        "equals": {
+          "pendingActionCount": 0,
+          "collapsedCount": 0
+        },
+        "note": "the collapse-forced rest queued in the previous step is now active: minFatigue recovers (not decreases) and the task completes, dropping pendingActionCount back to 0 and clearing collapsedCount. This batch is interrupted early by an unrelated random event (politics_mining_expo) -- the recovery is already visible in however many ticks actually ran."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -154,7 +299,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -163,7 +309,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

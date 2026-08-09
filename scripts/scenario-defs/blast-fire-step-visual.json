@@ -2,7 +2,16 @@
   "name": "blast-fire-step-visual",
   "description": "Redesign P4/#26: the Blast Workshop's Fire step (danger zone, Sound the Horn, pre-flight checklist) and the real fire flow — FIRE opens PreflightModal, DETONATE fires and closes it, BlastReportModal auto-opens with the real report, CLOSE dismisses it.",
   "shots": [
-    { "name": "overview", "yaw": 0, "pitch": 45, "target": [10, 10], "distance": 15 }
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [
+        10,
+        10
+      ],
+      "distance": 15
+    }
   ],
   "steps": [
     {
@@ -10,65 +19,194 @@
       "timeout": 30,
       "description": "Setup: a fresh site",
       "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:32" }
-      ]
+        {
+          "type": "command",
+          "command": "new_game seed:42 size:32"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
       "timeout": 30,
-      "description": "Setup: a single hole, charged and sequenced — a complete, valid plan",
+      "description": "Setup: a single hole — a complete, valid plan once charged and sequenced below. Split into one step per command (issue #479, same class as Finding #5 in the original #479 plan doc): the bundled 3-command interaction array only ever ran its first command in command mode, since command-runner.ts's runSteps executes step.command alone, not the interaction array.",
       "interaction": [
-        { "type": "command", "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6" },
-        { "type": "command", "command": "charge hole:* explosive:boomite amount:5kg stemming:2m" },
-        { "type": "command", "command": "sequence set hole:H1 delay:0ms" }
-      ]
+        {
+          "type": "command",
+          "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 1
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
+      "timeout": 30,
+      "description": "Declared boomite/5kg/2m is exactly what the Charge panel shows on a fresh page (DEFAULT_EXPLOSIVE/DEFAULT_AMOUNT_KG/DEFAULT_STEMMING_M, Charge.ts), so Charge All commits the declared values with no stepper click at all — asserted rather than assumed. The Blast Workshop is opened here rather than three steps later; autoAdvance is untouched (no tab is clicked anywhere in this file), so the panel still walks itself Drill -> Charge -> Sequence -> Fire as the plan completes, which is what the Fire step below checks.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "5 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "chargedCount": 1
+        }
+      },
+      "role": "player"
+    },
+    {
+      "command": "sequence set hole:H1 delay:0ms",
+      "timeout": 30,
+      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. H1 has no delay at all at this point (Auto Sequence never ran in this file), and adjustHoleDelay reads an absent delay as 0 and floors the result at 0 — so one decrement dispatches exactly the declared `sequence set hole:H1 delay:0ms`. Charging the only hole moved the panel to Sequence by itself, so no tab click is needed.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "sequencedCount": 1
+        }
+      },
+      "role": "player"
     },
     {
       "command": "state",
       "timeout": 30,
-      "description": "Opening the Blast Workshop auto-lands on step 5 (Fire) since the plan is complete — the danger zone shows clear (nobody nearby), Sound the Horn is disabled, and the pre-flight checklist reads all-clear",
+      "description": "The plan is complete once H1 is sequenced, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire) — the danger zone shows clear (nobody nearby), Sound the Horn is disabled, and the pre-flight checklist reads all-clear. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "waitForSelector", "selector": "#bs-blast-panel [data-action=\"sound-horn\"]" },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"execute\"]"
+      }
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "FIRE opens PreflightModal — real plan stats, the 'run analysis' hint (no preview has run), and the all-clear warnings",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"execute\"]" },
-        { "type": "wait", "durationMs": 300 },
-        { "type": "waitForSelector", "selector": "[data-action=\"preflight-detonate\"]" },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "[data-action=\"preflight-detonate\"]"
+      }
     },
     {
       "command": "blast",
       "timeout": 30,
       "description": "DETONATE fires the blast, closes PreflightModal, and BlastReportModal auto-opens with the real report (rating, cleared/cracked/fragments, ore value)",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "[data-action=\"preflight-detonate\"]" },
-        { "type": "wait", "durationMs": 400 },
-        { "type": "waitForSelector", "selector": "[data-action=\"report-close\"]" },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"preflight-detonate\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 400
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      }
     },
     {
       "command": "state",
       "timeout": 30,
       "description": "CLOSE dismisses the report",
       "interaction": [
-        { "type": "command", "command": "state" },
-        { "type": "clickSelector", "selector": "[data-action=\"report-close\"]" },
-        { "type": "wait", "durationMs": 200 },
-        { "type": "screenshot" }
-      ]
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 200
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "blocked": "[data-action=\"report-close\"]",
+        "note": "the report modal must hide once closed, same invariant as BlastReportModal's other conversions"
+      }
     }
   ]
 }

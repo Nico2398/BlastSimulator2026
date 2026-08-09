@@ -92,13 +92,13 @@ export class LevelEndScreen {
     this.starRatingRows = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:8px' } });
     const starRatingCard = card([this.starRatingTitle, this.starRatingRows]);
 
-    this.replayBtn = button('ghost', t('ui.level_end.replay'), { onClick: () => {
+    this.replayBtn = button('ghost', t('ui.level_end.replay'), { dataAction: 'replay', onClick: () => {
       if (this.lastState?.campaign.activeLevelId) this.onReplay?.(this.lastState.campaign.activeLevelId);
     } });
     this.replayBtn.style.flex = '1';
     this.locale.bindText(this.replayBtn, 'ui.level_end.replay');
 
-    this.continueBtn = button('primary', '', { onClick: () => {
+    this.continueBtn = button('primary', '', { dataAction: 'continue', onClick: () => {
       const state = this.lastState;
       if (!state) return;
       const nextId = this.nextLevelId(state);
@@ -135,11 +135,14 @@ export class LevelEndScreen {
       children: [tipIcon, this.defeatTipTextEl],
     });
 
-    this.defeatBackBtn = button('ghost', t('ui.level_end.back_to_portfolio'), { onClick: () => this.onBackToPortfolio?.() });
+    this.defeatBackBtn = button('ghost', t('ui.level_end.back_to_portfolio'), {
+      dataAction: 'back-to-portfolio',
+      onClick: () => this.onBackToPortfolio?.(),
+    });
     this.defeatBackBtn.style.flex = '1';
     this.locale.bindText(this.defeatBackBtn, 'ui.level_end.back_to_portfolio');
 
-    this.defeatRetryBtn = button('primary', '', { onClick: () => {
+    this.defeatRetryBtn = button('primary', '', { dataAction: 'retry', onClick: () => {
       if (this.lastState?.campaign.activeLevelId) this.onReplay?.(this.lastState.campaign.activeLevelId);
     } });
     this.defeatRetryBtn.style.flex = '1.4';

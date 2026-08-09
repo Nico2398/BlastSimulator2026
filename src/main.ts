@@ -517,7 +517,9 @@ window.__gameState = () => {
     time: s.time,
     tickCount: s.tickCount,
     isPaused: s.isPaused,
+    timeScale: s.timeScale,
     mineType: s.mineType,
+    weather: ctx.weatherCycle?.current ?? null,
     // The site's live bounding box, so a harness can map grid coordinates to
     // the tile picker without inferring them from a terrain bounding box that
     // blasts and ramps change underneath it. Size is a bounding box, not a
@@ -533,6 +535,8 @@ window.__gameState = () => {
     holeCount: s.drillHoles.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
+    surveyCount: s.surveyResults.length,
+    pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
@@ -543,6 +547,13 @@ window.__gameState = () => {
     proficiencyTotal: s.employees.employees
       .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
     trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
+    // Needs mechanics: proves fatigue actually built up and collapse actually
+    // fired, rather than a scenario guessing at it from a screenshot alone.
+    collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
+    minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
+    activeContractCount: s.contracts.active.length,
+    deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
     // ── Game-over detection fields ──
@@ -552,9 +563,14 @@ window.__gameState = () => {
     arrested: s.arrest.arrested,
     cash: s.cash,
     profit: s.levelStats?.totalWealth ?? 0,
+    wellBeing: s.scores.wellBeing,
+    safety: s.scores.safety,
+    ecology: s.scores.ecology,
+    nuisance: s.scores.nuisance,
     muckPile: ctx.grid
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
+    storedMassKg: s.logistics.storedMassKg,
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
@@ -840,12 +856,30 @@ selectionBar.setActionHandler((action, entity) => {
     case 'dispatch_here': {
       // "Here" = wherever the player is currently pointing on the ground —
       // the live hover state, read at the moment the button is clicked.
-      const terrain = scenePicking.hover?.terrain;
+      const terrain = scenePicking.aim?.terrain;
       if (!terrain) {
-        uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_haul_target') });
+        // `no_move_target` ("point at the ground…"), not `no_haul_target`
+        // ("no fragment nearby to haul") — this step fails because the cursor
+        // is not over terrain, which has nothing to do with fragments. The
+        // haul-specific text was copied here and told the player to look for
+        // the wrong thing.
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.dispatch_here'), body: t('shell.selection.no_move_target') });
         break;
       }
       reportIfFailed(t('shell.selection.dispatch_here'), window.__gameConsole(`employee dispatch ${entity.id} x:${terrain.tileX} z:${terrain.tileZ}`));
+      break;
+    }
+    case 'move_here': {
+      // Vehicle counterpart of Dispatch Here: drive to whatever tile the
+      // player is currently pointing at. Note the parser's coordinate form
+      // here is `to:x,z` (one comma-joined argument), not the `x:… z:…` pair
+      // `employee dispatch` takes — see src/console/commands/vehicle.ts.
+      const terrain = scenePicking.aim?.terrain;
+      if (!terrain) {
+        uiManager.notify({ severity: 'warn', title: t('shell.selection.move_here'), body: t('shell.selection.no_move_target') });
+        break;
+      }
+      reportIfFailed(t('shell.selection.move_here'), window.__gameConsole(`vehicle move ${entity.id} to:${terrain.tileX},${terrain.tileZ}`));
       break;
     }
     case 'follow':
@@ -857,7 +891,7 @@ selectionBar.setActionHandler((action, entity) => {
     case 'haul': {
       // Same live-hover pattern as Dispatch Here: haul whichever fragment the
       // player is currently pointing at.
-      const hovered = scenePicking.hover?.entity;
+      const hovered = scenePicking.aim?.entity;
       if (!hovered || hovered.kind !== 'fragment') {
         uiManager.notify({ severity: 'warn', title: t('shell.selection.haul'), body: t('shell.selection.no_haul_target') });
         break;

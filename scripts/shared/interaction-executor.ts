@@ -9,8 +9,11 @@
  */
 
 import type { Page, KeyInput } from 'puppeteer';
-import type { InteractionStepAction } from './scenario-types.js';
+import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
 import { awaitPlacementArmed } from './tile-picker.js';
+import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './playtest-types.js';
+import type { PlayerAction } from './playtest-types.js';
+import { runAction } from './playtest-driver.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -107,6 +110,77 @@ function describeReason(r: UnclickableReport): string {
 }
 
 /**
+ * Read-only commands an `observe`-marked step may run.
+ *
+ * These report state rather than changing it, which is how a scenario records
+ * what happened — there is no button for "dump the game state", and there
+ * should not be. Kept as an explicit list rather than a naming convention
+ * (`*_list`, `*_status`) so that adding a mutating command to it is a visible
+ * edit here, not an accident of what somebody named a subcommand.
+ */
+export const OBSERVATION_COMMANDS = [
+  'state', 'scores', 'finances', 'needs', 'inspect', 'fragments', 'stats',
+  'preview', 'terrain_info', 'help',
+  // NOT here, on purpose: `blast_preview` ("Run Analysis") writes
+  // state.lastBlastPreview (mining.ts) — it is an action with a real button
+  // (`[data-action="run-analysis"]`), not a read; `preview <slice>` is the
+  // read of what it wrote. `blast_plan` is `save|load|list|validate` —
+  // save/load mutate, so the bare command can't be blanket-allowed either.
+  // Both were wrongly in this list originally; caught converting scenarios
+  // that actually click "Run Analysis" (issue #479).
+] as const;
+
+/**
+ * Read-only *subcommands*: `<command> list|status|show|types|mode|ore_report`
+ * inspects, where the bare command would act. `vehicle list` is an
+ * observation; `vehicle buy` is a player action.
+ */
+const OBSERVATION_SUBCOMMANDS = ['list', 'status', 'show', 'types', 'mode', 'ore_report'] as const;
+
+/** True when `command` only reports state. */
+export function isObservationCommand(command: string): boolean {
+  const [top, sub] = command.trim().split(/\s+/);
+  if (top === undefined) return false;
+  if ((OBSERVATION_COMMANDS as readonly string[]).includes(top)) return true;
+  return sub !== undefined && (OBSERVATION_SUBCOMMANDS as readonly string[]).includes(sub);
+}
+
+/**
+ * Whether `action` (already known to be a `command`) may run inside `step`,
+ * given the step's role (issue #479). Returns a message naming the step and
+ * the reason when it may not; `null` when it is fine.
+ *
+ * A player step may not reach the console at all — a click that was awkward
+ * is a playability finding, not license to type it instead. A setup step may
+ * still run a command, but only one `isAllowedSetupCommand` admits: the same
+ * allowlist the playtest harness uses to bootstrap a world, reused rather
+ * than reinvented so there is exactly one place that decides what counts as
+ * "setup" instead of two that can drift apart. An observe step is held to
+ * `isObservationCommand`, so "I only wanted to read the state" cannot smuggle
+ * a `build` through. A step with no role is unconstrained — see
+ * {@link ScenarioStepRole}.
+ */
+export function checkStepActionAllowed(
+  step: ScenarioStepDef,
+  action: InteractionStepAction & { type: 'command' },
+): string | null {
+  const label = step.description ?? step.command;
+  if (step.role === 'player') {
+    return `step "${label}" is player-marked but its interaction runs console command `
+      + `"${action.command}" — player steps must be completed by clicking, not a console command.`;
+  }
+  if (step.role === 'setup' && !isAllowedSetupCommand(action.command)) {
+    return `step "${label}" is setup-marked but runs console command "${action.command}", `
+      + `which is not on the setup allowlist (${[...SETUP_COMMAND_ALLOWLIST, ...TIME_COMMAND_ALLOWLIST].join(', ')}).`;
+  }
+  if (step.role === 'observe' && !isObservationCommand(action.command)) {
+    return `step "${label}" is observe-marked but runs console command "${action.command}", `
+      + `which changes state rather than reporting it — mark it "player" and click it, or "setup" if it bootstraps the world.`;
+  }
+  return null;
+}
+
+/**
  * Executes a single interaction action on the given Puppeteer page.
  * Handles all supported action types: click, mousedown, mouseup, mousemove,
  * keypress, keydown, keyup, scroll, wheel, wait, waitForSelector, type,
@@ -114,10 +188,13 @@ function describeReason(r: UnclickableReport): string {
  *
  * @param page - Puppeteer page object.
  * @param action - The interaction action to execute.
+ * @param step - The step `action` belongs to, so a `command` action can be
+ *   checked against the step's role (issue #479).
  */
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
+  step: ScenarioStepDef,
 ): Promise<void> {
   switch (action.type) {
     case 'click': {
@@ -229,6 +306,64 @@ export async function executeActionOnPage(
     case 'waitForSelector':
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
+    case 'resolveEventIfPending': {
+      // Ask the game, not the DOM. `event status` is read-only
+      // (isObservationCommand admits it) and this is the harness deciding
+      // whether to wait — the resolution itself is a real click below.
+      const pending = await page.evaluate(() => {
+        const run = (window as unknown as {
+          __gameConsole?: (c: string) => { output?: unknown };
+        }).__gameConsole;
+        if (run === undefined) return false;
+        const out = String(run('event status').output ?? '');
+        return !/no pending event/i.test(out);
+      });
+      if (!pending) break;
+
+      // Something IS pending, so the dialog must appear — wait properly rather
+      // than probing briefly, and fail loudly if it never does.
+      const evTimeout = action.timeoutMs ?? 30000;
+      await page.waitForSelector('#bs-event-dialog .bs-event-choice', { timeout: evTimeout });
+      await page.click('#bs-event-dialog .bs-event-choice');
+      // The outcome panel replaces the choices; dismiss it if it appears.
+      try {
+        await page.waitForSelector('#bs-event-dialog .bs-event-dismiss', { timeout: evTimeout });
+        await page.click('#bs-event-dialog .bs-event-dismiss');
+      } catch {
+        // Some events resolve without an outcome panel — not a failure.
+      }
+      break;
+    }
+    case 'clickIfPresent': {
+      // Poll for the control to become usable, but treat "never showed up" as a
+      // legitimate outcome rather than a failure — see the type's own doc
+      // comment for why this is not an escape hatch. Reuses the same
+      // `__probeSelector` usability gate `clickSelector` clicks through, so a
+      // control that IS present but inert still counts as not-clickable here
+      // (a tutorial rail blocking it is a real block, and silently clicking
+      // through it would prove nothing).
+      const settleMs = action.timeoutMs ?? 0;
+      const deadline = Date.now() + settleMs;
+      for (;;) {
+        const usable = await page.evaluate((sel: string) => {
+          const el = document.querySelector(sel);
+          if (el === null) return false;
+          const probe = (window as unknown as {
+            __probeSelector?: (s: string) => string | null;
+          }).__probeSelector;
+          if (probe === undefined) return true;
+          el.scrollIntoView({ block: 'center', inline: 'nearest' });
+          return probe(sel) === null;
+        }, action.selector);
+        if (usable) {
+          await page.click(action.selector);
+          break;
+        }
+        if (Date.now() >= deadline) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      break;
+    }
     case 'waitForTutorialStep': {
       const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
       const deadline = Date.now() + (action.timeout ?? 30000);
@@ -291,7 +426,9 @@ export async function executeActionOnPage(
     case 'viewport':
       await page.setViewport({ width: action.width, height: action.height });
       break;
-    case 'command':
+    case 'command': {
+      const violation = checkStepActionAllowed(step, action);
+      if (violation !== null) throw new Error(violation);
       await page.evaluate((cmd: string) => {
         if (typeof (window as any).__gameConsole === 'function') {
           return (window as any).__gameConsole(cmd);
@@ -299,6 +436,7 @@ export async function executeActionOnPage(
         return undefined;
       }, action.command);
       break;
+    }
     case 'cameraFocus':
       await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
         (window as any).__cameraFocus(x, z, distance);
@@ -324,6 +462,21 @@ export async function executeActionOnPage(
     case 'screenshot':
       // Screenshot is handled by the caller, not here
       break;
+    // The vocabulary shared with the playability harness (issue #479). These
+    // are structurally identical to their `PlayerAction` counterparts, so they
+    // run through `runAction` rather than being reimplemented here — one
+    // implementation means a converted scenario step and the playtest beat it
+    // mirrors genuinely do the same thing, including the failure diagnosis.
+    case 'set':
+    case 'clickLabel':
+    case 'awaitUsable':
+    case 'zoomOut':
+    case 'focusTile':
+    case 'clickEntity': {
+      const { type, ...rest } = action;
+      await runAction(page, { do: type, ...rest } as PlayerAction);
+      break;
+    }
     default: {
       // Exhaustiveness check
       const _exhaustive: never = action;

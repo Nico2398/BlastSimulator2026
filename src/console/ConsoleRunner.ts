@@ -73,6 +73,18 @@ export class ConsoleRunner {
     this.handlers.set(name, handler);
   }
 
+  /**
+   * True when `name` is a registered command or alias.
+   *
+   * Exists for the UI/command parity lint: a button wired to a command that
+   * was never registered fails silently — `run()` returns
+   * `Unknown command: "…"` and no UI call site checks the result, so the
+   * control simply does nothing. Both tubing buttons shipped that way.
+   */
+  has(name: string): boolean {
+    return this.handlers.has(name);
+  }
+
   /** Run a raw command string. Returns a CommandResult. */
   run(input: string): CommandResult {
     const parsed = parseCommand(input);

@@ -10,24 +10,38 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee list",
@@ -36,7 +50,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -45,7 +60,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 100",
@@ -54,7 +70,28 @@
           "type": "command",
           "command": "tick 100"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "wellBeing"
+        ],
+        "decreased": [
+          "cash",
+          "minFatigue"
+        ],
+        "note": "well-rested bonus: at 100 ticks all gauges are still above 80, morale rises to 100 and wellBeing jumps toward its cap — confirms the file's own claimed bonus, not just the eventual penalty"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -63,7 +100,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -72,7 +110,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -81,7 +120,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 150",
@@ -90,7 +130,26 @@
           "type": "command",
           "command": "tick 150"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash",
+          "minFatigue",
+          "wellBeing"
+        ],
+        "note": "gauges have now drained below thresholds — morale and wellBeing both fall from their tick-100 peak, confirming the penalty side of the file's claim"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "needs",
@@ -99,7 +158,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -108,7 +168,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -117,7 +178,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 200",
@@ -126,7 +188,31 @@
           "type": "command",
           "command": "tick 200"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "minFatigue",
+          "wellBeing"
+        ],
+        "note": "a real event (verified via direct trace) fires only ~5 ticks into this batch and blocks the rest, so cash doesn't move yet within that short a window (no payroll cycle hit) — minFatigue/wellBeing still confirm the continuing drain"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "expect": {
+        "increased": [
+          "wellBeing"
+        ],
+        "note": "verified via direct trace: the pending event here is union_pet_day, and choosing option 0 genuinely boosts wellBeing back up (30.17→38.17) rather than leaving it at its drained low — a real, surprising effect worth locking in, not assumed"
+      },
+      "role": "player"
     },
     {
       "command": "needs",
@@ -135,7 +221,8 @@
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee list",
@@ -144,7 +231,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -153,7 +241,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -162,7 +251,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

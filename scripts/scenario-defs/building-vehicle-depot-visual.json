@@ -10,16 +10,50 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build vehicle_depot at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build vehicle_depot at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 32000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build vehicle_depot at:15,5 tier:2",
@@ -28,7 +62,15 @@
           "type": "command",
           "command": "build vehicle_depot at:15,5 tier:2"
         }
-      ]
+      ],
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "expect": {
+        "equals": {
+          "cash": 32000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 not researched"
+      }
     },
     {
       "command": "build vehicle_depot at:25,5 tier:3",
@@ -37,7 +79,15 @@
           "type": "command",
           "command": "build vehicle_depot at:25,5 tier:3"
         }
-      ]
+      ],
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "expect": {
+        "equals": {
+          "cash": 32000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 3 not researched"
+      }
     },
     {
       "command": "build list",
@@ -46,7 +96,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle list",
@@ -55,7 +106,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -64,7 +116,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -73,7 +126,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

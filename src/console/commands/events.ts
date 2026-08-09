@@ -383,6 +383,13 @@ export function eventCommand(
       const result = resolveEvent(state.events, state.finances, state.scores, idx, state.tickCount, rng);
       if (!result) return { success: false, output: 'No pending event or invalid option.' };
 
+      // resolveEvent already logged the transaction to state.finances via
+      // addIncome/addExpense — mirror it onto the flat state.cash field too,
+      // the same dual-write every other cash-moving command in this file
+      // does, since FinancesPanel.ts and serializeGameState() both read the
+      // flat field, not state.finances.cash.
+      state.cash += result.cashChange;
+
       const lines = [`Event resolved: ${result.eventId}`, t(result.resultKey), 'Consequences:'];
       for (const e of result.effects) {
         lines.push(`  • ${e}`);

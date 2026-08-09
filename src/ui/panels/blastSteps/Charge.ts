@@ -7,8 +7,13 @@
 // the mock treats them as one interaction). Here a card click only *selects*
 // a product; CHARGE ALL is the one explicit commit. A row that looks like
 // "browse the catalog" silently reflashing every hole's charge is a bad
-// surprise, and per-hole charging isn't a feature here anyway, so nothing is
-// lost by requiring the extra click.
+// surprise, so nothing is lost by requiring the extra click.
+//
+// Per-hole charging (gap G3): `charge hole:<id> …` is a real gameplay command
+// and had no button at all — only CHARGE ALL — so a player could never charge
+// one hole differently from the rest, while the console could. ChargeHoleList
+// closes that; this step feeds it the panel's current product / amount /
+// stemming values and dispatches for the one hole whose row was clicked.
 //
 // Also omitted vs. the mock: locking a product by "site rock tier" — the
 // mock's single site-wide rock tier has no real-data equivalent (rock is
@@ -22,6 +27,7 @@ import { t } from '../../../core/i18n/I18n.js';
 import { el, stepper, sectionHeader, reasonLine, button } from '../../dom.js';
 import { iconEl } from '../../icons.js';
 import { LocaleTextRegistry } from '../../localeText.js';
+import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { TUBING_COST } from '../../../core/mining/Tubing.js';
@@ -44,6 +50,7 @@ export class ChargeStep {
   private readonly stemmingValueEl: HTMLElement;
   private readonly chargeAllBtn: HTMLButtonElement;
   private readonly chargeLineEl: HTMLElement;
+  private readonly holeList: ChargeHoleList;
   private readonly tubingCardEl: HTMLElement;
 
   private gameConsole?: GameConsoleFn;
@@ -75,12 +82,18 @@ export class ChargeStep {
     const stemmingStepperEl = stepper(`${this.stemmingM.toFixed(1)} m`, () => this.adjustStemming(-0.2), () => this.adjustStemming(0.2));
     this.stemmingValueEl = stemmingStepperEl.querySelector('.bsx-stepper-value') as HTMLElement;
 
-    const amountField = el('div', { children: [
+    // data-field, same reasoning as ParamStrip.ts's grid spacing/depth
+    // steppers (issue #479 follow-up, Finding #4): without it there is no
+    // selector a click-only scenario/playtest step can target to reach an
+    // exact amount/stemming before Charge All, so a declared
+    // `charge ... amount:8 stemming:0` silently charged at the panel's
+    // 5kg/2m defaults instead whenever the click never touched these.
+    const amountField = el('div', { attrs: { 'data-field': 'amount' }, children: [
       this.locale.bindText(el('span', { attrs: { style: fieldLabelStyle } }), 'ui.blast_workshop.charge.amount'),
       amountStepperEl,
     ] });
     amountField.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:4px';
-    const stemmingField = el('div', { children: [
+    const stemmingField = el('div', { attrs: { 'data-field': 'stemming' }, children: [
       this.locale.bindText(el('span', { attrs: { style: fieldLabelStyle } }), 'ui.blast_workshop.charge.stemming'),
       stemmingStepperEl,
     ] });
@@ -99,10 +112,15 @@ export class ChargeStep {
     this.chargeAllBtn.append(chargeAllLabelEl, this.chargeLineEl);
     this.chargeAllBtn.addEventListener('click', () => this.chargeAll());
 
+    this.holeList = new ChargeHoleList(holeId => this.chargeHole(holeId));
+
     const tubingHeader = sectionHeader(t('ui.blast_workshop.charge.tubing_section'));
     this.tubingCardEl = el('div');
 
-    this.el.append(productHeader, this.productListEl, stepperRow, this.chargeAllBtn, tubingHeader, this.tubingCardEl);
+    this.el.append(
+      productHeader, this.productListEl, stepperRow, this.chargeAllBtn,
+      this.holeList.root, tubingHeader, this.tubingCardEl,
+    );
     container.appendChild(this.el);
   }
 
@@ -112,22 +130,29 @@ export class ChargeStep {
 
   refreshLocale(): void {
     this.locale.refresh();
+    this.holeList.refreshLocale();
     this.lastSignature = '';
   }
 
   update(state: GameState, weather: WeatherState | undefined): void {
     const wet = weather ? wetHoles(state, weather) : [];
-    const holeCount = state.drillHoles.length;
+    const holes = state.drillHoles;
 
     const signature = JSON.stringify({
       selected: this.selectedExplosiveId, amt: this.amountKg, stem: this.stemmingM,
-      holeCount, wet, tub: state.tubingState.inventory,
+      // Hole ids *and* their charges, not just a count: a per-hole charge
+      // changes neither the hole list nor anything else in the signature, so a
+      // count-only signature would leave the row it was fired from stale.
+      holes: holes.map(h => h.id),
+      charges: holes.map(h => holeChargeSignature(state.chargesByHole[h.id])),
+      wet, tub: state.tubingState.inventory,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 
     this.renderProductList(wet.length > 0);
-    this.updateChargeLine(holeCount);
+    this.updateChargeLine(holes.length);
+    this.holeList.render(holes, state.chargesByHole);
     this.renderTubingCard(wet, state.tubingState.inventory);
   }
 
@@ -288,11 +313,25 @@ export class ChargeStep {
     this.gameConsole?.(`charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m`);
   }
 
+  // Same three panel values Charge All reads, one hole instead of `*`. The
+  // list is re-rendered from the next update()'s real state (charge success is
+  // the core's call, not this panel's), so the signature is cleared rather
+  // than the row being repainted optimistically here.
+  private chargeHole(holeId: string): void {
+    this.gameConsole?.(`charge hole:${holeId} explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m`);
+    this.lastSignature = '';
+  }
+
+  // `buy` / `install_tubing`, not `tubing buy` / `tubing install`: there is no
+  // `tubing` command in the registry (createRunner.ts:150,153 register the two
+  // verbs separately and pass the subcommand in themselves). Both buttons sent
+  // the non-existent form and silently did nothing — the runner answers
+  // `Unknown command: "tubing"`, and neither caller checks the result.
   private buyTubing(): void {
-    this.gameConsole?.(`tubing buy amount:${TUBING_BUY_AMOUNT}`);
+    this.gameConsole?.(`buy amount:${TUBING_BUY_AMOUNT}`);
   }
 
   private installTubing(wetIds: string[]): void {
-    for (const holeId of wetIds) this.gameConsole?.(`tubing install hole:${holeId}`);
+    for (const holeId of wetIds) this.gameConsole?.(`install_tubing hole:${holeId}`);
   }
 }

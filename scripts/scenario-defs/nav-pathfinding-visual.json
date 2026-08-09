@@ -9,43 +9,139 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0,
+          "stuckEmployeeCount": 0
+        }
+      }
     },
     {
       "command": "build management_office at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build management_office at:5,7",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:5,7"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 7
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "build management_office at:7,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:7,5"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 7,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee list",
@@ -54,26 +150,40 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "employee dispatch 1 x:2 z:2",
-      "description": "Send the driller toward the far corner beyond the 3-building cluster at (5,5)/(5,7)/(7,5), forcing A* to route around them.",
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
       "interaction": [
         {
           "type": "command",
           "command": "employee dispatch 1 x:2 z:2"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 25000
+        }
+      }
     },
     {
       "command": "tick 20",
+      "description": "20 ticks is enough for the driller to route around all three management offices without ever going stuck -- confirmed via direct trace this file's three buildings never fully enclose (2,2), unlike nav-path-following-visual.json's deliberate box-in.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 20"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "stuckEmployeeCount": 0
+        }
+      }
     },
     {
       "command": "inspect 10,10,0",
@@ -82,7 +192,8 @@
           "type": "command",
           "command": "inspect 10,10,0"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

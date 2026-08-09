@@ -1,6 +1,6 @@
 {
   "name": "tutorial-steps-visual",
-  "description": "Step-by-step visual walkthrough of all 23 tutorial steps (0-22) with per-step screenshots for visual regression testing. Exercises the tutorial overlay from start through congratulations, capturing each step's UI state, highlight targets, and progress indicator.",
+  "description": "Step-by-step visual walkthrough of all 23 tutorial steps (0-22) with per-step screenshots for visual regression testing. Exercises the tutorial overlay from start through congratulations, capturing each step's UI state, highlight targets, and progress indicator. Every player-facing step is a real click gated by the tutorial's own rail (issue #479/Finding #74 follow-up), including the box-cut and haul-debris stages the file originally skipped entirely.",
   "shots": [
     {
       "name": "overview",
@@ -21,63 +21,115 @@
   "steps": [
     {
       "command": "new_game seed:42",
-      "timeout": 15,
-      "description": "Setup: create game with seed 42 (24x12x24 tutorial_pit)",
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:tutorial_pit",
       "timeout": 15,
-      "description": "Setup: start tutorial pit level with $20,000 starting cash",
       "interaction": [
         {
           "type": "command",
           "command": "campaign start level:tutorial_pit"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 80000
+        },
+        "note": "tutorial_pit grants $80,000 starting cash on a 32x20x32 grid (Level.ts)"
+      }
     },
     {
       "command": "tutorial_start",
       "timeout": 30,
-      "description": "Step 0: Start tutorial overlay — time-speed guidance displayed with highlight on #bs-hud-top .bs-speed-btn",
       "interaction": [
         {
           "type": "command",
           "command": "tutorial_start"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tutorial-overlay"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "time-speed"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "tutorial_start is registered only in src/main.ts (the browser boot path), not in the shared console command table console-api.ts's createRunner() uses -- command mode reports \"Unknown command\" here and never actually starts the tutorial overlay, while interaction mode's `command` action reaches the real registered handler and does start it (arming TutorialOverlay's rails and setting state.isPaused = true). The added waitForSelector/waitForTutorialStep only run in interaction mode (command mode never starts the overlay to wait on) and gate every real click below on the rail actually being armed, mirroring tutorial-interactive.json.",
+      "expect": {
+        "tutorialStep": "time-speed"
+      }
     },
     {
       "command": "time speed 2",
       "timeout": 15,
-      "description": "Step 0 complete: increase time speed (positional form actually applies the change) → overlay advances to step 1 (hire-surveyor)",
       "interaction": [
         {
-          "type": "command",
-          "command": "time speed 2"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "hire-surveyor"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "time-speed complete: real click on the 2x speed button (the exact button #489 fixed the rail to point at). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "timeScale": 2
+        },
+        "tutorialStep": "hire-surveyor",
+        "note": "proves the time-speed control itself works, independent of the tutorial overlay"
+      }
     },
     {
       "command": "employee hire role:surveyor",
       "timeout": 15,
-      "description": "Step 1 complete: hire surveyor employee → overlay advances to step 2 (survey)",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "survey"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "hire-surveyor complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "cash": 78800,
+          "employeeCount": 1
+        },
+        "tutorialStep": "survey"
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:3",
       "timeout": 15,
-      "description": "Assign geology skill to surveyor for seismic survey",
+      "description": "Test-only bootstrap, not a tutorial stage: hiring already grants Rookie geology (ROLE_STARTING_QUALIFICATION in Employee.ts), this only raises the level for tighter survey estimates. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building, which this scenario does not need.",
       "interaction": [
         {
           "type": "command",
@@ -86,75 +138,132 @@
       ]
     },
     {
-      "command": "survey seismic x:15 z:15",
+      "command": "survey seismic x:23 z:23",
       "timeout": 30,
-      "description": "Step 2: queue seismic survey (async — resolves over ticks, not on command return)",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:15 z:15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 23,
+          "z": 23
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Target corrected from the file's original x:15 z:15 to x:23 z:23 (Finding #74 follow-up): the tutorial's survey stage gates its picker to REGION.survey, a single exact point at (23,23) (tutorialStages.ts) -- (15,15) is outside that region and the picker would refuse to confirm it under a real click, the same class Finding #42 already found for un-gated drill grids. Result unaffected: nothing downstream reads survey findings by location, only the flat $3,000 survey cost. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "cash": 75800
+        }
+      }
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (1/4) — matches WORK_GRACE_TICKS so the overlay resolves the survey before later commands race ahead of it",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 74980
+        },
+        "note": "seismic survey completes mid-tick (tick 9 of this 10-tick block)"
+      }
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (2/4)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (3/4)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "tick 10",
       "timeout": 30,
-      "description": "Let queued survey work run (4/4): survey resolves → overlay advances to step 3 (hire-driller)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 72520
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "timeout": 15,
-      "description": "Step 3 complete: hire driller → overlay advances to step 4 (drill-plan)",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "box-cut"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "hire-driller complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "cash": 71520,
+          "employeeCount": 2
+        },
+        "tutorialStep": "box-cut"
+      }
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
       "timeout": 15,
-      "description": "Assign blasting skill to driller for drill plan",
+      "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
       "interaction": [
         {
           "type": "command",
@@ -163,97 +272,286 @@
       ]
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
-      "timeout": 15,
-      "description": "Step 4 complete: create drill plan → overlay advances to step 5 (charge)",
+      "command": "build_ramp start:16,19 end:16,31 depth:8",
+      "timeout": 30,
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 16,
+          "z1": 19,
+          "x2": 16,
+          "z2": 31
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "drill-plan"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "cash": 70320
+        },
+        "tutorialStep": "drill-plan",
+        "note": "ramp build cost $1,200 (buildRampCommand, mining.ts), verified live"
+      }
+    },
+    {
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 30,
+          "z2": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "charge"
+        }
+      ],
+      "role": "player",
+      "description": "Start corrected from the file's original 15,15 to 20,20 (Finding #74/#75 follow-up): the tutorial's drill-plan stage gates its picker to REGION.drill, the exact rectangle (20,20)-(30,30) (tutorialStages.ts). spacing and depth both corrected from the file's original 5/8 to the grid tool's real defaults 3/6 (DEFAULT_SPACING_M/DEFAULT_DEPTH_M, Drill.ts), discovered live: neither stepper (#bs-param-strip [data-field=\"spacing\"|\"depth\"]) is one of this stage's own targets (tutorialStages.ts's 'drill-plan' entry lists only the toolbar, grid-tool button, and picker canvas/confirm) -- the tutorial rail's own CSS lockout makes every other control pointer-events:none while a stage is active, confirmed by two real interaction-mode failures in a row (depth stepper, then a wrong 16-hole count once depth was fixed but spacing was still assumed adjustable). A real playthrough of this tutorial stage cannot reach any grid but the raw-default one for whatever rectangle is dragged: (30-20)/3+1 = 4 holes per side = 16 total, not the file's original declared 9. Matches tutorial-interactive.json's drill-plan step, which already used the real depth default for the same reason (it did not attempt a non-default spacing at all).",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        },
+        "tutorialStep": "charge"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "timeout": 15,
-      "description": "Step 5 complete: set charges on all holes → overlay advances to step 6 (sequence)",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "sequence"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "charge complete: Charge All Holes clicked. This step's own explosive/amount/stemming already match the Charge panel's real defaults (boomite/5kg/2m, confirmed throughout this suite's Finding #10 audit) so the click reproduces the declared command exactly, unlike most other files' charge steps. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "chargedCount": 16
+        },
+        "tutorialStep": "sequence"
+      }
     },
     {
       "command": "sequence auto delay_step:25",
       "timeout": 15,
-      "description": "Step 6 complete: auto-sequence delays → overlay advances to step 7 (blast)",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "blast"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "sequence complete: Auto Sequence clicked. delay_step:25 already matches the Sequence panel's own default (Sequence.ts DEFAULT_DELAY_STEP_MS) so 0 stepper clicks are needed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "sequencedCount": 16
+        },
+        "tutorialStep": "blast"
+      }
     },
     {
       "command": "blast",
       "timeout": 30,
-      "description": "Step 7 complete: execute blast → overlay advances to step 8 (scores). Screenshot captures blast crater + fragments",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": [
+            "scores",
+            "event-fire-resolve",
+            "hire-manager"
+          ],
+          "timeout": 60000
         }
-      ]
+      ],
+      "role": "player",
+      "description": "blast complete: Execute clicked, confirm dialog answered, Blast Report closed. Mechanism behind the file's original deathCount:1 changed (Finding #74/#75 follow-up), verified live rather than assumed: the file's original 9-hole/8m-depth grid is not reachable by a real click at all (both steppers are off this tutorial stage's target list, see the drill-plan step above) -- but the real 16-hole/6m-depth grid the tutorial's own rail actually produces is a bigger footprint, and still kills the same one nearby employee. deathCount:1 confirmed live, not carried over from the file's old (unreachable) premise.",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "deathCount": 1,
+          "cash": 70320
+        }
+      }
     },
     {
       "command": "scores",
       "timeout": 15,
-      "description": "Step 8: view scores overlay → auto-advances after 2s to step 9 (event-fire-resolve). Screenshot captures scores display",
       "interaction": [
         {
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 1",
       "timeout": 30,
-      "description": "Step 9: advance time to fire tutorial_synergy_consultant event. Overlay fires event, pending event dialog appears",
       "interaction": [
         {
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "The file's original decreased:[\"safety\"] assertion does not survive across both modes (Finding #74/#75 follow-up, discovered live) -- not because the point is wrong, but because it is no longer independently checkable here. In command mode safety still drops exactly on this scripted tick (50 -> 45.05, matching the file's original point precisely). In interaction mode the blast step's own waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) drives the real clock through several ticks while polling for the rail to reach hire-manager -- including the event-fire-resolve stage's own autoCommands: [\"tick 3\", ...] -- so the safety damage already lands during that wait, before this step ever runs, and by here it reads 35.15 with nothing left to decrease on this specific tick. Same class as the contract-deliver step below: real per-click waiting does not reproduce command mode's precise scripted tick count. cash is unaffected by either mode's path and stays checkable.",
+      "expect": {
+        "equals": {
+          "cash": 70320
+        }
+      }
     },
     {
       "command": "event choose 0",
       "timeout": 15,
-      "description": "Resolve tutorial_synergy_consultant (hire consultant: -$3k, +15 well-being). Clears pending event guard",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-choice",
+          "timeout": 30000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "hire-manager"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, then dismissed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "tutorialStep": "hire-manager"
+      }
     },
     {
       "command": "employee hire role:manager",
       "timeout": 15,
-      "description": "Step 10 complete: hire manager (event guard now clear) → overlay advances to step 11 (contract-accept)",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:manager"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "contract-accept"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "hire-manager complete: Crew panel opened, Hire clicked now that the event is resolved. cash not pinned exactly (Finding #74/#75 follow-up, discovered live): the blast step's own multi-target waitForTutorialStep (scores/event-fire-resolve/hire-manager) drives the real clock through several real-time-dependent ticks, draining more wage/upkeep cash than command mode's precise scripted tick count -- a real, verified cross-mode divergence (same class as the tick-1 step above), not a fixed offset safe to hardcode. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "employeeCount": 3
+        },
+        "decreased": [
+          "cash"
+        ],
+        "tutorialStep": "contract-accept"
+      }
     },
     {
       "command": "employee assign_skill 3 skill:management level:3",
       "timeout": 15,
-      "description": "Assign management skill to manager",
+      "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above.",
       "interaction": [
         {
           "type": "command",
@@ -264,29 +562,62 @@
     {
       "command": "contract accept 1",
       "timeout": 15,
-      "description": "Step 11 complete: accept first contract → overlay advances to step 12 (hire-driver)",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 1"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "hire-driver"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "contract-accept complete: Accept clicked on the first offer in the Contracts panel. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1
+        },
+        "tutorialStep": "hire-driver"
+      }
     },
     {
       "command": "employee hire role:driver",
       "timeout": 15,
-      "description": "Step 12 complete: hire driver → overlay advances to step 13 (vehicle-buy-assign)",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "vehicle-buy-assign"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "hire-driver complete: Crew panel opened, Hire clicked. cash not pinned exactly, same reason as hire-manager above (downstream of the blast step's real-time-dependent wait). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "employeeCount": 4
+        },
+        "decreased": [
+          "cash"
+        ],
+        "tutorialStep": "vehicle-buy-assign"
+      }
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
       "timeout": 15,
-      "description": "Assign driving.truck skill to driver",
+      "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above; kept for command mode, which needs it for the explicit `vehicle driver 1 4` below to succeed identically.",
       "interaction": [
         {
           "type": "command",
@@ -297,123 +628,269 @@
     {
       "command": "vehicle buy debris_hauler",
       "timeout": 15,
-      "description": "Step 13: buy debris_hauler vehicle → overlay auto-executes buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface. cash not pinned exactly, same reason as hire-manager above (downstream of the blast step's real-time-dependent wait).",
+      "expect": {
+        "equals": {
+          "vehicleCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
       "command": "vehicle driver 1 4",
-      "timeout": 15,
-      "description": "Step 13 complete: assign driver (ID 4) to vehicle (ID 1) → overlay advances to step 14 (build-storage)",
+      "timeout": 30,
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 1 4"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "build-storage",
+          "timeout": 60000
         }
-      ]
+      ],
+      "role": "player",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "tutorialStep": "build-storage"
+      }
     },
     {
-      "command": "build freight_warehouse at:12,8",
-      "timeout": 15,
-      "description": "Step 14 complete: build freight warehouse → overlay advances to step 15 (contract-deliver)",
+      "command": "build freight_warehouse at:6,6",
+      "timeout": 30,
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:12,8"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 6,
+          "z": 6
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "haul-debris"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Site corrected from the file's original 12,8 to 6,6 (same class as the survey/drill fixes above): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,6) (tutorialStages.ts). cash not pinned exactly, same reason as hire-manager above (downstream of the blast step's real-time-dependent wait). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        },
+        "decreased": [
+          "cash"
+        ],
+        "tutorialStep": "haul-debris"
+      }
+    },
+    {
+      "command": "vehicle haul 1 fragment:1",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn",
+          "timeout": 30000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "contract-deliver",
+          "timeout": 60000
+        }
+      ],
+      "role": "player",
+      "description": "NEW step (Finding #74/#75 follow-up), same gap class as box-cut: this file never drove the tutorial's own haul-debris stage -- with the rail active, the Contracts panel's Deliver button downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven haul-debris step: the Vehicles panel's Haul button sends the hauler to a reachable fragment, and waitForTutorialStep drives the real clock for the trip. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "tutorialStep": "contract-deliver"
+      }
     },
     {
       "command": "contract deliver 1 amount:5000",
       "timeout": 30,
-      "description": "Step 15 complete: deliver first contract → overlay advances to step 16 (finances)",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract deliver 1 amount:5000"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver",
+          "timeout": 30000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-deliver"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": [
+            "finances",
+            "needs",
+            "set-policy"
+          ],
+          "timeout": 60000
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Outcome changed from the file's original premise (Finding #74/#75 follow-up): with the newly-inserted haul-debris step actually delivering material to storage for real, Deliver now genuinely succeeds -- unlike the old command-mode-only version, which never drove a real `vehicle haul` at all and documented the resulting \"0.0 kg available\" failure as its point. Same divergence tutorial-interactive.json already documents for the identical reason (command mode's `vehicle haul` dispatches but never waits for real arrival/unload, so command mode and interaction mode read genuinely different outcomes here). Not asserted with an exact equals here, matching tutorial-interactive.json's own contract-deliver step: the waitForTutorialStep gate above is itself the proof of completion (the tutorial's own isComplete requires completedHistory to grow), and the exact delivered tonnage is position/timing-dependent, the same reasoning hauling-gate.json documents (Finding #33)."
     },
     {
       "command": "finances",
       "timeout": 15,
-      "description": "Step 16: view finances overlay → auto-advances after 2s to step 17 (build-ramp). Screenshot captures balance + contract earnings",
       "interaction": [
         {
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build_ramp start:10,15 end:10,25",
       "timeout": 15,
-      "description": "Step 17 complete: build ramp on navGrid → overlay advances to step 18 (needs)",
       "interaction": [
         {
           "type": "command",
           "command": "build_ramp start:10,15 end:10,25"
         }
-      ]
+      ],
+      "description": "Left unmarked: this ramp is not one of the 23 canonical tutorial stages (tutorialSteps.ts has exactly one box-cut stage, already driven for real above) -- with the tutorial rail now active and pointed at set-policy/tick-advance for the rest of the file, the Build panel's ramp tool is off-target and inert to a real click here. No UI path reaches this specific action while the tutorial is running; left as a command rather than a click that would silently no-op."
     },
     {
       "command": "needs",
       "timeout": 15,
-      "description": "Step 18: view employee needs → auto-advances after 2s to step 19 (set-policy)",
       "interaction": [
         {
           "type": "command",
           "command": "needs"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 15,
-      "description": "Step 19 complete: set shift policy → overlay advances to step 20 (tick-advance)",
       "interaction": [
         {
-          "type": "command",
-          "command": "set_policy mode:shift_8h"
+          "type": "waitForTutorialStep",
+          "stepId": "set-policy",
+          "timeout": 30000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "tick-advance"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "set-policy complete: Apply pressed in the Operations panel -- the form mirrors the policy already in force, and applying it unchanged still counts. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "expect": {
+        "tutorialStep": "tick-advance"
+      }
     },
     {
       "command": "tick 6",
       "timeout": 30,
-      "description": "Step 20 complete: advance 6 ticks (tickCount > prev + 5) → overlay advances to step 21 (victory)",
       "interaction": [
         {
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "campaign complete",
       "timeout": 15,
-      "description": "Step 21 complete: force level completion (levelEnded=true) → overlay advances to step 22 (congratulations)",
       "interaction": [
         {
           "type": "command",
           "command": "campaign complete"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action -- `campaign` is on the reused setup allowlist.",
+      "expect": {
+        "equals": {
+          "levelEnded": true,
+          "levelEndReason": "completed"
+        },
+        "increased": [
+          "cash"
+        ],
+        "note": "campaign complete is a debug force-complete hook (console-only), grants a completion bonus"
+      }
     },
     {
       "command": "tick 1",
       "timeout": 15,
-      "description": "Step 22: congratulations displayed → overlay auto-dismisses after 4s. Final state: isPaused=false, bs_tutorial_done set",
       "interaction": [
         {
           "type": "command",
           "command": "tick 1"
         }
-      ]
+      ],
+      "role": "setup"
     }
   ]
 }

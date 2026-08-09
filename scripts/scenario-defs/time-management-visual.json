@@ -1,6 +1,6 @@
 {
   "name": "time-management-visual",
-  "description": "Visual verification of time management controls: speed buttons (1x, 2x, 4x, 8x), pause/resume toggle, current speed indicator in HUD, tick count display, and auto-pause behavior during events.",
+  "description": "Visual verification of time management controls: speed buttons (1x, 2x, 4x, 8x), pause/resume toggle, current speed indicator in HUD, tick count display, and auto-pause behavior during events. Originally console-only despite its own description promising real button clicks (issue #479 follow-up) -- pause/resume and every speed change now go through the real HUD controls.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,16 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "isPaused": false,
+          "timeScale": 1,
+          "tickCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +28,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time status",
@@ -28,16 +43,30 @@
           "type": "command",
           "command": "time status"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "isPaused": false,
+          "timeScale": 1
+        }
+      }
     },
     {
       "command": "time pause",
+      "description": "The pause/resume control is a single toggle button (TopBar.ts) with no separate pause vs. resume element -- one click alternates it, matching togglePause()'s own `isPaused ? 'time resume' : 'time pause'` logic.",
       "interaction": [
         {
-          "type": "command",
-          "command": "time pause"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top [data-action=\"pause-toggle\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "isPaused": true
+        }
+      }
     },
     {
       "command": "time status",
@@ -46,25 +75,44 @@
           "type": "command",
           "command": "time status"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "isPaused": true
+        }
+      }
     },
     {
       "command": "time resume",
+      "description": "Same toggle button as the pause step above -- clicking it again alternates back.",
       "interaction": [
         {
-          "type": "command",
-          "command": "time resume"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top [data-action=\"pause-toggle\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "isPaused": false
+        }
+      }
     },
     {
       "command": "time speed 2",
       "interaction": [
         {
-          "type": "command",
-          "command": "time speed 2"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"2\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "timeScale": 2
+        }
+      }
     },
     {
       "command": "time status",
@@ -73,7 +121,13 @@
           "type": "command",
           "command": "time status"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "timeScale": 2
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -82,25 +136,38 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 5
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "time speed 4",
       "interaction": [
         {
-          "type": "command",
-          "command": "time speed 4"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"4\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "timeScale": 4
+        }
+      }
     },
     {
       "command": "time status",
@@ -109,7 +176,13 @@
           "type": "command",
           "command": "time status"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "timeScale": 4
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -118,25 +191,38 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 10
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "time speed 8",
       "interaction": [
         {
-          "type": "command",
-          "command": "time speed 8"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "timeScale": 8
+        }
+      }
     },
     {
       "command": "time status",
@@ -145,7 +231,13 @@
           "type": "command",
           "command": "time status"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "timeScale": 8
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -154,25 +246,38 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 15
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "time speed 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "time speed 1"
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "timeScale": 1
+        }
+      }
     },
     {
       "command": "time status",
@@ -181,7 +286,13 @@
           "type": "command",
           "command": "time status"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "timeScale": 1
+        }
+      }
     },
     {
       "command": "state full",
@@ -190,7 +301,15 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 15,
+          "timeScale": 1,
+          "isPaused": false
+        }
+      }
     }
   ],
   "shots": [

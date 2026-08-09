@@ -1,6 +1,6 @@
 {
   "name": "event-dialog-visual",
-  "description": "Visual verification of the event dialog system: event categories (Unions, Politics, Weather, Mafia, Lawsuits), dialog with title/description/options, consequence display, and state updates after resolution.",
+  "description": "Visual verification of the event dialog system: event categories (Unions, Politics, Weather, Mafia, Lawsuits), dialog with title/description/options, consequence display, and state updates after resolution. Every event raised by an explicit `event fire` is now answered and dismissed by clicking the dialog's own buttons (issue #479); `event fire` itself stays a command because it is a test hook with no player-facing equivalent.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,13 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +25,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -28,7 +40,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event status",
@@ -37,7 +50,8 @@
           "type": "command",
           "command": "event status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "event fire union_coffee_uprising",
@@ -46,16 +60,42 @@
           "type": "command",
           "command": "event fire union_coffee_uprising"
         }
-      ]
+      ],
+      "description": "event fire union_coffee_uprising — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42000
+        },
+        "increased": [
+          "wellBeing"
+        ],
+        "note": "real click resolves union_coffee_uprising option 0 -- Lost $8000, wellBeing +12, matching the command-mode consequence text exactly"
+      }
     },
     {
       "command": "tick 8",
@@ -64,16 +104,23 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 42000
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "event fire tutorial_synergy_consultant",
@@ -82,20 +129,47 @@
           "type": "command",
           "command": "event fire tutorial_synergy_consultant"
         }
-      ]
+      ],
+      "description": "event fire tutorial_synergy_consultant — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
     },
     {
       "command": "event choose 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 1"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(2)"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choices .bs-event-choice:nth-child(2)"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42000
+        },
+        "decreased": [
+          "wellBeing",
+          "safety"
+        ],
+        "note": "real click on the 2nd option (nth-child(2), index 1) resolves tutorial_synergy_consultant's 'Get off my site' -- no cash cost, wellBeing -10/safety -5, confirming the dialog's 2nd-choice selector reaches the same option `event choose 1` names"
+      }
     },
     {
       "command": "event fire mafia_protection_racket",
-      "description": "Mafia category: 'consulting fee' protection racket, 3 options — dialog must render the mafia-specific tone/consequences",
+      "description": "Mafia category: 'consulting fee' protection racket, 3 options — dialog must render the mafia-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -107,14 +181,39 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 37000
+        },
+        "increased": [
+          "safety"
+        ],
+        "note": "mafia_protection_racket option 0 -- Lost $5000, safety +4 (also Corruption +5, not exposed via serializeGameState so not assertable here)"
+      }
     },
     {
       "command": "event fire lawsuit_wrongful_death",
-      "description": "Lawsuit category: wrongful death suit, 3 options — dialog must render the lawsuit-specific tone/consequences",
+      "description": "Lawsuit category: wrongful death suit, 3 options — dialog must render the lawsuit-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -126,14 +225,39 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": -163000
+        },
+        "increased": [
+          "safety"
+        ],
+        "note": "lawsuit_wrongful_death option 0 -- Lost $200000, safety +5; drives cash sharply negative (finances.isBankrupt flips true) but the separate bankruptcy-consequence tracker (ticksBelowThreshold) hasn't crossed its grace threshold yet, so levelEnded stays false"
+      }
     },
     {
       "command": "event fire politics_explosive_embargo",
-      "description": "Politics category: explosive embargo, 3 options — dialog must render the politics-specific tone/consequences",
+      "description": "Politics category: explosive embargo, 3 options — dialog must render the politics-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -145,14 +269,39 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": -203000
+        },
+        "increased": [
+          "ecology"
+        ],
+        "note": "politics_explosive_embargo option 0 -- Lost $40000, ecology +3"
+      }
     },
     {
       "command": "event fire weather_pit_flood",
-      "description": "Weather category: pit flood, 3 options — dialog must render the weather-specific tone/consequences",
+      "description": "Weather category: pit flood, 3 options — dialog must render the weather-specific tone/consequences — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
       "interaction": [
         {
           "type": "command",
@@ -164,10 +313,36 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-choice"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-event-dialog .bs-event-dismiss"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": -223000
+        },
+        "increased": [
+          "ecology",
+          "safety"
+        ],
+        "note": "weather_pit_flood option 0 -- Lost $20000, ecology +8, safety +5"
+      }
     },
     {
       "command": "tick 8",
@@ -176,16 +351,23 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -223000
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "event status",
@@ -194,7 +376,8 @@
           "type": "command",
           "command": "event status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 8",
@@ -203,16 +386,23 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": -223000
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -221,7 +411,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -230,7 +421,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -239,7 +431,15 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": -223000,
+          "activeContractCount": 0
+        },
+        "note": "this file never accepts a contract -- activeContractCount stays 0 throughout, only event consequences move any state"
+      }
     }
   ],
   "shots": [

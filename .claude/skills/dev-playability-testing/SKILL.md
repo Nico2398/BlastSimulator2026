@@ -7,6 +7,8 @@ description: >
   be performed", or before reporting a gameplay feature done.
 ---
 
+**2026-08-09 — mid-consolidation, tracked by issue #515.** This skill is scheduled for retirement once the scenario suite's click-only enforcement is total (`docs/plans/scenario-assertions-and-playtest-removal.md`, Phase 3); its still-true content folds into `dev-visual-testing`/`dev-testing-strategy`. Until then, everything below describes real, current, required procedure. When a `role: 'player'` scenario step with `expect` would prove the same thing as a new playtest beat, add the scenario step, not the beat.
+
 ## Why This Channel Exists
 
 The game is driven from two places. `src/console/` accepts commands; the UI offers buttons. **The console is a superset of the UI**, and that gap is where dead ends live.

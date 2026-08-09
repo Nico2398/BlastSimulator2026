@@ -9,7 +9,14 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +25,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "worldSizeX"
+        ]
+      }
     },
     {
       "command": "time resume",
@@ -27,16 +40,32 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 48800
+        }
+      }
     },
     {
       "command": "employee assign_skill 1 skill:geology level:5",
@@ -45,7 +74,13 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:geology level:5"
         }
-      ]
+      ],
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for the scenario's needs. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 5
+        }
+      }
     },
     {
       "command": "employee list",
@@ -54,7 +89,8 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -63,16 +99,52 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey seismic x:20 z:20",
+      "description": "Method 1/3: seismic.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey seismic x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0
+        },
+        "note": "surveys are arrival-gated (#437) — queued and paid for, not yet completed"
+      }
     },
     {
       "command": "state full",
@@ -81,7 +153,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 23",
@@ -90,16 +163,18 @@
           "type": "command",
           "command": "tick 23"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -108,16 +183,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -126,16 +203,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -144,16 +223,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -162,7 +243,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        },
+        "note": "exact equals is safe here (ground rule #14) -- natural ceiling for surveys queued so far"
+      }
     },
     {
       "command": "state full",
@@ -171,16 +259,44 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey core_sample x:20 z:20",
+      "description": "Method 2/3: core_sample.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey core_sample x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
       "command": "state full",
@@ -189,7 +305,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 23",
@@ -198,16 +315,18 @@
           "type": "command",
           "command": "tick 23"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -216,16 +335,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -234,16 +355,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -252,16 +375,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -270,7 +395,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 2
+        },
+        "note": "exact equals is safe here (ground rule #14) -- natural ceiling for surveys queued so far"
+      }
     },
     {
       "command": "state full",
@@ -279,16 +411,44 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "survey aerial x:20 z:20",
+      "description": "Method 3/3: aerial.",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey aerial x:20 z:20"
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"aerial\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
       "command": "state full",
@@ -297,7 +457,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 23",
@@ -306,16 +467,18 @@
           "type": "command",
           "command": "tick 23"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -324,16 +487,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -342,16 +507,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -360,16 +527,18 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "survey show",
@@ -378,7 +547,14 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 3
+        },
+        "note": "exact equals is safe here (ground rule #14) -- natural ceiling for surveys queued so far"
+      }
     },
     {
       "command": "state full",
@@ -387,7 +563,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

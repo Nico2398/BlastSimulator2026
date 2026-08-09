@@ -1,6 +1,6 @@
 {
   "name": "contract-negotiation",
-  "description": "Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes",
+  "description": "Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes -- the file's original version never called `contract negotiate` at all, only accept/deliver; rewritten to exercise the actual negotiation mechanic (issue #479 follow-up).",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -9,7 +9,14 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +25,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -27,7 +40,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "contract list",
@@ -36,16 +50,86 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract negotiate id:1",
+      "description": "First negotiation attempt (round 1). No state field exists for a contract's own terms (price/deadline/penalty) -- there is nothing to negotiate over but the contracts a fresh dusty_hollow start already offers, so the target id is fixed at 1 throughout this file rather than reading it back from `contract list`'s text output, which expect can't do.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "negotiating costs nothing and moves no count -- the only real effect is on the contract's own terms, which no state field exposes. Confirmed via direct trace (seed:42, dusty_hollow): this first attempt genuinely FAILS (deadline worsened by 11%)."
+      }
+    },
+    {
+      "command": "tick 5",
+      "description": "A tick between negotiation attempts, not just a pause -- contract negotiate's RNG is freshly seeded from state.seed + state.tickCount each call (economy.ts), so two negotiate calls at the same tick roll identically. This is what lets round 2 below land a genuinely different outcome.",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 1"
+          "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
+    },
+    {
+      "command": "contract negotiate id:1",
+      "description": "Second negotiation attempt (round 2) on the same still-available contract -- this is the file's own premise made real: repeated negotiation produces both outcomes.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-action=\"negotiate\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        },
+        "note": "confirmed via direct trace: this second attempt genuinely SUCCEEDS (deadline improved by 8%) -- opposite of round 1, proving the file's own claim (\"observe both improved and worsened pricing outcomes\") for real rather than asserting it never happened."
+      }
+    },
+    {
+      "command": "contract accept id:1",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -54,7 +138,14 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
+        }
+      }
     },
     {
       "command": "contract deliver 1 amount:50",
@@ -63,7 +154,17 @@
           "type": "command",
           "command": "contract deliver 1 amount:50"
         }
-      ]
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of dirtite in storage against a 320 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:50` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
+        },
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel .bs-contract-deliver",
+        "note": "the contract stays active/undelivered -- this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline"
+      }
     },
     {
       "command": "finances",
@@ -72,7 +173,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -81,79 +183,14 @@
           "type": "command",
           "command": "state full"
         }
-      ]
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 1
         }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ]
-    },
-    {
-      "command": "contract list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract list"
-        }
-      ]
-    },
-    {
-      "command": "contract accept 1",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract accept 1"
-        }
-      ]
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ]
-    },
-    {
-      "command": "contract deliver 1 amount:50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver 1 amount:50"
-        }
-      ]
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
-        }
-      ]
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ]
+      }
     }
   ]
 }

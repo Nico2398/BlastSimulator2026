@@ -10,16 +10,65 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20",
+      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:20,20",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (20,20)-(35,30) rectangle computes the declared 4x3 instead of the default-spacing 6x4 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:8 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 35,
+          "z2": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 12
+        },
+        "note": "3 rows x 4 cols = 12"
+      }
     },
     {
       "command": "drill_plan show",
@@ -28,7 +77,8 @@
           "type": "command",
           "command": "drill_plan show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -37,61 +87,237 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 12
+        }
+      }
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:H1 explosive:boomite amount:8 stemming:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
-      ]
+      ],
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 12
+        },
+        "note": "count is unchanged — every hole was already charged by Charge All; this step overrides H1 alone"
+      }
     },
     {
       "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:H2 explosive:boomite amount:3 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"charge-hole\"]"
         }
-      ]
+      ],
+      "description": "The opposite override on the neighbouring hole: 5 amount decrements (8 -> 3kg) and 10 stemming decrements (3.0 -> 1.0m) off what the H1 row left behind, then H2's own commit button.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 12
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 12
+        }
+      }
     },
     {
       "command": "sequence set hole:H1 delay:0",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H1 delay:0"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
         }
-      ]
+      ],
+      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. Auto Sequence left H1 at 50ms with a 25ms step (traced: step-08-sequence.json), so 2 decrements land exactly on the declared 0 (50 -> 25 -> 0); a third would be a no-op, since adjustHoleDelay floors the result at 0.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 12
+        },
+        "note": "H1 50ms -> 25 -> 0; no hole gains or loses a delay, only H1's value changes"
+      }
     },
     {
       "command": "sequence set hole:H6 delay:100",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H6 delay:100"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H6\"] [data-action=\"delay-inc\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H6\"] [data-action=\"delay-dec\"]"
         }
-      ]
+      ],
+      "description": "Auto Sequence already put H6 on exactly this step's declared 100ms (traced: step-08-sequence.json), so the arithmetic here is a net zero — one increment and one decrement (100 -> 125 -> 100) is the honest click expression of it, and it still exercises both stepper directions on a row other than H1. Command mode's version of this step was likewise a no-op: the step-08 and step-09 dumps are byte-identical.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 12
+        },
+        "note": "H6 ends on 100ms, the same value it started this step with"
+      }
     },
     {
       "command": "sequence show",
@@ -100,25 +326,41 @@
           "type": "command",
           "command": "sequence show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "blast_preview",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast_preview"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "buy_software tier:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"1\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49500
+        }
+      }
     },
     {
       "command": "preview energy",
@@ -127,16 +369,27 @@
           "type": "command",
           "command": "preview energy"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "buy_software tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"2\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47500
+        }
+      }
     },
     {
       "command": "preview fragments",
@@ -145,16 +398,27 @@
           "type": "command",
           "command": "preview fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "buy_software tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"3\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 42500
+        }
+      }
     },
     {
       "command": "preview projections",
@@ -163,16 +427,27 @@
           "type": "command",
           "command": "preview projections"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "buy_software tier:4",
       "interaction": [
         {
-          "type": "command",
-          "command": "buy_software tier:4"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-tier=\"4\"] [data-action=\"buy-tier\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 30500
+        }
+      }
     },
     {
       "command": "preview vibrations",
@@ -181,16 +456,22 @@
           "type": "command",
           "command": "preview vibrations"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "blast_preview",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast_preview"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "blast",
@@ -199,10 +480,39 @@
       "interval": 50,
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero"
+      }
     },
     {
       "command": "fragments",
@@ -211,7 +521,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "inspect 20,20,0",
@@ -220,7 +531,8 @@
           "type": "command",
           "command": "inspect 20,20,0"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -229,7 +541,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -238,7 +551,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -247,7 +561,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -256,7 +571,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

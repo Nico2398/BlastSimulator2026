@@ -10,61 +10,175 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15",
+      "description": "Two increment clicks on the spacing stepper (data-field=\"spacing\") raise it 3->5m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (15,15)-(25,25) rectangle computes the declared 3x3 instead of the default-spacing 4x4 (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 25,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        },
+        "note": "3 rows x 3 cols = 9"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:50",
+      "description": "Real bug found converting this step: role:player + clicking auto-sequence directly looked converted, but with no stepper clicks first the panel's dstepMs stays at its 25ms default -- sequencedCount alone can't catch a wrong delay value, since Auto Sequence assigns every hole a delay regardless of what it is. Sequence's delay-step stepper now carries data-field=\"delay-step\" (Sequence.ts) so a click can target it unambiguously. 5 increment clicks: 25ms default -> 50 (DELAY_STEP_INCREMENT=5ms).",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:50"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "sequence set hole:H1 delay:0",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H1 delay:0"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"delay-dec\"]"
         }
-      ]
+      ],
+      "description": "Per-hole delay is a relative +/- stepper ([data-hole=\"<id>\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), stepping by the panel's current delay-step value and clamping at 0. Reaching an exact target is therefore arithmetic on the delay Auto Sequence actually assigned, read out of a real command-mode trace (screenshots/scenario-<name>-command/step-NN-sequence.json's sequenceDelays) rather than computed by re-deriving autoVPattern. This file drove the delay step to 50ms before Auto Sequence, and Auto Sequence left H1 at 50ms (traced: step-03-sequence.json), so one decrement lands exactly on the declared 0.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        },
+        "note": "H1 50ms -> 0 at a 50ms step"
+      }
     },
     {
       "command": "sequence set hole:H5 delay:200",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H5 delay:200"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H5\"] [data-action=\"delay-inc\"]"
         }
-      ]
+      ],
+      "description": "H5 came out of Auto Sequence on 150ms (traced: step-03-sequence.json); one increment at the 50ms step reaches the declared 200.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        },
+        "note": "H5 150ms -> 200"
+      }
     },
     {
       "command": "sequence set hole:H9 delay:500",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence set hole:H9 delay:500"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H9\"] [data-action=\"delay-inc\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H9\"] [data-action=\"delay-inc\"]"
         }
-      ]
+      ],
+      "description": "H9 is Auto Sequence's last hole at 400ms (traced: step-03-sequence.json); 2 increments at the 50ms step reach the declared 500.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        },
+        "note": "H9 400ms -> 450 -> 500"
+      }
     },
     {
       "command": "sequence show",
@@ -73,7 +187,8 @@
           "type": "command",
           "command": "sequence show"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

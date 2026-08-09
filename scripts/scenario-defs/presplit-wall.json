@@ -9,97 +9,536 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
-    },
-    {
-      "command": "drill_plan grid rows:1 cols:5 spacing:3 depth:10 start:10,20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "drill_plan grid rows:1 cols:5 spacing:3 depth:10 start:10,20"
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
         }
-      ]
+      }
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:12 start:20,20",
+      "description": "Production grid drilled first (Finding #8: drill_plan grid replaces the whole plan and resets hole ids to H1 — see finding log — so the production grid must land before anything else, not after). The spacing stepper defaults to 3m (DEFAULT_SPACING_M) and depth to 6m (DEFAULT_DEPTH_M, Drill.ts); two increment clicks on spacing (3->5) and six on depth (6->12) before dragging the (20,20)-(30,30) rectangle (10x10) so it computes the declared 3x3 instead of the default-spacing 3x3-at-wrong-depth (issue #479 follow-up, Finding #4).",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:12 start:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 20,
+          "x2": 30,
+          "z2": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 9
+        },
+        "note": "3 rows x 3 cols = 9 — the presplit row is added next, appended without wiping this grid (drill_plan add, unlike drill_plan grid)"
+      }
     },
     {
-      "command": "charge hole:1 explosive:presplit amount:2 stemming:3",
+      "command": "drill_plan add x:10 z:20 depth:10",
+      "description": "First presplit-row hole: the add-hole tool (data-action=\"add-hole-tool\", Drill.ts) — a real UI control distinct from the rect grid tool, point-shaped placement. Its depth stepper shares Drill.ts's single gridDepth field with the grid tool above, still sitting at 12m from the production grid; two decrement clicks bring it to the presplit row's declared 10m before placing this and every hole after it (the field persists across arm/disarm, Finding #4's class again).",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:1 explosive:presplit amount:2 stemming:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 10
+        }
+      }
     },
     {
-      "command": "charge hole:2 explosive:presplit amount:2 stemming:3",
+      "command": "drill_plan add x:13 z:20 depth:10",
+      "description": "Second presplit-row hole.",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:2 explosive:presplit amount:2 stemming:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 13,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 11
+        }
+      }
     },
     {
-      "command": "charge hole:3 explosive:presplit amount:2 stemming:3",
+      "command": "drill_plan add x:16 z:20 depth:10",
+      "description": "Third presplit-row hole.",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:3 explosive:presplit amount:2 stemming:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 16,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 12
+        }
+      }
     },
     {
-      "command": "charge hole:4 explosive:presplit amount:2 stemming:3",
+      "command": "drill_plan add x:19 z:20 depth:10",
+      "description": "Fourth presplit-row hole.",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:4 explosive:presplit amount:2 stemming:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 19,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 13
+        }
+      }
     },
     {
-      "command": "charge hole:5 explosive:presplit amount:2 stemming:3",
+      "command": "drill_plan add x:22 z:20 depth:10",
+      "description": "Fifth and last presplit-row hole — the full presplit line now runs (10,20)-(22,20), parallel to and clear of the production grid at (20,20)-(30,30).",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:5 explosive:presplit amount:2 stemming:3"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 22,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 14
+        },
+        "note": "9 production + 5 presplit = 14"
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 14
+        },
+        "note": "Charge All reaches every hole that exists by this point — all 14, production and presplit alike, with boomite. The presplit row's real explosive is applied next, one hole at a time, overwriting these 5 with pop_rock — chargedCount stays 14 throughout, only the per-hole explosiveId changes"
+      }
+    },
+    {
+      "command": "charge hole:H10 explosive:pop_rock amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H10\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The presplit line is exactly the case per-hole charging exists for: five holes that must carry a different product from the 9 production holes Charge All just loaded. Clicking the pop_rock product card also clamps the amount stepper into pop_rock's own [0.5, 3]kg range (ChargeStep.clampAmount), taking it 5 -> 3kg; 1 further decrement reaches the declared 2kg, and 5 stemming increments take 2.0 -> 3.0m. The Charge All step above pinned the panel to [data-step=\"2\"], so the Per Hole rows stay visible for all five. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed. Finding #7 class: the file previously charged bare-numeric hole:1..hole:5 with a fictional explosive:presplit id that does not exist in ExplosiveCatalog.ts (8 real products, none named presplit) — every charge silently failed on BOTH counts and chargedCount for these holes stayed 0 through this file's entire history. Fixed by using the real hole id (H10, drill_plan add's own numbering, continuing from the production grid's H1-H9) and pop_rock — the catalog's lowest-energy, lowest-projection-risk, lowest-vibration product, the real product that matches a presplit line's job.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 14
+        },
+        "note": "chargedCount does not move — Charge All had already loaded all 14 holes with boomite; what changes here is H10's explosiveId/amount/stemming"
+      }
+    },
+    {
+      "command": "charge hole:H11 explosive:pop_rock amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H11\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "description": "Same product and same stepper values as H10 — a player selects the product once and walks the presplit rows, so this step is one click on H11's own [data-action=\"charge-hole\"], with the panel state asserted first.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 14
+        }
+      }
+    },
+    {
+      "command": "charge hole:H12 explosive:pop_rock amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H12\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "description": "Same product and same stepper values as the row before it — a player selects the product once and walks the presplit rows, so this step is one click on H12's own [data-action=\"charge-hole\"], with the panel state asserted first.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 14
+        }
+      }
+    },
+    {
+      "command": "charge hole:H13 explosive:pop_rock amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H13\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "description": "Same product and same stepper values as the row before it — a player selects the product once and walks the presplit rows, so this step is one click on H13's own [data-action=\"charge-hole\"], with the panel state asserted first.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 14
+        }
+      }
+    },
+    {
+      "command": "charge hole:H14 explosive:pop_rock amount:2 stemming:3",
+      "interaction": [
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H14\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "description": "Same product and same stepper values as the row before it — a player selects the product once and walks the presplit rows, so this step is one click on H14's own [data-action=\"charge-hole\"], with the panel state asserted first.",
+      "expect": {
+        "equals": {
+          "chargedCount": 14
+        },
+        "note": "all 5 presplit holes now carry pop_rock alongside the 9 production holes' boomite"
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 14
+        }
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "note": "a fired blast clears the plan back to zero — all 14 holes (both explosives) detonate together in one plan, proving the presplit row and production grid actually coexist now (Finding #8), unlike every previous run of this file"
+      }
     },
     {
       "command": "fragments",
@@ -108,7 +547,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -117,7 +557,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

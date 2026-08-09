@@ -10,6 +10,7 @@ import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPla
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
+import { addExpense } from '../../core/economy/Finance.js';
 import { processProjections } from '../../core/entities/Damage.js';
 import { killEmployee } from '../../core/entities/Employee.js';
 import { destroyVehicle } from '../../core/entities/Vehicle.js';
@@ -31,6 +32,7 @@ import {
   ALL_WEATHER_STATES,
   type WeatherState,
 } from '../../core/weather/WeatherCycle.js';
+import { wetHoles } from '../../core/mining/WetHoles.js';
 import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
@@ -273,7 +275,13 @@ export function blastCommand(
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
 
-  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings, ctx.emitter);
+  // ctx.weatherCycle may not exist yet (created lazily by the `weather`
+  // command, eagerly by main.ts on new_game/campaign start/sandbox start —
+  // see console-api.ts's `weather` field doc) — 'sunny' (not raining) is the
+  // correct fallback either way, since createWeatherCycle's own initial
+  // state is always 'sunny' regardless of seed.
+  const wetHoleIds = new Set(wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny'));
+  const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
   if (!result) return { success: false, output: 'Blast execution failed.' };
 
   // Store fragment data for renderer (localized remesh + mesh spawning)
@@ -612,6 +620,7 @@ export function buySoftwareCommand(
   const result = purchaseSoftware(currentTier, ctx.state!.cash);
   if ('error' in result) return { success: false, output: result.error };
   ctx.state!.cash -= result.cost;
+  addExpense(ctx.state!.finances, result.cost, 'equipment', `Software tier ${result.newTier}`, ctx.state!.tickCount);
   ctx.state!.softwareTier = result.newTier;
   return { success: true, output: `Upgraded to software tier ${result.newTier}. Cost: $${result.cost}` };
 }
@@ -665,6 +674,7 @@ export function buildRampCommand(
 
   if (!result.success) return { success: false, output: result.message };
   ctx.state!.cash -= result.cost;
+  addExpense(ctx.state!.finances, result.cost, 'construction', 'Build ramp', ctx.state!.tickCount);
 
   // Patch NavGrid to reflect ramp terrain changes
   if (ctx.state!.navGrid && ctx.grid) {
@@ -748,6 +758,7 @@ export function tubingCommand(
     const result = buyTubing(ctx.state!.tubingState, amount, ctx.state!.cash);
     if (!result.success) return { success: false, output: result.message };
     ctx.state!.cash -= result.cost;
+    addExpense(ctx.state!.finances, result.cost, 'equipment', `Tubing x${amount}`, ctx.state!.tickCount);
     return { success: true, output: `${result.message}. Inventory: ${ctx.state!.tubingState.inventory}` };
   }
 

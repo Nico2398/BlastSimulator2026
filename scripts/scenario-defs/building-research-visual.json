@@ -10,45 +10,118 @@
           "type": "command",
           "command": "new_game seed:42 cash:230000"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 230000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build research_center at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 205000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build research_center at:15,5 tier:2",
-      "description": "Rejected — tier 2 has not been researched yet. Demonstrates the research gate.",
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
       "interaction": [
         {
           "type": "command",
           "command": "build research_center at:15,5 tier:2"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 205000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 not yet researched"
+      }
     },
     {
       "command": "research queue type:research_center tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 200000
+        }
+      }
     },
     {
       "command": "research queue type:research_center tier:3",
       "description": "Rejected (conditions_not_met) — tier-2 research is queued but has not been processed by a tick yet, so its own tier-2 research is not yet 'completed'. Demonstrates the tier-ordering gate before the flow continues below to tick tier-2 to completion.",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "buildingCount": 1
+        },
+        "note": "rejected: tier 2 research is only queued, not yet completed"
+      }
     },
     {
       "command": "tick 50",
@@ -57,25 +130,69 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build research_center at:15,5 tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:15,5 tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "2"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "tier 2 now buildable — real unlock, not just a queued task. cash uses decreased not equals since this follows a tick step (Finding #12)"
+      }
     },
     {
       "command": "research queue type:research_center tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "research queue type:research_center tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "3"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-research-btn"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "note": "now succeeds — tier 3's condition (tier 2 research completed) is satisfied"
+      }
     },
     {
       "command": "tick 50",
@@ -84,16 +201,41 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build research_center at:25,5 tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:25,5 tier:3"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 25,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        },
+        "note": "tier 3 now buildable — full T1→T2→T3 progression completes as this file's own description promises, unlike its sibling building-research-progression-visual.json (Finding #20)"
+      }
     },
     {
       "command": "build list",
@@ -102,7 +244,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -111,7 +254,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -120,7 +264,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

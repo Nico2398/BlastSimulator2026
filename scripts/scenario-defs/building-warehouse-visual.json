@@ -10,25 +10,82 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build explosive_warehouse at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build explosive_warehouse at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 30000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build freight_warehouse at:10,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build freight_warehouse at:10,5"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 15000,
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "build explosive_warehouse at:20,5 tier:2",
@@ -37,7 +94,15 @@
           "type": "command",
           "command": "build explosive_warehouse at:20,5 tier:2"
         }
-      ]
+      ],
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "expect": {
+        "equals": {
+          "cash": 15000,
+          "buildingCount": 2
+        },
+        "note": "rejected: tier 2 not researched"
+      }
     },
     {
       "command": "build freight_warehouse at:25,5 tier:2",
@@ -46,7 +111,15 @@
           "type": "command",
           "command": "build freight_warehouse at:25,5 tier:2"
         }
-      ]
+      ],
+      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "expect": {
+        "equals": {
+          "cash": 15000,
+          "buildingCount": 2
+        },
+        "note": "rejected: tier 2 not researched"
+      }
     },
     {
       "command": "build list",
@@ -55,7 +128,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "fragments",
@@ -64,7 +138,8 @@
           "type": "command",
           "command": "fragments"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -73,7 +148,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

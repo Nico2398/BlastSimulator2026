@@ -35,7 +35,7 @@ export class BlastReportModal {
   private readonly notesEl: HTMLElement;
 
   private open = false;
-  private lastShownTick: number | null = null;
+  private lastShownReport: BlastReport | null = null;
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -89,8 +89,15 @@ export class BlastReportModal {
 
   update(state: GameState): void {
     const report = state.lastBlastReport;
-    if (!report || report.tick === this.lastShownTick) return;
-    this.lastShownTick = report.tick;
+    // Identity, not report.tick: buildBlastReport (mining.ts) is a fresh
+    // object every call, but tick is not a unique key — two blasts with no
+    // tick command between them (entirely possible; nothing forces the clock
+    // to advance between plans) fire on the same state.tickCount, and a
+    // tick-equality check silently drops the second report forever (found
+    // converting vibration-budget.json to real clicks, issue #479 — a
+    // player who fires twice in a row would never see the second one).
+    if (!report || report === this.lastShownReport) return;
+    this.lastShownReport = report;
     this.render(report, state);
     this.open = true;
     this.overlay.style.display = '';

@@ -130,6 +130,7 @@ export class WorldMap {
       style: `border-radius:9px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.45);display:flex;flex-direction:column;`
         + `background:var(--bsx-card);opacity:${unlocked ? '1' : '.62'}`,
     } });
+    card.dataset['level'] = lvl.id;
 
     // Biome header art
     const biomeHeader = el('div', { attrs: { style: `height:104px;position:relative;background:${style.gradient}` } });
@@ -189,6 +190,10 @@ export class WorldMap {
           + `font:800 11px/1 var(--bsx-font-ui);letter-spacing:.18em;`
           + `background:${completed ? 'rgba(255,176,46,.16)' : 'var(--bsx-amber)'};color:${completed ? 'var(--bsx-amber)' : 'var(--bsx-text-on-amber)'}` },
       });
+      // Every card's button is identical but for the level it starts — the
+      // pair identifies which one without an `nth-of-type` position.
+      startBtn.dataset['action'] = 'start-level';
+      startBtn.dataset['level'] = lvl.id;
       startBtn.addEventListener('click', () => this.onStartLevel?.(lvl.id));
       body.appendChild(startBtn);
     }

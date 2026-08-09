@@ -454,6 +454,23 @@ describe('BlastCalc — computeInitialEnergy', () => {
     const effective = effectiveHoleEnergy(charge, holeDepth, false, false);
     expect(effective.downward).toBe(initial);
   });
+
+  it('defaults isFlooded to false, matching a dry hole', () => {
+    const charge = makeCharge('boomite', 5, 2.4);
+    expect(computeInitialEnergy(charge, 8)).toBe(computeInitialEnergy(charge, 8, false));
+  });
+
+  it('flooded + water-sensitive explosive drops to 10% energy (waterEffect)', () => {
+    // boomite is waterSensitive:true. 340 * 5 * 1.0 * 0.1 = 170
+    const charge = makeCharge('boomite', 5, 2.4);
+    expect(computeInitialEnergy(charge, 8, true)).toBe(170);
+  });
+
+  it('flooded + water-resistant explosive is unaffected', () => {
+    // krackle is waterSensitive:false. 400 * 5 * 1.0 = 2000, same flooded or dry.
+    const charge = makeCharge('krackle', 5, 2.4);
+    expect(computeInitialEnergy(charge, 8, true)).toBe(computeInitialEnergy(charge, 8, false));
+  });
 });
 
 

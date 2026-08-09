@@ -1,6 +1,6 @@
 {
   "name": "contract-panel-visual",
-  "description": "Visual verification of the contract panel UI: available contracts list with material type, quantity, unit price, deadline and penalties; active contracts with progress; completed contract history; accept/reject/negotiate buttons.",
+  "description": "Visual verification of the contract panel UI: available contracts list with material type, quantity, unit price, deadline and penalties; active contracts with progress; completed contract history; accept/reject/negotiate buttons. Accept, the delivery amount and Deliver are all driven through the Contracts panel's own controls (issue #479); only the clock, world setup and the read-only list/status steps remain console commands The Contracts panel is opened once and left open: the tool rail TOGGLES a panel, so re-clicking its entry would close the panel the next step needs.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,7 +10,14 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 0
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -19,7 +26,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -28,7 +41,8 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "contract list",
@@ -41,16 +55,29 @@
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"contracts\"]"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract accept 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 1"
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 1,
+          "cash": 50000
+        },
+        "note": "real click on the Contracts panel's first available row -- contract #1 (Supply dirtite) is genuinely first in both the console list and the panel, matching `contract accept 1`'s explicit id; no Finding #55-class mismatch here"
+      }
     },
     {
       "command": "contract status",
@@ -59,7 +86,8 @@
           "type": "command",
           "command": "contract status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -68,16 +96,23 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -86,16 +121,23 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "contract list",
@@ -104,16 +146,29 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "contract accept 2",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept 2"
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "activeContractCount": 2,
+          "cash": 50000
+        },
+        "note": "2nd real click on the same unqualified .bs-contract-accept selector -- with contract #1 already moved to active, the panel's first available row is now #2 (Dispose of rubble), matching `contract accept 2`'s explicit id; verified via a real interaction-mode run rather than assumed from panel-ordering logic"
+      }
     },
     {
       "command": "contract status",
@@ -122,7 +177,8 @@
           "type": "command",
           "command": "contract status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "tick 10",
@@ -131,16 +187,23 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "contract deliver 2 amount:300",
@@ -149,7 +212,17 @@
           "type": "command",
           "command": "contract deliver 2 amount:300"
         }
-      ]
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows both active cards at 0.0 kg stored (dirtite #1, rubble #2) -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 2 amount:300` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 2,
+          "cash": 50000
+        },
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel .bs-contract-deliver",
+        "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
+      }
     },
     {
       "command": "contract status",
@@ -158,7 +231,8 @@
           "type": "command",
           "command": "contract status"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -167,7 +241,13 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "state full",
@@ -176,7 +256,14 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "activeContractCount": 2
+        }
+      }
     }
   ],
   "shots": [

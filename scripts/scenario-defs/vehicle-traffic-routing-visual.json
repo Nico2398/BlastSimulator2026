@@ -1,6 +1,6 @@
 {
   "name": "vehicle-traffic-routing-visual",
-  "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert",
+  "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert. Confirmed via direct engine trace (Finding #22) that the traffic_jam event genuinely fires at tick 25 once the tick budget was corrected — see the tick 26 step for detail.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -10,88 +10,205 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "description": "Plain new_game at the sandbox default. The `cash:150000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash.",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "vehicleCount": 0
+        }
+      }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:150000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:150000"
         }
-      ]
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee hire role:driver"
-        }
-      ]
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee hire role:driver"
-        }
-      ]
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee hire role:driver"
-        }
-      ]
+      ],
+      "role": "setup",
+      "description": "campaign start replaces the whole GameState (createGameForLevel), cash included, so `cash:` belongs here and nowhere earlier. $150,000 covers 4 drivers ($800 each) plus 4 tier-1 debris haulers ($25,000 each) = $103,200 — and all 4 haulers converging on one tile is precisely what makes this scenario's jam fire, so underfunding it would take the feature under test with it.",
+      "expect": {
+        "equals": {
+          "cash": 150000,
+          "vehicleCount": 0
+        },
+        "note": "the cash: override replaces dusty_hollow's $50,000 default outright"
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 149200,
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 148400,
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 147600,
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 146800,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Opens the Fleet panel and buys hauler #1 by clicking its tier-1 dealership row. The three buys below reuse the open panel.",
+      "expect": {
+        "equals": {
+          "cash": 121800,
+          "vehicleCount": 1
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Hauler #2, bought by clicking the same dealership row again: $121,800 in hand against $25,000. awaitUsable is the affordability assertion -- FleetPanel disables a tier row on cash < purchaseCost, so an underfunded run fails here instead of buying anyway.",
+      "expect": {
+        "equals": {
+          "cash": 96800,
+          "vehicleCount": 2
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Hauler #3, same row again: $96,800 in hand against $25,000.",
+      "expect": {
+        "equals": {
+          "cash": 71800,
+          "vehicleCount": 3
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle buy debris_hauler"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Hauler #4, same row again: $71,800 in hand against $25,000. This is the vehicle that makes the jam reachable -- detectTrafficJam needs 3 vehicles waiting on a tile a 4th already occupies.",
+      "expect": {
+        "equals": {
+          "cash": 46800,
+          "vehicleCount": 4
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -100,17 +217,43 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "vehicle move 1 to:37,33",
-      "description": "All 4 haulers converge on the same target cell — detectTrafficJam groups waiting vehicles by shared targetX/targetZ (#411), so a common destination is what actually lets TRAFFIC_JAM_MIN_VEHICLES be reached, not just visually adjacent-but-different targets. Spawns are staggered (issue 1's fix) so the 4 approach from distinct tiles and queue behind whichever one claims the cell first, instead of spawning fused.",
+      "description": "Real click path for the one hauler a mouse can actually pick: select #1 in the 3D scene, rest the cursor on (37,33), press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre, measured in a real browser until the dispatched command read `vehicle move 1 to:37,33`. The three steps below stay console commands for a reason recorded there.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 1 to:37,33"
+          "type": "clickEntity",
+          "kind": "vehicle",
+          "id": 1
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 37.5,
+          "z": 33.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle move 2 to:37,33",
@@ -119,7 +262,8 @@
           "type": "command",
           "command": "vehicle move 2 to:37,33"
         }
-      ]
+      ],
+      "description": "Left as a command, and this is a defect report rather than a closed exception. MOVE HERE exists and works -- the `vehicle move 1` step above clicks it for real -- but no mouse can select haulers #2, #3 or #4 here: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting this step would silently re-order hauler #1 instead of #2. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 3 to:37,33",
@@ -128,7 +272,8 @@
           "type": "command",
           "command": "vehicle move 3 to:37,33"
         }
-      ]
+      ],
+      "description": "Left as a command, and this is a defect report rather than a closed exception. MOVE HERE exists and works -- the `vehicle move 1` step above clicks it for real -- but no mouse can select haulers #2, #3 or #4 here: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting this step would silently re-order hauler #1 instead of #2. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "vehicle move 4 to:37,33",
@@ -137,7 +282,8 @@
           "type": "command",
           "command": "vehicle move 4 to:37,33"
         }
-      ]
+      ],
+      "description": "Left as a command, and this is a defect report rather than a closed exception. MOVE HERE exists and works -- the `vehicle move 1` step above clicks it for real -- but no mouse can select haulers #2, #3 or #4 here: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting this step would silently re-order hauler #1 instead of #2. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
     },
     {
       "command": "tick 6",
@@ -147,7 +293,14 @@
           "type": "command",
           "command": "tick 6"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleCount": 4
+        },
+        "note": "all 4 vehicles still converging on (37,33) — real jam confirmed at tick 25, see the tick 26 step below (Finding #22)"
+      }
     },
     {
       "command": "vehicle list",
@@ -156,17 +309,25 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "tick 16",
-      "description": "Extended from tick 6 (#411 round 3, issue B): TRAFFIC_JAM_MIN_TICKS=10 consecutive waiting ticks on top of the ~8-10 ticks it takes the haulers to converge means the jam fires around cumulative tick 20 — this scenario's own stated purpose (demonstrating TrafficJamEvent) was previously unreachable within its 6+6=12 tick budget even after wiring detectTrafficJam into the console tick path. 6+16=22 gives margin past the tick-20 fire point.",
+      "command": "tick 26",
+      "description": "Finding #22: a direct engine trace (sampling state.events.pendingEvent tick by tick) found the jam actually fires at absolute tick 25, not tick 20 as this step previously assumed — the previous 6+16=22 tick budget was 3 ticks short and left the event unfired every run. Extended to 6+26=32 for real margin past the confirmed tick-25 fire point (verified: all 4 vehicles converge on (37,33), vehicle #1 occupies it, #2/#3/#4 all enter the waiting state simultaneously and cross TRAFFIC_JAM_MIN_TICKS=10 together, satisfying TRAFFIC_JAM_MIN_VEHICLES=3 — unlike vehicle-traffic.json's Finding #21, converging all 4 purchased vehicles rather than 3 is exactly what makes this one work).",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 16"
+          "command": "tick 26"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "vehicleCount": 4
+        },
+        "note": "the step's own console output is the direct evidence: \"[tick 25] EVENT: Traffic Jam ... (Advanced 19 of 26 requested ticks)\" — the tick loop stops on the pending event, which is why tickCount lands on 25 rather than 32. No scalar field exists in SerializableGameState to assert the event directly, so this anchors on the fleet staying intact at 4 while the jam condition is met."
+      }
     },
     {
       "command": "vehicle list",
@@ -175,7 +336,8 @@
           "type": "command",
           "command": "vehicle list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -184,7 +346,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

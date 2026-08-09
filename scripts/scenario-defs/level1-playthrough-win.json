@@ -1,6 +1,6 @@
 {
   "name": "level1-playthrough-win",
-  "description": "Full Level 1 (Dusty Hollow) profitable playthrough: surveys, 3 blast cycles, contracts, and building infrastructure to reach $80k profit target",
+  "description": "Full Level 1 (Dusty Hollow) playthrough: a survey, 2 blast cycles, vehicle-hauled contract fulfillment, and building infrastructure. Named for an $80k profit target and originally scoped for 3 blast cycles; see Findings #45-#50 for why that target is not reachable within this file's budget even after fixing the missing hauling infrastructure that made every contract delivery fail outright, and why a 3rd cycle was cut.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -9,7 +9,13 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +24,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "time resume",
@@ -27,7 +39,13 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "scores",
@@ -36,7 +54,17 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 50,
+          "nuisance": 50
+        }
+      },
+      "role": "observe"
     },
     {
       "command": "finances",
@@ -45,43 +73,355 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      },
+      "role": "observe"
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48800,
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "description": "Finding #46: a backup surveyor, and in fact the ENTIRE roster (all 8 hires below), front-loaded here while cash is still healthy, rather than split into a second hiring round later once cash has gone negative. `CrewPanel.ts`'s hire button disables on `state.cash < HIRING_COSTS[role]` -- confirmed directly with a real click ('element is disabled') once cash is deep in the red from this file's own setup costs, the same class of finding as vehicle-purchase-visual.json's `vehicle buy drill_rig` case. A mid-game 'hire more staff' beat, as the original file attempted, is not something a real player can click through once early spending has already gone negative -- front-loading is the only version of this file a real player could actually complete.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47600,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 46600,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 45100,
+          "employeeCount": 4
+        }
+      }
     },
     {
-      "command": "employee assign_skill 1 geology 3",
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44300,
+          "employeeCount": 5
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43300,
+          "employeeCount": 6
+        }
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 41800,
+          "employeeCount": 7
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 41000,
+          "employeeCount": 8
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:3",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 geology 3"
+          "command": "employee assign_skill 1 skill:geology level:3"
         }
-      ]
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "employee assign_skill 2 skill:geology level:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:geology level:3"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "employee assign_skill 3 skill:blasting level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:blasting level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "employee assign_skill 4 skill:blasting level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:blasting level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "employee assign_skill 5 skill:driving.truck level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 5 skill:driving.truck level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "employee assign_skill 6 skill:blasting level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 6 skill:blasting level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "employee assign_skill 7 skill:blasting level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 7 skill:blasting level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "employee assign_skill 8 skill:driving.truck level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 8 skill:driving.truck level:5"
+        }
+      ],
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Finding #45: the file's original syntax (`employee assign_skill 1 geology 3`, no skill:/level: prefixes) was a silent no-op the whole time -- the command requires `skill:<category> level:1-5` -- corrected here."
+    },
+    {
+      "command": "build freight_warehouse at:5,5",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Finding #47: the original file's `build office at:8,8` / `build storage_depot at:12,8` steps named building types that do not exist at all -- the only warehouse type is `freight_warehouse` (Building.ts/balance.ts) -- so those commands silently no-op'd. Worse, the file never bought a vehicle either, so even a correctly-named warehouse could not have received any hauled material -- every `contract deliver` in the original file failed outright ('0.0 kg available'). Fixed the sequence to genuinely exercise drilling/blasting/hauling/contract fulfillment end-to-end. Placed at (5,5), safely outside all 3 blast footprints (roughly x:10-29 z:10-35 combined) -- a first attempt closer to the blast site got destroyed by a blast's crack/clear radius, taking the whole delivery loop down with it.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 26000
+        }
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 1000
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 1 5",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 1000
+        }
+      }
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 922,
+          "tickCount": 6
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "employee list",
@@ -90,7 +430,13 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "employeeCount": 8
+        }
+      },
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -99,25 +445,56 @@
           "type": "command",
           "command": "state full"
         }
-      ]
-    },
-    {
-      "command": "survey seismic x:15 z:15",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "survey seismic x:15 z:15"
+      ],
+      "expect": {
+        "equals": {
+          "cash": 922,
+          "tickCount": 6,
+          "holeCount": 0,
+          "deathCount": 0
         }
-      ]
+      },
+      "role": "observe"
     },
     {
       "command": "survey core_sample x:15 z:15",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey core_sample x:15 z:15"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 15,
+          "z": 15
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "description": "Finding #49: the original file also queued `survey seismic` here ($3000) -- with only $1000 left after front-loading every hire plus the warehouse and vehicle (Finding #46/#47), and ~$78 already burned over the 6 ticks spent waiting for the driver to board, seismic is unaffordable (confirmed directly: 'Insufficient funds. seismic survey costs $3000', a silent no-op in command mode with no assertion to catch it, and presumably a disabled Survey-panel control in the UI the same way hire/build/buy already are). Dropped it -- core_sample alone ($800) still sends employee #1 to survey (15,15), which blast 1 then clears (step 36), and nothing later in this file depends on a survey result anyway (contract material is read directly off the blasted fragments -- see step 43).",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 122
+        }
+      }
     },
     {
       "command": "survey show",
@@ -126,7 +503,8 @@
           "type": "command",
           "command": "survey show"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -135,7 +513,15 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 122,
+          "tickCount": 6,
+          "surveyCount": 0
+        }
+      },
+      "role": "observe"
     },
     {
       "command": "tick 8",
@@ -144,16 +530,23 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "tickCount": 14
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -162,16 +555,23 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "tickCount": 22
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -180,16 +580,23 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "tickCount": 30
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 8",
@@ -198,43 +605,62 @@
           "type": "command",
           "command": "tick 8"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "tickCount": 38,
+          "cash": -23814
+        }
+      },
+      "role": "setup"
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
-      "command": "survey show",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
-          "type": "command",
-          "command": "survey show"
-        }
-      ]
-    },
-    {
-      "command": "state full",
-      "interaction": [
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
-          "type": "command",
-          "command": "state full"
-        }
-      ]
-    },
-    {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15",
-      "interaction": [
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
         {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:15,15"
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 25,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "description": "Ground rule #15: depth corrected to 6, matching the grid-tool's own DEFAULT_DEPTH_M -- the click never changes depth, so any other declared value would silently diverge from what interaction mode actually drills.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -243,25 +669,77 @@
           "type": "command",
           "command": "charge hole:* explosive:boomite amount:5 stemming:2"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults, and there is no proven click path to an exact non-default amount -- Charge All is the only commit at whatever the steppers currently show."
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "25 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "This value already matches the Sequence panel's own 25ms default (Sequence.ts DEFAULT_DELAY_STEP_MS) -- 0 stepper clicks needed, asserted rather than assumed (Finding #75). A later delay_step:20 occurrence in this file (already role:player) depends on dstepMs still reading 25 by the time it runs; converting this step from a bare command (which bypassed the UI's stepper state entirely) to a real click keeps that true instead of leaving it accidentally correct only because this step used to be unclicked."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "description": "Finding #46 (cont.): employee #1, dispatched to survey (15,15) (step 27), is standing at/near that tile when this blast clears it. A real, reproducible casualty, same class as Finding #40. Employee #2 (the backup surveyor) never gets dispatched anywhere -- with only one survey queued (Finding #49), only one surveyor is sent into harm's way -- so deathCount is 1 here, not 2. `surveyCount` never leaves 0 anywhere in this file -- ground rule #14's arrival-gating means the survey doesn't have enough time to complete before its surveyor dies; the `survey` step above pays real cash ($800) for a result this file's own timeline never collects.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "deathCount": 1,
+          "cash": -23814
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "state full",
@@ -270,16 +748,18 @@
           "type": "command",
           "command": "state full"
         }
-      ]
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
+      ],
+      "expect": {
+        "equals": {
+          "cash": -23814,
+          "tickCount": 38,
+          "deathCount": 1,
+          "holeCount": 0,
+          "employeeCount": 8,
+          "surveyCount": 0
         }
-      ]
+      },
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -288,43 +768,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
+      ],
+      "expect": {
+        "equals": {
+          "wellBeing": 69.11500000000008,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
         }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ]
+      },
+      "role": "observe"
     },
     {
       "command": "contract list",
@@ -333,25 +786,78 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        }
+      ],
+      "description": "Finding #48: the Fleet panel's Haul button (`.bs-vehicle-haul-btn`) always sends the vehicle to `findReachableGroundFragment` (HaulingTask.ts) -- the NEAREST reachable, non-oversized, storage-fitting fragment -- with no regard for what ore it carries. A player cannot click their way to a SPECIFIC fragment by ore content; only command mode's explicit `fragment:N` can. So the CONTRACT must be picked to match what the vehicle will actually haul next, not the other way around -- every contract accept below is chosen by first checking what `findReachableGroundFragment` returns for this cycle, replaying the file's own exact, complete command sequence to get it (not a hand-abbreviated one -- `contract list`'s own RNG draw depends on exactly how many times it has already been called, so a shortened trace generates a different contract pool than the real file). This cycle's nearest fragment (id 1208) has empty ore content, so contract #2 (rubble disposal, materialId '') is the only one it can actually satisfy.",
+      "role": "player"
+    },
+    {
+      "command": "vehicle haul 1 fragment:1208",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+        }
+      ],
+      "description": "Fragment id 1208 from `findReachableGroundFragment` (see Finding #48 above), not an arbitrary trace pick -- this is what the real Haul button reaches for from the vehicle's actual position.",
+      "role": "player"
+    },
+    {
+      "command": "tick 29",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 1"
+          "command": "tick 29"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "tickCount": 67
+        }
+      },
+      "role": "setup"
     },
     {
-      "command": "contract deliver 1 amount:500",
+      "command": "contract deliver 2 amount:260",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 1 amount:500"
+          "command": "contract deliver 2 amount:260"
         }
-      ]
+      ],
+      "description": "CONVERSION ATTEMPTED AND REVERTED -- the blocker is upstream, at the accept step, and is a real finding. ContractsPanel renders no contract id on either an offered or an active card (no data-id, only the `#<id>` text), so `.bs-contract-accept` can only ever click the FIRST card on offer. Step 46 declares `contract accept 2` (rubble disposal, chosen because the fragment the Haul button hauls carries no ore) but the click accepts contract #1, \"Supply dirtite (bulk)\". Measured, not reasoned: at this step command mode holds 550 kg of rubble against the rubble contract and delivers it (\"Contract #2 COMPLETED! Payment: $451.97\"), while the browser holds the same 550 kg of rubble against a DIRTITE contract, so maxDeliverable is 0 and the whole deliver row is disabled -- a `set`+DELIVER conversion failed here with `\"#bs-contract-panel .bs-contract-amount\" ... is present but disabled`. No `expect.blocked` is attached either: the button's disabled state here is a symptom of the accept divergence, not of a stable game guard, and pinning it would enshrine the bug. Fix the panel first (give the cards a per-contract selector), then this step and step 63 both convert. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact. One haul is enough to complete this contract outright (fragment 1208 carries 550kg, the contract needs 260kg) -- no second haul round needed this cycle.",
+      "expect": {
+        "equals": {
+          "tickCount": 67,
+          "deathCount": 1,
+          "employeeCount": 8
+        }
+      }
     },
     {
       "command": "finances",
@@ -360,25 +866,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
-    },
-    {
-      "command": "build office at:8,8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build office at:8,8"
-        }
-      ]
-    },
-    {
-      "command": "build storage_depot at:12,8",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build storage_depot at:12,8"
-        }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "build list",
@@ -387,61 +876,46 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "state full",
+      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:20,10",
       "interaction": [
         {
-          "type": "command",
-          "command": "state full"
-        }
-      ]
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
-          "type": "command",
-          "command": "employee hire role:driller"
-        }
-      ]
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
-        }
-      ]
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
         {
-          "type": "command",
-          "command": "employee hire role:driver"
-        }
-      ]
-    },
-    {
-      "command": "employee list",
-      "interaction": [
+          "type": "dragTiles",
+          "x1": 20,
+          "z1": 10,
+          "x2": 28,
+          "z2": 22
+        },
         {
-          "type": "command",
-          "command": "employee list"
-        }
-      ]
-    },
-    {
-      "command": "drill_plan grid rows:4 cols:3 spacing:4 depth:10 start:20,10",
-      "interaction": [
+          "type": "screenshot"
+        },
         {
-          "type": "command",
-          "command": "drill_plan grid rows:4 cols:3 spacing:4 depth:10 start:20,10"
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "description": "Ground rule #15: depth corrected to 6, same reasoning as step 38.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 20
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:4 stemming:3",
@@ -450,25 +924,74 @@
           "type": "command",
           "command": "charge hole:* explosive:krackle amount:4 stemming:3"
         }
-      ]
+      ],
+      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults, and there is no proven click path to an exact non-default amount -- Charge All is the only commit at whatever the steppers currently show."
     },
     {
       "command": "sequence auto delay_step:20",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:20"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Explicitly switches to the Sequence tab (data-step=\"3\") first -- relying on the panel's own autoAdvance to land there was unverified and, per a real interaction-mode run, wrong at this point in some files (element present but zero-size, i.e. a hidden inactive tab). Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) so a click can target it unambiguously. 1 decrement click: 25ms default -> 20 (DELAY_STEP_INCREMENT=5ms)."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "description": "No further casualties from this blast -- the whole roster survived blast 1 except employee #1 (Finding #46), and nobody else is dispatched near this blast's footprint. This blast rates CATASTROPHIC (883 projections, vs. blast 1's PERFECT/0 projections), consistent with krackle's higher violence at this amount/stemming.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "deathCount": 1
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "state full",
@@ -477,16 +1000,16 @@
           "type": "command",
           "command": "state full"
         }
-      ]
-    },
-    {
-      "command": "finances",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "finances"
+      ],
+      "expect": {
+        "equals": {
+          "tickCount": 67,
+          "deathCount": 1,
+          "employeeCount": 8,
+          "holeCount": 0
         }
-      ]
+      },
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -495,43 +1018,17 @@
           "type": "command",
           "command": "scores"
         }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
+      ],
+      "description": "safety no longer reaches an exact 0 floor in this file's corrected form (only 1 casualty total, vs. the 2+ that used to pin it) -- still a real, deterministic value from a zero-random-event trace, just not a pinned one, so it is asserted exactly rather than left as 'safe once pinned' the way Findings #42/#43/#44 do.",
+      "expect": {
+        "equals": {
+          "wellBeing": 94.6187500000003,
+          "safety": 1.4499999999999955,
+          "ecology": 41.17,
+          "nuisance": 27.924999999999997
         }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ]
+      },
+      "role": "observe"
     },
     {
       "command": "contract list",
@@ -540,124 +1037,79 @@
           "type": "command",
           "command": "contract list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
-      "command": "contract accept 2",
+      "command": "contract accept 4",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel .bs-contract-accept"
+        }
+      ],
+      "description": "Finding #48: the Fleet panel's Haul button (`.bs-vehicle-haul-btn`) always sends the vehicle to `findReachableGroundFragment` (HaulingTask.ts) -- the NEAREST reachable, non-oversized, storage-fitting fragment -- with no regard for what ore it carries. A player cannot click their way to a SPECIFIC fragment by ore content; only command mode's explicit `fragment:N` can. So the CONTRACT must be picked to match what the vehicle will actually haul next, not the other way around -- every contract accept below is chosen by first checking what `findReachableGroundFragment` returns for this cycle, replaying the file's own exact, complete command sequence to get it (not a hand-abbreviated one -- `contract list`'s own RNG draw depends on exactly how many times it has already been called, so a shortened trace generates a different contract pool than the real file). This cycle's nearest fragment (id 1431) carries dirtite, so contract #4 (Deliver dirtite ore, 60kg) is the match.",
+      "role": "player"
+    },
+    {
+      "command": "vehicle haul 1 fragment:1431",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+        }
+      ],
+      "description": "Fragment id from `findReachableGroundFragment`, same class as step 47.",
+      "role": "player"
+    },
+    {
+      "command": "tick 2",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 2"
+          "command": "tick 2"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "tickCount": 69,
+          "deathCount": 1,
+          "employeeCount": 8
+        }
+      },
+      "role": "setup"
     },
     {
-      "command": "contract deliver 2 amount:800",
+      "command": "contract deliver 4 amount:60",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 2 amount:800"
+          "command": "contract deliver 4 amount:60"
         }
-      ]
-    },
-    {
-      "command": "contract accept 3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract accept 3"
+      ],
+      "description": "Left as a command for the same reason as step 49: `.bs-contract-accept` clicks whichever card happens to be first, so step 60's declared `contract accept 4` and the click it runs accept different contracts, and the material this file hauls does not match what the browser ends up holding. Command mode's own trace here is a clean success (60 kg of dirtite against 575 kg stored, \"Contract #4 COMPLETED\"), which is exactly why the divergence is worth naming rather than papering over. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact.",
+      "expect": {
+        "equals": {
+          "tickCount": 69,
+          "deathCount": 1
         }
-      ]
-    },
-    {
-      "command": "contract deliver 3 amount:600",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "contract deliver 3 amount:600"
-        }
-      ]
-    },
-    {
-      "command": "drill_plan grid rows:4 cols:4 spacing:5 depth:12 start:10,20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "drill_plan grid rows:4 cols:4 spacing:5 depth:12 start:10,20"
-        }
-      ]
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:6 stemming:3"
-        }
-      ]
-    },
-    {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:20"
-        }
-      ]
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ]
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ]
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ]
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "event choose 0"
-        }
-      ]
+      }
     },
     {
       "command": "finances",
@@ -666,7 +1118,8 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -675,7 +1128,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "safety": 1.5499999999999956,
+          "wellBeing": 96.38125000000032,
+          "ecology": 41.269999999999996,
+          "nuisance": 28.025
+        }
+      },
+      "role": "observe"
     },
     {
       "command": "stats",
@@ -684,7 +1146,8 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "campaign status",
@@ -693,7 +1156,21 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "description": "Finding #50: a 3rd blast cycle was cut from this file after discovering a real divergence between command mode and a real browser: `contract deliver` clears `storedMassKg` to exactly 0 in command mode regardless of the delivered amount (confirmed directly -- a 260kg rubble delivery against a 550kg-mass fragment, and separately a 60kg ore delivery against a 528kg-mass fragment, both left `storedMassKg` at 0, not the undelivered remainder), but in a real browser run `storedMassKg` was still 550 after the equivalent point -- the leftover mass from cycle 1's haul was never cleared. By the time a 3rd cycle's haul was attempted, this accumulated leftover left too little room for `findReachableGroundFragment` (HaulingTask.ts's `mass > roomKg` eligibility check) to consider the next fragment reachable at all in the browser, so the Fleet panel's Haul button never rendered and the step timed out waiting for a control that was never coming -- not a scenario-authoring problem, a real gap between the two execution paths. Out of scope to fix here (`docs/plans/scenario-assertions-and-playtest-removal.md`'s ground rules: a real bug with wide blast radius is a finding, not a drive-by fix) -- flagged in the plan doc's findings log for separate investigation. 2 blast cycles, with 2 different contract types (rubble disposal and ore-specific), already prove the drilling/blasting/hauling/contract-fulfillment loop end-to-end twice over, so the file ends here rather than force a 3rd cycle through a real, unrelated bug. Finding #51: `activeContractCount` was also dropped from this step's assertions after a real browser run consistently reported it as 2 (both cycle 1 and cycle 2's contracts still counted active) at this exact point, even though command mode reports 0 and the deliveries' cash income is genuinely received in both modes -- reproduced identically across two separate interaction-mode runs, so not flaky. Same family as Finding #50 (a `contract deliver` side effect that fully applies in command mode but not in a real browser), but broader: it affects every contract cycle in this file, not only a 3rd one blocked by leftover mass. Left for the same separate investigation.",
+      "expect": {
+        "equals": {
+          "tickCount": 69,
+          "deathCount": 1,
+          "employeeCount": 8,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null,
+          "surveyCount": 0
+        },
+        "note": "Findings #45-#51: this file's original action sequence could never reach its named $80k profit target -- `build office`/`build storage_depot` named building types that don't exist at all, no vehicle was ever bought, and its `employee assign_skill` calls used syntax the command actually rejects (a silent no-op) -- so blasted material could never reach storage and every `contract deliver` failed outright. Fixed the sequence to genuinely exercise drilling/blasting/surveying/hauling/contract fulfillment end-to-end (2 contracts delivered for real income across 2 blast cycles, each completed in a single haul once the contract was matched to what the Haul button actually reaches for -- Finding #48), with every hire front-loaded before cash goes negative (Finding #46) since a mid-game hire is unclickable once it has, and only the affordable survey queued (Finding #49). A 3rd cycle was cut after Finding #50. Even so, the $80k target was never close: fixed setup costs (warehouse $15k, vehicle $25k, 8 employees $9k) dwarf what 2 small contracts earn. The level neither wins nor formally ends within this file's 69-tick budget. Treated like Findings #41/#43/#44: the real, now-genuinely-functional trajectory is asserted instead of the named outcome. cash is not hard-asserted from the first contract delivery onward -- Ground rule #12, confirmed directly in a real browser run. activeContractCount is not hard-asserted anywhere after the first delivery either -- Finding #51, same real command-mode-vs-browser divergence."
+      },
+      "role": "setup"
     }
   ]
 }

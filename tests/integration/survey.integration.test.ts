@@ -319,12 +319,16 @@ describe('Survey system', () => {
   // ── 8. Insufficient funds ────────────────────────────────────────────────
 
   it('survey with insufficient funds returns error', () => {
-    // Set cash to 0
-    ctx.state!.cash = 0;
-
-    // We need a surveyor for the runSurvey guard to reach the cash check
+    // Hire BEFORE zeroing the balance: `employee hire` now refuses a hire the
+    // player cannot afford, so hiring at $0 leaves the roster empty and
+    // runSurvey answers 'no_surveyor' — a different refusal than the one this
+    // test is about. We need a surveyor for the runSurvey guard to reach the
+    // cash check.
     const empId = hireEmployeeByRole(ctx, 'surveyor');
     employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '1' });
+
+    // Set cash to 0
+    ctx.state!.cash = 0;
 
     // Most expensive survey (seismic = $3000) — cash is 0
     const result = surveyCommand(ctx as any, ['seismic'], { x: '16', z: '16' });

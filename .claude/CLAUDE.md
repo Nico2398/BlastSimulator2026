@@ -70,6 +70,8 @@ Five independent channels prove a change works. Each catches what the others mis
 
 **The other four channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `playability` is the only channel that plays the game. Procedures live in the `dev-playability-testing` skill.
 
+**`playability` is folding into `visual`.** Tracked by issue #515: once the scenario suite's click-only enforcement is total, interaction-mode `expect` checks prove what a playtest beat proves today, and this row retires. Until then it remains required exactly as below.
+
 **You have vision.** Screenshots are readable evidence: capture the PNG, then open it with the Read tool and describe what is actually on screen. A rendering change is unverified until an image has been inspected — a green test suite proves the logic, not the picture. Procedures live in the `dev-visual-testing` skill.
 
 **When a channel is genuinely unavailable** (no browser, dev server unreachable, screenshots never written), say so explicitly and mark the work unverified for that channel. Never substitute a state JSON dump for an image you were unable to inspect, and never report PASS for a channel you did not run.

@@ -9,7 +9,13 @@
           "type": "command",
           "command": "new_game seed:42"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "campaign start level:dusty_hollow",
@@ -18,7 +24,13 @@
           "type": "command",
           "command": "campaign start level:dusty_hollow"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "time resume",
@@ -27,7 +39,13 @@
           "type": "command",
           "command": "time resume"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "scores",
@@ -36,7 +54,17 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 50,
+          "nuisance": 50
+        }
+      }
     },
     {
       "command": "finances",
@@ -45,70 +73,157 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 49000,
+          "employeeCount": 1
+        }
+      }
     },
     {
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driller"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48000,
+          "employeeCount": 2
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 46500,
+          "employeeCount": 3
+        }
+      }
     },
     {
       "command": "employee hire role:blaster",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:blaster"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 45000,
+          "employeeCount": 4
+        }
+      }
     },
     {
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:driver"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44200,
+          "employeeCount": 5
+        }
+      }
     },
     {
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:surveyor"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43000,
+          "employeeCount": 6
+        }
+      }
     },
     {
       "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee hire role:manager"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"manager\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 41000,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "employee list",
@@ -117,7 +232,14 @@
           "type": "command",
           "command": "employee list"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41000,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "state full",
@@ -126,7 +248,16 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "cash": 41000,
+          "employeeCount": 7,
+          "holeCount": 0,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -135,16 +266,25 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 5,
+          "cash": 41000,
+          "wellBeing": 50.95000000000002
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 5",
@@ -153,16 +293,25 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 10,
+          "cash": 36250,
+          "wellBeing": 52.400000000000034
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -171,43 +320,202 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 10,
+          "cash": 36250,
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 52.400000000000034,
+          "nuisance": 50
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:10 start:5,5",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:10 start:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 5,
+          "x2": 14,
+          "z2": 14
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 16
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "description": "Charge All commits the panel's current product card / amount / stemming (ChargeStep.chargeAll, Charge.ts), and all three are reachable by click: the krackle product card selects the explosive, 3 amount increments take 5 -> 8kg and 5 stemming decrements take 2.0 -> 1.0m. The explicit [data-step=\"2\"] click is required because the drill step above clicks [data-step=\"1\"] manually, which disarms autoAdvance. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 16
+        },
+        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-20-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts)."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 32.16,
+          "nuisance": 5.399999999999999,
+          "cash": 36250,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -216,7 +524,17 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 32.16,
+          "nuisance": 5.399999999999999,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -225,7 +543,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 32.16,
+          "safety": 50,
+          "wellBeing": 52.400000000000034,
+          "nuisance": 5.399999999999999
+        }
+      }
     },
     {
       "command": "tick 5",
@@ -234,16 +561,27 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 15,
+          "ecology": 32.40999999999998,
+          "wellBeing": 54.350000000000044,
+          "nuisance": 5.649999999999998,
+          "cash": 36250
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 5",
@@ -252,16 +590,27 @@
           "type": "command",
           "command": "tick 5"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 20,
+          "cash": 31500,
+          "ecology": 32.65999999999997,
+          "wellBeing": 56.80000000000006,
+          "nuisance": 5.899999999999997
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -270,43 +619,164 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 20,
+          "cash": 31500,
+          "ecology": 32.65999999999997,
+          "safety": 50,
+          "wellBeing": 56.80000000000006,
+          "nuisance": 5.899999999999997
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:12 start:15,5",
+      "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:12 start:15,5"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 5,
+          "x2": 24,
+          "z2": 17
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 20
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "description": "krackle and 1.0m stemming still hold from the first cycle (ChargeStep instance fields, no reset path — a blast clearing the plan does not touch them), so only the amount moves: 2 increments, 8 -> 10kg, krackle's maximum. Asserted before the commit rather than assumed.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 20
+        },
+        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-31-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 7.149999999999967,
+          "nuisance": 0,
+          "cash": 31500,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -315,7 +785,17 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 7.149999999999967,
+          "nuisance": 0,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -324,7 +804,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 7.149999999999967,
+          "safety": 50,
+          "wellBeing": 56.80000000000006,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -333,16 +822,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 30,
+          "cash": 26750,
+          "ecology": 7.649999999999965,
+          "wellBeing": 63.20000000000009,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -351,16 +851,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 40,
+          "cash": 22000,
+          "ecology": 8.149999999999965,
+          "wellBeing": 71.60000000000011,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -369,16 +880,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 50,
+          "cash": 17250,
+          "ecology": 8.649999999999972,
+          "wellBeing": 81.10000000000014,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -387,43 +909,164 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 50,
+          "cash": 17250,
+          "ecology": 8.649999999999972,
+          "safety": 50,
+          "wellBeing": 81.10000000000014,
+          "nuisance": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:10 start:5,15",
+      "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:10 start:5,15"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 5,
+          "z1": 15,
+          "x2": 17,
+          "z2": 24
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 20
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "description": "Back down to 8kg: 2 amount decrements off the 10kg the previous cycle left. Product and stemming untouched.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 20
+        },
+        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-44-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "cash": 17250,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -432,7 +1075,17 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -441,7 +1094,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "safety": 50,
+          "wellBeing": 81.10000000000014,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -450,16 +1112,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 60,
+          "cash": 12500,
+          "wellBeing": 90.60000000000016,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -468,16 +1141,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 70,
+          "cash": 7750,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -486,16 +1170,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 80,
+          "cash": 3000,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -504,43 +1199,164 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 80,
+          "cash": 3000,
+          "ecology": 0,
+          "safety": 50,
+          "wellBeing": 99.95,
+          "nuisance": 0
+        }
+      }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:15,15",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:12 start:15,15"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 27,
+          "z2": 27
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 25
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
-      ]
+      ],
+      "description": "Back up to 10kg: 2 amount increments off the 8kg the previous cycle left. Product and stemming untouched.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "chargedCount": 25
+        },
+        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-57-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+      }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "command",
-          "command": "sequence auto delay_step:10"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "10 ms"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "cash": 3000,
+          "deathCount": 0
+        }
+      }
     },
     {
       "command": "state full",
@@ -549,7 +1365,17 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "ecology": 0,
+          "nuisance": 0,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "scores",
@@ -558,7 +1384,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "ecology": 0,
+          "safety": 50,
+          "wellBeing": 99.95,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "tick 10",
@@ -567,16 +1402,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 90,
+          "cash": -1750,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -585,16 +1431,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 100,
+          "cash": -6500,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -603,16 +1460,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 110,
+          "cash": -11250,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -621,16 +1489,27 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 120,
+          "cash": -16000,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "nuisance": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -639,16 +1518,29 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 130,
+          "cash": -20750,
+          "wellBeing": 99.95,
+          "ecology": 0,
+          "safety": 50,
+          "nuisance": 0
+        },
+        "note": "last checkpoint before the region where a real random event fires in the command-mode trace (next event choose 0 step) -- see that step's description and Finding #44."
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -657,16 +1549,28 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 140,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -675,7 +1579,16 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 140,
+          "deathCount": 0,
+          "employeeCount": 7
+        },
+        "note": "cash/ecology/safety/wellBeing/nuisance intentionally not asserted from here on -- see step 71's description and Finding #44."
+      }
     },
     {
       "command": "tick 10",
@@ -684,16 +1597,28 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 150,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -702,16 +1627,28 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 160,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -720,16 +1657,28 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 170,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -738,16 +1687,29 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 180,
+          "deathCount": 0,
+          "employeeCount": 7
+        },
+        "note": "command-mode trace shows bankrupt flips true here (levelEndReason: 'bankruptcy') but that is not hard-asserted at this exact step -- the earlier event's uncertain timing (step 71) could shift which 10-tick block crosses the bankruptcy grace countdown by one block either way. Asserted instead at the file's final step, where it is robust regardless: BANKRUPTCY_GRACE_TICKS=100 consecutive ticks below the $5000 threshold (Bankruptcy.ts), and this file's cash declines monotonically with zero income sources anywhere, so the countdown that starts around tick ~76 completes by tick 200 no matter when the one weather event's extra -$8000 lands (Finding #44)."
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -756,16 +1718,28 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 190,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -774,16 +1748,28 @@
           "type": "command",
           "command": "tick 10"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "tickCount": 200,
+          "deathCount": 0,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "command",
-          "command": "event choose 0"
+          "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "scores",
@@ -792,7 +1778,19 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 200,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy",
+          "revolted": false
+        }
+      }
     },
     {
       "command": "finances",
@@ -801,7 +1799,14 @@
           "type": "command",
           "command": "finances"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "bankrupt": true,
+          "tickCount": 200
+        }
+      }
     },
     {
       "command": "stats",
@@ -810,7 +1815,14 @@
           "type": "command",
           "command": "stats"
         }
-      ]
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 200,
+          "employeeCount": 7
+        }
+      }
     },
     {
       "command": "campaign status",
@@ -819,7 +1831,20 @@
           "type": "command",
           "command": "campaign status"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 200,
+          "deathCount": 0,
+          "employeeCount": 7,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy",
+          "revolted": false
+        },
+        "note": "confirms the file's own premise doesn't hold: named for worker revolt, but revolted stays false throughout -- wellBeing never gets low enough (it spends the file between 50 and 99.95, only mildly declining near the very end, nowhere near a sustained-low band; see WorkerRevolt.ts). The real, deterministic loss condition is bankruptcy: hiring 7 employees up front with zero contracts or other income anywhere in the file drains cash below the $5000 threshold around tick ~76, and BANKRUPTCY_GRACE_TICKS=100 consecutive ticks below that threshold (Bankruptcy.ts) triggers game-over ~100 ticks later -- independent of which random events fire in between, since this file's cash never recovers once it crosses (Finding #44)."
+      }
     }
   ]
 }

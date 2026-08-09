@@ -10,7 +10,14 @@
           "type": "command",
           "command": "new_game seed:42 cash:200000"
         }
-      ]
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "buildingCount": 0
+        }
+      }
     },
     {
       "command": "build research_center at:25,15",
@@ -45,7 +52,14 @@
           "type": "wait",
           "durationMs": 500
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 175000,
+          "buildingCount": 1
+        }
+      }
     },
     {
       "command": "build living_quarters at:5,5 tier:1",
@@ -76,7 +90,14 @@
           "type": "wait",
           "durationMs": 500
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 165000,
+          "buildingCount": 2
+        }
+      }
     },
     {
       "command": "research queue type:living_quarters tier:2",
@@ -94,7 +115,13 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 160000
+        }
+      }
     },
     {
       "command": "tick 50",
@@ -103,7 +130,8 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build upgrade 2",
@@ -117,7 +145,15 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "upgrade replaces the building (new id #3), it doesn't add one — buildingCount stays 2. cash uses decreased not equals since this follows a tick step (Finding #12)"
+      }
     },
     {
       "command": "research queue type:living_quarters tier:3",
@@ -135,7 +171,11 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"]
+      }
     },
     {
       "command": "tick 50",
@@ -144,7 +184,8 @@
           "type": "command",
           "command": "tick 50"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "build upgrade 3",
@@ -158,7 +199,15 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "upgrade replaces the building again (new id #4) — buildingCount stays 2"
+      }
     },
     {
       "command": "build management_office at:15,5 tier:1",
@@ -189,7 +238,14 @@
           "type": "wait",
           "durationMs": 500
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 3
+        }
+      }
     },
     {
       "command": "build destroy 5",
@@ -207,7 +263,15 @@
           "type": "wait",
           "durationMs": 300
         }
-      ]
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "buildingCount": 2
+        },
+        "note": "demolishing has a $2,000 cost of its own"
+      }
     },
     {
       "command": "build list",
@@ -216,7 +280,8 @@
           "type": "command",
           "command": "build list"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "scores",
@@ -225,7 +290,8 @@
           "type": "command",
           "command": "scores"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state full",
@@ -234,7 +300,8 @@
           "type": "command",
           "command": "state full"
         }
-      ]
+      ],
+      "role": "observe"
     }
   ],
   "shots": [

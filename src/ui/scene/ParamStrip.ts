@@ -136,7 +136,14 @@ export class ParamStrip {
     titleBlock.append(iconEl(config.icon, 15), titleCol);
 
     const fieldEls = config.fields.map((f) => {
-      const wrap = el('div');
+      // data-field, not just a positional wrapper: without it there is no
+      // selector a click-only scenario/playtest step can target to set an
+      // exact spacing/depth before confirming a grid — only the whole-strip
+      // default was reachable, silently making an explicit spacing:N in a
+      // scenario's command field describe a different grid than the click
+      // actually drags (found converting scenarios to real assertions,
+      // issue #479 follow-up).
+      const wrap = el('div', { attrs: { 'data-field': f.key } });
       wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:7px 12px;border-right:1px solid rgba(255,255,255,.07);justify-content:center';
       wrap.append(
         el('span', { text: f.label, attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.12em;color:var(--bsx-text-muted)' } }),

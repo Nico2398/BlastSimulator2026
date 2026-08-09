@@ -13,40 +13,103 @@
       "command": "terrain_info",
       "description": "Biome and seed should match what was asked for. Grid extents are the fixed 64x32x64 default regardless of request (#504).",
       "interaction": [
-        { "type": "command", "command": "terrain_info" }
-      ]
+        {
+          "type": "command",
+          "command": "terrain_info"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "seed": 777,
+          "worldSizeX": 64,
+          "worldSizeZ": 64,
+          "mineType": "alpine_granite"
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20",
       "interaction": [
-        { "type": "command", "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20" }
-      ]
+        {
+          "type": "command",
+          "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20"
+        }
+      ],
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "expect": {
+        "equals": {
+          "holeCount": 9,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
-        { "type": "command", "command": "charge hole:* explosive:boomite amount:5 stemming:2" }
-      ]
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+        }
+      ],
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
-        { "type": "command", "command": "sequence auto delay_step:25" }
-      ]
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:25"
+        }
+      ],
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
     },
     {
       "command": "blast",
-      "description": "A sandbox site plays like any other — the blast pipeline runs end to end on it.",
+      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
       "interaction": [
-        { "type": "command", "command": "blast" }
-      ]
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "cash": 50000
+        }
+      }
     },
     {
       "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337",
       "description": "A second site with a different biome, difficulty and seed, to confirm the mode can be re-entered.",
       "interaction": [
         { "type": "command", "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337" }
-      ]
+      ],
+      "expect": {
+        "equals": {
+          "cash": 250000,
+          "seed": 31337,
+          "worldSizeX": 64,
+          "worldSizeZ": 64,
+          "mineType": "tropical_karst",
+          "holeCount": 0
+        },
+        "note": "difficulty:easy starts at $250,000 (SANDBOX_DIFFICULTIES.easy.startingCash, Sandbox.ts) -- grid extents stay the fixed 64x32x64 default (#504) regardless of biome/difficulty, same as the first site."
+      }
     }
   ]
 }
