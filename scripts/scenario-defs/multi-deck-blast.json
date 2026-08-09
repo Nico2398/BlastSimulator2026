@@ -362,11 +362,32 @@
       "command": "blast",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"5\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "blast — still a command here, but NOT for want of a button: the Fire step's Execute -> confirm -> report-close path is real and is clicked for real in sibling files (presplit-wall.json, level1-lose-ecology.json). Converting it is the blast step's own conversion, not this pass's (per-hole charging); console `blast` reuses the same validator the Execute button gates, so both modes exercise the same code.",
+      "role": "player",
+      "description": "blast — Fire step's Execute -> confirm -> report-close path, same click sequence as the sibling files (presplit-wall.json, level1-lose-ecology.json). The blast panel is already open (opened at the drill_plan step above) and stays open through every per-hole charge/sequence step, so no panel-open click is needed here.",
       "expect": {
         "equals": {
           "holeCount": 0,
