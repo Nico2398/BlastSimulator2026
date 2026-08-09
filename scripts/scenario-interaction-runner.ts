@@ -21,7 +21,7 @@ import {
   captureFrame,
   suspendDrawing,
 } from './shared/puppeteer-utils.js';
-import { checkGoal, gameState, PlaytestFailure } from './shared/playtest-driver.js';
+import { checkGoal, gameState, InteractionFailure } from './shared/interaction-driver.js';
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -49,11 +49,11 @@ export function describeStepFailure(step: ScenarioStepDef, err: unknown): string
   const base = step.role === 'player'
     ? `player step "${label}" did not complete: ${raw}`
     : raw;
-  // PlaytestFailure (thrown by checkGoal for a failed `expect`, or by a
-  // reused playtest-driver action like `set`/`clickEntity`) carries a
+  // InteractionFailure (thrown by checkGoal for a failed `expect`, or by a
+  // reused interaction-driver action like `set`/`clickEntity`) carries a
   // diagnosis — what was usable/blocked at the moment of failure — that a
   // bare message loses. Surface it too.
-  return err instanceof PlaytestFailure ? `${base}\n${err.diagnosis}` : base;
+  return err instanceof InteractionFailure ? `${base}\n${err.diagnosis}` : base;
 }
 
 function checkScreenshotSize(filepath: string): string | undefined {
@@ -116,8 +116,8 @@ export async function runScenarioInteraction(
             stepScreenshotPaths.push(...interactionResult.screenshotPaths);
 
             // Real DOM/tutorial checks, not just "nothing threw" — reuses
-            // playtest-driver.ts's checkGoal so a step's `expect` and a
-            // playtest beat's `expect` are proven the same way (issue #479
+            // interaction-driver.ts's checkGoal so a step's `expect` and an
+            // interaction beat's `expect` are proven the same way (issue #479
             // follow-up: scenarios gained assertions instead of staying a
             // pass/fail-on-exception-only channel).
             if (step.expect) {

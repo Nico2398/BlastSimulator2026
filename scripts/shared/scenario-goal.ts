@@ -3,7 +3,7 @@
  *
  * Command mode has a state dump but no DOM, so it can only prove the
  * `equals`/`increased` half of a step's `expect` — the same fields
- * `playtest-driver.ts`'s `checkGoal` proves, minus `usable`/`blocked`/
+ * `interaction-driver.ts`'s `checkGoal` proves, minus `usable`/`blocked`/
  * `tutorialStep`, which need a live page and are checked only in
  * interaction mode (scenario-interaction-runner.ts calls `checkGoal`
  * directly there, rather than duplicating this logic).

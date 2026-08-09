@@ -61,8 +61,8 @@ export type InteractionStepAction =
   // everything a player does, and the scenario vocabulary did not: there was
   // no way to set a <select>, so a step like `charge hole:* explosive:X
   // amount:Y` had no click-equivalent and stayed a console command. Each of
-  // these delegates to `runAction` in `playtest-driver.ts` — the same
-  // implementation the playtest channel uses, rather than a second copy that
+  // these delegates to `runAction` in `interaction-driver.ts` — the same
+  // implementation interaction mode uses, rather than a second copy that
   // can drift from it.
   /** Set a form control's value the way typing or picking would. */
   | { type: 'set'; selector: string; value: string }
@@ -154,9 +154,9 @@ export type ScenarioStepRole = 'player' | 'setup' | 'observe' | 'bootstrap' | 'g
  * anywhere only proves "nothing threw" — the playtest harness's whole
  * argument was that this is not the same as "the step actually happened"
  * (a click that silently no-ops still throws nothing). Field-for-field
- * mirror of `PlaytestGoal` (scripts/shared/playtest-types.ts) so interaction
- * mode reuses `checkGoal` from `playtest-driver.ts` directly — one evaluator,
- * not two that can drift apart.
+ * mirror of `InteractionGoal` (scripts/shared/interaction-types.ts) so
+ * interaction mode reuses `checkGoal` from `interaction-driver.ts` directly —
+ * one evaluator, not two that can drift apart.
  *
  * `usable`/`blocked`/`tutorialStep` need a live page and are only checked
  * when the scenario runs in interaction mode; command mode has no DOM, so it

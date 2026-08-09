@@ -1,13 +1,14 @@
 /**
- * BlastSimulator2026 — Playtest definitions
+ * BlastSimulator2026 — Interaction definitions
  *
- * A playtest is stricter than a scenario: it plays the game the way a player
- * does and asserts that the game actually moved. Scenarios can pass while the
- * game is stuck, because "no selector timed out" is not the same as "the step
- * completed". A playtest names the goal of each beat and fails when the goal is
- * not reached, with the reason the blocking control could not be used.
+ * Shared player-action and goal vocabulary for interaction-mode scenario runs:
+ * it plays the game the way a player does and asserts that the game actually
+ * moved. Scenarios can pass while the game is stuck, because "no selector
+ * timed out" is not the same as "the step completed". A goal names what each
+ * beat must achieve and fails when it is not reached, with the reason the
+ * blocking control could not be used.
  *
- * @module shared/playtest-types
+ * @module shared/interaction-types
  */
 
 /** One thing a player does. Nothing here can reach the console. */
@@ -24,7 +25,7 @@ export type PlayerAction =
   | { do: 'dragTiles'; x1: number; z1: number; x2: number; z2: number }
   /**
    * Click a live scene entity (redesign P2 — src/ui/scene/ScenePicking.ts)
-   * by kind + id rather than a baked world coordinate: a playtest that just
+   * by kind + id rather than a baked world coordinate: a scenario that just
    * hired an employee has no static x/z to click, only the id the hire
    * produced, and the driver looks up its current position itself.
    */
@@ -62,14 +63,14 @@ export type PlayerAction =
    * outcome and which one is showing depends on how fast the run got there.
    */
   | { do: 'awaitTutorialStep'; stepId: string | string[]; timeoutMs?: number }
-  /** Let the simulation run. This is the only way a playtest passes time. */
+  /** Let the simulation run. This is the only way an interaction run passes time. */
   | { do: 'letTimePass'; ticks: number };
 
 /**
  * What must be true after a beat's actions. At least one field is required —
  * a beat with no goal proves nothing.
  */
-export interface PlaytestGoal {
+export interface InteractionGoal {
   /** The tutorial card must show this step id. */
   tutorialStep?: string;
   /** These numeric fields of the state dump must have grown. */
@@ -103,7 +104,7 @@ export interface PlaytestGoal {
   note?: string;
 }
 
-export interface PlaytestBeat {
+export interface InteractionBeat {
   /** What the player is trying to do, in plain words. */
   goal: string;
   /** Setup commands, allowed only in beats flagged `setup`. */
@@ -111,17 +112,17 @@ export interface PlaytestBeat {
   /** Player actions, in order. */
   actions?: PlayerAction[];
   /** Assertions that decide pass or fail. */
-  expect?: PlaytestGoal;
+  expect?: InteractionGoal;
 }
 
-export interface PlaytestDef {
+export interface InteractionDef {
   name: string;
   description: string;
-  beats: PlaytestBeat[];
+  beats: InteractionBeat[];
 }
 
 /**
- * Console commands a playtest may use, and only in a beat's `setup`.
+ * Console commands an interaction beat may use, and only in a beat's `setup`.
  *
  * Everything else has to be reachable by clicking, because a console command
  * standing in for a player action is how a dead end hides: a harness that runs
@@ -140,7 +141,7 @@ export const SETUP_COMMAND_ALLOWLIST = [
 /** Time control is a player affordance (the speed button), so it is separate. */
 export const TIME_COMMAND_ALLOWLIST = ['tick', 'time'] as const;
 
-/** True when `command`'s first token may appear in a playtest setup block. */
+/** True when `command`'s first token may appear in an interaction setup block. */
 export function isAllowedSetupCommand(command: string): boolean {
   const token = command.trim().split(/\s+/)[0] ?? '';
   return (SETUP_COMMAND_ALLOWLIST as readonly string[]).includes(token)

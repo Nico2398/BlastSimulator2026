@@ -11,9 +11,9 @@
 import type { Page, KeyInput } from 'puppeteer';
 import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
 import { awaitPlacementArmed } from './tile-picker.js';
-import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './playtest-types.js';
-import type { PlayerAction } from './playtest-types.js';
-import { runAction } from './playtest-driver.js';
+import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './interaction-types.js';
+import type { PlayerAction } from './interaction-types.js';
+import { runAction } from './interaction-driver.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -429,8 +429,8 @@ export async function executeActionOnPage(
     }
     case 'pickTile': {
       // P3: in-scene placement, not the old 2D canvas. Scenario mode drives it
-      // through window.__placement directly (playtest mode drives the same
-      // tool with real clicks instead — see playtest-driver.ts).
+      // through window.__placement directly (interaction mode drives the same
+      // tool with real clicks instead — see interaction-driver.ts).
       await awaitPlacementArmed(page, PICKER_TIMEOUT_MS);
       await page.evaluate((x: number, z: number) => (window as unknown as {
         __placement: { paintRect: (x1: number, z1: number, x2: number, z2: number) => void };

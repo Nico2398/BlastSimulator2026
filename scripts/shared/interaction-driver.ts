@@ -1,14 +1,14 @@
 /**
- * BlastSimulator2026 — Playtest driver
+ * BlastSimulator2026 — Interaction driver
  *
  * Executes player actions against a live page and reports, for every failure,
  * which control blocked and why. No console access is exposed to actions.
  *
- * @module shared/playtest-driver
+ * @module shared/interaction-driver
  */
 
 import type { Page } from 'puppeteer';
-import type { PlayerAction, PlaytestGoal } from './playtest-types.js';
+import type { PlayerAction, InteractionGoal } from './interaction-types.js';
 import { awaitPlacementArmed, worldToScreenPoint } from './tile-picker.js';
 
 /** Mirror of src/ui/uiActionProbe.ts UiAction, kept structural to avoid a src import. */
@@ -30,10 +30,10 @@ export interface TutorialSnapshot {
   total: number;
 }
 
-export class PlaytestFailure extends Error {
+export class InteractionFailure extends Error {
   constructor(message: string, readonly diagnosis: string) {
     super(message);
-    this.name = 'PlaytestFailure';
+    this.name = 'InteractionFailure';
   }
 }
 
@@ -126,14 +126,14 @@ async function requireUsable(page: Page, selector: string, timeoutMs: number): P
   const why = reason === 'absent'
     ? 'it is not in the DOM at all'
     : `it is present but ${reason}${sameRegion ? ` — panel says "${sameRegion}"` : ''}`;
-  throw new PlaytestFailure(
+  throw new InteractionFailure(
     `control "${selector}" never became usable: ${why}`,
     describeAvailable(actions),
   );
 }
 
 /**
- * Wait for the P3 placement tool to be armed, with a playtest-shaped
+ * Wait for the P3 placement tool to be armed, with an interaction-shaped
  * diagnosis on miss. The polling itself lives in `tile-picker.ts` so the
  * scenario channel waits on the same condition; only the failure report
  * differs.
@@ -142,7 +142,7 @@ async function armedPlacement(page: Page): Promise<void> {
   try {
     await awaitPlacementArmed(page, DEFAULT_TIMEOUT_MS);
   } catch {
-    throw new PlaytestFailure('no placement tool is armed', describeAvailable(await probe(page)));
+    throw new InteractionFailure('no placement tool is armed', describeAvailable(await probe(page)));
   }
 }
 
@@ -167,14 +167,14 @@ async function requireCanvasAt(page: Page, px: number, py: number, tile: string)
     return `<${top.tagName.toLowerCase()}${id}${cls}>`;
   }, { x: px, y: py });
   if (blocker === null) return;
-  throw new PlaytestFailure(
+  throw new InteractionFailure(
     `tile ${tile} cannot be clicked — ${blocker} covers it at (${Math.round(px)}, ${Math.round(py)})`,
     'A tile the player is told to click must not sit under a docked panel, strip or card.'
     + ' Move the UI, or frame the camera on the target when the tool arms.',
   );
 }
 
-/** Run one player action, throwing PlaytestFailure with a diagnosis on failure. */
+/** Run one player action, throwing InteractionFailure with a diagnosis on failure. */
 export async function runAction(page: Page, action: PlayerAction): Promise<void> {
   switch (action.do) {
     case 'click': {
@@ -190,7 +190,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
         && a.label.toLowerCase().includes(wanted)
         && (action.region === undefined || a.region === action.region));
       if (!match) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `no usable control labelled "${action.label}"${action.region ? ` in ${action.region}` : ''}`,
           describeAvailable(actions),
         );
@@ -239,14 +239,14 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
           __entityWorldPosition: (k: string, i: number) => { x: number; z: number } | null;
         }).__entityWorldPosition(kind, id), { kind: action.kind, id: action.id });
       if (!pos) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `no ${action.kind} #${action.id} is on the scene to click`,
           describeAvailable(await probe(page)),
         );
       }
       await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
         (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
-        // Playtests suspend the draw loop like interaction-mode scenarios
+        // Interaction runs suspend the draw loop like interaction-mode scenarios
         // (#475) — force a frame so the new camera position and the scene's
         // entity transforms are current before the click below raycasts.
         (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
@@ -295,7 +295,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
           seen = await tutorialState(page);
           if (seen.stepId !== null && wanted.includes(seen.stepId)) break;
           if (Date.now() > deadline) {
-            throw new PlaytestFailure(
+            throw new InteractionFailure(
               `tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`
               + ` — it is on "${seen.stepId}" (${seen.title})`,
               describeAvailable(await probe(page)),
@@ -318,16 +318,16 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
   await new Promise(r => setTimeout(r, SETTLE_MS));
 }
 
-/** Check a beat's goal, throwing PlaytestFailure with a diagnosis when unmet. */
+/** Check a beat's goal, throwing InteractionFailure with a diagnosis when unmet. */
 export async function checkGoal(
   page: Page,
-  goal: PlaytestGoal,
+  goal: InteractionGoal,
   before: Record<string, unknown>,
 ): Promise<void> {
   if (goal.tutorialStep !== undefined) {
     const tut = await tutorialState(page);
     if (tut.stepId !== goal.tutorialStep) {
-      throw new PlaytestFailure(
+      throw new InteractionFailure(
         `tutorial should be on "${goal.tutorialStep}" but is on "${tut.stepId}" (${tut.title})`,
         describeAvailable(await probe(page)),
       );
@@ -342,7 +342,7 @@ export async function checkGoal(
       const was = typeof wasRaw === 'number' ? wasRaw : 0;
       const now = typeof nowRaw === 'number' ? nowRaw : 0;
       if (!(now > was)) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `${field} should have increased but went ${was} → ${now}`,
           describeAvailable(await probe(page)),
         );
@@ -358,7 +358,7 @@ export async function checkGoal(
       const was = typeof wasRaw === 'number' ? wasRaw : 0;
       const now = typeof nowRaw === 'number' ? nowRaw : 0;
       if (!(now < was)) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `${field} should have decreased but went ${was} → ${now}`,
           describeAvailable(await probe(page)),
         );
@@ -370,7 +370,7 @@ export async function checkGoal(
     const after = await gameState(page);
     for (const [field, expected] of Object.entries(goal.equals)) {
       if (after[field] !== expected) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(after[field])}`,
           describeAvailable(await probe(page)),
         );
@@ -385,7 +385,7 @@ export async function checkGoal(
   if (goal.blocked) {
     const reason = await blockedReason(page, goal.blocked);
     if (reason === null) {
-      throw new PlaytestFailure(
+      throw new InteractionFailure(
         `control "${goal.blocked}" is reachable but should not be`,
         describeAvailable(await probe(page)),
       );
@@ -394,7 +394,7 @@ export async function checkGoal(
       // Absent technically satisfies "not reachable", but it is far more often
       // a stale selector — which would make this assertion pass forever while
       // proving nothing.
-      throw new PlaytestFailure(
+      throw new InteractionFailure(
         `control "${goal.blocked}" is not in the DOM, so "blocked" proves nothing — fix the selector`,
         describeAvailable(await probe(page)),
       );
@@ -405,13 +405,13 @@ export async function checkGoal(
     for (const [selector, expected] of Object.entries(goal.textEquals)) {
       const actual = await domProperty(page, selector, 'textContent');
       if (actual === undefined) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `textEquals: selector "${selector}" not found in the DOM`,
           describeAvailable(await probe(page)),
         );
       }
       if (actual !== expected) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `textEquals: "${selector}" should read ${JSON.stringify(expected)} but reads ${JSON.stringify(actual)}`,
           describeAvailable(await probe(page)),
         );
@@ -423,13 +423,13 @@ export async function checkGoal(
     for (const [selector, expected] of Object.entries(goal.titleEquals)) {
       const actual = await domProperty(page, selector, 'title');
       if (actual === undefined) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `titleEquals: selector "${selector}" not found in the DOM`,
           describeAvailable(await probe(page)),
         );
       }
       if (actual !== expected) {
-        throw new PlaytestFailure(
+        throw new InteractionFailure(
           `titleEquals: "${selector}".title should read ${JSON.stringify(expected)} but reads ${JSON.stringify(actual)}`,
           describeAvailable(await probe(page)),
         );
