@@ -223,9 +223,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1
+          "pendingActionCount": 1,
+          "collapsedCount": 1
         },
-        "note": "this is the file's own claimed premise made real: with minFatigue critically low, the engine proactively auto-inserts a rest PendingAction — visible here as pendingActionCount going from 0 back to 1 with no player action in between"
+        "note": "minFatigue hits the collapse floor mid-batch (5.0 -> 1.4) and tickCollapse fires before autoInsertNeedTasks ever gets a chance at its own, earlier warning-threshold insertion (25) -- this is a genuine collapse forcing the rest task, not the calm pre-collapse insertion the file's own name implies. pendingActionCount 0->1 is real, but it is collapse recovery, not proactive queuing; not fixed here since it is a game-balance question (why the proactive threshold never preempts it), not a command/UI divergence."
       }
     },
     {
@@ -269,12 +270,16 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
+          "cash"
+        ],
+        "increased": [
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1
-        }
+          "pendingActionCount": 0,
+          "collapsedCount": 0
+        },
+        "note": "the collapse-forced rest queued in the previous step is now active: minFatigue recovers (not decreases) and the task completes, dropping pendingActionCount back to 0 and clearing collapsedCount. This batch is interrupted early by an unrelated random event (politics_mining_expo) -- the recovery is already visible in however many ticks actually ran."
       }
     },
     {
