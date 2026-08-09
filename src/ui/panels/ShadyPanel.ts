@@ -39,6 +39,7 @@ export class ShadyPanel {
   private readonly exposureCard: HTMLElement;
   private readonly exposureValueEl: HTMLElement;
   private readonly exposureBarEl: HTMLElement;
+  private readonly statusEl: HTMLElement;
 
   private onCloseCb?: () => void;
   private gameConsole?: GameConsoleFn;
@@ -115,7 +116,11 @@ export class ShadyPanel {
     );
     this.exposureCard = card([exposureHeadRow, exposureTrack, exposureNote]);
 
-    this.bodyEl.append(introEl, influenceCard, arrangementsHeader, this.targetsEl, servicesHeader, this.servicesEl);
+    this.statusEl = el('div', {
+      attrs: { id: 'bs-shady-status', style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);min-height:14px' },
+    });
+
+    this.bodyEl.append(introEl, influenceCard, arrangementsHeader, this.targetsEl, servicesHeader, this.servicesEl, this.statusEl);
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
   }
@@ -128,6 +133,11 @@ export class ShadyPanel {
   show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
+
+  setStatus(msg: string): void {
+    this.statusEl.textContent = msg;
+    setTimeout(() => { if (this.statusEl.textContent === msg) this.statusEl.textContent = ''; }, 3000);
+  }
 
   refreshLocale(): void {
     this.locale.refresh();
@@ -199,7 +209,10 @@ export class ShadyPanel {
         title: t('ui.shady.confirm_title'),
         body: t('ui.shady.confirm_body', { target: t(target.nameKey), cost: cost.toLocaleString('en-US'), rate }),
         confirmLabel: t('ui.shady.make_the_call'),
-        onConfirm: () => this.gameConsole?.(`corrupt target:${target.id}`),
+        onConfirm: () => {
+          const cmdResult = this.gameConsole?.(`corrupt target:${target.id}`);
+          this.setStatus(cmdResult?.output ?? '');
+        },
       });
     });
     const footRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [
@@ -245,7 +258,10 @@ export class ShadyPanel {
       { dataAction: 'mafia-smuggle' },
     );
     toggleBtn.style.width = '100%';
-    toggleBtn.addEventListener('click', () => this.gameConsole?.('mafia smuggle'));
+    toggleBtn.addEventListener('click', () => {
+      const cmdResult = this.gameConsole?.('mafia smuggle');
+      this.setStatus(cmdResult?.output ?? '');
+    });
     return card([headRow, note, toggleBtn]);
   }
 
@@ -268,7 +284,10 @@ export class ShadyPanel {
         title: t('ui.shady.accident_confirm_title'),
         body: t('ui.shady.accident_confirm_body', { name: emp.name, cost: ACCIDENT_COST.toLocaleString('en-US'), rate: successRate }),
         confirmLabel: t('ui.shady.accident_button'),
-        onConfirm: () => this.gameConsole?.(`mafia accident employee:${emp.id}`),
+        onConfirm: () => {
+          const cmdResult = this.gameConsole?.(`mafia accident employee:${emp.id}`);
+          this.setStatus(cmdResult?.output ?? '');
+        },
       });
     });
     const row = el('div', { attrs: { style: 'display:flex;gap:6px' }, children: [select, goBtn] });
@@ -302,7 +321,10 @@ export class ShadyPanel {
             title: t('ui.shady.frame_complete_confirm_title'),
             body: t('ui.shady.frame_complete_confirm_body', { name: emp.name, rate: successRate }),
             confirmLabel: t('ui.shady.frame_complete_button'),
-            onConfirm: () => this.gameConsole?.(`mafia frame employee:${emp.id}`),
+            onConfirm: () => {
+              const cmdResult = this.gameConsole?.(`mafia frame employee:${emp.id}`);
+              this.setStatus(cmdResult?.output ?? '');
+            },
           });
         });
         row.appendChild(useBtn);
@@ -330,7 +352,10 @@ export class ShadyPanel {
         title: t('ui.shady.frame_start_confirm_title'),
         body: t('ui.shady.frame_start_confirm_body', { name: emp.name, cost: FRAME_COST.toLocaleString('en-US'), ticks: FRAME_EVIDENCE_TICKS }),
         confirmLabel: t('ui.shady.frame_start_button'),
-        onConfirm: () => this.gameConsole?.(`mafia frame employee:${emp.id}`),
+        onConfirm: () => {
+          const cmdResult = this.gameConsole?.(`mafia frame employee:${emp.id}`);
+          this.setStatus(cmdResult?.output ?? '');
+        },
       });
     });
     children.push(el('div', { attrs: { style: 'display:flex;gap:6px' }, children: [select, startBtn] }));

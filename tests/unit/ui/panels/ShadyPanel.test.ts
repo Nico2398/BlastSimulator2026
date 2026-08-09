@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { ShadyPanel } from '../../../../src/ui/panels/ShadyPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -27,7 +27,7 @@ function stateWithMafiaUnlocked(): GameState {
 }
 
 describe('ShadyPanel', () => {
-  afterEach(() => { setLocale('en'); });
+  afterEach(() => { setLocale('en'); vi.useRealTimers(); });
 
   it('carries a stable root id and is hidden by default', () => {
     const { container, panel } = mount();
@@ -394,6 +394,149 @@ describe('ShadyPanel', () => {
       useBtn!.click();
       requested!.onConfirm();
       expect(calls).toEqual([`mafia frame employee:${b.id}`]);
+      panel.dispose();
+    });
+  });
+
+  // The 5 handlers below discard the CommandResult returned by
+  // this.gameConsole?.(...) — a refused/failed attempt (e.g. the judge says
+  // no) is silent to the player today. These assert the real cmdResult.output
+  // lands in #bs-shady-status, matching BuildMenu's setStatus(cmdResult.output) wiring.
+  describe('status wiring (#510)', () => {
+    it('a successful corrupt attempt surfaces cmdResult.output in the status area', () => {
+      const { container, panel } = mount();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      panel.setGameConsole(() => ({ success: true, output: 'Judge takes the bribe. Corruption level rises.' }));
+
+      const btn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-target="judge"] [data-action="corrupt"]');
+      btn!.click();
+      requested!.onConfirm();
+
+      expect(container.querySelector('#bs-shady-status')!.textContent).toBe('Judge takes the bribe. Corruption level rises.');
+      panel.dispose();
+    });
+
+    it('a failed/refused corrupt attempt also surfaces cmdResult.output in the status area (today silent)', () => {
+      const { container, panel } = mount();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      panel.setGameConsole(() => ({ success: false, output: 'The judge refused the bribe.' }));
+
+      const btn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-target="judge"] [data-action="corrupt"]');
+      btn!.click();
+      requested!.onConfirm();
+
+      expect(container.querySelector('#bs-shady-status')!.textContent).toBe('The judge refused the bribe.');
+      panel.dispose();
+    });
+
+    it('the mafia-smuggle toggle surfaces cmdResult.output in the status area on click', () => {
+      const { container, panel } = mount();
+      panel.update(stateWithMafiaUnlocked());
+      panel.show();
+      panel.setGameConsole(() => ({ success: true, output: 'Smuggling operation started.' }));
+
+      const btn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-smuggle"]');
+      btn!.click();
+
+      expect(container.querySelector('#bs-shady-status')!.textContent).toBe('Smuggling operation started.');
+      panel.dispose();
+    });
+
+    it('confirming a mafia-accident arrangement surfaces cmdResult.output', () => {
+      const { container, panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      panel.setGameConsole(() => ({ success: true, output: 'An unfortunate accident has been arranged.' }));
+
+      const select = container.querySelector<HTMLSelectElement>('#bs-shady-panel [data-action="mafia-accident-employee"]');
+      select!.value = String(employee.id);
+      const goBtn = container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-accident"]');
+      goBtn!.click();
+      requested!.onConfirm();
+
+      expect(container.querySelector('#bs-shady-status')!.textContent).toBe('An unfortunate accident has been arranged.');
+      panel.dispose();
+    });
+
+    it('confirming a mafia-frame start surfaces cmdResult.output', () => {
+      const { container, panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      panel.setGameConsole(() => ({ success: true, output: 'Evidence is being planted.' }));
+
+      const select = container.querySelector<HTMLSelectElement>('#bs-shady-panel [data-action="mafia-frame-employee"]');
+      select!.value = String(employee.id);
+      container.querySelector<HTMLButtonElement>('#bs-shady-panel [data-action="mafia-frame-start"]')!.click();
+      requested!.onConfirm();
+
+      expect(container.querySelector('#bs-shady-status')!.textContent).toBe('Evidence is being planted.');
+      panel.dispose();
+    });
+
+    it('confirming a mafia-frame complete ("use the evidence") surfaces cmdResult.output', () => {
+      const { container, panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+      state.tickCount = 20;
+      state.mafia.pendingFrames = [{ employeeId: employee.id, startTick: 5, readyTick: 15 }];
+      panel.update(state);
+      panel.show();
+
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
+      panel.setGameConsole(() => ({ success: true, output: 'The frame is complete. The employee is arrested.' }));
+
+      const useBtn = container.querySelector<HTMLButtonElement>(
+        `#bs-shady-panel [data-frame-id="${employee.id}"] [data-action="mafia-frame-complete"]`,
+      );
+      useBtn!.click();
+      requested!.onConfirm();
+
+      expect(container.querySelector('#bs-shady-status')!.textContent).toBe('The frame is complete. The employee is arrested.');
+      panel.dispose();
+    });
+
+    it('setStatus auto-clears after ~3000ms, and a fresher call is not clobbered by a stale timeout', () => {
+      vi.useFakeTimers();
+      const { container, panel } = mount();
+      const statusText = () => container.querySelector('#bs-shady-status')!.textContent;
+
+      panel.setStatus('first message');
+      expect(statusText()).toBe('first message');
+
+      vi.advanceTimersByTime(1000);
+      panel.setStatus('second message');
+      expect(statusText()).toBe('second message');
+
+      // first message's own 3000ms timeout fires here (1000 + 2000 = 3000ms after it
+      // was set) — it must recognize the text has moved on and do nothing.
+      vi.advanceTimersByTime(2000);
+      expect(statusText()).toBe('second message');
+
+      // second message's own timeout, 3000ms after it was set, clears it.
+      vi.advanceTimersByTime(1000);
+      expect(statusText()).toBe('');
+
       panel.dispose();
     });
   });
