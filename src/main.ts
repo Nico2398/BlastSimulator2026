@@ -1,6 +1,7 @@
 // BlastSimulator2026 — Browser entry point
 // Initializes the 3D scene, UI, audio, save system, and exposes the console bridge.
 
+import * as THREE from 'three';
 import { SceneManager } from './renderer/SceneManager.js';
 import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
@@ -818,6 +819,9 @@ uiManager.setSiteMapHandler(() => {
 uiManager.setOpenSavesHandler(() => savesModal.show());
 uiManager.setMapFocusHandler((x, z) => {
   scene.cameraController.focus(x, gameRenderer.surfaceYAt(x, z), z, 60);
+});
+uiManager.setSelectVehicleHandler((vehicleId) => {
+  scenePicking.select({ kind: 'vehicle', id: vehicleId, point: new THREE.Vector3(), distance: 0 });
 });
 
 // --- Scene picking wiring (redesign P2) ---

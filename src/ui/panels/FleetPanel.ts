@@ -70,11 +70,6 @@ export class FleetPanel {
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
-
-    // Skeleton-phase placeholder read: implementer wires this into the
-    // vehicle card's click listener (makeVehicleCard). Keeps noUnusedLocals
-    // green until that wiring lands.
-    void this.onSelectVehicleCb;
   }
 
   get root(): HTMLElement { return this.el; }
@@ -277,6 +272,12 @@ export class FleetPanel {
 
     const wrap = card(rows);
     wrap.dataset['vehicleId'] = String(v.id);
+    wrap.style.cursor = 'pointer';
+    wrap.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button, select, input, a')) return;
+      this.onSelectVehicleCb?.(v.id);
+    });
     return wrap;
   }
 
