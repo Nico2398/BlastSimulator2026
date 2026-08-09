@@ -798,14 +798,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
         }
       ],
-      "description": "Finding #48: the Fleet panel's Haul button (`.bs-vehicle-haul-btn`) always sends the vehicle to `findReachableGroundFragment` (HaulingTask.ts) -- the NEAREST reachable, non-oversized, storage-fitting fragment -- with no regard for what ore it carries. A player cannot click their way to a SPECIFIC fragment by ore content; only command mode's explicit `fragment:N` can. So the CONTRACT must be picked to match what the vehicle will actually haul next, not the other way around -- every contract accept below is chosen by first checking what `findReachableGroundFragment` returns for this cycle, replaying the file's own exact, complete command sequence to get it (not a hand-abbreviated one -- `contract list`'s own RNG draw depends on exactly how many times it has already been called, so a shortened trace generates a different contract pool than the real file). This cycle's nearest fragment (id 1208) has empty ore content, so contract #2 (rubble disposal, materialId '') is the only one it can actually satisfy.",
+      "description": "Finding #48: the Fleet panel's Haul button (`.bs-vehicle-haul-btn`) always sends the vehicle to `findReachableGroundFragment` (HaulingTask.ts) -- the NEAREST reachable, non-oversized, storage-fitting fragment -- with no regard for what ore it carries. A player cannot click their way to a SPECIFIC fragment by ore content; only command mode's explicit `fragment:N` can. So the CONTRACT must be picked to match what the vehicle will actually haul next, not the other way around -- every contract accept below is chosen by first checking what `findReachableGroundFragment` returns for this cycle, replaying the file's own exact, complete command sequence to get it (not a hand-abbreviated one -- `contract list`'s own RNG draw depends on exactly how many times it has already been called, so a shortened trace generates a different contract pool than the real file). This cycle's nearest fragment (id 1208) has empty ore content, so contract #2 (rubble disposal, materialId '') is the only one it can actually satisfy. #513: the selector is now scoped to `[data-contract-id=\"2\"]` so it targets contract #2's own card regardless of DOM order, rather than unscoped `.bs-contract-accept` which always resolved to the first offered card.",
       "role": "player"
     },
     {
@@ -846,18 +846,24 @@
       "command": "contract deliver 2 amount:260",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract deliver 2 amount:260"
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-amount",
+          "value": "260"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
         }
       ],
-      "description": "CONVERSION ATTEMPTED AND REVERTED -- the blocker is upstream, at the accept step, and is a real finding. ContractsPanel renders no contract id on either an offered or an active card (no data-id, only the `#<id>` text), so `.bs-contract-accept` can only ever click the FIRST card on offer. Step 46 declares `contract accept 2` (rubble disposal, chosen because the fragment the Haul button hauls carries no ore) but the click accepts contract #1, \"Supply dirtite (bulk)\". Measured, not reasoned: at this step command mode holds 550 kg of rubble against the rubble contract and delivers it (\"Contract #2 COMPLETED! Payment: $451.97\"), while the browser holds the same 550 kg of rubble against a DIRTITE contract, so maxDeliverable is 0 and the whole deliver row is disabled -- a `set`+DELIVER conversion failed here with `\"#bs-contract-panel .bs-contract-amount\" ... is present but disabled`. No `expect.blocked` is attached either: the button's disabled state here is a symptom of the accept divergence, not of a stable game guard, and pinning it would enshrine the bug. Fix the panel first (give the cards a per-contract selector), then this step and step 63 both convert. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact. One haul is enough to complete this contract outright (fragment 1208 carries 550kg, the contract needs 260kg) -- no second haul round needed this cycle.",
+      "description": "#513 fix landed: ContractsPanel now sets `data-contract-id` on both offered and active cards, so the accept step above (and this deliver step) can scope selectors to the exact contract instead of always resolving to the first card in the DOM. This step converts from a bare `contract deliver` command to a real click -- `set` the amount field to 260 on contract #2's own card, then click that card's own `.bs-contract-deliver`. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact. One haul is enough to complete this contract outright (fragment 1208 carries 550kg, the contract needs 260kg) -- no second haul round needed this cycle.",
       "expect": {
         "equals": {
           "tickCount": 67,
           "deathCount": 1,
           "employeeCount": 8
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "finances",
@@ -1049,14 +1055,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         }
       ],
-      "description": "Finding #48: the Fleet panel's Haul button (`.bs-vehicle-haul-btn`) always sends the vehicle to `findReachableGroundFragment` (HaulingTask.ts) -- the NEAREST reachable, non-oversized, storage-fitting fragment -- with no regard for what ore it carries. A player cannot click their way to a SPECIFIC fragment by ore content; only command mode's explicit `fragment:N` can. So the CONTRACT must be picked to match what the vehicle will actually haul next, not the other way around -- every contract accept below is chosen by first checking what `findReachableGroundFragment` returns for this cycle, replaying the file's own exact, complete command sequence to get it (not a hand-abbreviated one -- `contract list`'s own RNG draw depends on exactly how many times it has already been called, so a shortened trace generates a different contract pool than the real file). This cycle's nearest fragment (id 1431) carries dirtite, so contract #4 (Deliver dirtite ore, 60kg) is the match.",
+      "description": "Finding #48: the Fleet panel's Haul button (`.bs-vehicle-haul-btn`) always sends the vehicle to `findReachableGroundFragment` (HaulingTask.ts) -- the NEAREST reachable, non-oversized, storage-fitting fragment -- with no regard for what ore it carries. A player cannot click their way to a SPECIFIC fragment by ore content; only command mode's explicit `fragment:N` can. So the CONTRACT must be picked to match what the vehicle will actually haul next, not the other way around -- every contract accept below is chosen by first checking what `findReachableGroundFragment` returns for this cycle, replaying the file's own exact, complete command sequence to get it (not a hand-abbreviated one -- `contract list`'s own RNG draw depends on exactly how many times it has already been called, so a shortened trace generates a different contract pool than the real file). This cycle's nearest fragment (id 1431) carries dirtite, so contract #4 (Deliver dirtite ore, 60kg) is the match. #513: the selector is now scoped to `[data-contract-id=\"4\"]` so it targets contract #4's own card regardless of DOM order, rather than unscoped `.bs-contract-accept` which always resolved to the first offered card.",
       "role": "player"
     },
     {
@@ -1099,17 +1105,23 @@
       "command": "contract deliver 4 amount:60",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract deliver 4 amount:60"
+          "type": "set",
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-amount",
+          "value": "60"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
         }
       ],
-      "description": "Left as a command for the same reason as step 49: `.bs-contract-accept` clicks whichever card happens to be first, so step 60's declared `contract accept 4` and the click it runs accept different contracts, and the material this file hauls does not match what the browser ends up holding. Command mode's own trace here is a clean success (60 kg of dirtite against 575 kg stored, \"Contract #4 COMPLETED\"), which is exactly why the divergence is worth naming rather than papering over. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact.",
+      "description": "#513 fix landed: same as step 62 -- ContractsPanel now sets `data-contract-id` on both offered and active cards, so this step converts from a bare `contract deliver` command to a real click, scoped to contract #4's own card, instead of the old unscoped `.bs-contract-accept`/`.bs-contract-deliver` that always resolved to the first card in the DOM. Command mode's own trace here is a clean success (60 kg of dirtite against 575 kg stored, \"Contract #4 COMPLETED\"), and the scoped click now matches it. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact.",
       "expect": {
         "equals": {
           "tickCount": 69,
           "deathCount": 1
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "finances",

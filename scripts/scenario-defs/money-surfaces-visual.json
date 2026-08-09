@@ -137,21 +137,30 @@
     {
       "command": "contract accept id:2",
       "timeout": 30,
-      "description": "BLOCKED FINDING, left unconverted deliberately: offered-contract rows carry no id-scoped selector, so negotiating contract 1 and accepting contract 2 specifically can't be expressed as a reliable click — only \"the first offer\" resolves unambiguously (proven in contract-panel-visual.json). A click here risks acting on the wrong contract, which is worse than staying a command.",
+      "description": "#513 fix landed: offered-contract cards now carry `data-contract-id`, so negotiating contract 1 and accepting contract 2 specifically is a reliable, scoped click instead of only ever reaching \"the first offer\". Converted from three commands to real clicks: open the contracts panel, negotiate on card 1's own `[data-action=\"negotiate\"]`, then accept on card 2's own `.bs-contract-accept`.",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract list"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
         },
         {
-          "type": "command",
-          "command": "contract negotiate id:1"
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"1\"] [data-action=\"negotiate\"]"
         },
         {
-          "type": "command",
-          "command": "contract accept id:2"
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"1\"] [data-action=\"negotiate\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state",
