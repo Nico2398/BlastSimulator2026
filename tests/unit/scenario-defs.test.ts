@@ -814,7 +814,11 @@ describe('isAllowedBootstrapCommand (issue #515)', () => {
   });
 
   it('rejects a command with a real UI equivalent', () => {
-    expect(isAllowedBootstrapCommand('build office')).toBe(false);
+    // `management_office` is a real BuildingType (Building.ts) with a real
+    // catalog row (BuildMenu.ts's data-build-type). `office` (no such type —
+    // see BOOTSTRAP_COMMAND_ALLOWLIST's comment) would be the wrong example
+    // here: it has no UI to smuggle past, real or otherwise.
+    expect(isAllowedBootstrapCommand('build management_office')).toBe(false);
   });
 
   it('rejects an empty command', () => {
