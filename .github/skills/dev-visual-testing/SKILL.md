@@ -103,7 +103,7 @@ npm run scenarios:interaction
 npm run scenarios -- blast-basic tutorial-playthrough
 ```
 
-Interaction actions (clickSelector, waitForSelector, type, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/shared/scenario-types.ts`. Steps without `interaction` use command execution.
+Interaction actions (clickSelector, waitForSelector, type, etc.) defined in scenario step `interaction` arrays. Type definitions in `scripts/shared/scenario-types.ts`. Steps without `interaction` use command execution. A step's `expect` (same file) is what proves game state actually moved during the step, not merely that nothing threw — role/expect mechanics: `dev-testing-strategy`.
 
 **Output per step:**
 - `step-NN-command.json` — game state + command output (always)
@@ -174,3 +174,5 @@ When images could not be produced at all, say the visual channel is unverified a
 A screenshot shows a button. It does not show that the button is enabled, that a click reaches it, or that a player can satisfy its preconditions. An interaction-mode scenario may click a control and continue past a click that did nothing, because "no selector timed out" is not "the step completed".
 
 When the change touches a player-facing flow, run the `playability` channel too: `npm run playtest`. Procedures, the `__uiActions` / `__probeSelector` / `__tutorialState` bridges, and the no-console-commands rule live in the `dev-playability-testing` skill.
+
+This distinction is scheduled to collapse: once issue #515 lands, mandatory `role` tagging plus `expect`'s `usable`/`blocked` checks make an interaction-mode scenario step prove the same thing a playtest beat proves today — see the transitional note in `dev-playability-testing`.
