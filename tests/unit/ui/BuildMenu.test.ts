@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { BuildMenu } from '../../../src/ui/BuildMenu.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
-import type { Building } from '../../../src/core/entities/Building.js';
+import { getBuildingDef, type Building } from '../../../src/core/entities/Building.js';
 
 /** Minimal GameState that won't crash the panel update loop. */
 function makeMockState(overrides?: Partial<GameState>): GameState {
@@ -142,5 +142,71 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
       expect(btn!.style.flex).toBe('0 1 auto');
       expect(btn!.style.whiteSpace).toBe('normal');
     }
+  });
+});
+
+describe('BuildMenu — placed-row affordability guard (issue #511)', () => {
+  let container: HTMLDivElement;
+  let menu: BuildMenu;
+
+  beforeEach(() => {
+    ({ container, menu } = setupMenu());
+  });
+
+  afterEach(() => {
+    menu.dispose();
+    container.remove();
+  });
+
+  it('.bs-build-demolish-btn / .bs-build-upgrade-btn / .bs-build-move-btn disable when cash is short of their real cost, and re-enable on a cash-only update() that never rebuilds the row', () => {
+    const building = makeBuilding({ id: 1, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [building];
+    // Tier 2 researched so only the funds guard — not the research gate — is
+    // under test here; the tier-locked case is covered by BuildMenu's own
+    // pre-existing nextTier===null disabling, not this guard.
+    state.buildings.unlockedTiers['management_office'] = 2;
+
+    const oldDef = getBuildingDef('management_office', 1);
+    const newDef = getBuildingDef('management_office', 2);
+    const demolishCost = oldDef.demolishCost;
+    const moveCost = Math.round(oldDef.constructionCost * 0.5);
+    const upgradeCost = oldDef.demolishCost + newDef.constructionCost;
+    const maxCost = Math.max(demolishCost, moveCost, upgradeCost);
+
+    state.cash = maxCost - 1;
+    menu.update(state);
+    const row = findPlacedRow(container, 1);
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(demolishCost > state.cash);
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.disabled).toBe(upgradeCost > state.cash);
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(moveCost > state.cash);
+
+    // Cash-only change: building id/tier, unlockedTiers, and researchQueue are
+    // all unchanged, so `update()` must not trigger `refreshPlacedList()` — the
+    // row's own DOM node must survive, proving the cash refresh is the cheap
+    // per-tick path, not a full placed-list rebuild.
+    state.cash = maxCost;
+    menu.update(state);
+    const rowAfter = findPlacedRow(container, 1);
+    expect(rowAfter).toBe(row);
+    expect(rowAfter.querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(false);
+    expect(rowAfter.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn')!.disabled).toBe(false);
+    expect(rowAfter.querySelector<HTMLButtonElement>('.bs-build-move-btn')!.disabled).toBe(false);
+  });
+
+  it('re-disables on a cash-only update() that drops the balance back below cost', () => {
+    const building = makeBuilding({ id: 2, type: 'management_office', tier: 1 });
+    const state = makeMockState();
+    state.buildings.buildings = [building];
+    state.buildings.unlockedTiers['management_office'] = 2;
+    const demolishCost = getBuildingDef('management_office', 1).demolishCost;
+
+    state.cash = demolishCost;
+    menu.update(state);
+    expect(findPlacedRow(container, 2).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(false);
+
+    state.cash = demolishCost - 1;
+    menu.update(state);
+    expect(findPlacedRow(container, 2).querySelector<HTMLButtonElement>('.bs-build-demolish-btn')!.disabled).toBe(true);
   });
 });

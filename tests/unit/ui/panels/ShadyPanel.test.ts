@@ -7,6 +7,8 @@ import { hireEmployee } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
 import { t, setLocale } from '../../../../src/core/i18n/I18n.js';
 import type { ConfirmModalConfig } from '../../../../src/ui/panels/ConfirmModal.js';
+import { TARGET_COSTS } from '../../../../src/core/economy/Corruption.js';
+import { ACCIDENT_COST, FRAME_COST } from '../../../../src/core/events/MafiaActions.js';
 
 function mount(): { container: HTMLDivElement; panel: ShadyPanel } {
   const container = document.createElement('div');
@@ -537,6 +539,107 @@ describe('ShadyPanel', () => {
       vi.advanceTimersByTime(1000);
       expect(statusText()).toBe('');
 
+      panel.dispose();
+    });
+  });
+
+  // Funds-guard parity (issue #511): a control that spends cash must refuse
+  // an unaffordable action the same way employee hire / vehicle buy / build
+  // already do, on both the console guard and the button's disabled state.
+  // These cover the button side; the console side lives in
+  // tests/unit/console/insufficient-funds-guards.test.ts.
+  describe('affordability guard (#511)', () => {
+    // Scoped to `panel.root` rather than `container.querySelector('#bs-shady-panel ...')`:
+    // a red-phase assertion failure below skips the trailing `panel.dispose()`,
+    // and jsdom resolves id selectors against the whole document rather than
+    // the query root (same gotcha BuildMenu.test.ts documents for #462), so a
+    // prior test's undisposed panel can shadow this one's #bs-shady-panel.
+    // `panel.root` is the exact element, immune to that collision regardless
+    // of cleanup order.
+
+    it('disables the corrupt call button when cash is short of the target cost, and re-enables on a cash-only update()', () => {
+      const { panel } = mount();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      state.cash = TARGET_COSTS.witness - 1;
+      panel.update(state);
+      panel.show();
+
+      const witnessBtn = panel.root.querySelector<HTMLButtonElement>('[data-target="witness"] [data-action="corrupt"]')!;
+      expect(witnessBtn.disabled).toBe(true);
+
+      // Cash-only change: no roster/frame/level/smuggling change, so the
+      // signature-gated render() must not need to fire for this to update.
+      state.cash = TARGET_COSTS.witness;
+      panel.update(state);
+      const witnessBtnAfter = panel.root.querySelector<HTMLButtonElement>('[data-target="witness"] [data-action="corrupt"]')!;
+      expect(witnessBtnAfter.disabled).toBe(false);
+      panel.dispose();
+    });
+
+    it('a cheap target stays clickable while an expensive one is disabled at the same balance', () => {
+      const { panel } = mount();
+      const state = createGame({ seed: 1, mineType: 'desert' });
+      state.cash = TARGET_COSTS.judge - 1; // affords every target except judge
+      panel.update(state);
+      panel.show();
+
+      const judgeBtn = panel.root.querySelector<HTMLButtonElement>('[data-target="judge"] [data-action="corrupt"]')!;
+      const witnessBtn = panel.root.querySelector<HTMLButtonElement>('[data-target="witness"] [data-action="corrupt"]')!;
+      expect(judgeBtn.disabled).toBe(true);
+      expect(witnessBtn.disabled).toBe(false);
+      panel.dispose();
+    });
+
+    it('disables the accident button when cash is short of the accident cost — distinct from the no-employees disable case', () => {
+      const { panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      hireEmployee(state.employees, 'driller', new Random(1));
+      state.cash = ACCIDENT_COST - 1;
+      panel.update(state);
+      panel.show();
+
+      const goBtn = panel.root.querySelector<HTMLButtonElement>('[data-action="mafia-accident"]')!;
+      expect(goBtn.disabled).toBe(true);
+
+      state.cash = ACCIDENT_COST;
+      panel.update(state);
+      const goBtnAfter = panel.root.querySelector<HTMLButtonElement>('[data-action="mafia-accident"]')!;
+      expect(goBtnAfter.disabled).toBe(false);
+      panel.dispose();
+    });
+
+    it('disables the frame start button when cash is short of the frame cost, and re-enables on a cash-only update()', () => {
+      const { panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      hireEmployee(state.employees, 'driller', new Random(1));
+      state.cash = FRAME_COST - 1;
+      panel.update(state);
+      panel.show();
+
+      const startBtn = panel.root.querySelector<HTMLButtonElement>('[data-action="mafia-frame-start"]')!;
+      expect(startBtn.disabled).toBe(true);
+
+      state.cash = FRAME_COST;
+      panel.update(state);
+      const startBtnAfter = panel.root.querySelector<HTMLButtonElement>('[data-action="mafia-frame-start"]')!;
+      expect(startBtnAfter.disabled).toBe(false);
+      panel.dispose();
+    });
+
+    it('keeps the frame complete button enabled regardless of cash — completing a ready frame is always free', () => {
+      const { panel } = mount();
+      const state = stateWithMafiaUnlocked();
+      const { employee } = hireEmployee(state.employees, 'driller', new Random(1));
+      state.tickCount = 20;
+      state.mafia.pendingFrames = [{ employeeId: employee.id, startTick: 5, readyTick: 15 }];
+      state.cash = 0;
+      panel.update(state);
+      panel.show();
+
+      const useBtn = panel.root.querySelector<HTMLButtonElement>(
+        `[data-frame-id="${employee.id}"] [data-action="mafia-frame-complete"]`,
+      )!;
+      expect(useBtn.disabled).toBe(false);
       panel.dispose();
     });
   });

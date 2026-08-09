@@ -146,6 +146,7 @@ const VISUAL_SCENARIO_NAMES = [
   'tutorial-interactive',
   'scene-picking-visual',
   'landscape-continuity-visual',
+  'insufficient-funds-guards-visual',
 ] as const;
 
 /**
