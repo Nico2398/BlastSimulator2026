@@ -10,6 +10,8 @@ import {
   getBuildingDef,
   getDefSize,
   getMoveCost,
+  getDemolishCost,
+  getUpgradeCost,
   isPlacementBlockedByResearch,
   getStorageCapacity,
   type BuildingType,
@@ -88,14 +90,15 @@ export function buildCommand(
       const toDestroy = state.buildings.buildings.find(b => b.id === id);
       if (!toDestroy) return { success: false, output: `Building #${id} not found.` };
       const destroyDef = getBuildingDef(toDestroy.type, toDestroy.tier);
-      if (state.cash < destroyDef.demolishCost) {
+      const demolishCost = getDemolishCost(toDestroy);
+      if (state.cash < demolishCost) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(destroyDef.demolishCost)}, have $${formatMoney(state.cash)}`,
+          output: `Insufficient funds: need $${formatMoney(demolishCost)}, have $${formatMoney(state.cash)}`,
         };
       }
-      state.cash -= destroyDef.demolishCost;
-      addExpense(state.finances, destroyDef.demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
+      state.cash -= demolishCost;
+      addExpense(state.finances, demolishCost, 'construction', `Demolish ${toDestroy.type} #${id}`, state.tickCount);
       destroyBuilding(state.buildings, id);
       refreshLogisticsCapacity(state);
       // Patch NavGrid for removed building footprint
@@ -103,7 +106,7 @@ export function buildCommand(
         const { sizeX, sizeZ } = getDefSize(destroyDef);
         patchNavGrid(state, ctx.grid, makeFootprintRegion(toDestroy.x, toDestroy.z, sizeX, sizeZ));
       }
-      return { success: true, output: `Building #${id} demolished. Cost: $${destroyDef.demolishCost}` };
+      return { success: true, output: `Building #${id} demolished. Cost: $${demolishCost}` };
     }
     case 'upgrade': {
       const id = parseInt(args[1] ?? '', 10);
@@ -117,7 +120,7 @@ export function buildCommand(
       }
       const oldDef = getBuildingDef(toUpgrade.type, toUpgrade.tier);
       const newDef = getBuildingDef(toUpgrade.type, nextTier);
-      const totalCost = oldDef.demolishCost + newDef.constructionCost;
+      const totalCost = getUpgradeCost(toUpgrade, nextTier);
       if (state.cash < totalCost) {
         return {
           success: false,
