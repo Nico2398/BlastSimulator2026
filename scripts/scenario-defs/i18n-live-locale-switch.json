@@ -253,7 +253,11 @@
           "property": "textContent",
           "expectedValue": "HORLOGE EN PAUSE"
         }
-      ]
+      ],
+      "expect": {
+        "blocked": "#bs-toolbar [data-panel=\"settings\"]",
+        "note": "tutorial rails (src/ui/tutorialGuide.ts) make every control but the current step's own target inert, including the Settings toggle -- confirms a player cannot switch language again once the tutorial has engaged, matching playtest's tutorial-fr.json beat 2 (checked there before tutorial_start; checked here after, on the toggle itself rather than the panel it opens)."
+      }
     },
     {
       "command": "time speed:2",
@@ -266,6 +270,12 @@
         {
           "type": "waitForTutorialStep",
           "stepId": "hire-surveyor"
+        },
+        {
+          "type": "assert",
+          "selector": ".bs-tutorial-box .bs-panel-title",
+          "property": "textContent",
+          "expectedValue": "Embaucher Prospecteur"
         }
       ]
     },
