@@ -1457,6 +1457,15 @@ below) or simply not-yet-converted, not legitimate permanent exceptions.
 own three deliverables, and issue #515 (the structural click-only
 enforcement gate), are what actually gate Phase 3 now.
 
+**This checklist is now tracked as issue #516** (2026-08-09), depending on
+#510-#515 all landing first. The 2026-08-09 documentation pass added dated
+transitional banners to `.claude/rules/playability.md`,
+`.claude/rules/scenario-defs.md`, `.claude/CLAUDE.md` (+ its `.github`/
+`.opencode` entry-point siblings), `dev-testing-strategy`,
+`dev-visual-testing`, and `dev-playability-testing` (all mirrored across the
+3 trees) — #516 is what finds and resolves every one of them, alongside the
+code deletion below.
+
 1. Delete `scripts/playtest.ts`, `scripts/playtests/*.json`,
    `scripts/shared/playtest-utils.ts`.
 2. `playtest-driver.ts`/`playtest-types.ts` **survive** — they are now the
