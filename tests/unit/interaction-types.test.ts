@@ -1,7 +1,8 @@
-// BlastSimulator2026 — playtest-types.ts direct coverage (issue #515)
+// BlastSimulator2026 — interaction-types.ts direct coverage (issue #515, renamed #516)
 //
 // playtest.ts and playtest-utils.ts were removed once every scenario step
-// carried a structurally-enforced role (issue #515), but playtest-types.ts
+// carried a structurally-enforced role (issue #515), but this module
+// (formerly playtest-types.ts, renamed interaction-types.ts in #516)
 // survives: `isAllowedSetupCommand`/`SETUP_COMMAND_ALLOWLIST` are the
 // allowlist interaction-executor.ts's `role: 'setup'` branch reuses for
 // scenario steps (see scripts/shared/interaction-executor.ts and
@@ -15,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SETUP_COMMAND_ALLOWLIST,
   isAllowedSetupCommand,
-} from '../../scripts/shared/playtest-types.js';
+} from '../../scripts/shared/interaction-types.js';
 
 describe('isAllowedSetupCommand', () => {
   it('allows world setup and time control', () => {

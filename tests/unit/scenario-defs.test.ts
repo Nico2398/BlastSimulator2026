@@ -885,7 +885,7 @@ describe('Role-marked steps obey checkStepActionAllowed for bootstrap/guard (iss
 // rule for beats). Checked in BOTH modes: command mode via
 // checkGoalAgainstState (equals/increased only — no DOM), interaction mode
 // via checkGoal (all fields) — scripts/shared/scenario-goal.ts and
-// scripts/shared/playtest-driver.ts respectively.
+// scripts/shared/interaction-driver.ts respectively.
 // ──────────────────────────────────────────────
 describe('Step expect field is shaped correctly when present', () => {
   for (const name of ALL_SCENARIO_NAMES) {
