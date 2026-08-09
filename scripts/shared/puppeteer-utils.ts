@@ -147,9 +147,9 @@ export async function executeInteractionActions(
       await executeActionOnPage(page, action, step);
       // A click that mutates the DOM — opening a panel, then clicking a control
       // inside it — needs the panel's next-frame `uiManager.update` to run
-      // before the following action reads or clicks that control. The playtest
-      // driver settles after every action for exactly this; the interaction
-      // scenarios did not, so a hire button clicked in the same beat its panel
+      // before the following action reads or clicks that control. The
+      // interaction driver settles after every action for exactly this; the
+      // interaction scenarios did not, so a hire button clicked in the same beat its panel
       // opened fired against a not-yet-live control and the click was lost
       // (the tutorial-interactive surveyor hire, which stalled the whole run).
       // Only the mutating actions pay it; reads and explicit waits do not.

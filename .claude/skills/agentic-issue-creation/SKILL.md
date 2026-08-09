@@ -67,7 +67,7 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 7. **Context explains the "why"** — what feature, what phase, what goal.
 8. **Single task per issue.** A task touching several concerns is several issues.
 9. **SMART compliance.** Specific (one clear goal), Measurable (verifiable outcome), Achievable (within an agent's capabilities), Relevant (part of the larger feature), Time-bound (a single atomic task).
-10. **Flag interaction-mode risk.** An issue whose change a playtest definition drives, or which touches machinery every scenario runs through, gets the `full-ci` label — it runs the two slow browser jobs. Command-mode scenarios and the `visual` channel suffice for everything else, UI included. The label costs the merge path ~50 minutes, so leave it off when in doubt: `agentic-pipeline-pr-management` holds the test.
+10. **Flag interaction-mode risk.** An issue whose change an interaction-mode scenario drives, or which touches machinery every scenario runs through, gets the `full-ci` label — it starts the interaction-mode browser job. Command-mode scenarios and the `visual` channel suffice for everything else, UI included. The label costs the merge path ~30 minutes, so leave it off when in doubt: `agentic-pipeline-pr-management` holds the test.
 11. **Label transfer.** A PR opened from a `full-ci` issue gets the same label: `gh pr edit <number> --add-label "full-ci"`.
 
 ## Checklist
@@ -80,6 +80,6 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 - [ ] Verification is a concrete observable outcome
 - [ ] SMART criteria respected
 - [ ] An issue that must stay out of the queue carries its own lifecycle label
-- [ ] Interaction-mode risk assessed → `full-ci` added only when a playtest definition drives the change, or every scenario runs through what it touches
+- [ ] Interaction-mode risk assessed → `full-ci` added only when an interaction-mode scenario drives the change, or every scenario runs through what it touches
 - [ ] If the issue has `full-ci`, the PR gets `full-ci` when opened
 - [ ] Labels set on creation: `ready,agent-task` unless the human specified otherwise or the issue must stay out of the queue

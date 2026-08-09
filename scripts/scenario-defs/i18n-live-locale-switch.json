@@ -259,7 +259,7 @@
       ],
       "expect": {
         "blocked": "#bs-toolbar [data-panel=\"settings\"]",
-        "note": "tutorial rails (src/ui/tutorialGuide.ts) make every control but the current step's own target inert, including the Settings toggle -- confirms a player cannot switch language again once the tutorial has engaged, matching playtest's tutorial-fr.json beat 2 (checked there before tutorial_start; checked here after, on the toggle itself rather than the panel it opens)."
+        "note": "tutorial rails (src/ui/tutorialGuide.ts) make every control but the current step's own target inert, including the Settings toggle -- confirms a player cannot switch language again once the tutorial has engaged, matching the deleted playtest's tutorial-fr.json beat 2 (checked there before tutorial_start; checked here after, on the toggle itself rather than the panel it opens)."
       },
       "role": "setup"
     },

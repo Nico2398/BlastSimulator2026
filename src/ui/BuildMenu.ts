@@ -13,8 +13,8 @@
 // P5. `.bs-build-tier-sel` (catalog tier `<select>`), `.bs-build-placed-row`
 // + `data-building-id` (placed rows), and `.bs-build-move-btn`
 // /`.bs-build-upgrade-btn`/`.bs-build-research-btn`/`.bs-build-demolish-btn`
-// (placed-row actions) are additionally load-bearing — playtests and
-// scenario defs (research-center-gate, building-tier-system-visual) and
+// (placed-row actions) are additionally load-bearing — scenario defs
+// (research-center-gate, building-tier-system-visual) and
 // BuildMenu.test.ts (#462, placed-row layout) all click or assert on them
 // directly, so they carry over unchanged too.
 //

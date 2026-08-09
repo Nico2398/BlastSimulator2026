@@ -11,7 +11,7 @@
 // wrapper's .bs-employee-detail class, [data-employee-id], the hire
 // button's [data-role], and the train button's .bs-train-btn/[data-skill]/
 // [data-employee] are all preserved from the old EmployeePanel so
-// tutorialStages.ts, uiActionProbe.ts, and the tutorial/scenario/playtest
+// tutorialStages.ts, uiActionProbe.ts, and the tutorial/scenario
 // defs keep resolving unchanged — same convention ContractsPanel.ts already
 // established for #bs-contract-panel in P5.
 

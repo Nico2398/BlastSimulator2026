@@ -80,8 +80,8 @@ Dev server must be running. `bash scripts/visual-test.sh --name "terrain" --comm
 
 ### Batch
 ```bash
-npm run scenarios                # all 126, command mode, no browser
-npm run scenarios:interaction    # all 126, interaction mode, shared browser
+npm run scenarios                # all 127, command mode, no browser
+npm run scenarios:interaction    # all 127, interaction mode, shared browser
 ```
 
 ### Multi-Angle Screenshots

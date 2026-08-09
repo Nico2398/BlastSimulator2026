@@ -118,7 +118,7 @@ describe('SelectionBar', () => {
     expect(root.style.display).toBe('none');
   });
 
-  it('every action button carries a stable data-action selector for scenario/playtest harnesses', () => {
+  it('every action button carries a stable data-action selector for scenario/interaction harnesses', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { employee } = hireEmployee(state.employees, 'driller', new Random(1));

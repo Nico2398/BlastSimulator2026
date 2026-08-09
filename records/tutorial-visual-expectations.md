@@ -286,9 +286,13 @@ Finding 24 is the one the owner reported. It had survived a full green run of
 `static`, `logic`, `scenario` and `visual`, because all four drive the simulation
 through `src/console/`, whose commands are a superset of what any button exposes.
 
-The harness is now the fifth verification channel, `playability`, and
-`tests/unit/playtest-defs.test.ts` fails the suite if a definition reaches for a
-gameplay command. Procedures live in the `dev-playability-testing` skill.
+The harness became a fifth verification channel, `playability`, checked
+against its own JSON definitions. Issue #515 later folded `playability` into
+`visual` once every scenario step carried a structurally-enforced `role` and
+interaction-mode `expect.usable`/`expect.blocked` checks proved what a
+playtest beat used to prove; the playtest harness and its definitions are
+deleted. The click-only invariant it enforced lives on in
+`.claude/rules/scenario-defs.md`; procedures live in `dev-visual-testing`.
 
 ### Fourth pass — the skills hiring does not grant
 
@@ -319,9 +323,10 @@ defect survived.
 Also fixed in passing: need gauges printed the raw drain value
 (`Hunger 69.85000000000016`), now rounded to whole percent.
 
-`scripts/playtests/training.json` covers it — hire a driver, build a driving
-center, take the excavator licence, then promote the truck licence, entirely by
-clicking.
+The deleted playtest definition `training.json` covered it — hire a driver,
+build a driving center, take the excavator licence, then promote the truck
+licence, entirely by clicking. `scripts/scenario-defs/employee-training.json`
+is its scenario-suite successor and covers the same two proofs.
 
 ### Fifth pass — the tutorial on rails
 
