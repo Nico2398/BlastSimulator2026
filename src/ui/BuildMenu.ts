@@ -123,6 +123,9 @@ export class BuildMenu {
     container.appendChild(this.el);
 
     this.buildCatalog();
+    // Skeleton-phase reference only — keeps noUnusedLocals quiet until the
+    // implementer wires this into update()/refreshPlacedList().
+    void this.refreshPlacedButtons;
   }
 
   get root(): HTMLElement { return this.el; }
@@ -382,6 +385,16 @@ export class BuildMenu {
   private updateCostDisplay(target: HTMLElement, type: BuildingType, tier: BuildingTier): void {
     const def = getBuildingDef(type, tier);
     target.textContent = t('ui.build.cost', { cost: String(def.constructionCost) });
+  }
+
+  /**
+   * Stub — will disable/enable move/upgrade/demolish buttons on placed rows
+   * per affordability, mirroring `refreshCatalogButtons`. Not yet wired into
+   * `update()`.
+   */
+  private refreshPlacedButtons(cash: number): void {
+    void cash;
+    // TODO: implement
   }
 
   private refreshCatalogButtons(cash: number): void {

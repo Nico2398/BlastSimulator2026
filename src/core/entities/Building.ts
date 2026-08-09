@@ -253,6 +253,34 @@ export function demolishBuilding(state: BuildingState, buildingId: number): Demo
   return { success: true, freedCells };
 }
 
+/**
+ * Cost to demolish a building ($). Stub — see `demolishBuildingResult.cost`
+ * wiring, not yet consumed by `demolishBuilding`.
+ */
+export function getDemolishCost(building: Building): number {
+  void building;
+  return 0;
+}
+
+/**
+ * Cost to upgrade a building to `nextTier` ($). Stub — not yet consumed by
+ * any upgrade command.
+ */
+export function getUpgradeCost(building: Building, nextTier: BuildingTier): number {
+  void building;
+  void nextTier;
+  return 0;
+}
+
+/**
+ * Cost to relocate a building ($). Stub — mirrors the 50%-of-construction
+ * calculation inlined in `moveBuilding` today; not yet consumed there.
+ */
+export function getMoveCost(building: Building): number {
+  void building;
+  return 0;
+}
+
 /** Move a building to new coordinates. Returns relocation cost (50% of construction). */
 export function moveBuilding(
   state: BuildingState,

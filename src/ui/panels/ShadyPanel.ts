@@ -123,6 +123,9 @@ export class ShadyPanel {
     this.bodyEl.append(introEl, influenceCard, arrangementsHeader, this.targetsEl, servicesHeader, this.servicesEl, this.statusEl);
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
+    // Skeleton-phase reference only — keeps noUnusedLocals quiet until the
+    // implementer wires this into update()/render().
+    void this.refreshAffordability;
   }
 
   get root(): HTMLElement { return this.el; }
@@ -155,6 +158,16 @@ export class ShadyPanel {
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
     this.render(state);
+  }
+
+  /**
+   * Stub — will disable/enable the corrupt/accident/frame action buttons per
+   * affordability, mirroring BuildMenu's cost-gating pattern. Not yet wired
+   * into `update()`.
+   */
+  private refreshAffordability(cash: number): void {
+    void cash;
+    // TODO: implement
   }
 
   /** Cheap per-tick refresh: the exposure meter climbs continuously while smuggling runs. */
