@@ -189,4 +189,70 @@ describe('ContractsPanel', () => {
     panel.dispose();
     expect(container.contains(panel.root)).toBe(false);
   });
+
+  // ── #513: cards must carry data-contract-id so per-card action selectors scope correctly ──
+
+  it('offered card carries data-contract-id matching its contract', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 7 }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="7"]')).not.toBeNull();
+  });
+
+  it('active card carries data-contract-id matching its contract', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 40;
+    state.contracts.active.push(makeContract({ id: 5, quantityKg: 100, deliveredKg: 0 }));
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-contract-id="5"]')).not.toBeNull();
+  });
+
+  it('Accept on a specific offered card dispatches contract accept for that card only, with two offers present', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 3 }), makeContract({ id: 9 }));
+    panel.show();
+    panel.update(state);
+
+    (panel.root.querySelector('[data-contract-id="9"] .bs-contract-accept') as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledWith('contract accept id:9');
+    expect(gameConsole).not.toHaveBeenCalledWith('contract accept id:3');
+  });
+
+  it('Accept on the other offered card dispatches contract accept for that id, with two offers present', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.contracts.available.push(makeContract({ id: 3 }), makeContract({ id: 9 }));
+    panel.show();
+    panel.update(state);
+
+    (panel.root.querySelector('[data-contract-id="3"] .bs-contract-accept') as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledWith('contract accept id:3');
+    expect(gameConsole).not.toHaveBeenCalledWith('contract accept id:9');
+  });
+
+  it('Deliver on a specific active card dispatches contract deliver for that card only, with two active contracts present', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    state.collectedOre['dirtite'] = 100;
+    state.contracts.active.push(
+      makeContract({ id: 5, quantityKg: 100, deliveredKg: 0 }),
+      makeContract({ id: 8, quantityKg: 60, deliveredKg: 0 }),
+    );
+    panel.show();
+    panel.update(state);
+
+    (panel.root.querySelector('[data-contract-id="8"] .bs-contract-deliver') as HTMLButtonElement).click();
+
+    expect(gameConsole).toHaveBeenCalledWith('contract deliver 8 amount:60');
+    expect(gameConsole).not.toHaveBeenCalledWith(expect.stringMatching(/^contract deliver 5 /));
+  });
 });

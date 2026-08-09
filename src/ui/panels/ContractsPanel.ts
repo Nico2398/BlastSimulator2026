@@ -255,7 +255,9 @@ export class ContractsPanel {
       attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' },
     });
 
-    return card([headRow, progressBar(pct, color), progressLine, deliverRow, storedNote]);
+    const cardEl = card([headRow, progressBar(pct, color), progressLine, deliverRow, storedNote]);
+    cardEl.dataset['contractId'] = String(c.id);
+    return cardEl;
   }
 
   // ── Offered ──
@@ -329,7 +331,9 @@ export class ContractsPanel {
     btnRow.style.cssText = 'display:flex;gap:6px';
     btnRow.append(acceptBtn, negotiateBtn, declineBtn);
 
-    return card([headRow, statRow, haveRow, termsRow, negBox, btnRow]);
+    const cardEl = card([headRow, statRow, haveRow, termsRow, negBox, btnRow]);
+    cardEl.dataset['contractId'] = String(c.id);
+    return cardEl;
   }
 
   private miniStat(label: string, value: string, color?: string, last = false): HTMLElement {
