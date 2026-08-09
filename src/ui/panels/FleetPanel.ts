@@ -36,6 +36,7 @@ export class FleetPanel {
   private onNavigateCb?: (panel: 'crew') => void;
   private gameConsole?: GameConsoleFn;
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
+  private onSelectVehicleCb?: (vehicleId: number) => void;
   private lastSignature = '';
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
@@ -76,6 +77,9 @@ export class FleetPanel {
   setNavigateHandler(cb: (panel: 'crew') => void): void { this.onNavigateCb = cb; }
   setGameConsole(fn: GameConsoleFn): void { this.gameConsole = fn; }
   setConfirmHandler(cb: (config: ConfirmModalConfig) => void): void { this.onConfirmRequestCb = cb; }
+
+  /** Register a callback fired when a vehicle's Fleet panel row is clicked to select it. */
+  setSelectVehicleHandler(cb: (vehicleId: number) => void): void { this.onSelectVehicleCb = cb; }
 
   show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
@@ -268,6 +272,12 @@ export class FleetPanel {
 
     const wrap = card(rows);
     wrap.dataset['vehicleId'] = String(v.id);
+    wrap.style.cursor = 'pointer';
+    wrap.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button, select, input, a')) return;
+      this.onSelectVehicleCb?.(v.id);
+    });
     return wrap;
   }
 

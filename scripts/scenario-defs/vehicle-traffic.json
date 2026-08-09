@@ -223,31 +223,103 @@
       "command": "vehicle move 2 to:21,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 2 to:21,20"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 21.5,
+          "z": 20.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
+      "role": "player",
+      "description": "Fixed by issue #512: all four haulers spawn on ONE tile (vehicle buy stagger gets undone by NavGrid.findNearestReachableCell snapping every one of them to the same reachable cell), so scene-raycast clickEntity could only ever pick hauler #1 -- clickEntity for #2/#3/#4 always raycast onto #1 instead. FleetPanel rows are clickable now, so hauler #2 gets selected by clicking its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"2\"]`), routed through ScenePicking.select(), then MOVE HERE drives the same `vehicle move` command as the hauler #1 step above."
     },
     {
       "command": "vehicle move 3 to:20,21",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 3 to:20,21"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 20.5,
+          "z": 21.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
+      "role": "player",
+      "description": "Fixed by issue #512, same fix as hauler #2 above: hauler #3 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"3\"]`) instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle move 4 to:19,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 4 to:19,20"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 19.5,
+          "z": 20.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
+      "role": "player",
+      "description": "Fixed by issue #512, same fix as haulers #2/#3 above: hauler #4 gets selected via its Fleet panel row (`#bs-vehicle-panel [data-vehicle-id=\"4\"]`) instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "tick 5",
@@ -263,31 +335,103 @@
       "command": "vehicle move 2 to:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 2 to:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 20.5,
+          "z": 20.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
+      "role": "player",
+      "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #2 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle move 3 to:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 3 to:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 20.5,
+          "z": 20.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
+      "role": "player",
+      "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #3 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle move 4 to:20,20",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle move 4 to:20,20"
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
+        },
+        {
+          "type": "cameraFocus",
+          "x": 20.5,
+          "z": 20.5,
+          "distance": 25
+        },
+        {
+          "type": "mousemove",
+          "x": 640,
+          "y": 360
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Left as a command, and this is a defect report rather than a closed exception. The SelectionBar's MOVE HERE drives `vehicle move` for real (gap G4, usable with a mouse since 47f4fef latched the aim), but every move in this file targets hauler #2, #3 or #4 and no mouse can select those: all four spawn on ONE tile. `vehicle buy` staggers the raw spawn point by fleet index, then NavGrid.findNearestReachableCell snaps every one of them back to the same reachable cell, (82,34) on this level -- the file's own `vehicle list` step shows all four there. Verified in a real browser: clickEntity for vehicle 2, 3 and 4 each raycast onto hauler #1 and the selection bar reads \"Debris Hauler #1\" every time, and nothing in src/ui calls ScenePicking.select, so no panel row offers a way round it. Converting would silently re-order hauler #1 and destroy the convergence this file exists to set up. The fix is in the game (de-stack the spawn snap, or give FleetPanel a per-vehicle select), not in this file."
+      "role": "player",
+      "description": "Fixed by issue #512, second round of convergence at (20,20): hauler #4 gets selected via its Fleet panel row instead of the scene raycast that could only ever hit hauler #1."
     },
     {
       "command": "vehicle list",

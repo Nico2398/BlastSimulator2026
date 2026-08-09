@@ -276,6 +276,11 @@ export class UIManager {
     this.miniMap.setFocusHandler(cb);
   }
 
+  /** Wire the Fleet panel's per-row click-to-select (main.ts owns ScenePicking). */
+  setSelectVehicleHandler(cb: (vehicleId: number) => void): void {
+    this.fleetPanel.setSelectVehicleHandler(cb);
+  }
+
   /** Register a notification: appears as a toast now, stays in the activity log. */
   notify(input: NotifyInput): void {
     this.notificationCenter.notify(input);
