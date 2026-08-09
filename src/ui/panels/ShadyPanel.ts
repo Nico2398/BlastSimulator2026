@@ -39,6 +39,7 @@ export class ShadyPanel {
   private readonly exposureCard: HTMLElement;
   private readonly exposureValueEl: HTMLElement;
   private readonly exposureBarEl: HTMLElement;
+  private readonly statusEl: HTMLElement;
 
   private onCloseCb?: () => void;
   private gameConsole?: GameConsoleFn;
@@ -115,7 +116,11 @@ export class ShadyPanel {
     );
     this.exposureCard = card([exposureHeadRow, exposureTrack, exposureNote]);
 
-    this.bodyEl.append(introEl, influenceCard, arrangementsHeader, this.targetsEl, servicesHeader, this.servicesEl);
+    this.statusEl = el('div', {
+      attrs: { id: 'bs-shady-status', style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-micro);min-height:14px' },
+    });
+
+    this.bodyEl.append(introEl, influenceCard, arrangementsHeader, this.targetsEl, servicesHeader, this.servicesEl, this.statusEl);
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
   }
@@ -128,6 +133,9 @@ export class ShadyPanel {
   show(): void { this.el.style.display = 'flex'; }
   hide(): void { this.el.style.display = 'none'; }
   get visible(): boolean { return this.el.style.display !== 'none'; }
+
+  // TODO: implement in TDD green phase
+  setStatus(_msg: string): void { /* TODO: implement in TDD green phase */ }
 
   refreshLocale(): void {
     this.locale.refresh();
