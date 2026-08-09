@@ -10,6 +10,8 @@ paths:
 
 # Playability
 
+**2026-08-09 — mid-consolidation, tracked by issue #515.** This rule is being merged into `.claude/rules/scenario-defs.md` and deleted once the scenario suite's click-only enforcement is total (`docs/plans/scenario-assertions-and-playtest-removal.md`, Phase 3). Until then, everything below describes real, current, required behavior — the invariants are not softened by this notice. When a `role: 'player'` scenario step with `expect` would prove the same thing as a new playtest beat, add the scenario step, not the beat.
+
 A feature that works in `src/core/` and has no button is not a feature. The console can do things the UI cannot, so `logic`, `scenario`, and `static` all pass on a game no player can play. Changes here require the `playability` channel.
 
 ## ▶ PROCEDURE
