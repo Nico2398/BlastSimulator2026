@@ -70,6 +70,19 @@ export interface RunnerWithContext {
 export const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
 
 /**
+ * `event` subcommands that are harness/UI bookkeeping rather than a player
+ * decision, exempted the same way META_COMMANDS is: `status` is a pure read
+ * (interaction mode's `resolveEventIfPending` polls it every step, pending or
+ * not, to decide whether to wait for a real click — command-mode scenarios
+ * never issue an equivalent poll, so counting it inflates interaction mode's
+ * actionCountSinceEvent for a call no real player ever makes); `dismiss`
+ * closes an already-resolved outcome panel — command-mode scenarios never
+ * model it either, since nothing downstream depends on it. `choose` and
+ * `fire` are real decisions and still count.
+ */
+const META_EVENT_SUBCOMMANDS = ['status', 'dismiss'] as const;
+
+/**
  * Run a command through the runner and apply the same action-count gating
  * every command entry point must apply — browser (`window.__gameConsole`),
  * CLI (`console.ts`), and headless scenario runners alike. Centralized here
@@ -77,11 +90,17 @@ export const META_COMMANDS = ['tick', 'speed', 'pause', 'time'] as const;
  * this increment, `EventSystem`'s `MIN_EVENT_INTERVAL_ACTIONS` cooldown gate
  * never opens, and timer-based events (e.g. politics_ev_mandate) can fire in
  * one mode and never in the other despite an identical seed and command list.
+ * The same divergence resurfaces if a mode-specific bookkeeping call (like
+ * `event status`) counts on one side and has no equivalent on the other —
+ * see META_EVENT_SUBCOMMANDS.
  */
 export function runCommand(engine: RunnerWithContext, cmd: string): CommandResult {
   const result = engine.runner.run(cmd);
-  const cmdName = parseCommand(cmd).command;
-  if (engine.ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
+  const parsed = parseCommand(cmd);
+  const isMetaEvent = parsed.command === 'event'
+    && (META_EVENT_SUBCOMMANDS as readonly string[]).includes(parsed.args[0] ?? '');
+  const isExempt = META_COMMANDS.includes(parsed.command as typeof META_COMMANDS[number]) || isMetaEvent;
+  if (engine.ctx.state && !isExempt) {
     incrementActionCount(engine.ctx.state.events);
   }
   return result;
