@@ -7,11 +7,24 @@
  * @module shared/scenario-utils
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import type { ScenarioDef } from './scenario-types.js';
 
 export const SCENARIO_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', 'scenario-defs');
+
+/**
+ * File names (without extension) of every scenario definition on disk,
+ * sorted. Reads the directory directly rather than a hand-maintained name
+ * list — issue #515's role lint must cover every scenario file that exists,
+ * not only the subset a test file's own constant happens to enumerate.
+ */
+export function scenarioFiles(dir: string = SCENARIO_DIR): string[] {
+  return readdirSync(dir)
+    .filter(f => f.endsWith('.json'))
+    .map(f => f.replace(/\.json$/, ''))
+    .sort();
+}
 
 /**
  * Format a zero-padded step index (e.g., 0 → "00", 12 → "12").

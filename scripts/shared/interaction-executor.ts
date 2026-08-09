@@ -146,6 +146,30 @@ export function isObservationCommand(command: string): boolean {
 }
 
 /**
+ * Console commands a `bootstrap`-marked step may run (issue #515).
+ *
+ * Narrower than {@link SETUP_COMMAND_ALLOWLIST}: a bootstrap command has no
+ * UI equivalent and no business having one (e.g. `employee assign_skill`,
+ * which exists so a test doesn't have to grind XP for real — the
+ * player-facing path is `employee train`), rather than standing in for world
+ * setup a player never does. Kept as an explicit list for the same reason
+ * {@link OBSERVATION_COMMANDS} is: adding an entry is a visible edit here,
+ * not an accident of what a step happened to call.
+ *
+ * TODO(#515): populate with the audited entries — `employee assign_skill`,
+ * `employee dispatch`, `weather set`, `weather`, `event fire`,
+ * `corrupt target:witness`, and `sandbox-mode.json`'s specific commands.
+ */
+export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [];
+
+/** True when `command`'s first token may appear in a `bootstrap`-marked step. */
+export function isAllowedBootstrapCommand(_command: string): boolean {
+  // TODO(#515): implement — mirror isAllowedSetupCommand's token check
+  // against BOOTSTRAP_COMMAND_ALLOWLIST.
+  throw new Error('not implemented');
+}
+
+/**
  * Whether `action` (already known to be a `command`) may run inside `step`,
  * given the step's role (issue #479). Returns a message naming the step and
  * the reason when it may not; `null` when it is fine.
@@ -176,6 +200,18 @@ export function checkStepActionAllowed(
   if (step.role === 'observe' && !isObservationCommand(action.command)) {
     return `step "${label}" is observe-marked but runs console command "${action.command}", `
       + `which changes state rather than reporting it — mark it "player" and click it, or "setup" if it bootstraps the world.`;
+  }
+  // TODO(#515): implement bootstrap/guard enforcement.
+  //   bootstrap — allow only when isAllowedBootstrapCommand(action.command),
+  //     mirroring the setup branch above but against BOOTSTRAP_COMMAND_ALLOWLIST.
+  //   guard — a guard step proves a control is unreachable (expect.blocked),
+  //     not that a command ran; decide here whether/which commands a guard
+  //     step's interaction may still use.
+  if (step.role === 'bootstrap') {
+    throw new Error('checkStepActionAllowed: role "bootstrap" enforcement not implemented (#515)');
+  }
+  if (step.role === 'guard') {
+    throw new Error('checkStepActionAllowed: role "guard" enforcement not implemented (#515)');
   }
   return null;
 }
