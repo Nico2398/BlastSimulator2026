@@ -1093,16 +1093,16 @@
       "role": "player"
     },
     {
-      "command": "tick 2",
+      "command": "tick 29",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 2"
+          "command": "tick 29"
         }
       ],
       "expect": {
         "equals": {
-          "tickCount": 69,
+          "tickCount": 96,
           "deathCount": 1,
           "employeeCount": 8
         }
@@ -1133,7 +1133,7 @@
       "description": "#513 fix landed: same as the contract #2 deliver step above -- ContractsPanel now sets `data-contract-id` on both offered and active cards, so this step converts from a bare `contract deliver` command to a real click, scoped to contract #4's own card, instead of the old unscoped `.bs-contract-accept`/`.bs-contract-deliver` that always resolved to the first card in the DOM. Also reopens the Contracts panel first -- the intervening `vehicle haul` step switched to the Fleet tab, hiding it via `ContractsPanel.hide()`, same gap as the contract #2 deliver step. Command mode's own trace here is a clean success (60 kg of dirtite against 575 kg stored, \"Contract #4 COMPLETED\"), and the scoped click now matches it. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact.",
       "expect": {
         "equals": {
-          "tickCount": 69,
+          "tickCount": 96,
           "deathCount": 1
         }
       },
@@ -1159,10 +1159,10 @@
       ],
       "expect": {
         "equals": {
-          "safety": 1.5499999999999956,
-          "wellBeing": 96.38125000000032,
-          "ecology": 41.269999999999996,
-          "nuisance": 28.025
+          "safety": 2.899999999999993,
+          "wellBeing": 99.95,
+          "ecology": 42.61999999999992,
+          "nuisance": 29.375000000000018
         }
       },
       "role": "observe"
@@ -1188,7 +1188,7 @@
       "description": "Finding #50: a 3rd blast cycle was cut from this file after discovering a real divergence between command mode and a real browser: `contract deliver` clears `storedMassKg` to exactly 0 in command mode regardless of the delivered amount (confirmed directly -- a 260kg rubble delivery against a 550kg-mass fragment, and separately a 60kg ore delivery against a 528kg-mass fragment, both left `storedMassKg` at 0, not the undelivered remainder), but in a real browser run `storedMassKg` was still 550 after the equivalent point -- the leftover mass from cycle 1's haul was never cleared. By the time a 3rd cycle's haul was attempted, this accumulated leftover left too little room for `findReachableGroundFragment` (HaulingTask.ts's `mass > roomKg` eligibility check) to consider the next fragment reachable at all in the browser, so the Fleet panel's Haul button never rendered and the step timed out waiting for a control that was never coming -- not a scenario-authoring problem, a real gap between the two execution paths. Out of scope to fix here (`docs/plans/scenario-assertions-and-playtest-removal.md`'s ground rules: a real bug with wide blast radius is a finding, not a drive-by fix) -- flagged in the plan doc's findings log for separate investigation. 2 blast cycles, with 2 different contract types (rubble disposal and ore-specific), already prove the drilling/blasting/hauling/contract-fulfillment loop end-to-end twice over, so the file ends here rather than force a 3rd cycle through a real, unrelated bug. Finding #51: `activeContractCount` was also dropped from this step's assertions after a real browser run consistently reported it as 2 (both cycle 1 and cycle 2's contracts still counted active) at this exact point, even though command mode reports 0 and the deliveries' cash income is genuinely received in both modes -- reproduced identically across two separate interaction-mode runs, so not flaky. Same family as Finding #50 (a `contract deliver` side effect that fully applies in command mode but not in a real browser), but broader: it affects every contract cycle in this file, not only a 3rd one blocked by leftover mass. Left for the same separate investigation.",
       "expect": {
         "equals": {
-          "tickCount": 69,
+          "tickCount": 96,
           "deathCount": 1,
           "employeeCount": 8,
           "bankrupt": false,
