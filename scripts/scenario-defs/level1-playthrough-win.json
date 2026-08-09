@@ -846,6 +846,14 @@
       "command": "contract deliver 2 amount:260",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
+        },
+        {
           "type": "set",
           "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-amount",
           "value": "260"
@@ -855,7 +863,7 @@
           "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
         }
       ],
-      "description": "#513 fix landed: ContractsPanel now sets `data-contract-id` on both offered and active cards, so the accept step above (and this deliver step) can scope selectors to the exact contract instead of always resolving to the first card in the DOM. This step converts from a bare `contract deliver` command to a real click -- `set` the amount field to 260 on contract #2's own card, then click that card's own `.bs-contract-deliver`. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact. One haul is enough to complete this contract outright (fragment 1208 carries 550kg, the contract needs 260kg) -- no second haul round needed this cycle.",
+      "description": "#513 fix landed: ContractsPanel now sets `data-contract-id` on both offered and active cards, so the accept step above (and this deliver step) can scope selectors to the exact contract instead of always resolving to the first card in the DOM. This step converts from a bare `contract deliver` command to a real click -- reopens the Contracts panel first (the intervening `vehicle haul` step switched the toolbar to the Fleet tab, which calls `ContractsPanel.hide()` and sets `display:none` -- without reopening here, the amount/deliver controls exist in the DOM but are hidden and unclickable), then `set` the amount field to 260 on contract #2's own card, then click that card's own `.bs-contract-deliver`. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact. One haul is enough to complete this contract outright (fragment 1208 carries 550kg, the contract needs 260kg) -- no second haul round needed this cycle.",
       "expect": {
         "equals": {
           "tickCount": 67,
@@ -1105,6 +1113,14 @@
       "command": "contract deliver 4 amount:60",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+        },
+        {
           "type": "set",
           "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-amount",
           "value": "60"
@@ -1114,7 +1130,7 @@
           "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
         }
       ],
-      "description": "#513 fix landed: same as step 62 -- ContractsPanel now sets `data-contract-id` on both offered and active cards, so this step converts from a bare `contract deliver` command to a real click, scoped to contract #4's own card, instead of the old unscoped `.bs-contract-accept`/`.bs-contract-deliver` that always resolved to the first card in the DOM. Command mode's own trace here is a clean success (60 kg of dirtite against 575 kg stored, \"Contract #4 COMPLETED\"), and the scoped click now matches it. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact.",
+      "description": "#513 fix landed: same as the contract #2 deliver step above -- ContractsPanel now sets `data-contract-id` on both offered and active cards, so this step converts from a bare `contract deliver` command to a real click, scoped to contract #4's own card, instead of the old unscoped `.bs-contract-accept`/`.bs-contract-deliver` that always resolved to the first card in the DOM. Also reopens the Contracts panel first -- the intervening `vehicle haul` step switched to the Fleet tab, hiding it via `ContractsPanel.hide()`, same gap as the contract #2 deliver step. Command mode's own trace here is a clean success (60 kg of dirtite against 575 kg stored, \"Contract #4 COMPLETED\"), and the scoped click now matches it. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact.",
       "expect": {
         "equals": {
           "tickCount": 69,
