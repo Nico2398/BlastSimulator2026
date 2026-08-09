@@ -60,7 +60,8 @@
       ],
       "expect": {
         "equals": { "cash": 181000 }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:witness",
@@ -70,7 +71,8 @@
       ],
       "expect": {
         "equals": { "cash": 171000 }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:witness",
@@ -80,7 +82,8 @@
       ],
       "expect": {
         "equals": { "cash": 161000 }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:witness cost:159500",
@@ -90,7 +93,8 @@
       ],
       "expect": {
         "equals": { "cash": 1500 }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build destroy 1",
@@ -102,7 +106,8 @@
         "equals": { "cash": 1500, "buildingCount": 1 },
         "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn",
         "note": "issue #511 — build destroy funds guard"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "build upgrade 1",
@@ -114,7 +119,8 @@
         "equals": { "cash": 1500, "buildingCount": 1 },
         "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn",
         "note": "issue #511 — build upgrade funds guard"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "build move 1 to:10,10",
@@ -126,7 +132,8 @@
         "equals": { "cash": 1500, "buildingCount": 1 },
         "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-move-btn",
         "note": "issue #511 — build move funds guard"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "state",
@@ -147,7 +154,8 @@
         "equals": { "cash": 1500 },
         "blocked": "#bs-shady-panel [data-target=\"witness\"] [data-action=\"corrupt\"]",
         "note": "issue #511 — corrupt funds guard"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "mafia accident employee:1",
@@ -159,7 +167,8 @@
         "equals": { "cash": 1500, "employeeCount": 1 },
         "blocked": "#bs-shady-panel [data-action=\"mafia-accident\"]",
         "note": "issue #511 — mafia accident funds guard"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "mafia frame employee:1",
@@ -171,7 +180,8 @@
         "equals": { "cash": 1500, "employeeCount": 1 },
         "blocked": "#bs-shady-panel [data-action=\"mafia-frame-start\"]",
         "note": "issue #511 — mafia frame funds guard"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "state",

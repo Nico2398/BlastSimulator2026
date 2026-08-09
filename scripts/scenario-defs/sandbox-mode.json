@@ -7,7 +7,8 @@
       "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode.",
       "interaction": [
         { "type": "command", "command": "sandbox start biome:alpine_granite difficulty:hard seed:777" }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "terrain_info",
@@ -36,7 +37,8 @@
           "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20"
         }
       ],
-      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "description": "role: bootstrap, temporary exception (issue #515): bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above). Not a permanent bootstrap primitive like `employee assign_skill` -- once the #bs-toolbar zero-size bug is fixed, this step should convert to a real click.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "holeCount": 9,
@@ -52,7 +54,8 @@
           "command": "charge hole:* explosive:boomite amount:5 stemming:2"
         }
       ],
-      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "description": "role: bootstrap, temporary exception (issue #515) -- see the preceding drill_plan step's description for the #bs-toolbar zero-size rationale.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "chargedCount": 9,
@@ -68,7 +71,8 @@
           "command": "sequence auto delay_step:25"
         }
       ],
-      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "description": "role: bootstrap, temporary exception (issue #515) -- see the drill_plan step's description for the #bs-toolbar zero-size rationale.",
+      "role": "bootstrap",
       "expect": {
         "equals": {
           "sequencedCount": 9
@@ -77,7 +81,8 @@
     },
     {
       "command": "blast",
-      "description": "Left unmarked: bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above).",
+      "description": "role: bootstrap, temporary exception (issue #515) -- see the drill_plan step's description for the #bs-toolbar zero-size rationale.",
+      "role": "bootstrap",
       "interaction": [
         {
           "type": "command",
@@ -109,7 +114,8 @@
           "holeCount": 0
         },
         "note": "difficulty:easy starts at $250,000 (SANDBOX_DIFFICULTIES.easy.startingCash, Sandbox.ts) -- grid extents stay the fixed 64x32x64 default (#504) regardless of biome/difficulty, same as the first site."
-      }
+      },
+      "role": "setup"
     }
   ]
 }

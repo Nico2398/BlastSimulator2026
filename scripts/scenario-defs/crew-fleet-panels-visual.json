@@ -120,7 +120,8 @@
       "expect": {
         "blocked": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]",
         "note": "proves the disabled-button guard is real (interaction mode only — command mode has no DOM to check), without needing the cash-guard fix itself"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "state",

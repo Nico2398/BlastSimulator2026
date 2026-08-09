@@ -606,36 +606,38 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 180,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
+        "command": "blast",
+        "timeout": 180,
+        "interaction": [
+          {
+            "type": "command",
+            "command": "blast"
+          },
+          {
+            "type": "waitForSelector",
+            "selector": "[data-action=\"report-close\"]"
+          },
+          {
+            "type": "clickSelector",
+            "selector": "[data-action=\"report-close\"]"
+          }
+        ],
+        "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+        "expect": {
+          "equals": {
+            "cash": 37350,
+            "tickCount": 10,
+            "deathCount": 0,
+            "employeeCount": 7,
+            "holeCount": 0,
+            "chargedCount": 0,
+            "sequencedCount": 0,
+            "levelEnded": false,
+            "levelEndReason": null
+          },
+          "blocked": "#bs-blast-panel [data-action=\"execute\"]"
         },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
-      "expect": {
-        "equals": {
-          "cash": 37350,
-          "tickCount": 10,
-          "deathCount": 0,
-          "employeeCount": 7,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
+        "role": "guard"
     },
     {
       "command": "state full",
@@ -810,36 +812,38 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 180,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
+        "command": "blast",
+        "timeout": 180,
+        "interaction": [
+          {
+            "type": "command",
+            "command": "blast"
+          },
+          {
+            "type": "waitForSelector",
+            "selector": "[data-action=\"report-close\"]"
+          },
+          {
+            "type": "clickSelector",
+            "selector": "[data-action=\"report-close\"]"
+          }
+        ],
+        "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+        "expect": {
+          "equals": {
+            "cash": 37350,
+            "tickCount": 10,
+            "deathCount": 5,
+            "employeeCount": 7,
+            "holeCount": 0,
+            "chargedCount": 0,
+            "sequencedCount": 0,
+            "levelEnded": false,
+            "levelEndReason": null
+          },
+          "blocked": "#bs-blast-panel [data-action=\"execute\"]"
         },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
-      "expect": {
-        "equals": {
-          "cash": 37350,
-          "tickCount": 10,
-          "deathCount": 5,
-          "employeeCount": 7,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
+        "role": "guard"
     },
     {
       "command": "state full",
@@ -1173,36 +1177,38 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 180,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
+        "command": "blast",
+        "timeout": 180,
+        "interaction": [
+          {
+            "type": "command",
+            "command": "blast"
+          },
+          {
+            "type": "waitForSelector",
+            "selector": "[data-action=\"report-close\"]"
+          },
+          {
+            "type": "clickSelector",
+            "selector": "[data-action=\"report-close\"]"
+          }
+        ],
+        "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+        "expect": {
+          "equals": {
+            "cash": 34350,
+            "tickCount": 34,
+            "deathCount": 7,
+            "employeeCount": 7,
+            "holeCount": 0,
+            "chargedCount": 0,
+            "sequencedCount": 0,
+            "levelEnded": false,
+            "levelEndReason": null
+          },
+          "blocked": "#bs-blast-panel [data-action=\"execute\"]"
         },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
-      "expect": {
-        "equals": {
-          "cash": 34350,
-          "tickCount": 34,
-          "deathCount": 7,
-          "employeeCount": 7,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
+        "role": "guard"
     },
     {
       "command": "state full",
@@ -1315,7 +1321,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "sequence auto delay_step:10",
@@ -1356,28 +1363,30 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 180,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here.",
-      "expect": {
-        "equals": {
-          "cash": 34350,
-          "tickCount": 34,
-          "deathCount": 7,
-          "employeeCount": 7,
-          "holeCount": 25,
-          "chargedCount": 0,
-          "sequencedCount": 25,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
+        "command": "blast",
+        "timeout": 180,
+        "interaction": [
+          {
+            "type": "command",
+            "command": "blast"
+          }
+        ],
+        "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here.",
+        "expect": {
+          "equals": {
+            "cash": 34350,
+            "tickCount": 34,
+            "deathCount": 7,
+            "employeeCount": 7,
+            "holeCount": 25,
+            "chargedCount": 0,
+            "sequencedCount": 25,
+            "levelEnded": false,
+            "levelEndReason": null
+          },
+          "blocked": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        "role": "guard"
     },
     {
       "command": "state full",
@@ -1707,36 +1716,38 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 180,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
+        "command": "blast",
+        "timeout": 180,
+        "interaction": [
+          {
+            "type": "command",
+            "command": "blast"
+          },
+          {
+            "type": "waitForSelector",
+            "selector": "[data-action=\"report-close\"]"
+          },
+          {
+            "type": "clickSelector",
+            "selector": "[data-action=\"report-close\"]"
+          }
+        ],
+        "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
+        "expect": {
+          "equals": {
+            "cash": 34350,
+            "tickCount": 64,
+            "deathCount": 7,
+            "employeeCount": 7,
+            "holeCount": 0,
+            "chargedCount": 0,
+            "sequencedCount": 0,
+            "levelEnded": false,
+            "levelEndReason": null
+          },
+          "blocked": "#bs-blast-panel [data-action=\"execute\"]"
         },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc.",
-      "expect": {
-        "equals": {
-          "cash": 34350,
-          "tickCount": 64,
-          "deathCount": 7,
-          "employeeCount": 7,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
+        "role": "guard"
     },
     {
       "command": "state full",
@@ -2037,7 +2048,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "sequence auto delay_step:10",
@@ -2078,28 +2090,30 @@
       }
     },
     {
-      "command": "blast",
-      "timeout": 180,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
-      ],
-      "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here.",
-      "expect": {
-        "equals": {
-          "cash": 34350,
-          "tickCount": 104,
-          "deathCount": 7,
-          "employeeCount": 7,
-          "holeCount": 36,
-          "chargedCount": 0,
-          "sequencedCount": 36,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
+        "command": "blast",
+        "timeout": 180,
+        "interaction": [
+          {
+            "type": "command",
+            "command": "blast"
+          }
+        ],
+        "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug, not introduced by this conversion. Every subsequent command runs against whatever bare new_game seed:3666 produced instead of the intended level, and by this cycle the mismatch leaves the Fire step's execute button disabled -- validateBlastPlan genuinely rejects this plan on the wrong world, not a selector or tab-visibility issue. The detonate itself stays a command rather than force a click that cannot land, but the resulting BlastReportModal opens regardless of how the blast fired (Finding #12 -- state-reactive, not click-reactive) and blocks every later panel click until closed, so the close IS a real click here. See Finding #24 in the plan doc. This specific cycle's blast fails outright (\"Invalid plan: Missing charge\" on every hole) rather than just failing validation -- no report is produced, so no modal opens and no close click is needed here.",
+        "expect": {
+          "equals": {
+            "cash": 34350,
+            "tickCount": 104,
+            "deathCount": 7,
+            "employeeCount": 7,
+            "holeCount": 36,
+            "chargedCount": 0,
+            "sequencedCount": 36,
+            "levelEnded": false,
+            "levelEndReason": null
+          },
+          "blocked": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        "role": "guard"
     },
     {
       "command": "state full",

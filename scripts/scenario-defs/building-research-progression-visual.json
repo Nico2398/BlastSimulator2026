@@ -68,11 +68,12 @@
     },
     {
       "command": "build research_center at:15,5 tier:2",
-      "description": "Left unmarked: the Place button is genuinely disabled here because Tier 2 is not researched yet (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`), so a real player could not click it. Cash is not the reason — $205,000 comfortably covers the $60,000 Tier 2 cost; only the research lock blocks it. The console command reproduces the same rejection the disabled button would.",
+      "description": "role: guard (issue #515): selecting tier 2 in the catalog row's own tier dropdown is a real interaction; the Place button is then genuinely disabled — `refreshCatalogButtons`'s `locked` check (BuildMenu.ts: `btn.disabled = cash < def.constructionCost || locked`) is true since tier 2 is not researched yet. Cash is not the reason — $205,000 comfortably covers the $60,000 Tier 2 cost; only the research lock blocks it.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:15,5 tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "2"
         }
       ],
       "expect": {
@@ -80,8 +81,10 @@
           "cash": 205000,
           "buildingCount": 1
         },
+        "blocked": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not yet researched (funds are ample)"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "build list",

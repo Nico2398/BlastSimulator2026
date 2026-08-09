@@ -128,7 +128,8 @@
         "equals": {
           "cash": 50000
         }
-      }
+      },
+      "role": "setup"
     },
     {
       "command": "state",

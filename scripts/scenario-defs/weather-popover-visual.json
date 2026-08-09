@@ -42,7 +42,8 @@
       "expect": {
         "usable": ".bs-weather",
         "note": "the TopBar weather chip itself must stay usable after being clicked open — state.weather is not in the serialized game state (no player-facing weather control exists to assert an equals/increased on), so this is the strongest assertion available for this step"
-      }
+      },
+      "role": "bootstrap"
     }
   ]
 }

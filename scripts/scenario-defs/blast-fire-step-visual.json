@@ -33,20 +33,21 @@
       }
     },
     {
-      "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
-      "timeout": 30,
-      "description": "Setup: a single hole — a complete, valid plan once charged and sequenced below. Split into one step per command (issue #479, same class as Finding #5 in the original #479 plan doc): the bundled 3-command interaction array only ever ran its first command in command mode, since command-runner.ts's runSteps executes step.command alone, not the interaction array.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "holeCount": 1
-        }
-      }
+        "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
+        "timeout": 30,
+        "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran. No dragTiles-based grid-tool conversion was attempted here for that reason, not because one doesn't exist for a 1x1 grid.",
+        "interaction": [
+          {
+            "type": "command",
+            "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6"
+          }
+        ],
+        "expect": {
+          "equals": {
+            "holeCount": 1
+          }
+        },
+        "role": "bootstrap"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",

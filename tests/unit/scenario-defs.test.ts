@@ -695,14 +695,14 @@ describe('UI-driven scenarios click real controls', () => {
 // ──────────────────────────────────────────────
 describe('Step role field is a recognized value when present', () => {
   for (const name of ALL_SCENARIO_NAMES) {
-    it(`${name} — every step's role, if set, is "player", "setup" or "observe"`, () => {
+    it(`${name} — every step's role, if set, is "player", "setup", "observe", "bootstrap" or "guard"`, () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i] as ScenarioStepDef;
         if (step.role === undefined) continue;
         expect(
-          ['player', 'setup', 'observe'],
-          `step[${i}] role "${step.role}" must be "player", "setup" or "observe"`,
+          ['player', 'setup', 'observe', 'bootstrap', 'guard'],
+          `step[${i}] role "${step.role}" must be "player", "setup", "observe", "bootstrap" or "guard"`,
         ).toContain(step.role);
       }
     });

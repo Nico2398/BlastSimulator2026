@@ -137,7 +137,8 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:geology level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "state",
@@ -274,7 +275,8 @@
           "type": "command",
           "command": "employee assign_skill 2 skill:blasting level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
@@ -522,7 +524,8 @@
           "type": "command",
           "command": "employee assign_skill 4 skill:driving.truck level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "vehicle buy debris_hauler",

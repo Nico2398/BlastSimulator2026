@@ -174,7 +174,8 @@
           "qualificationCount": 3,
           "proficiencyTotal": 4
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build blasting_academy at:7,5",

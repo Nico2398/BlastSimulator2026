@@ -51,7 +51,8 @@
           "type": "command",
           "command": "weather set sunny"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "weather set storm",
@@ -61,7 +62,8 @@
           "type": "command",
           "command": "weather set storm"
         }
-      ]
+      ],
+      "role": "bootstrap"
     }
   ]
 }

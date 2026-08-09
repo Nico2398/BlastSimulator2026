@@ -132,6 +132,9 @@ export const SETUP_COMMAND_ALLOWLIST = [
   'new_game',
   'campaign',
   'tutorial_start',
+  'save',
+  'load',
+  'sandbox',
 ] as const;
 
 /** Time control is a player affordance (the speed button), so it is separate. */

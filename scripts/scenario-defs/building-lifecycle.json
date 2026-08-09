@@ -68,17 +68,18 @@
       "command": "build upgrade 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "build upgrade 1"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn"
         }
       ],
-      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "description": "role: player (issue #515): building #1's Upgrade button is present and ENABLED — `upgradeBtn.disabled` (BuildMenu.ts) only checks `nextTier === null` or affordability, not the research lock. A real click intercepts client-side (`if (nextTier !== null && nextLocked) { this.setStatus(...); return; }`) and never even issues `build upgrade 1` — a stricter no-op than the console command's own rejection, but the same observable outcome (buildingCount unchanged). Not `guard`: the button is reachable, just ineffective while locked.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
         "note": "rejected: Tier 2 management_office is not researched — confirms this is a genuine no-op, not a silent success"
-      }
+      },
+      "role": "player"
     },
     {
       "command": "build list",
@@ -98,13 +99,14 @@
           "command": "build move 2 to:10,5"
         }
       ],
-      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "description": "role: bootstrap (issue #515): building #2 was never placed, so there is no row and no button in the DOM at all — not merely disabled. `expect.blocked` needs a present-but-unusable control (playtest-driver.ts's checkGoal refuses an absent selector: \"not in the DOM, so blocked proves nothing\"), which doesn't exist here, and no player can ever target an id that was never shown to them. Genuinely bootstrap: this exercises the console's own bad-id guard, not a control a player could reach either way.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
         "note": "rejected: Building #2 not found — only building #1 was ever placed"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build list",
@@ -124,13 +126,14 @@
           "command": "build destroy 2"
         }
       ],
-      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "description": "role: bootstrap (issue #515): same reasoning as the `build move 2` step above — building #2 was never placed, so there is no row and no button in the DOM to point `expect.blocked` at, and no player can ever target an id that was never shown to them.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
         "note": "rejected: Building #2 not found — the real building #1 is still standing"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build list",

@@ -184,7 +184,8 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:driving.truck level:5"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "vehicle list",
@@ -266,7 +267,8 @@
           "storedMassKg": 0
         },
         "note": "the refused haul must not move anything into storage \u2014 the real proof is the command's own 'Fragment is oversized' rejection text, checked nowhere else this mechanism reaches; storedMassKg staying 0 is the closest state-level corroboration"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "fragments",
@@ -314,7 +316,8 @@
           "type": "command",
           "command": "employee assign_skill 2 skill:driving.excavator level:5"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "vehicle buy rock_fragmenter",

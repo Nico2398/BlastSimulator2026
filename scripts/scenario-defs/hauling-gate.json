@@ -248,7 +248,8 @@
           "cash": 59200
         },
         "note": "the driver already holds driving.truck at level 1 from ROLE_STARTING_QUALIFICATION -- this call is a same-level no-op"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "vehicle driver 1 1",

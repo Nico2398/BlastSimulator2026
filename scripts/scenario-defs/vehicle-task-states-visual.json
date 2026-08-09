@@ -152,7 +152,8 @@
           "vehicleCount": 1
         },
         "note": "vehicle list confirms moving → transport, overriding the earlier move task"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "vehicle list",

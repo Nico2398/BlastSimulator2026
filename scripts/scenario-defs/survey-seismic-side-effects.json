@@ -80,7 +80,8 @@
         "equals": {
           "proficiencyTotal": 5
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee hire role:driver",
@@ -115,7 +116,8 @@
         "equals": {
           "proficiencyTotal": 6
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee list",

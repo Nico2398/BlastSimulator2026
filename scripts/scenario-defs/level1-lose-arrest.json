@@ -56,13 +56,14 @@
           "command": "corrupt target:judge cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 75000
         },
         "note": "the bribe's own success/scandal roll (attemptCorruption, corruptCommand -- events.ts) is RNG-driven and not asserted here, but the cost deduction (state.cash -= result.cost) happens unconditionally regardless of that roll, so cash is safe to assert exactly."
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:inspector cost:5000",
@@ -72,12 +73,13 @@
           "command": "corrupt target:inspector cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 70000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:union_leader cost:5000",
@@ -87,12 +89,13 @@
           "command": "corrupt target:union_leader cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 65000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:politician cost:5000",
@@ -102,12 +105,13 @@
           "command": "corrupt target:politician cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 60000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:witness cost:5000",
@@ -117,12 +121,13 @@
           "command": "corrupt target:witness cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 55000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:judge cost:10000",
@@ -132,12 +137,13 @@
           "command": "corrupt target:judge cost:10000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 45000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:inspector cost:10000",
@@ -147,12 +153,13 @@
           "command": "corrupt target:inspector cost:10000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 35000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:union_leader cost:10000",
@@ -162,13 +169,14 @@
           "command": "corrupt target:union_leader cost:10000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 25000
         },
         "note": "the eighth and last opening bribe: $55,000 of bribes against the level's $80,000, leaving $25,000 -- enough for both hires below to be real clicks on enabled buttons. `corrupt` itself still has no funds guard (only employee hire / vehicle buy / build got one), so this scenario no longer relies on that: it stays solvent by being funded, not by overdrawing."
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt",
@@ -178,13 +186,14 @@
           "command": "corrupt"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): bare `corrupt` is a read-only status query (corruption level/success rate/mafia-unlocked/attempts) with no dedicated UI readout of its own -- ShadyPanel shows the influence level but not attempts/success-rate as text a selector could assert against. No mutating effect, so bootstrap is a safe fit despite that role's doc leading with \"mutating command\".",
       "expect": {
         "equals": {
           "cash": 25000
         },
         "note": "bare `corrupt` is a read-only status query (corruption level/success rate/mafia-unlocked/attempts) -- no cost, cash unchanged."
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "finances",
@@ -256,17 +265,26 @@
       "command": "mafia smuggle",
       "interaction": [
         {
-          "type": "command",
-          "command": "mafia smuggle"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"shady\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-shady-panel [data-action=\"mafia-smuggle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-shady-panel [data-action=\"mafia-smuggle\"]"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: player (issue #515): a real click on ShadyPanel's smuggling toggle ([data-action=\"mafia-smuggle\"]) -- unlike the corrupt bribes above, this command takes no cost override so the real button reproduces the exact same state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 22500
         },
         "note": "toggling smuggling ON is free and instant -- the $8000/tick income (SMUGGLE_BASE_INCOME, MafiaActions.ts) only starts accruing once ticking resumes, checked on the next tick step. This single toggle is the whole reason the level ends in a win before arrest ever triggers -- see the file's own top-level description."
-      }
+      },
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -379,12 +397,13 @@
           "command": "corrupt target:judge cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 253600
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "corrupt target:politician cost:5000",
@@ -394,12 +413,13 @@
           "command": "corrupt target:politician cost:5000"
         }
       ],
-      "description": "Left unmarked: ShadyPanel.ts's per-target \"Make the Call\" buttons and mafia service buttons carry no data-target/data-action scoping -- only plain text buttons distinguished by locale-dependent label text. Same class as Finding #8 (contract offer rows have no id-scoped selector): no stable selector exists to click a specific target, left as a command.",
+      "description": "role: bootstrap (issue #515): the cost:X override is a scenario-only convenience to hit an exact cash delta -- ShadyPanel's real \"Make the Call\" button always bribes at the fixed TARGET_COSTS rate (Corruption.ts), which does not match the scripted amount here, so no real click can reproduce this exact state change. ShadyPanel now DOES scope its buttons (data-target/data-action, issue #513) -- the earlier \"no stable selector\" reasoning was stale.",
       "expect": {
         "equals": {
           "cash": 248600
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 10",

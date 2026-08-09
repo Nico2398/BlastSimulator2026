@@ -85,7 +85,8 @@
         "equals": {
           "cash": 48000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 19",

@@ -137,7 +137,8 @@
           "proficiencyTotal": 6
         },
         "note": "employee 1 (Rookie 1) -> level 5, employee 2 stays Rookie 1: 5+1=6"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee assign_skill 2 skill:geology level:1",
@@ -147,7 +148,8 @@
           "command": "employee assign_skill 2 skill:geology level:1"
         }
       ],
-      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for Finding #15."
+      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too, and for Finding #15.",
+      "role": "bootstrap"
     },
     {
       "command": "employee list",

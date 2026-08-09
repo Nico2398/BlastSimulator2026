@@ -135,7 +135,8 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:geology level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "survey seismic x:23 z:23",
@@ -269,7 +270,8 @@
           "type": "command",
           "command": "employee assign_skill 2 skill:blasting level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
@@ -557,7 +559,8 @@
           "type": "command",
           "command": "employee assign_skill 3 skill:management level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "contract accept 1",
@@ -623,7 +626,8 @@
           "type": "command",
           "command": "employee assign_skill 4 skill:driving.truck level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -800,7 +804,8 @@
           "command": "build_ramp start:10,15 end:10,25"
         }
       ],
-      "description": "Left unmarked: this ramp is not one of the 23 canonical tutorial stages (tutorialSteps.ts has exactly one box-cut stage, already driven for real above) -- with the tutorial rail now active and pointed at set-policy/tick-advance for the rest of the file, the Build panel's ramp tool is off-target and inert to a real click here. No UI path reaches this specific action while the tutorial is running; left as a command rather than a click that would silently no-op."
+      "description": "Left unmarked: this ramp is not one of the 23 canonical tutorial stages (tutorialSteps.ts has exactly one box-cut stage, already driven for real above) -- with the tutorial rail now active and pointed at set-policy/tick-advance for the rest of the file, the Build panel's ramp tool is off-target and inert to a real click here. No UI path reaches this specific action while the tutorial is running; left as a command rather than a click that would silently no-op.",
+      "role": "bootstrap"
     },
     {
       "command": "needs",

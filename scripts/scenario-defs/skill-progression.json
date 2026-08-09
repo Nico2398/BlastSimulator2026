@@ -80,7 +80,8 @@
         "equals": {
           "proficiencyTotal": 2
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee list",
@@ -100,7 +101,8 @@
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
       ],
-      "description": "Test-only bootstrap, not a player action: `employee dispatch` exists (per its own doc comment in employees.ts) purely so console/scenario driving can put an employee to genuine, ticksWorked-incrementing work without a full drill/haul pipeline -- there is no UI control for it and none should exist. Repeated 40 times here (queued back to back before any tick, all targeted at employee #1) so the driller has continuous excavator work queued through the full 700-tick budget below; each dispatched task only lasts ~20-45 ticks depending on proficiency and fatigue, so a single dispatch would leave the employee idle (and gaining no XP -- XP only accrues via tickTaskProgress while a task is actively in progress) for most of the 700 ticks. Verified via a real dump that 40 is enough to keep the driller continuously busy through tick 700 with none left over."
+      "description": "Test-only bootstrap, not a player action: `employee dispatch` exists (per its own doc comment in employees.ts) purely so console/scenario driving can put an employee to genuine, ticksWorked-incrementing work without a full drill/haul pipeline -- there is no UI control for it and none should exist. Repeated 40 times here (queued back to back before any tick, all targeted at employee #1) so the driller has continuous excavator work queued through the full 700-tick budget below; each dispatched task only lasts ~20-45 ticks depending on proficiency and fatigue, so a single dispatch would leave the employee idle (and gaining no XP -- XP only accrues via tickTaskProgress while a task is actively in progress) for most of the 700 ticks. Verified via a real dump that 40 is enough to keep the driller continuously busy through tick 700 with none left over.",
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -109,7 +111,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -118,7 +121,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -127,7 +131,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -136,7 +141,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -145,7 +151,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -154,7 +161,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -163,7 +171,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -172,7 +181,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -181,7 +191,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -190,7 +201,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -199,7 +211,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -208,7 +221,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -217,7 +231,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -226,7 +241,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -235,7 +251,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -244,7 +261,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -253,7 +271,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -262,7 +281,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -271,7 +291,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -280,7 +301,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -289,7 +311,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -298,7 +321,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -307,7 +331,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -316,7 +341,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -325,7 +351,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -334,7 +361,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -343,7 +371,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -352,7 +381,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -361,7 +391,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -370,7 +401,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -379,7 +411,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -388,7 +421,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -397,7 +431,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -406,7 +441,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -415,7 +451,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -424,7 +461,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -433,7 +471,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -442,7 +481,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator",
@@ -451,7 +491,8 @@
           "type": "command",
           "command": "employee dispatch 1 x:15 z:15 skill:driving.excavator"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "tick 50",

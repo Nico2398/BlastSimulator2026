@@ -56,7 +56,8 @@
           "worldSizeZ": 32,
           "holeCount": 1
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "drill_plan add x:-4 z:10 depth:6",
@@ -73,7 +74,8 @@
           "worldMinX": -16,
           "holeCount": 2
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "terrain_info",
@@ -118,7 +120,8 @@
         "equals": {
           "buildingCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build management_office at:34,4",
@@ -134,7 +137,8 @@
         "equals": {
           "buildingCount": 1
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -219,7 +223,8 @@
         "equals": {
           "cash": 491200
         }
-      }
+      },
+      "role": "setup"
     },
     {
       "command": "load slot:expanded",
@@ -238,7 +243,8 @@
           "worldMinX": -16,
           "buildingCount": 1
         }
-      }
+      },
+      "role": "setup"
     },
     {
       "command": "terrain_info",

@@ -61,7 +61,8 @@
           "weather": "heavy_rain",
           "cash": 50000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 5",

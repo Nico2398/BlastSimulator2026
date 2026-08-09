@@ -77,7 +77,8 @@
         "equals": {
           "collapsedCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "needs",
