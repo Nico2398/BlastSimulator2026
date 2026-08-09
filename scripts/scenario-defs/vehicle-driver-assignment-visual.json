@@ -91,7 +91,8 @@
           "proficiencyTotal": 1
         },
         "note": "unchanged from before — driving.truck was already the driver role's Rookie starting qualification at level 1; this command reproduces the same level, not a change"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "vehicle list",
@@ -188,7 +189,8 @@
           "employeeCount": 2
         },
         "note": "rejected: Employee lacks licence for this role"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 5",

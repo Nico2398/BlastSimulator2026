@@ -41,7 +41,6 @@ loop runs for tens of minutes, while a single screenshot pays it once.
 | Single screenshot (`npm run screenshot`) | Here. Seconds to a minute; this is the channel's core loop. |
 | One named scenario, interaction mode | Here, when you are debugging that scenario. |
 | **All** scenarios in interaction mode | CI (`Scenarios (interaction mode)`, label a PR `full-ci`). Never in a session. |
-| Playability suite | CI (`Playtest (playability)`, label a PR `full-ci`). See `dev-playability-testing`. |
 
 ### ▶ While any browser-driven run is in flight
 
@@ -117,6 +116,31 @@ Scenario definitions in `scripts/scenario-defs/*.json`.
 Browser entry point exposes:
 - `window.__gameState()` — serialized game state
 - `window.__uiState()` — panel visibility, button states, pointer-events
+- `window.__uiActions()` — every interactive control on screen: `selector`, `label`, `region`, `usable`, `blockedBy`, `hint`. Ask "what can I do right now?" instead of guessing selectors.
+- `window.__probeSelector(sel)` — `null` when usable, else `'absent' | 'disabled' | 'hidden' | 'zero-size' | 'covered' | 'pointer-events-none'`. Ask "why can't I click this?" about one control.
+- `window.__tutorialState()` — `{ active, stepIndex, stepId, title, total }`. Know which tutorial card is showing, by id.
+
+Implementation: `src/ui/uiActionProbe.ts`. `blockedBy` is the diagnosis, not a detail:
+
+- `disabled` — the panel decided you may not do this. Read the region's `hint`; it usually says why ("Hire a surveyor with a geology qualification first"). A permanently disabled control with no in-game way to satisfy its condition is a dead end, not a hint.
+- `covered` — a real click at the control's centre would hit something else. A full-screen overlay swallowing clicks looks exactly like a broken button.
+- `absent` — the control is not in the DOM. Either the panel never rendered it, or the feature has no UI at all.
+- `zero-size` / `pointer-events-none` — a CSS bug; the control exists but no click can reach it.
+
+### ▶ Diagnosing an interaction-mode step that cannot complete
+
+Work in this order. Stop at the first one that explains it.
+
+1. **Read the hint.** The failure prints the region's status line. `"No selection"`, `"Ramp carved."`, `"Insufficient funds"` are answers.
+2. **Check for a qualification or licence gate.** Skill-gated actions (`survey`, `drill`, driving a vehicle, management) require a `SkillCategory`. Ask: which button grants it? If the answer is "none, only the console", that is the bug. See `gameplay-employee-skills`.
+3. **Check affordability.** A tutorial step the starting cash cannot pay for is a dead end even though every control works. `startingCash` is per level in `src/core/campaign/Level.ts`.
+4. **Check for a covering overlay.** `blockedBy: 'covered'` names the element on top. Confirmation modals, tile pickers, and the tutorial card all overlay the scene.
+5. **Check for duplicate element ids.** Several panels each own a `TileSelectOverlay`, and their forms reuse ids. A `document.getElementById` that resolves to a closed panel's control is invisible in the DOM and fatal to a click. Panel code must scope lookups to its own root.
+6. **Check whether the control is disabled until a precondition.** A `point`-mode tile picker starts with Confirm disabled and enables on the first tile click. Awaiting Confirm *before* picking can never succeed.
+7. **Check for a timed card.** Auto-advance tutorial steps move on after 2s. Acting before the next card appears makes that step snapshot state *after* the change it was watching for, so it never completes. Use `waitForTutorialStep`.
+8. **Only then suspect the harness.** If `__probeSelector` says a control is usable and clicking it does nothing, the handler is not wired.
+
+A real failure this diagnostic order was built to catch: `hireEmployee` created every employee with `qualifications: []`. Surveys require a `geology` qualification, so a hired surveyor could not survey. `logic` and `scenario` were both green — the unit tests granted the skill with `assignSkill`, and the console-mode scenarios did the same. The model was correct; the game was unplayable, and only a real click caught it.
 
 ### Extra Capture Modes
 
@@ -169,10 +193,8 @@ Never mark rendering task complete unless:
 
 When images could not be produced at all, say the visual channel is unverified and give the `npm run verify:env` remedy. Never report a rendering change verified on the strength of the test suite alone.
 
-## This Channel Does Not Prove Playability
+## A Screenshot Alone Does Not Prove Playability
 
-A screenshot shows a button. It does not show that the button is enabled, that a click reaches it, or that a player can satisfy its preconditions. An interaction-mode scenario may click a control and continue past a click that did nothing, because "no selector timed out" is not "the step completed".
+A screenshot shows a button. It does not show that the button is enabled, that a click reaches it, or that a player can satisfy its preconditions. What proves that: a `role: 'player'` scenario step, whose `interaction` array can never fall back to a console command (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts` — throws before the command reaches the game), combined with an `expect.usable`/`expect.blocked` check on the control it just clicked. A step whose click cannot complete fails the whole scenario and names the blocking control, the same diagnosis `__probeSelector`/`blockedBy` gives above.
 
-When the change touches a player-facing flow, run the `playability` channel too: `npm run playtest`. Procedures, the `__uiActions` / `__probeSelector` / `__tutorialState` bridges, and the no-console-commands rule live in the `dev-playability-testing` skill.
-
-This distinction is scheduled to collapse: once issue #515 lands, mandatory `role` tagging plus `expect`'s `usable`/`blocked` checks make an interaction-mode scenario step prove the same thing a playtest beat proves today — see the transitional note in `dev-playability-testing`.
+When the change touches a player-facing flow, run the scenario suite in interaction mode (`npm run scenarios:interaction`, or one named scenario with `npm run scenario -- --mode interaction --screenshots`) — no console command may stand in for a player action. Step roles and the allowlists each role is checked against: `.claude/rules/scenario-defs.md`.

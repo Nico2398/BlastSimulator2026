@@ -38,11 +38,10 @@ export interface ShotDef {
 /**
  * Turns a raw step error into a report line. A player-marked step's failure
  * is the mechanism working (issue #479) — it means no click could finish
- * what the step asked, the same conclusion `npm run playtest` reaches — so
- * it is called out rather than left to read like any other broken step.
- * `err`'s own message already names the blocking control the way
- * `describeUnclickable` (interaction-executor.ts) reports it; this only adds
- * the step-level framing on top.
+ * what the step asked, so it is called out rather than left to read like any
+ * other broken step. `err`'s own message already names the blocking control
+ * the way `describeUnclickable` (interaction-executor.ts) reports it; this
+ * only adds the step-level framing on top.
  */
 export function describeStepFailure(step: ScenarioStepDef, err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
@@ -53,7 +52,7 @@ export function describeStepFailure(step: ScenarioStepDef, err: unknown): string
   // PlaytestFailure (thrown by checkGoal for a failed `expect`, or by a
   // reused playtest-driver action like `set`/`clickEntity`) carries a
   // diagnosis — what was usable/blocked at the moment of failure — that a
-  // bare message loses. Surface it the same way `npm run playtest` does.
+  // bare message loses. Surface it too.
   return err instanceof PlaytestFailure ? `${base}\n${err.diagnosis}` : base;
 }
 

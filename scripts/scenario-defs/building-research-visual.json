@@ -57,11 +57,12 @@
     },
     {
       "command": "build research_center at:15,5 tier:2",
-      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "description": "role: guard (issue #515): selecting tier 2 in the catalog row's own tier dropdown is a real interaction; the Buy button is then genuinely disabled — `refreshCatalogButtons`'s `locked` check (BuildMenu.ts) is true since tier 2 is not researched.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build research_center at:15,5 tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-tier-sel",
+          "value": "2"
         }
       ],
       "expect": {
@@ -69,8 +70,10 @@
           "cash": 205000,
           "buildingCount": 1
         },
+        "blocked": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not yet researched"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "research queue type:research_center tier:2",

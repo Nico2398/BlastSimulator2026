@@ -192,12 +192,13 @@
           "command": "charge hole:* explosive:boomite amount:8 stemming:0"
         }
       ],
-      "description": "Left unmarked: this amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default value -- Finding #10's class, Charge All is the only commit, at whatever the steppers currently show.",
+      "description": "role: bootstrap (issue #515): `stemming:0` is below the Charge panel's own floor \u2014 `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) \u2014 so no click sequence can ever reach it while `createCharge` (ChargePlan.ts) itself has no lower bound and accepts 0 freely. A real, narrow UI/console gap, not a missing selector.",
       "expect": {
         "equals": {
           "chargedCount": 4
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "sequence auto",

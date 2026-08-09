@@ -57,7 +57,8 @@
           "pendingActionCount": 1
         },
         "note": "the dispatched work task itself, queued and not yet claimed"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 40",

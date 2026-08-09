@@ -61,7 +61,8 @@
           "command": "event fire union_coffee_uprising"
         }
       ],
-      "description": "event fire union_coffee_uprising — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
+      "description": "event fire union_coffee_uprising — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "role": "bootstrap"
     },
     {
       "command": "event choose 0",
@@ -130,7 +131,8 @@
           "command": "event fire tutorial_synergy_consultant"
         }
       ],
-      "description": "event fire tutorial_synergy_consultant — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled."
+      "description": "event fire tutorial_synergy_consultant — test hook: `event fire` has no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy/unconstrained) rather than mislabelled.",
+      "role": "bootstrap"
     },
     {
       "command": "event choose 1",
@@ -175,7 +177,8 @@
           "type": "command",
           "command": "event fire mafia_protection_racket"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "event choose 0",
@@ -219,7 +222,8 @@
           "type": "command",
           "command": "event fire lawsuit_wrongful_death"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "event choose 0",
@@ -263,7 +267,8 @@
           "type": "command",
           "command": "event fire politics_explosive_embargo"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "event choose 0",
@@ -307,7 +312,8 @@
           "type": "command",
           "command": "event fire weather_pit_flood"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "event choose 0",

@@ -82,7 +82,8 @@
           "proficiencyTotal": 5
         },
         "note": "level:5 replaces the Rookie starting qualification's proficiency 1"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee hire role:surveyor",
@@ -112,7 +113,8 @@
           "command": "employee assign_skill 2 skill:geology level:1"
         }
       ],
-      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too."
+      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
+      "role": "bootstrap"
     },
     {
       "command": "employee list",

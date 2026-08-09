@@ -99,7 +99,8 @@
           "employeeCount": 0,
           "activeContractCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build office at:8,5",
@@ -118,7 +119,8 @@
           "employeeCount": 0,
           "activeContractCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:10,10",
@@ -172,11 +174,35 @@
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:pop_rock amount:3 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "equals": {
           "cash": 50000,
@@ -188,7 +214,8 @@
           "chargedCount": 4,
           "sequencedCount": 0
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:30",
@@ -449,8 +476,9 @@
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel .bs-contract-deliver"
-      }
+        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "drill_plan grid rows:2 cols:4 spacing:3 depth:6 diameter:0.089 start:15,15",
@@ -504,11 +532,35 @@
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:pop_rock amount:3 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"pop_rock\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "equals": {
           "cash": 50000,
@@ -520,7 +572,8 @@
           "chargedCount": 8,
           "sequencedCount": 0
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -758,8 +811,9 @@
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel .bs-contract-deliver"
-      }
+        "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:20,20",
@@ -1096,8 +1150,9 @@
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel .bs-contract-deliver"
-      }
+        "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:8,8",
@@ -1151,11 +1206,47 @@
       "command": "charge hole:* explosive:boomite amount:6 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:6 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "6 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: this explosive/amount/stemming doesn't match the Charge panel's defaults (boomite/5kg/2m), and there is no proven click path to an exact non-default amount -- Finding #10's class, Charge All is the only commit at whatever the steppers currently show.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m \u2014 step 32 (pre-existing, out of scope here) only clicks data-step then Charge All without touching the explosive/amount/stemming controls, so it charges with whatever the panel already showed rather than its own declared values; not fixed here per the #515 contract's \"do not touch steps that already have a role.\"",
       "expect": {
         "equals": {
           "cash": 49804,
@@ -1167,7 +1258,8 @@
           "chargedCount": 16,
           "sequencedCount": 0
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:20",

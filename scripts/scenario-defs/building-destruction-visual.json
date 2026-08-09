@@ -148,16 +148,73 @@
       "command": "charge hole:* explosive:boomite amount:8 stemming:1",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:8 stemming:1"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "1.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Left unmarked: amount:8/stemming:1 don't match the Charge panel's defaults (boomite/5kg/2m), and there is no click path to an exact non-default amount -- same class as Finding #10 (per-hole charging has no UI at all; Charge All is the only commit, at whatever the steppers currently show). Sequence/blast afterward still click normally since the panel reacts to state, not to how holes got charged.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "equals": {
           "chargedCount": 9
         }
-      }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",

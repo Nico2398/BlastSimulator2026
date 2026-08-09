@@ -35,7 +35,7 @@
     {
       "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
       "timeout": 30,
-      "description": "Setup: one hole — a complete, valid plan once charged and sequenced below. Split into one step per command (issue #479, same class as Finding #5 in the original #479 plan doc): the bundled 3-command interaction array only ever ran its first command in command mode, since command-runner.ts's runSteps executes step.command alone, not the interaction array — command mode was silently never charging/sequencing this fixture until the split.",
+      "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran. No dragTiles-based grid-tool conversion was attempted here for that reason, not because one doesn't exist for a 1x1 grid.",
       "interaction": [
         {
           "type": "command",
@@ -46,7 +46,8 @@
         "equals": {
           "holeCount": 1
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
@@ -88,7 +89,7 @@
     {
       "command": "sequence set hole:H1 delay:0ms",
       "timeout": 30,
-      "description": "sequence set hole:H1 delay:0ms — per-hole delay only reachable via relative +/- steppers, not a set-to-value click (Finding #9). Left as a command.",
+      "description": "role: bootstrap (issue #515): `sequence set hole:H1 delay:0ms` sets an ABSOLUTE per-hole delay \u2014 the panel only exposes relative +/- steppers ([data-hole=\"H1\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), so there is no click path to a specific value, only to whatever the steppers already show.",
       "interaction": [
         {
           "type": "command",
@@ -99,7 +100,8 @@
         "equals": {
           "sequencedCount": 1
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "state",

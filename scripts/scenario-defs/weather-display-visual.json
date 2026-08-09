@@ -63,7 +63,8 @@
           "weather": "sunny"
         },
         "note": "createWeatherCycle always starts at 'sunny' regardless of seed (only the first auto-transition's duration is seed-derived, and nothing in this file ever calls advanceWeather -- confirmed via grep, `weather advance`/`forceAdvance` has zero call sites outside the console command and its own definition -- so weather never changes except via the explicit `weather set` steps below). Both modes now agree: command mode just lazily created the cycle here, interaction mode had it since new_game, same seed either way."
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather set cloudy",
@@ -78,7 +79,8 @@
         "equals": {
           "weather": "cloudy"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather",
@@ -93,7 +95,8 @@
         "equals": {
           "weather": "cloudy"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather set light_rain",
@@ -108,7 +111,8 @@
         "equals": {
           "weather": "light_rain"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather",
@@ -123,7 +127,8 @@
         "equals": {
           "weather": "light_rain"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather set heavy_rain",
@@ -138,7 +143,8 @@
         "equals": {
           "weather": "heavy_rain"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather",
@@ -153,7 +159,8 @@
         "equals": {
           "weather": "heavy_rain"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather set storm",
@@ -168,7 +175,8 @@
         "equals": {
           "weather": "storm"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather",
@@ -183,7 +191,8 @@
         "equals": {
           "weather": "storm"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather set heat_wave",
@@ -198,7 +207,8 @@
         "equals": {
           "weather": "heat_wave"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather",
@@ -213,7 +223,8 @@
         "equals": {
           "weather": "heat_wave"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather set cold_snap",
@@ -228,7 +239,8 @@
         "equals": {
           "weather": "cold_snap"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "weather",
@@ -243,7 +255,8 @@
         "equals": {
           "weather": "cold_snap"
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "state full",

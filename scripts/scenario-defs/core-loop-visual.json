@@ -87,7 +87,8 @@
           "cash": 48800,
           "proficiencyTotal": 3
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "survey seismic x:20 z:20",
@@ -358,9 +359,10 @@
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
         "note": "the contract stays active/undelivered -- this file's own \"contract delivery\" step in its description is a queued attempt, not a completed one; economy-full-loop.json is the file that actually hauls stock and completes a delivery"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "finances",

@@ -104,7 +104,8 @@
           "proficiencyTotal": 2
         },
         "note": "already level 1 from hiring's Rookie starting qualification -- this call is a same-level no-op, not the first level-up"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee assign_skill 2 skill:driving.truck level:1",
@@ -120,7 +121,8 @@
           "cash": 47700,
           "proficiencyTotal": 2
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee list",
@@ -146,7 +148,8 @@
           "cash": 47700,
           "pendingActionCount": 1
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 1",
@@ -180,7 +183,8 @@
           "pendingActionCount": 1
         },
         "note": "the second dispatch's ghost preview -- employee A is still busy with the first task and employee B can't claim it (wrong skill), so this stays queued through the next several checkpoints"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee list",

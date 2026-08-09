@@ -1,8 +1,8 @@
 ---
 name: dev-testing-strategy
 description: >
-  Testing strategy and conventions for BlastSimulator2026: 5-layer test pyramid (unit, integration,
-  visual, scenario, playability), Vitest patterns, per-chapter coverage goals, integration test suites with
+  Testing strategy and conventions for BlastSimulator2026: 4-layer test pyramid (unit, integration,
+  visual, scenario), Vitest patterns, per-chapter coverage goals, integration test suites with
   specific scenarios, full-level integration tests, scenario definitions, performance benchmarks,
   and validation workflow. Use when writing tests, setting up test infrastructure, or validating changes.
 ---
@@ -14,24 +14,22 @@ No layer optional. **More tests always better** — do not limit test cases.
 1. **Unit tests** — Every exported pure function in `src/core/` has exhaustive coverage. Fast, no I/O, seeded PRNG.
 2. **Small integration tests** — Console command sequences covering partial gameplay loops with huge scenario variation.
 3. **Full-level integration tests** — Complete runs from `new_game` to terminal outcome (win or each loss condition).
-4. **Visual scenario tests** — Full browser sessions (Puppeteer). Screenshots + JSON state dumps after every command.
-5. **Playtests** — The game played through its own UI, clicks only. Proves a player can reach the goal.
+4. **Visual scenario tests** — Full browser sessions (Puppeteer), real clicks. Screenshots + JSON state dumps after every command. Proves a player can reach the goal — no console command stands in for a player action.
 
-All five layers must pass before any PR is merged. **`playability` is scheduled to fold into `visual`/`scenario` once issue #515 lands** — see the transitional note in `dev-playability-testing`.
+All four layers must pass before any PR is merged. Playability used to be a fifth, separate layer (`npm run playtest`); issue #515 folded it into `visual` once every scenario step carried a structurally-enforced `role` and interaction-mode `expect.usable`/`expect.blocked` checks proved what a playtest beat proved. The old playtest script and its JSON definitions are deleted.
 
 ## Verification Channels
 
-The layers surface as five independent channels. Each catches what the others miss, so a change is verified through every channel it touches — not the cheapest one.
+The layers surface as four independent channels. Each catches what the others miss, so a change is verified through every channel it touches — not the cheapest one.
 
 | Channel | Command | Proves | Misses |
 |---------|---------|--------|--------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Anything about runtime behaviour |
 | `logic` | `npm run test` | Unit + integration behaviour matches expectations | Whether the game renders |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Whether the UI is reachable |
-| `visual` | `npm run scenarios:interaction`, `npm run screenshot` | The game renders and the UI responds to real clicks | Whether a click did anything |
-| `playability` | `npm run playtest` | A player can reach the goal by clicking alone | Numeric correctness — that is `logic` |
+| `visual` | `npm run scenarios:interaction`, `npm run screenshot` | The game renders, the UI responds to real clicks, and a player can reach the goal by clicking alone | Numeric correctness — that is `logic` |
 
-The first four all drive the simulation through `src/console/`, whose commands are a superset of what the UI exposes. That is why they can be green on an unplayable game, and why `playability` forbids console commands for anything a player would have to do. Procedures: `dev-playability-testing` skill.
+The first three all drive the simulation through `src/console/`, whose commands are a superset of what the UI exposes. That is why they can be green on an unplayable game, and why a `role: 'player'` scenario step forbids console commands for anything a player would have to do (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts`). Procedures: `dev-visual-testing` skill; step roles: `.claude/rules/scenario-defs.md`.
 
 Two channels disagreeing means neither result stands. Investigate until they agree.
 
@@ -46,12 +44,12 @@ npm run typecheck         # TypeScript across src/ and scripts/
 npm run test              # Unit + integration tests
 npm run test:integration  # Integration tests only
 npm run test:scenarios    # Validates scenario definition files (not the scenario runner)
-npm run scenarios         # Runs all 126 scenarios, command mode
-npm run playtest          # Plays the game through its UI, clicks only
+npm run scenarios         # Runs all scenarios, command mode
+npm run scenarios:interaction  # Runs all scenarios, interaction mode (real clicks)
 npm run console           # Interactive gameplay testing (no browser)
 ```
 
-`npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner, the visual channel, or the playability channel — invoke `npm run scenarios`, the visual commands, and `npm run playtest` separately.
+`npm run validate` covers static, logic, and the scenario *definition* check. It does not run the scenario runner or the visual channel — invoke `npm run scenarios` and the visual commands separately.
 
 ## Unit Test Conventions
 
@@ -220,7 +218,7 @@ CI has 3 tiers of scenario testing:
 
 † No GPU means ~6 s/frame in software rasterisation (#475) — a cached minute figure goes stale fast, so none is kept here. Current cost and the `full-ci` label rule: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
-**Label convention:** Add `full-ci` to a PR when a playtest definition drives the change, or when it touches machinery every scenario runs through. The `full-ci` label on an issue MUST transfer to the opened PR. Most PRs — docs, config, logic-only, and UI no definition reaches — skip both browser jobs safely; the `visual` channel covers those against the one scenario that exercises them. Rule and cost: `agentic-pipeline-pr-management`.
+**Label convention:** Add `full-ci` to a PR when an interaction-mode scenario drives the change, or when it touches machinery every scenario runs through. The `full-ci` label on an issue MUST transfer to the opened PR. Most PRs — docs, config, logic-only, and UI no definition reaches — skip both browser jobs safely; the `visual` channel covers those against the one scenario that exercises them. Rule and cost: `agentic-pipeline-pr-management`.
 
 ## Regression Test Policy
 

@@ -103,7 +103,8 @@
           "type": "command",
           "command": "event fire union_coffee_uprising"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "event choose 0",
@@ -174,7 +175,8 @@
           "property": "textContent",
           "expectedValue": "HORLOGE ARRÊTÉE"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "event choose 0",
@@ -217,7 +219,8 @@
           "type": "assert",
           "selector": "#bs-settings-panel [data-lang=\"fr\"].active"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "tutorial_start",
@@ -257,7 +260,8 @@
       "expect": {
         "blocked": "#bs-toolbar [data-panel=\"settings\"]",
         "note": "tutorial rails (src/ui/tutorialGuide.ts) make every control but the current step's own target inert, including the Settings toggle -- confirms a player cannot switch language again once the tutorial has engaged, matching playtest's tutorial-fr.json beat 2 (checked there before tutorial_start; checked here after, on the toggle itself rather than the panel it opens)."
-      }
+      },
+      "role": "setup"
     },
     {
       "command": "time speed:2",
@@ -277,7 +281,8 @@
           "property": "textContent",
           "expectedValue": "Embaucher Prospecteur"
         }
-      ]
+      ],
+      "role": "player"
     },
     {
       "command": "state full",
@@ -295,7 +300,8 @@
           "type": "assert",
           "selector": "#bs-employee-panel"
         }
-      ]
+      ],
+      "role": "player"
     }
   ]
 }

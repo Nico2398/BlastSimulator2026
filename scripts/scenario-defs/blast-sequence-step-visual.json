@@ -35,7 +35,7 @@
     {
       "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 30,
-      "description": "Setup: a 2x2 drill grid (H1-H4), none sequenced yet. Split into one step per command (issue #479, same class as Finding #5 in the original #479 plan doc): the bundled 2-command interaction array only ever ran its first command in command mode, since command-runner.ts's runSteps executes step.command alone, not the interaction array.",
+      "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran.",
       "interaction": [
         {
           "type": "command",
@@ -46,7 +46,8 @@
         "equals": {
           "holeCount": 4
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",

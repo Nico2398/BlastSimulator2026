@@ -13,8 +13,9 @@
  *   1. static    — TypeScript type check
  *   2. logic     — Vitest unit + integration suites
  *   3. scenario  — command-mode scenario runner (pure Node.js)
- *   4. visual    — Puppeteer screenshots + interaction-mode scenarios
- *   5. playability — plays the game through its own UI, clicks only
+ *   4. visual    — Puppeteer screenshots + interaction-mode scenarios; a
+ *                  `role: 'player'` scenario step is what proves the game is
+ *                  playable by clicking, no console command standing in
  *
  * @module verify-env
  */
@@ -102,28 +103,15 @@ async function collectChannels(): Promise<Channel[]> {
     },
     {
       id: 'visual',
-      proves: 'The game actually renders and the UI responds to real clicks',
+      proves: 'The game renders, the UI responds to real clicks, and a player can reach the goal by clicking — no console command stands in for a player action',
       command: 'npm run screenshot -- --name probe --commands "new_game seed:42"',
       status: deps && chromePath ? 'ready' : 'blocked',
       ...(chromePath
         ? {
-            detail: `chrome: ${chromePath}; dev server on :${port} ${serverUp ? 'UP' : 'DOWN (start with `npm run dev &`)'}`,
+            detail: `chrome: ${chromePath}; dev server on :${port} ${serverUp ? 'UP' : 'DOWN (start with `npm run dev &`)'}; ${jsonCount('scripts/scenario-defs')} scenario definitions`,
           }
         : {}),
       ...(deps && chromePath ? {} : { remedy: deps ? CHROME_MISSING_HELP : depsRemedy }),
-    },
-    {
-      id: 'playability',
-      proves: 'A player can reach the goal by clicking — no console command stands in for a player action',
-      command: 'npm run playtest',
-      // Unlike `visual`, a running server is not optional here: the harness
-      // drives the live page from the first beat and has nothing to capture
-      // without it.
-      status: deps && chromePath && serverUp ? 'ready' : 'blocked',
-      detail: `${jsonCount('scripts/playtests')} playtest definitions`,
-      ...(deps && chromePath && serverUp
-        ? {}
-        : { remedy: !deps ? depsRemedy : !chromePath ? CHROME_MISSING_HELP : 'npm run dev &' }),
     },
   ];
 

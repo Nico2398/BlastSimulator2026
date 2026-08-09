@@ -232,7 +232,7 @@ const ENTRY_SECTIONS = [
 ];
 
 /** Verification channels every entry point names. */
-const CHANNELS = ['static', 'logic', 'scenario', 'visual', 'playability'];
+const CHANNELS = ['static', 'logic', 'scenario', 'visual'];
 
 /**
  * Entry points are the only layer loaded on every session, and each runtime

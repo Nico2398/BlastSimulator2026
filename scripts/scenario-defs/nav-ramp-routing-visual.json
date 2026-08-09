@@ -231,7 +231,8 @@
         "equals": {
           "cash": 22960
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee list",

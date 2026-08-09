@@ -119,10 +119,13 @@ export type InteractionStepAction =
 
 /**
  * Whether a step's `interaction` models something the player must do by
- * clicking, or setup/observation the harness may still drive by console
- * command.
+ * clicking, or setup/observation/guard the harness may still drive by
+ * console command.
  *
- * The three categories are the ones issue #479 measured the suite against:
+ * The first three categories are the ones issue #479 measured the suite
+ * against; `bootstrap` and `guard` were added by issue #515, which turns
+ * `role` from a convention into a structural lint (every step must carry
+ * one of these five, or be a documented, individually-tracked exception):
  *
  * - `player` — something a player does. May not reach the console at all.
  * - `setup` — world bootstrapping and time control. May run a command, but
@@ -132,13 +135,19 @@ export type InteractionStepAction =
  *   This is how the harness records what happened, and it has no UI
  *   equivalent by design, so it stays a command — but only a command on
  *   `OBSERVATION_COMMANDS`, which is checked, not assumed.
+ * - `bootstrap` — a mutating command with no UI equivalent and no business
+ *   having one (e.g. `employee assign_skill`, which exists so a test doesn't
+ *   have to grind XP for real), narrower than `setup`'s allowlist and
+ *   checked against its own `isAllowedBootstrapCommand`.
+ * - `guard` — a step proving a control is unreachable (`expect.blocked`),
+ *   not that one was clicked — the rejection-path counterpart to `player`.
  *
  * Omitted means the step predates this distinction and is unconstrained.
  * A step opts in by setting this explicitly; nothing infers it from the
  * step's command, because inference is exactly the kind of convention a
  * future edit can quietly violate.
  */
-export type ScenarioStepRole = 'player' | 'setup' | 'observe';
+export type ScenarioStepRole = 'player' | 'setup' | 'observe' | 'bootstrap' | 'guard';
 
 /**
  * What must be true after a step's actions ran. A scenario with no `expect`

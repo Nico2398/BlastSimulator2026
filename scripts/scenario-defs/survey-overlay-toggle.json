@@ -60,7 +60,8 @@
           "type": "command",
           "command": "employee assign_skill 1 skill:geology level:3"
         }
-      ]
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "survey seismic x:20 z:20",

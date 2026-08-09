@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import type { ScenarioDef, ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
 import { getAllVehicleRoles } from '../../src/core/entities/Vehicle.js';
-import { checkStepActionAllowed } from '../../scripts/shared/interaction-executor.js';
+import { checkStepActionAllowed, isAllowedBootstrapCommand } from '../../scripts/shared/interaction-executor.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -19,9 +19,9 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   'wait', 'waitForSelector', 'waitForTutorialStep', 'type',
   'assert', 'viewport', 'command', 'screenshot',
   'loadingScreenDebug',
-  // Shared with the playability harness (issue #479) — same names, same
-  // implementations, so a converted step and its playtest counterpart do the
-  // same thing. See InteractionStepAction in scripts/shared/scenario-types.ts.
+  // Ported from the former playtest harness (issue #479) — same names, same
+  // implementations, so a converted step behaves the same way the harness's
+  // beats used to. See InteractionStepAction in scripts/shared/scenario-types.ts.
   'set', 'clickLabel', 'awaitUsable', 'zoomOut', 'focusTile', 'clickEntity',
   // Conditional click for genuinely nondeterministic beats (`event choose`
   // after a bare tick). Not an escape hatch — see InteractionStepAction.
@@ -695,14 +695,14 @@ describe('UI-driven scenarios click real controls', () => {
 // ──────────────────────────────────────────────
 describe('Step role field is a recognized value when present', () => {
   for (const name of ALL_SCENARIO_NAMES) {
-    it(`${name} — every step's role, if set, is "player", "setup" or "observe"`, () => {
+    it(`${name} — every step's role, if set, is "player", "setup", "observe", "bootstrap" or "guard"`, () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i] as ScenarioStepDef;
         if (step.role === undefined) continue;
         expect(
-          ['player', 'setup', 'observe'],
-          `step[${i}] role "${step.role}" must be "player", "setup" or "observe"`,
+          ['player', 'setup', 'observe', 'bootstrap', 'guard'],
+          `step[${i}] role "${step.role}" must be "player", "setup", "observe", "bootstrap" or "guard"`,
         ).toContain(step.role);
       }
     });
@@ -794,6 +794,87 @@ describe('Role-marked steps obey checkStepActionAllowed (issue #479)', () => {
     expect(checkStepActionAllowed(
       step, { type: 'command', command: 'build freight_warehouse at:4,4' },
     )).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────
+// 14b. `bootstrap` and `guard` roles (issue #515) — the two roles
+// ScenarioStepRole gained beyond #479's player/setup/observe. `bootstrap`
+// covers a mutating command with no UI equivalent and no business having one
+// (e.g. `employee assign_skill`); `guard` covers a step proving a control is
+// unreachable rather than clicking one.
+// ──────────────────────────────────────────────
+describe('isAllowedBootstrapCommand (issue #515)', () => {
+  it('allows the plan\'s audited bootstrap commands', () => {
+    expect(isAllowedBootstrapCommand('employee assign_skill 1 skill:geology level:3')).toBe(true);
+    expect(isAllowedBootstrapCommand('weather set storm')).toBe(true);
+    expect(isAllowedBootstrapCommand('corrupt target:witness')).toBe(true);
+  });
+
+  it('rejects a command with a real UI equivalent', () => {
+    // `management_office` is a real BuildingType (Building.ts) with a real
+    // catalog row (BuildMenu.ts's data-build-type). `office` (no such type —
+    // see BOOTSTRAP_COMMAND_ALLOWLIST's comment) would be the wrong example
+    // here: it has no UI to smuggle past, real or otherwise.
+    expect(isAllowedBootstrapCommand('build management_office')).toBe(false);
+  });
+
+  it('rejects an empty command', () => {
+    expect(isAllowedBootstrapCommand('')).toBe(false);
+    expect(isAllowedBootstrapCommand('   ')).toBe(false);
+  });
+});
+
+describe('Role-marked steps obey checkStepActionAllowed for bootstrap/guard (issue #515)', () => {
+  it('a bootstrap-marked step may use an allowlisted command', () => {
+    const cmd = 'employee assign_skill 1 skill:geology level:3';
+    const step: ScenarioStepDef = {
+      command: cmd,
+      role: 'bootstrap',
+      interaction: [{ type: 'command', command: cmd }],
+    };
+    expect(checkStepActionAllowed(step, { type: 'command', command: cmd })).toBeNull();
+  });
+
+  it('a bootstrap-marked step is rejected for a command outside the allowlist', () => {
+    const cmd = 'build freight_warehouse at:4,4';
+    const step: ScenarioStepDef = {
+      command: cmd,
+      description: 'bootstrap-build',
+      role: 'bootstrap',
+      interaction: [{ type: 'command', command: cmd }],
+    };
+    const violation = checkStepActionAllowed(step, { type: 'command', command: cmd });
+    expect(violation).not.toBeNull();
+    expect(violation).toContain('bootstrap-build');
+    expect(violation).toContain(cmd);
+  });
+
+  it('a guard-marked step with expect.blocked is allowed (no command runs)', () => {
+    const step: ScenarioStepDef = {
+      command: 'state',
+      role: 'guard',
+      expect: { blocked: '[data-action="run-analysis"]' },
+    };
+    // A guard step proves a control is unreachable, not that a command ran —
+    // checkStepActionAllowed is only reached for actions of type 'command',
+    // so a guard step whose interaction never dispatches one never hits this
+    // check. Exercised here via the observation-style command a guard step
+    // may still use to record state (mirrors the 'observe' role's shape).
+    expect(checkStepActionAllowed(step, { type: 'command', command: 'state' })).toBeNull();
+  });
+
+  it('a guard-marked step with no expect.blocked is rejected, naming the reason', () => {
+    const step: ScenarioStepDef = {
+      command: 'state',
+      description: 'guard-no-blocked',
+      role: 'guard',
+    };
+    const violation = checkStepActionAllowed(step, { type: 'command', command: 'state' });
+    expect(violation).not.toBeNull();
+    expect(violation).toContain('guard-no-blocked');
+    expect(violation).toMatch(/guard/i);
+    expect(violation).toMatch(/blocked/i);
   });
 });
 

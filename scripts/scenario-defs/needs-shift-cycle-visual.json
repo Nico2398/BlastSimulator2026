@@ -83,18 +83,19 @@
       "command": "build upgrade 1",
       "interaction": [
         {
-          "type": "command",
-          "command": "build upgrade 1"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn"
         }
       ],
-      "description": "Left unmarked: the button is genuinely disabled or absent at this point (tier not researched, id doesn't exist, or the building/role name isn't real), so a real player could not do this either -- the console command reproduces the same rejection.",
+      "description": "role: player (issue #515): building #1's Upgrade button is present and ENABLED — `upgradeBtn.disabled` (BuildMenu.ts) only checks `nextTier === null` or affordability, not the research lock. A real click intercepts client-side and never even issues `build upgrade 1` — the same observable outcome (buildingCount/cash unchanged) as the console command's own rejection. Not `guard`: the button is reachable, just ineffective while locked.",
       "expect": {
         "equals": {
           "cash": 39000,
           "buildingCount": 1
         },
         "note": "rejected: Tier 2 living_quarters is not researched — this is Finding #27's root cause, confirmed here in state too"
-      }
+      },
+      "role": "player"
     },
     {
       "command": "set_policy mode:shift_8h",
@@ -134,7 +135,8 @@
           "cash": 39000,
           "employeeCount": 1
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee list",

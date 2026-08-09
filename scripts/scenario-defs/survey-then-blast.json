@@ -100,7 +100,8 @@
         "equals": {
           "proficiencyTotal": 3
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee list",

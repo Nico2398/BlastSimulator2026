@@ -166,7 +166,8 @@
         "equals": {
           "cash": 25000
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 20",

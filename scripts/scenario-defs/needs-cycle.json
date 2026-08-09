@@ -77,7 +77,8 @@
           "employeeCount": 1
         },
         "note": "confirms the fake-role hire is a real no-op, not a silent success"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "employee hire role:surveyor",
@@ -114,7 +115,8 @@
           "buildingCount": 0
         },
         "note": "confirms the fake building type is a real no-op — this file's title promise (\"verify canteen auto-queue\") is unreachable since no canteen building type exists in this game; only the 2 real hires above and idle need-decay over the following ticks are actually testable"
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "tick 40",

@@ -59,35 +59,41 @@
       "command": "build vehicle_depot at:15,5 tier:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "build vehicle_depot at:15,5 tier:2"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-tier-sel",
+          "value": "2"
         }
       ],
-      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "description": "role: guard (issue #515): selecting tier 2 in the catalog row's own tier dropdown is a real interaction; the Buy button is then genuinely disabled — `refreshCatalogButtons`'s `locked` check (BuildMenu.ts) is true since tier 2 is not researched — so `expect.blocked` proves the same rejection command mode shows.",
       "expect": {
         "equals": {
           "cash": 32000,
           "buildingCount": 1
         },
+        "blocked": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not researched"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "build vehicle_depot at:25,5 tier:3",
       "interaction": [
         {
-          "type": "command",
-          "command": "build vehicle_depot at:25,5 tier:3"
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-tier-sel",
+          "value": "3"
         }
       ],
-      "description": "Left unmarked: at this point the button is genuinely disabled (tier not yet researched / affordable, or the target id doesn't exist), so a real player could not click it either -- this step deliberately demonstrates the rejection command mode shows via the same disabled-button rule that gates the UI. Not converted to a click; the console command reproduces the same no-op the disabled button would.",
+      "description": "role: guard (issue #515) — same reasoning as the tier:2 attempt above, for tier 3.",
       "expect": {
         "equals": {
           "cash": 32000,
           "buildingCount": 1
         },
+        "blocked": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn",
         "note": "rejected: tier 3 not researched"
-      }
+      },
+      "role": "guard"
     },
     {
       "command": "build list",

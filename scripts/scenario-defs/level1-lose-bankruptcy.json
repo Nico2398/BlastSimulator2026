@@ -72,7 +72,8 @@
           "cash": 147500,
           "buildingCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build office at:10,5",
@@ -88,7 +89,8 @@
           "cash": 147500,
           "buildingCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build medical_bay at:5,10",
@@ -104,7 +106,8 @@
           "cash": 147500,
           "buildingCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build canteen at:10,10",
@@ -120,7 +123,8 @@
           "cash": 147500,
           "buildingCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build storage_depot at:15,5",
@@ -136,7 +140,8 @@
           "cash": 147500,
           "buildingCount": 0
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build break_room at:15,10",
@@ -153,7 +158,8 @@
           "buildingCount": 0
         },
         "note": "confirmed via direct trace: all six declared building types are invalid, none of them ever exist -- this file's own \"overspend on buildings\" half of its premise never actually happens, only vehicles and employees genuinely drive the overspend below."
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "finances",

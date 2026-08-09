@@ -10,7 +10,7 @@ description: >
 
 Before open-pr step, evaluate: **is this PR ready to merge or should it be a draft?**
 
-**Verification decides, and nothing else.** A PR is `ready` when every verification channel the change owes reports PASS. Ask one question per channel the change touches — static, logic, scenario, visual, playability — and one question about the issue's own verification list. All PASS → `ready`.
+**Verification decides, and nothing else.** A PR is `ready` when every verification channel the change owes reports PASS. Ask one question per channel the change touches — static, logic, scenario, visual — and one question about the issue's own verification list. All PASS → `ready`.
 
 A PR is `draft` in exactly three cases:
 
@@ -49,23 +49,23 @@ A run that defaulted an open requirement keeps `READY TO MERGE` and records the 
 
 A marked PR whose runs are still going is the ordinary state of a PR the pipeline just opened. `agentic-auto-merge` reads it as `pending`, logs which runs it is waiting on, and stops — and the CI-completion sweep re-evaluates it when they report: green merges it, red fails the sweep step naming the PR. Marking is what hands the PR to that machinery. Withholding the marker takes it away.
 
-So a channel this session cannot run but CI does — `playability` and interaction-mode `scenario` — is **covered**, and the PR ships marked; when the change earns the `full-ci` label below, those jobs are what report on it. Only a channel no mechanism will ever report on is a draft case.
+So a channel this session cannot run but CI does — interaction-mode `visual`/`scenario` — is **covered**, and the PR ships marked; when the change earns the `full-ci` label below, that job is what reports on it. Only a channel no mechanism will ever report on is a draft case.
 
 **There is no third state.** Every pipeline PR leaves the run either marked or `--draft`. A non-draft PR carrying no marker is invisible to the entire loop: `agentic-auto-merge` skips it, `auto-assign-next` chains from a merge that never happens, and the watchdog skips any issue that has a linked PR — so the issue holds `in-progress` and every assignment behind it waits until a human notices. PRs #507 and #508 both ended exactly there, both promising the marker "will follow once those jobs report". Nothing comes back to add it; the only session that could have is over. `agentic-auto-merge` now fails its step on a non-draft `pipeline/feature-*` PR with no marker, so the state is loud instead of silent — but the run must not create it in the first place.
 
 ## The `full-ci` label
 
-`full-ci` starts two browser jobs — `Scenarios (interaction mode)` and `Playtest (playability)` — that add roughly 50 minutes to the merge path, because the terrain material costs ~6.4 s/frame without a GPU (#475). It buys evidence, so apply it where there is evidence to buy:
+`full-ci` starts the `Scenarios (interaction mode)` browser job — roughly 30 minutes added to the merge path, because the terrain material costs ~6.4 s/frame without a GPU (#475). It buys evidence, so apply it where there is evidence to buy:
 
 | Apply because | Test |
 |---------------|------|
 | The issue carried it | The label transfers from issue to PR — `agentic-issue-creation` |
-| A playtest definition drives the change | `scripts/playtests/` holds the whole playability channel. Read the definitions: does one click its way through the control, panel or flow this diff changes? |
-| Every scenario runs through what changed | Shared rendering, input, camera, picking, or the scenario harness itself — machinery no single definition names and all of them exercise |
+| An interaction-mode scenario drives the change | `scripts/scenario-defs/` holds the whole click-only, `role`-tagged suite (issue #515). Read the scenario: does one click its way through the control, panel or flow this diff changes? |
+| Every scenario runs through what changed | Shared rendering, input, camera, picking, or the scenario harness itself — machinery no single scenario names and all of them exercise |
 
-Otherwise the label pays 50 minutes to replay flows the diff never touched. A control added to an existing panel, a setup form's field list, copy, a renderer detail no definition reaches — the `visual` channel already covers those, run in this session against the one named scenario that exercises them, and that is the stronger evidence because it looks at the thing that changed.
+Otherwise the label pays 30 minutes to replay flows the diff never touched. A control added to an existing panel, a setup form's field list, copy, a renderer detail no scenario reaches — the `visual` channel already covers those, run in this session against the one named scenario that exercises them, and that is the stronger evidence because it looks at the thing that changed.
 
-**When playability is owed and no definition drives the flow**, the label is not the answer — running five definitions that never reach the change reports nothing about it. Say so in the PR body, naming the flow and what does cover it. A goal-reaching flow worth pinning earns a new definition in `scripts/playtests/` (and then the label, so CI runs it); a control on an existing panel is covered by the `visual` channel and needs neither.
+**When player-reachability is owed and no scenario drives the flow**, the label is not the answer — running scenarios that never reach the change reports nothing about it. Say so in the PR body, naming the flow and what does cover it. A goal-reaching flow worth pinning earns a new `role: 'player'` step in `scripts/scenario-defs/` (and then the label, so CI runs it in interaction mode); a control on an existing panel is covered by the `visual` channel and needs neither.
 
 Labelling is a claim about which machine runs a channel. It is never a reason to withhold the marker, and never a substitute for the visual channel.
 

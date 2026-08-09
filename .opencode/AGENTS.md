@@ -33,8 +33,7 @@ npm run verify:env      # which verification channels are live
 npm run validate        # TypeScript → coverage → integration → scenario defs → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser
-npm run playtest        # plays the game through its own UI, clicks only
-npm run dev             # dev server on :5173, required by the visual and playability channels
+npm run dev             # dev server on :5173, required by the visual channel
 npm run console         # interactive gameplay REPL, no browser
 ```
 
@@ -46,15 +45,14 @@ Before any task, load related skill(s) for domain rules, procedures, and constra
 
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE
 
-Five independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.
+Four independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.
 
 | Channel | Command | Proves | Required when |
 |---------|---------|--------|---------------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Every code change |
 | `logic` | `npm run test` | Unit + integration behaviour matches expectations | Every code change |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Gameplay, console, economy, campaign changes |
-| `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshots` | The game renders correctly and the UI responds to real clicks | Any change to `src/renderer/`, `src/ui/`, or anything a player sees |
-| `playability` | `npm run playtest` | A player can actually reach the goal by clicking — no console command stands in for a player action | Any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
+| `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshots` | The game renders correctly, the UI responds to real clicks, and a player can actually reach the goal by clicking — no console command stands in for a player action | Any change to `src/renderer/`, `src/ui/`, or anything a player sees; any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
 
 1. Run `npm run verify:env` when unsure a channel is usable. It reports each channel as READY or BLOCKED with the remedy.
 2. Pick every channel the change touches, not the cheapest one.
@@ -63,9 +61,7 @@ Five independent channels prove a change works. Each catches what the others mis
 5. **"Already fixed" and "no change needed" are claims about the whole issue, not about a diff.** With no diff there is nothing to scope the channels down to, so run every channel the issue's own verification list names. A verdict of already-resolved reached on a subset of them is unproven.
 6. **A channel already red before you arrived is a finding, not a precondition.** Never skip, downgrade, or discount a channel because it was failing on `main` when you started — that is how a red channel outlives the one session positioned to notice it. Fix it, or state plainly that it is red, what fails, and why you are not fixing it. Reporting work done while a required channel is red is a false report no matter who broke it.
 
-**The other four channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `playability` is the only channel that plays the game. Procedures live in the `dev-playability-testing` skill.
-
-**`playability` is folding into `visual`.** Tracked by issue #515: once the scenario suite's click-only enforcement is total, interaction-mode `expect` checks prove what a playtest beat proves today, and this row retires. Until then it remains required exactly as below.
+**The other three channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `visual`'s interaction-mode scenarios are the only channel that plays the game: a `role: 'player'` scenario step can never fall back to a console command, so a click that cannot complete fails the scenario and names the blocking control. Procedures live in the `dev-visual-testing` skill.
 
 **Running a visual channel is not the same as owning it.** The Capability Gate below still applies: capture the screenshots, then hand the inspection to @visual-tester, who reports what is actually on screen. A rendering change is unverified until an image has been looked at — a green test suite proves the logic, not the picture. Procedures live in the `dev-visual-testing` skill.
 

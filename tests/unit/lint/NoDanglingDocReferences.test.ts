@@ -65,6 +65,22 @@ const DANGLING_REFERENCE_ALLOWLIST: readonly string[] = [
   // the real path adds a `locales/` segment. Pre-existing, unrelated to
   // #494's deletions — out of scope for this issue's citation-repoint work.
   'docs/ui-redesign-spec.md:25',
+  // Issue #515 deleted the old playtest script, its JSON definitions, and
+  // its utility module (Phase 3 of the plan doc below), plus the
+  // now-superseded playability rule and its dedicated test suite. The
+  // entries below are the plan doc's and a findings record's own
+  // chronological log of that work — prose describing what a path *used to*
+  // be or *was deleted*, not a live citation — so they stay dangling by
+  // design rather than being rewritten out of a historical record.
+  'docs/plans/scenario-assertions-and-playtest-removal.md:52',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:53',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:1462',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:1469',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:1470',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:1479',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:1784',
+  'records/tutorial-visual-expectations.md:290',
+  'records/tutorial-visual-expectations.md:322',
 ];
 
 interface DanglingReference {

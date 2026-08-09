@@ -132,7 +132,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build storage_depot at:10,5",
@@ -153,7 +154,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build medical_bay at:5,10",
@@ -174,7 +176,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build canteen at:10,10",
@@ -195,7 +198,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build break_room at:15,5",
@@ -216,7 +220,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build bunkhouse at:15,10",
@@ -237,7 +242,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "build management_office at:20,5",
