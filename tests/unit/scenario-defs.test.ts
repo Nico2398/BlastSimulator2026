@@ -863,3 +863,79 @@ describe('Step expect field is shaped correctly when present', () => {
     });
   }
 });
+
+// ──────────────────────────────────────────────
+// 16. The 3 remaining un-converted, non-exempt player steps (issue #514).
+//
+// Issue #514 audited every untagged (no `role`) step carrying a raw console
+// `command` action and found 289 of them; all but 3 are legitimately exempt
+// (cheat/setup steps with no UI equivalent, or documented permanent
+// exceptions per .claude/rules/scenario-defs.md). These 3 are ordinary
+// player actions — a blast execution and two charge-hole steps — that were
+// simply never converted. They must become real `role: 'player'` steps
+// driven by clicks, matching every other player-facing step in the suite.
+//
+// This test intentionally does not dictate the click sequence (selectors,
+// waitForSelector targets, etc.) that the fix will use — only the
+// structural invariant: `role` must be `'player'` (or another established
+// non-exempt role) and the interaction array must not dispatch the console
+// command directly.
+// ──────────────────────────────────────────────
+describe('The 3 known un-converted player steps are converted to real UI interactions (#514)', () => {
+  const TARGETS: Array<{ file: string; stepIndex: number; expectedCommandPrefix: string }> = [
+    { file: 'multi-deck-blast', stepIndex: 7, expectedCommandPrefix: 'blast' },
+    { file: 'blast-preview-step-visual', stepIndex: 2, expectedCommandPrefix: 'charge hole:*' },
+    { file: 'blast-sequence-step-visual', stepIndex: 2, expectedCommandPrefix: 'charge hole:*' },
+  ];
+
+  for (const { file, stepIndex, expectedCommandPrefix } of TARGETS) {
+    it(`${file}.json step[${stepIndex}] — is tagged with a non-exempt role`, () => {
+      const scenario = loadScenarioDef(file, SCENARIO_DIR);
+      const step = scenario.steps[stepIndex] as ScenarioStepDef;
+      // Sanity check we're pointed at the right, still-unconverted step —
+      // fails loudly if the file is edited in a way that shifts step order
+      // before the role/interaction fix lands.
+      expect(
+        step.command.startsWith(expectedCommandPrefix),
+        `${file}.json step[${stepIndex}] command changed — expected it to start with "${expectedCommandPrefix}", got "${step.command}"`,
+      ).toBe(true);
+
+      expect(
+        step.role,
+        `${file}.json step[${stepIndex}] ("${step.command}") must carry role: "player" (or another established non-exempt role) — it is an ordinary player action, not exempt setup/observation`,
+      ).toBeDefined();
+      expect(step.role).not.toBe('setup');
+      expect(step.role).not.toBe('observe');
+    });
+
+    it(`${file}.json step[${stepIndex}] — its interaction array contains no raw "command" action`, () => {
+      const scenario = loadScenarioDef(file, SCENARIO_DIR);
+      const step = scenario.steps[stepIndex] as ScenarioStepDef;
+      expect(
+        step.interaction,
+        `${file}.json step[${stepIndex}] must have an interaction array`,
+      ).toBeDefined();
+      expect(step.interaction!.length).toBeGreaterThan(0);
+
+      const commandActions = (step.interaction ?? []).filter(a => a.type === 'command');
+      expect(
+        commandActions,
+        `${file}.json step[${stepIndex}] interaction array still dispatches the console command directly instead of real UI actions: ${JSON.stringify(commandActions)}`,
+      ).toEqual([]);
+    });
+
+    it(`${file}.json step[${stepIndex}] — a role-marked step's interaction obeys checkStepActionAllowed`, () => {
+      const scenario = loadScenarioDef(file, SCENARIO_DIR);
+      const step = scenario.steps[stepIndex] as ScenarioStepDef;
+      if (step.role === undefined) return; // covered by the role-defined assertion above
+      for (const action of step.interaction ?? []) {
+        if (action.type !== 'command') continue;
+        const violation = checkStepActionAllowed(step, action);
+        expect(
+          violation,
+          `${file}.json step[${stepIndex}] — unexpected allowed console command in a player-tagged step's interaction`,
+        ).toBeNull();
+      }
+    });
+  }
+});
