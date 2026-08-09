@@ -1,0 +1,199 @@
+{
+  "name": "insufficient-funds-guards-visual",
+  "description": "Issue #511: build destroy/upgrade/move and corrupt/mafia accident/frame must refuse an unaffordable action and disable their button the same way employee hire, vehicle buy, and build place already do. Cash is driven down to $1,500 — below every one of the six real costs (demolish $2,000, move $4,000, corrupt(witness) $10,000, mafia accident $10,000, mafia frame $5,000, upgrade $22,000) — then each action is attempted once, real console-mode refusal proven by expect.equals, and the corresponding UI control proven unreachable by expect.blocked.",
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45,
+      "target": [5, 5],
+      "distance": 15
+    }
+  ],
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:32 cash:200000",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 mine_type:desert size:32 cash:200000" }
+      ],
+      "expect": {
+        "equals": { "cash": 200000, "buildingCount": 0, "employeeCount": 0 }
+      }
+    },
+    {
+      "command": "build management_office at:5,5",
+      "description": "Placed by clicking the real Build panel — the building destroy/upgrade/move guards below all act on this one (#1). getBuildingDef('management_office', 1).constructionCost is 8000.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 5, "z": 5 },
+        { "type": "wait", "durationMs": 200 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "wait", "durationMs": 500 }
+      ],
+      "expect": {
+        "equals": { "cash": 192000, "buildingCount": 1 }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Hired by clicking the real Crew panel — the mafia accident/frame guards below target this one employee. HIRING_COSTS.driller is 1000 (balance.ts).",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
+      ],
+      "expect": {
+        "equals": { "cash": 191000, "employeeCount": 1 }
+      }
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "1/3 — unlocking the mafia (MAFIA_UNLOCK_THRESHOLD=3, Corruption.ts) requires 3 corrupt attempts, and corruption.level rises on both a success and a failure so this is deterministic. The Shady panel only reveals itself once corruption.level>0 (ToolRail.ts) — before that first attempt there is no button to click at all, so this is left a console command rather than a click that cannot land, same convention as the vehicle-buy BLOCKED FINDING in crew-fleet-panels-visual.json.",
+      "interaction": [
+        { "type": "command", "command": "corrupt target:witness" }
+      ],
+      "expect": {
+        "equals": { "cash": 181000 }
+      }
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "2/3.",
+      "interaction": [
+        { "type": "command", "command": "corrupt target:witness" }
+      ],
+      "expect": {
+        "equals": { "cash": 171000 }
+      }
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "3/3 — corruption.level now reaches MAFIA_UNLOCK_THRESHOLD; mafiaUnlocked flips true, and the Shady panel's accident/frame cards become reachable.",
+      "interaction": [
+        { "type": "command", "command": "corrupt target:witness" }
+      ],
+      "expect": {
+        "equals": { "cash": 161000 }
+      }
+    },
+    {
+      "command": "corrupt target:witness cost:159500",
+      "description": "Setup, not the guard under test: drains cash to $1,500 via the same named cost:<amount> override attemptCorruption already accepts, landing below every one of the six real costs checked below.",
+      "interaction": [
+        { "type": "command", "command": "corrupt target:witness cost:159500" }
+      ],
+      "expect": {
+        "equals": { "cash": 1500 }
+      }
+    },
+    {
+      "command": "build destroy 1",
+      "description": "$1,500 < demolishCost $2,000 — refused, and the Build panel's Demolish button on building #1's row must be disabled, not merely present.",
+      "interaction": [
+        { "type": "command", "command": "build destroy 1" }
+      ],
+      "expect": {
+        "equals": { "cash": 1500, "buildingCount": 1 },
+        "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn",
+        "note": "issue #511 — build destroy funds guard"
+      }
+    },
+    {
+      "command": "build upgrade 1",
+      "description": "$1,500 < upgradeCost $22,000 (demolishCost T1 $2,000 + constructionCost T2 $20,000) — refused, and the Upgrade button on building #1's row must be disabled.",
+      "interaction": [
+        { "type": "command", "command": "build upgrade 1" }
+      ],
+      "expect": {
+        "equals": { "cash": 1500, "buildingCount": 1 },
+        "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn",
+        "note": "issue #511 — build upgrade funds guard"
+      }
+    },
+    {
+      "command": "build move 1 to:10,10",
+      "description": "$1,500 < moveCost $4,000 (round(constructionCost T1 8000 * 0.5)) — refused, and the Move button on building #1's row must be disabled.",
+      "interaction": [
+        { "type": "command", "command": "build move 1 to:10,10" }
+      ],
+      "expect": {
+        "equals": { "cash": 1500, "buildingCount": 1 },
+        "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-move-btn",
+        "note": "issue #511 — build move funds guard"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Opens the now-revealed Shady panel (corruption.level>0 since step 3, ToolRail.ts) by clicking the real toolbar entry, so the call button is on screen for the next step's blocked check — present but disabled, not merely hidden behind a closed panel.",
+      "role": "player",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"shady\"]" },
+        { "type": "wait", "durationMs": 300 }
+      ]
+    },
+    {
+      "command": "corrupt target:witness",
+      "description": "$1,500 < TARGET_COSTS.witness $10,000 — refused, and the call button on the (now open) Shady panel must be disabled.",
+      "interaction": [
+        { "type": "command", "command": "corrupt target:witness" }
+      ],
+      "expect": {
+        "equals": { "cash": 1500 },
+        "blocked": "#bs-shady-panel [data-target=\"witness\"] [data-action=\"corrupt\"]",
+        "note": "issue #511 — corrupt funds guard"
+      }
+    },
+    {
+      "command": "mafia accident employee:1",
+      "description": "$1,500 < ACCIDENT_COST $10,000 — refused, and the accident GO button must be disabled. employeeCount unchanged proves the guard ran ahead of arrangeAccident, not just that the roll happened to miss.",
+      "interaction": [
+        { "type": "command", "command": "mafia accident employee:1" }
+      ],
+      "expect": {
+        "equals": { "cash": 1500, "employeeCount": 1 },
+        "blocked": "#bs-shady-panel [data-action=\"mafia-accident\"]",
+        "note": "issue #511 — mafia accident funds guard"
+      }
+    },
+    {
+      "command": "mafia frame employee:1",
+      "description": "$1,500 < FRAME_COST $5,000 — refused on the start path, and the frame start button must be disabled. Only the start path is gated; a ready pending frame's completion is always free and is covered by the console unit tests, not repeated here.",
+      "interaction": [
+        { "type": "command", "command": "mafia frame employee:1" }
+      ],
+      "expect": {
+        "equals": { "cash": 1500, "employeeCount": 1 },
+        "blocked": "#bs-shady-panel [data-action=\"mafia-frame-start\"]",
+        "note": "issue #511 — mafia frame funds guard"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Final state dump for visual inspection of the Build panel's disabled row buttons.",
+      "role": "observe",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    },
+    {
+      "command": "state",
+      "description": "Final state dump for visual inspection of the Shady panel's disabled action buttons.",
+      "role": "observe",
+      "interaction": [
+        { "type": "command", "command": "state" },
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"shady\"]" },
+        { "type": "wait", "durationMs": 300 },
+        { "type": "screenshot" }
+      ]
+    }
+  ]
+}

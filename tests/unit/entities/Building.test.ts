@@ -13,7 +13,13 @@ import {
   tickResearch,
   isTierUnlocked,
   findNearestActiveBuildingOfType,
+  getDemolishCost,
+  getUpgradeCost,
+  getMoveCost,
+  moveBuilding,
+  BUILDING_DEFS,
 } from '../../../src/core/entities/Building.js';
+import type { Building } from '../../../src/core/entities/Building.js';
 
 describe('Building system', () => {
   it('placing a building deducts cost and adds it to state', () => {
@@ -312,5 +318,83 @@ describe('findNearestActiveBuildingOfType', () => {
     const state = createBuildingState();
     const result = findNearestActiveBuildingOfType(state, 'freight_warehouse', 0, 0);
     expect(result).toBeNull();
+  });
+});
+
+// ── getDemolishCost / getUpgradeCost / getMoveCost (#511 — direct coverage) ──
+
+describe('getDemolishCost()', () => {
+  it('equals the demolish cost of the building def for its type and tier', () => {
+    const building: Building = { id: 1, type: 'management_office', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    expect(getDemolishCost(building)).toBe(getBuildingDef('management_office', 1).demolishCost);
+  });
+
+  it('uses the tier-specific demolish cost, not tier 1, for an upgraded building', () => {
+    const building: Building = { id: 2, type: 'freight_warehouse', tier: 3, x: 0, z: 0, hp: 100, active: true };
+    expect(getDemolishCost(building)).toBe(getBuildingDef('freight_warehouse', 3).demolishCost);
+    expect(getDemolishCost(building)).not.toBe(getBuildingDef('freight_warehouse', 1).demolishCost);
+  });
+});
+
+describe('getUpgradeCost()', () => {
+  it('is the sum of the current tier demolish cost and the next tier construction cost', () => {
+    const building: Building = { id: 1, type: 'living_quarters', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    const currentDemolish = getBuildingDef('living_quarters', 1).demolishCost;
+    const nextConstruction = getBuildingDef('living_quarters', 2).constructionCost;
+
+    expect(getUpgradeCost(building, 2)).toBe(currentDemolish + nextConstruction);
+    // Not just the next tier's construction cost alone...
+    expect(getUpgradeCost(building, 2)).not.toBe(nextConstruction);
+    // ...and not just the current tier's demolish cost alone.
+    expect(getUpgradeCost(building, 2)).not.toBe(currentDemolish);
+  });
+
+  it('computes the same demolish-plus-construction sum for a tier-2 to tier-3 upgrade', () => {
+    const building: Building = { id: 2, type: 'vehicle_depot', tier: 2, x: 0, z: 0, hp: 100, active: true };
+    const expected = getBuildingDef('vehicle_depot', 2).demolishCost + getBuildingDef('vehicle_depot', 3).constructionCost;
+
+    expect(getUpgradeCost(building, 3)).toBe(expected);
+  });
+});
+
+describe('getMoveCost()', () => {
+  it('is 50% of the construction cost for the building type and tier', () => {
+    const building: Building = { id: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    expect(getMoveCost(building)).toBe(Math.round(getBuildingDef('geology_lab', 1).constructionCost * 0.5));
+    expect(getMoveCost(building)).toBe(6000);
+  });
+
+  it('scales with tier via the tier-specific construction cost', () => {
+    const building: Building = { id: 2, type: 'freight_warehouse', tier: 3, x: 0, z: 0, hp: 100, active: true };
+    expect(getMoveCost(building)).toBe(Math.round(getBuildingDef('freight_warehouse', 3).constructionCost * 0.5));
+    expect(getMoveCost(building)).toBe(36000);
+  });
+
+  it('rounds a fractional raw product instead of truncating or leaving it unrounded', () => {
+    // Every real catalog constructionCost is a multiple of 500 (even), so halving
+    // never lands on a fraction. Nudge one entry's cost odd for this case only,
+    // to prove Math.round — not truncation, not a no-op — is what runs.
+    const original = BUILDING_DEFS.management_office[1].constructionCost;
+    const building: Building = { id: 3, type: 'management_office', tier: 1, x: 0, z: 0, hp: 100, active: true };
+    try {
+      BUILDING_DEFS.management_office[1].constructionCost = 8001; // raw product: 4000.5
+      expect(getMoveCost(building)).toBe(4001); // Math.round(4000.5) === 4001, not 4000
+    } finally {
+      BUILDING_DEFS.management_office[1].constructionCost = original;
+    }
+  });
+});
+
+describe('moveBuilding() cost matches getMoveCost()', () => {
+  it('deducts exactly getMoveCost(building) as the relocation cost', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const building = state.buildings[0]!;
+    const expectedCost = getMoveCost(building);
+
+    const result = moveBuilding(state, building.id, 10, 10, 64, 64);
+
+    expect(result.success).toBe(true);
+    expect(result.cost).toBe(expectedCost);
   });
 });

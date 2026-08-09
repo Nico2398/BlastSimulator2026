@@ -46,6 +46,8 @@ export class ShadyPanel {
   private onConfirmRequestCb?: (config: ConfirmModalConfig) => void;
   private lastSignature = '';
   private lastState: GameState | null = null;
+  /** Last cash value used for button affordability refresh. */
+  private lastCash = -1;
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -151,10 +153,44 @@ export class ShadyPanel {
     this.lastState = state;
     this.refreshDynamic(state);
 
+    if (state.cash !== this.lastCash) {
+      this.lastCash = state.cash;
+      this.refreshAffordability(state.cash);
+    }
+
     const signature = this.computeSignature(state);
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
     this.render(state);
+  }
+
+  /**
+   * Disable/enable the corrupt/accident/frame-start action buttons per
+   * affordability, mirroring BuildMenu's cost-gating pattern. Reapplies to
+   * already-rendered DOM without a full rebuild. The frame-complete button
+   * is never gated — completing a pending frame costs 0.
+   */
+  private refreshAffordability(cash: number): void {
+    for (const targetEl of Array.from(this.targetsEl.children) as HTMLElement[]) {
+      const targetId = targetEl.dataset['target'] as CorruptionTarget | undefined;
+      if (!targetId) continue;
+      const btn = targetEl.querySelector<HTMLButtonElement>('[data-action="corrupt"]');
+      if (btn) btn.disabled = cash < TARGET_COSTS[targetId];
+    }
+
+    const accidentBtn = this.servicesEl.querySelector<HTMLButtonElement>('[data-action="mafia-accident"]');
+    if (accidentBtn) {
+      const select = this.servicesEl.querySelector<HTMLSelectElement>('[data-action="mafia-accident-employee"]');
+      const noEligible = !select || select.disabled;
+      accidentBtn.disabled = noEligible || cash < ACCIDENT_COST;
+    }
+
+    const frameStartBtn = this.servicesEl.querySelector<HTMLButtonElement>('[data-action="mafia-frame-start"]');
+    if (frameStartBtn) {
+      const select = this.servicesEl.querySelector<HTMLSelectElement>('[data-action="mafia-frame-employee"]');
+      const noEligible = !select || select.disabled;
+      frameStartBtn.disabled = noEligible || cash < FRAME_COST;
+    }
   }
 
   /** Cheap per-tick refresh: the exposure meter climbs continuously while smuggling runs. */
@@ -186,14 +222,14 @@ export class ShadyPanel {
     this.influenceNoteEl.textContent = t('ui.shady.influence_note', { threshold: MAFIA_THRESHOLD });
 
     const rate = Math.round(getSuccessRate(state.corruption) * 100);
-    this.targetsEl.replaceChildren(...TARGETS.map(target => this.targetCard(target, rate)));
+    this.targetsEl.replaceChildren(...TARGETS.map(target => this.targetCard(target, rate, state.cash)));
 
     this.servicesEl.replaceChildren(
       state.corruption.mafiaUnlocked ? this.unlockedServices(state) : this.lockedServicesTeaser(),
     );
   }
 
-  private targetCard(target: { id: CorruptionTarget; nameKey: string; noteKey: string }, rate: number): HTMLElement {
+  private targetCard(target: { id: CorruptionTarget; nameKey: string; noteKey: string }, rate: number, cash: number): HTMLElement {
     const cost = TARGET_COSTS[target.id];
     const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' }, children: [
       iconEl('person', 13, 0.6),
@@ -203,6 +239,7 @@ export class ShadyPanel {
     const noteEl = el('span', { text: t(target.noteKey), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
     const callBtn = button('ghost', t('ui.shady.make_the_call'), { dataAction: 'corrupt' });
     callBtn.style.cssText = 'margin-left:auto;border-color:rgba(169,140,255,.4);background:rgba(169,140,255,.1);color:#c4aeff';
+    callBtn.disabled = cash < cost;
     callBtn.addEventListener('click', () => {
       this.onConfirmRequestCb?.({
         icon: 'shady',
@@ -239,7 +276,7 @@ export class ShadyPanel {
 
   private unlockedServices(state: GameState): HTMLElement {
     const wrap = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:8px' } });
-    wrap.append(this.exposureCard, this.smugglingCard(state), this.accidentCard(state), this.frameCard(state));
+    wrap.append(this.exposureCard, this.smugglingCard(state), this.accidentCard(state, state.cash), this.frameCard(state, state.cash));
     return wrap;
   }
 
@@ -265,7 +302,7 @@ export class ShadyPanel {
     return card([headRow, note, toggleBtn]);
   }
 
-  private accidentCard(state: GameState): HTMLElement {
+  private accidentCard(state: GameState, cash: number): HTMLElement {
     const successRate = Math.round(ACCIDENT_SUCCESS_RATE * 100);
     const label = el('span', { text: t('ui.shady.accident_label'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)' } });
     const note = el('span', { text: t('ui.shady.accident_note', { rate: successRate }), attrs: { style: 'font:400 10px/1.4 var(--bsx-font-ui);color:var(--bsx-text-muted)' } });
@@ -274,7 +311,7 @@ export class ShadyPanel {
     select.dataset['action'] = 'mafia-accident-employee';
     const goBtn = button('ghost', t('ui.shady.accident_button'), { dataAction: 'mafia-accident' });
     goBtn.style.cssText = 'border-color:rgba(255,91,76,.35);color:var(--bsx-critical-text)';
-    goBtn.disabled = alive.length === 0;
+    goBtn.disabled = alive.length === 0 || cash < ACCIDENT_COST;
     goBtn.addEventListener('click', () => {
       const empId = Number(select.value);
       const emp = alive.find(e => e.id === empId);
@@ -294,7 +331,7 @@ export class ShadyPanel {
     return card([label, note, row]);
   }
 
-  private frameCard(state: GameState): HTMLElement {
+  private frameCard(state: GameState, cash: number): HTMLElement {
     const successRate = Math.round(FRAME_SUCCESS_RATE * 100);
     const label = el('span', { text: t('ui.shady.frame_label'), attrs: { style: 'font:600 10px/1 var(--bsx-font-ui);letter-spacing:.14em;color:var(--bsx-text-muted)' } });
     const note = el('span', {
@@ -342,7 +379,7 @@ export class ShadyPanel {
     const select = this.employeeSelect(eligible);
     select.dataset['action'] = 'mafia-frame-employee';
     const startBtn = button('ghost', t('ui.shady.frame_start_button'), { dataAction: 'mafia-frame-start' });
-    startBtn.disabled = eligible.length === 0;
+    startBtn.disabled = eligible.length === 0 || cash < FRAME_COST;
     startBtn.addEventListener('click', () => {
       const empId = Number(select.value);
       const emp = eligible.find(e => e.id === empId);

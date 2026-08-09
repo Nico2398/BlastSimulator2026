@@ -23,10 +23,19 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
+import { corruptCommand, mafiaCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
-import { HIRING_COSTS } from '../../../src/core/entities/Employee.js';
+import { HIRING_COSTS, hireEmployee } from '../../../src/core/entities/Employee.js';
 import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
-import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import {
+  getBuildingDef,
+  placeBuilding,
+  type BuildingType,
+  type BuildingTier,
+} from '../../../src/core/entities/Building.js';
+import { TARGET_COSTS, MAFIA_THRESHOLD } from '../../../src/core/economy/Corruption.js';
+import { ACCIDENT_COST, FRAME_COST, FRAME_EVIDENCE_TICKS } from '../../../src/core/events/MafiaActions.js';
+import { Random } from '../../../src/core/math/Random.js';
 
 function makeCtx(cash: number): MiningContext {
   const ctx: MiningContext = {
@@ -59,7 +68,44 @@ function snapshot(ctx: MiningContext): Record<string, unknown> {
     vehicleNextId: s.vehicles.nextId,
     buildings: s.buildings.buildings.length,
     buildingNextId: s.buildings.nextId,
+    // The build destroy/upgrade/move and corrupt/mafia guards below all sit
+    // in front of state that mutates *before* today's unguarded cost
+    // deduction — attemptCorruption pushes an attempt record unconditionally,
+    // and arrangeAccident/startFraming/completeFrame raise mafia exposure
+    // risk even when the underlying action fails internally. A refusal that
+    // still moved one of these would pass the fields above by accident.
+    mafiaExposureRisk: s.mafia.exposureRisk,
+    mafiaPendingFrames: s.mafia.pendingFrames.length,
+    corruptionLevel: s.corruption.level,
+    corruptionAttempts: s.corruption.attempts.length,
   };
+}
+
+/**
+ * Place a building directly through the core `placeBuilding` — bypasses the
+ * console layer entirely, so setting up a building to destroy/upgrade/move
+ * never touches the cash balance a guard test is trying to control.
+ */
+function placeTestBuilding(ctx: MiningContext, type: BuildingType = 'management_office', tier: BuildingTier = 1): number {
+  const grid = ctx.grid!;
+  const result = placeBuilding(ctx.state!.buildings, type, 0, 0, grid.sizeX, grid.sizeZ, tier, grid.minX, grid.minZ);
+  if (!result.success) throw new Error(`setup: failed to place test building — ${result.error}`);
+  return result.building!.id;
+}
+
+/**
+ * Unlock the mafia deterministically: `attemptCorruption` bumps
+ * `corruption.level` by 1 on both a success and a failure, so 3 calls always
+ * clears `MAFIA_UNLOCK_THRESHOLD` regardless of the RNG roll. Cash is bumped
+ * for the duration and restored — this is setup, not the guard under test.
+ */
+function unlockMafia(ctx: MiningContext): void {
+  const prevCash = ctx.state!.cash;
+  setCash(ctx, 10_000_000);
+  for (let i = 0; i < MAFIA_THRESHOLD; i++) {
+    corruptCommand(ctx, [], { target: 'witness' });
+  }
+  setCash(ctx, prevCash);
 }
 
 // ── employee hire ──
@@ -224,5 +270,238 @@ describe('build <type> at: — insufficient funds guard', () => {
     expect(snapshot(ctx)).toEqual(before);
     expect({ minX: ctx.grid!.minX, maxX: ctx.grid!.maxX, minZ: ctx.grid!.minZ, maxZ: ctx.grid!.maxZ })
       .toEqual(boundsBefore);
+  });
+});
+
+// ── build destroy — issue #511 ──
+
+describe('build destroy — insufficient funds guard', () => {
+  const DEMOLISH_COST = getBuildingDef('management_office', 1).demolishCost;
+
+  it('refuses when cash is one dollar short', () => {
+    const ctx = makeCtx(DEMOLISH_COST - 1);
+    const id = placeTestBuilding(ctx);
+    const result = buildCommand(ctx, ['destroy', String(id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+  });
+
+  it('changes nothing at all when it refuses', () => {
+    const ctx = makeCtx(DEMOLISH_COST - 1);
+    const id = placeTestBuilding(ctx);
+    const before = snapshot(ctx);
+    buildCommand(ctx, ['destroy', String(id)], {});
+    expect(snapshot(ctx)).toEqual(before);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings[0]!.id).toBe(id);
+  });
+
+  it('demolishes when cash exactly equals the demolish cost', () => {
+    const ctx = makeCtx(DEMOLISH_COST);
+    const id = placeTestBuilding(ctx);
+    const result = buildCommand(ctx, ['destroy', String(id)], {});
+    expect(result.success).toBe(true);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.cash).toBe(0);
+  });
+});
+
+// ── build upgrade — issue #511 ──
+
+describe('build upgrade — insufficient funds guard', () => {
+  const OLD_DEF = getBuildingDef('management_office', 1);
+  const NEW_DEF = getBuildingDef('management_office', 2);
+  const UPGRADE_COST = OLD_DEF.demolishCost + NEW_DEF.constructionCost;
+
+  function unlockTier2(ctx: MiningContext): void {
+    ctx.state!.buildings.unlockedTiers['management_office'] = 3;
+  }
+
+  it('refuses when cash is one dollar short', () => {
+    const ctx = makeCtx(UPGRADE_COST - 1);
+    unlockTier2(ctx);
+    const id = placeTestBuilding(ctx);
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+  });
+
+  it('changes nothing at all when it refuses — original building untouched, destroyBuilding never ran', () => {
+    const ctx = makeCtx(UPGRADE_COST - 1);
+    unlockTier2(ctx);
+    const id = placeTestBuilding(ctx);
+    const before = snapshot(ctx);
+    buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(snapshot(ctx)).toEqual(before);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    const building = ctx.state!.buildings.buildings[0]!;
+    expect(building.id).toBe(id);
+    expect(building.tier).toBe(1);
+  });
+
+  it('upgrades when cash exactly equals the upgrade cost', () => {
+    const ctx = makeCtx(UPGRADE_COST);
+    unlockTier2(ctx);
+    const id = placeTestBuilding(ctx);
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(true);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
+    expect(ctx.state!.cash).toBe(0);
+  });
+
+  it('refuses a max-tier building for the tier-bound reason, not cost — even at cash 0', () => {
+    // Edge case: the pre-existing tier>=3 check must keep running ahead of
+    // the new funds guard, not get shadowed by it.
+    const ctx = makeCtx(0);
+    unlockTier2(ctx); // also unlocks T3 — placeTestBuilding's own placeBuilding() re-checks the research gate
+    const id = placeTestBuilding(ctx, 'management_office', 3);
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('already at max tier');
+    expect(result.output).not.toContain('Insufficient funds');
+  });
+});
+
+// ── build move — issue #511 ──
+
+describe('build move — insufficient funds guard', () => {
+  const MOVE_COST = Math.round(getBuildingDef('management_office', 1).constructionCost * 0.5);
+
+  it('refuses when cash is one dollar short', () => {
+    const ctx = makeCtx(MOVE_COST - 1);
+    const id = placeTestBuilding(ctx);
+    const result = buildCommand(ctx, ['move', String(id)], { to: '5,5' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+  });
+
+  it('changes nothing at all when it refuses — building keeps its original position', () => {
+    const ctx = makeCtx(MOVE_COST - 1);
+    const id = placeTestBuilding(ctx);
+    const before = snapshot(ctx);
+    buildCommand(ctx, ['move', String(id)], { to: '5,5' });
+    expect(snapshot(ctx)).toEqual(before);
+    const building = ctx.state!.buildings.buildings.find(b => b.id === id)!;
+    expect(building.x).toBe(0);
+    expect(building.z).toBe(0);
+  });
+
+  it('moves when cash exactly equals the move cost', () => {
+    const ctx = makeCtx(MOVE_COST);
+    const id = placeTestBuilding(ctx);
+    const result = buildCommand(ctx, ['move', String(id)], { to: '5,5' });
+    expect(result.success).toBe(true);
+    const building = ctx.state!.buildings.buildings.find(b => b.id === id)!;
+    expect(building.x).toBe(5);
+    expect(building.z).toBe(5);
+    expect(ctx.state!.cash).toBe(0);
+  });
+});
+
+// ── corrupt — issue #511 ──
+
+describe('corrupt — insufficient funds guard', () => {
+  const WITNESS_COST = TARGET_COSTS.witness;
+
+  it('refuses when cash is one dollar short', () => {
+    const ctx = makeCtx(WITNESS_COST - 1);
+    const result = corruptCommand(ctx, [], { target: 'witness' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+  });
+
+  it('leaves no phantom attempt record on refusal — attemptCorruption today pushes one unconditionally', () => {
+    const ctx = makeCtx(WITNESS_COST - 1);
+    const before = snapshot(ctx);
+    corruptCommand(ctx, [], { target: 'witness' });
+    expect(snapshot(ctx)).toEqual(before);
+    expect(ctx.state!.corruption.attempts).toHaveLength(0);
+    expect(ctx.state!.corruption.level).toBe(0);
+    expect(ctx.state!.corruption.mafiaUnlocked).toBe(false);
+  });
+
+  it('attempts corruption when cash exactly equals the target cost', () => {
+    const ctx = makeCtx(WITNESS_COST);
+    const result = corruptCommand(ctx, [], { target: 'witness' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(0);
+    expect(ctx.state!.corruption.attempts).toHaveLength(1);
+  });
+
+  it('refuses the expensive target at a balance that affords the cheap one', () => {
+    const cheapCost = TARGET_COSTS.inspector;
+    const expensiveCost = TARGET_COSTS.judge;
+    expect(expensiveCost).toBeGreaterThan(cheapCost);
+    const ctx = makeCtx(expensiveCost - 1);
+    expect(corruptCommand(ctx, [], { target: 'judge' }).success).toBe(false);
+    expect(corruptCommand(ctx, [], { target: 'inspector' }).success).toBe(true);
+  });
+});
+
+// ── mafia accident — issue #511 ──
+
+describe('mafia accident — insufficient funds guard', () => {
+  it('refuses when cash is one dollar short', () => {
+    const ctx = makeCtx(ACCIDENT_COST - 1);
+    unlockMafia(ctx);
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    const before = snapshot(ctx);
+    const result = mafiaCommand(ctx, ['accident'], { employee: String(employee.id) });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(snapshot(ctx)).toEqual(before);
+    expect(ctx.state!.employees.employees.find(e => e.id === employee.id)!.alive).toBe(true);
+  });
+
+  it('arranges the accident when cash exactly equals the accident cost', () => {
+    const ctx = makeCtx(ACCIDENT_COST);
+    unlockMafia(ctx);
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    const result = mafiaCommand(ctx, ['accident'], { employee: String(employee.id) });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(0);
+  });
+});
+
+// ── mafia frame — issue #511 ──
+
+describe('mafia frame — insufficient funds guard', () => {
+  it('refuses the start path when cash is one dollar short', () => {
+    const ctx = makeCtx(FRAME_COST - 1);
+    unlockMafia(ctx);
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    const before = snapshot(ctx);
+    const result = mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(snapshot(ctx)).toEqual(before);
+    expect(ctx.state!.mafia.pendingFrames).toHaveLength(0);
+  });
+
+  it('starts framing when cash exactly equals the frame cost', () => {
+    const ctx = makeCtx(FRAME_COST);
+    unlockMafia(ctx);
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    const result = mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(0);
+    expect(ctx.state!.mafia.pendingFrames).toHaveLength(1);
+  });
+
+  it('completes a ready pending frame even at cash === 0 — the complete path must never be gated', () => {
+    const ctx = makeCtx(FRAME_COST);
+    unlockMafia(ctx);
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    const startResult = mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
+    expect(startResult.success).toBe(true);
+    expect(ctx.state!.mafia.pendingFrames).toHaveLength(1);
+
+    ctx.state!.tickCount += FRAME_EVIDENCE_TICKS;
+    setCash(ctx, 0);
+    const completeResult = mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
+    expect(completeResult.success).toBe(true);
+    expect(completeResult.output).not.toContain('Insufficient funds');
+    expect(ctx.state!.cash).toBe(0);
   });
 });

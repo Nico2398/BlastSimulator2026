@@ -12,9 +12,11 @@ import {
   attemptCorruption,
   getCorruptionLevel,
   getSuccessRate,
+  TARGET_COSTS,
   type CorruptionTarget,
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome, type ExpenseCategory } from '../../core/economy/Finance.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
 import { processPayCycle } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost } from '../../core/entities/Building.js';
@@ -41,6 +43,8 @@ import {
   toggleSmuggling,
   processSmuggling,
   isExposed,
+  ACCIDENT_COST,
+  FRAME_COST,
 } from '../../core/events/MafiaActions.js';
 import { requireGame } from './commandUtils.js';
 import type { GameState } from '../../core/state/GameState.js';
@@ -482,6 +486,13 @@ export function corruptCommand(
   }
 
   const cost = named['cost'] ? parseInt(named['cost'], 10) : undefined;
+  const resolvedCost = cost ?? TARGET_COSTS[target];
+  if (state.cash < resolvedCost) {
+    return {
+      success: false,
+      output: `Insufficient funds: need $${formatMoney(resolvedCost)}, have $${formatMoney(state.cash)}`,
+    };
+  }
   const rng = new Random(state.seed + state.tickCount);
   const result = attemptCorruption(state.corruption, target, state.tickCount, rng, cost);
 
@@ -534,6 +545,12 @@ export function mafiaCommand(
     case 'accident': {
       const empId = parseInt(named['employee'] ?? '', 10);
       if (isNaN(empId)) return { success: false, output: 'Usage: mafia accident employee:<id>' };
+      if (state.cash < ACCIDENT_COST) {
+        return {
+          success: false,
+          output: `Insufficient funds: need $${formatMoney(ACCIDENT_COST)}, have $${formatMoney(state.cash)}`,
+        };
+      }
       const result = arrangeAccident(state.mafia, state.employees, state.corruption, empId, rng);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Arranged accident', state.tickCount);
@@ -553,6 +570,12 @@ export function mafiaCommand(
         return { success: true, output: result.message };
       }
 
+      if (state.cash < FRAME_COST) {
+        return {
+          success: false,
+          output: `Insufficient funds: need $${formatMoney(FRAME_COST)}, have $${formatMoney(state.cash)}`,
+        };
+      }
       const result = startFraming(state.mafia, state.employees, empId, state.tickCount);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Frame job', state.tickCount);

@@ -34,6 +34,9 @@ import type { GameState } from '../core/state/GameState.js';
 import {
   getAllBuildingTypes,
   getBuildingDef,
+  getDemolishCost,
+  getUpgradeCost,
+  getMoveCost,
   isTierUnlocked,
   isResearchQueued,
   type BuildingType,
@@ -149,6 +152,7 @@ export class BuildMenu {
     if (state.cash !== this.lastCash) {
       this.lastCash = state.cash;
       this.refreshCatalogButtons(state.cash);
+      this.refreshPlacedButtons(state.cash);
     }
     const placedSig = state.buildings.buildings.map((b) => `${b.id}:${b.tier}`).join(',');
     const unlockedSig = JSON.stringify(state.buildings.unlockedTiers);
@@ -384,6 +388,33 @@ export class BuildMenu {
     target.textContent = t('ui.build.cost', { cost: String(def.constructionCost) });
   }
 
+  /**
+   * Re-apply move/upgrade/demolish disabled state on already-rendered placed
+   * rows per affordability, mirroring `refreshCatalogButtons`. Does not
+   * rebuild the list — only toggles `disabled` on existing DOM buttons.
+   */
+  private refreshPlacedButtons(cash: number): void {
+    const buildings = this.lastState?.buildings.buildings ?? [];
+    for (const row of Array.from(this.placedEl.children) as HTMLElement[]) {
+      const idStr = row.dataset['buildingId'];
+      if (!idStr) continue;
+      const b = buildings.find((bb) => bb.id === Number(idStr));
+      if (!b) continue;
+
+      const moveBtn = row.querySelector<HTMLButtonElement>('.bs-build-move-btn');
+      if (moveBtn) moveBtn.disabled = cash < getMoveCost(b);
+
+      const demolishBtn = row.querySelector<HTMLButtonElement>('.bs-build-demolish-btn');
+      if (demolishBtn) demolishBtn.disabled = cash < getDemolishCost(b);
+
+      const upgradeBtn = row.querySelector<HTMLButtonElement>('.bs-build-upgrade-btn');
+      if (upgradeBtn) {
+        const nextTier = b.tier < 3 ? ((b.tier + 1) as BuildingTier) : null;
+        upgradeBtn.disabled = nextTier === null || cash < getUpgradeCost(b, nextTier);
+      }
+    }
+  }
+
   private refreshCatalogButtons(cash: number): void {
     for (const row of Array.from(this.catalogEl.children) as HTMLElement[]) {
       const type = row.dataset['buildType'] as BuildingType | undefined;
@@ -427,6 +458,8 @@ export class BuildMenu {
     moveBtn.className = 'bsx-btn bs-build-move-btn';
     moveBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
     moveBtn.textContent = t('ui.build.move');
+    moveBtn.title = `$${getMoveCost(b)}`;
+    moveBtn.disabled = this.lastCash < getMoveCost(b);
     moveBtn.addEventListener('click', () => {
       this.armBuildingPointTool(b.type, b.tier, `${t('ui.build.move')} #${b.id}`, (x, z) => {
         const cmdResult = this.gameConsole?.(`build move ${b.id} to:${x},${z}`);
@@ -444,8 +477,9 @@ export class BuildMenu {
     upgradeBtn.textContent = t('ui.build.upgrade');
     upgradeBtn.disabled = nextTier === null;
     if (nextTier !== null) {
-      const nextDef = getBuildingDef(b.type, nextTier);
-      upgradeBtn.title = `$${def.demolishCost + nextDef.constructionCost}`;
+      const upgradeCost = getUpgradeCost(b, nextTier);
+      upgradeBtn.title = `$${upgradeCost}`;
+      upgradeBtn.disabled = this.lastCash < upgradeCost;
     }
     upgradeBtn.addEventListener('click', () => {
       if (nextTier !== null && nextLocked) {
@@ -470,6 +504,7 @@ export class BuildMenu {
     demolishBtn.style.cssText = 'padding:1px 5px;font-size:9px;flex:0 1 auto;white-space:normal;min-width:0;height:auto';
     demolishBtn.textContent = t('ui.build.demolish');
     demolishBtn.title = `$${def.demolishCost}`;
+    demolishBtn.disabled = this.lastCash < getDemolishCost(b);
     demolishBtn.addEventListener('click', () => {
       const cmdResult = this.gameConsole?.(`build destroy ${b.id}`);
       this.setStatus(cmdResult?.success ? t('ui.build.demolished') : (cmdResult?.output ?? ''));

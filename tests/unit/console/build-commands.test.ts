@@ -98,6 +98,9 @@ describe('build command — upgrade', () => {
     // Research-gated: unlock tiers 2 and 3 so the setup upgrades (T1→T2→T3)
     // succeed, leaving only the max-tier rejection under test.
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
+    // Fund the two setup upgrades (funds-guarded, #511) so only the max-tier
+    // rejection is under test here, not affordability.
+    ctx.state!.cash += 100000;
     // upgrade to T2 then T3
     const id1 = ctx.state!.buildings.buildings[0]!.id;
     buildCommand(ctx, ['upgrade', String(id1)], {});
