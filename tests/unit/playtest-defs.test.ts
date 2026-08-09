@@ -237,4 +237,23 @@ describe('isAllowedSetupCommand', () => {
     expect(isAllowedSetupCommand('')).toBe(false);
     expect(isAllowedSetupCommand('   ')).toBe(false);
   });
+
+  // Issue #515: interaction-executor.ts's `setup`-role branch reuses this
+  // same allowlist for scenario steps (not just playtest beats), and
+  // scenario-defs retagging needs save/load/sandbox admitted as world
+  // bootstrapping so a scenario can set up a save-game state without being
+  // forced to click through it. Skeleton phase deliberately left
+  // playtest-types.ts untouched (a pure data change for @implementer), so
+  // these are expected to fail today.
+  it('allows save/load/sandbox as setup commands (#515)', () => {
+    expect(isAllowedSetupCommand('save slot:quicksave')).toBe(true);
+    expect(isAllowedSetupCommand('load slot:quicksave')).toBe(true);
+    expect(isAllowedSetupCommand('sandbox start biome:alpine_granite difficulty:hard seed:777')).toBe(true);
+  });
+
+  it('save/load/sandbox are recorded in SETUP_COMMAND_ALLOWLIST itself (#515)', () => {
+    expect(SETUP_COMMAND_ALLOWLIST).toContain('save');
+    expect(SETUP_COMMAND_ALLOWLIST).toContain('load');
+    expect(SETUP_COMMAND_ALLOWLIST).toContain('sandbox');
+  });
 });
