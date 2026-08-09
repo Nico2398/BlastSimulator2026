@@ -276,6 +276,98 @@ would be swallowed and the button would simply do nothing.
 Neither is a regression from this work — both predate it. They are recorded
 because the mandate's audit is only honest if it names what it found.
 
+## ▶ 2026-08-09 — Recap-table follow-through: mis-tags fixed, a CI regression fixed, 6 issues filed for the rest
+
+Continuing directly from the "recapitulative array" delivered at the end of
+2026-08-08 (Command↔UI parity gap table + playtest/scenario gap table, both
+answered in chat, not persisted here — reconstructed against fresh source
+reads below since the literal tables aren't in this file).
+
+**CI regression found and fixed first (not part of the user's ask, but
+owned since it's this PR's own CI):** PR #497's "Scenarios (interaction
+mode)" job failed on `skill-progression.json` — `proficiencyTotal should be
+6 but is 5` — the ONE failure in 126 files. Root-caused via a step-by-step
+state diff between a local command-mode and interaction-mode run (state was
+bit-identical through tick 480, diverged only at the next tick): interaction
+mode's `resolveEventIfPending` (added earlier this session) polls `event
+status` every step whether or not one is pending, and clicks `event
+dismiss` after every real resolution — neither has a command-mode
+equivalent, and neither was exempted from `EventSystem`'s
+`actionCountSinceEvent` cooldown gate (`MIN_EVENT_INTERVAL_ACTIONS = 10`).
+Interaction mode accumulated the counter roughly 3x faster than command
+mode per event cycle, so a timer-based event (`Dust Fashion`) fired one
+batch early in interaction mode only. Fixed in
+`src/console/createRunner.ts`'s `runCommand` — the single centralized entry
+point both modes already share — by exempting `event status`/`event
+dismiss` the same way `META_COMMANDS` already exempts `tick`/`time`/etc.
+Verified: both modes now match exactly (tick 580, cash -15530,
+proficiencyTotal 6); 8630 unit/integration tests and 126/126 command-mode
+scenarios stay green. Pushed `d888493`.
+
+**Mis-tagged steps fixed (zero-effort bucket) — audited via a dedicated
+subagent pass, not guessed:** the "~13 weather/state" estimate from the
+prior recap was wrong. `weather` (17 untagged occurrences) turned out to
+already be correctly, individually documented — not mis-tags: each already
+explains why it stays a command (no UI sets weather at all). Only **6
+`state` steps** were genuine mis-tags (5× `loading-screen-visual.json`, 1×
+`i18n-live-locale-switch.json`) — added `role: "observe"`. **1 `time
+pause` step** (`i18n-live-locale-switch.json`) was mis-tagged — added
+`role: "setup"` (already on `TIME_COMMAND_ALLOWLIST`, zero allowlist work
+needed). **`vehicle assign`** (1 occurrence,
+`vehicle-task-states-visual.json`) was already correctly left untagged with
+its own in-file rationale — confirmed, not touched. All 3 touched files
+re-verified clean in both command and interaction mode after tagging;
+`tests/unit/scenario-defs.test.ts` (3116 tests) stays green. Pushed
+`d934e41`.
+
+**`zone clear` equivalence resolved — genuinely NOT equivalent, not merely
+unverified.** Traced `Fire.ts`'s Sound the Horn button: it computes its own
+zone from `computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)`. At
+`safety-projection-visual.json`'s zone-clear step, `drillHoles` is still
+empty (the file's `drill_plan` runs later), so the computed zone is `null`
+and the button is disabled outright — a player cannot reach this command by
+clicking here at all, let alone with the scenario's exact rectangle. Even
+at the later, holes-populated moment, the auto-computed zone would pad out
+to a different rectangle than the scenario's explicit one. Description
+rewritten to state this as a confirmed finding rather than an open
+question. Pushed `0ae3b62`.
+
+**6 GitHub issues filed for everything else**, so each becomes a proper
+dedicated task instead of staying prose in this doc:
+
+| Issue | Title | Was called | Depends on |
+|---|---|---|---|
+| #510 | ShadyPanel discards every command result | G8 | — |
+| #511 | No affordability gate on build destroy/upgrade/move or corrupt/mafia | G7 | #510 |
+| #512 | Vehicle fleet — only the first vehicle in a stack can ever be selected | the vehicle-selection bug, labeled "G9" further up this doc | — |
+| #513 | Contract offer cards carry no id attribute | G10 | — |
+| #514 | 3 scenario steps are real, unblocked UI conversions — just not done yet | "mechanically convertible, unaudited" bucket | #510-#513 (partially, for 2 of the 3) |
+| #515 | Make click-only enforcement total in the scenario suite | the playtest-merge structural/strictness gap | #510-#514 |
+
+**Naming note:** this doc's "▶ G9" heading further up is the ALREADY-FIXED
+SelectionBar hover/aim bug (Dispatch Here/Move Here/Haul unusable with a
+mouse). The vehicle-same-tile-selection bug found later reused the label
+"G9" a second time in the "▶ G9 / G10" section below it — a genuine
+in-document numbering collision, not two names for the same bug. Issue
+#512 is the second one; do not conflate them when reading further up.
+
+**Correction to the prior "~55 mechanically convertible, unaudited"
+estimate:** a full structural scan (script-driven, not grepped by hand)
+found 89 untagged command actions across the charge/blast/drill_plan/
+build/sequence/vehicle/employee/contract/build_ramp verbs the estimate
+covered — but 86 of those 89 *already carry a specific, verified rationale*
+in their own `description` field (fake building types the game itself
+rejects in both modes, values outside a panel's own clamp, disabled-button
+demonstrations, locked-level cascades, etc. — Findings #74-77's own audit,
+still holding up). Only 3 are genuinely open, filed as #514. The
+DELIVERABLE 3a SIZING table above is now superseded by this measurement —
+it predates several rounds of fixes and undercounted how much of the
+backlog was already-correct documentation rather than unaudited debt.
+
+None of #510-#515 carry the `ready` label — filed for tracking per the
+user's request, left for deliberate triage/queueing rather than
+auto-entering the pipeline.
+
 ## ▶ MEASUREMENT DISCIPLINE — a mistake made twice in this session
 
 **Never pipe a suite run through `tail`/`head` when you need its verdict.**
