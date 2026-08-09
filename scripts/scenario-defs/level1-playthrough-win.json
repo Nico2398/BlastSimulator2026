@@ -671,39 +671,39 @@
       }
     },
     {
-        "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-        "interaction": [
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-step=\"2\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "5 kg"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "2.0 m"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-          }
-        ],
-        "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-        "role": "player"
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "5 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -965,63 +965,63 @@
       }
     },
     {
-        "command": "charge hole:* explosive:krackle amount:4 stemming:3",
-        "interaction": [
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-step=\"2\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "4 kg"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "3.0 m"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-          }
-        ],
-        "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-        "role": "player"
+      "command": "charge hole:* explosive:krackle amount:4 stemming:3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "4 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:20",

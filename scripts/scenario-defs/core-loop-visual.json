@@ -345,24 +345,24 @@
       }
     },
     {
-        "command": "contract deliver 1 amount:500",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 1 amount:500"
-          }
-        ],
-        "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of dirtite in storage against a 320 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
-        "expect": {
-          "equals": {
-            "cash": 45800,
-            "activeContractCount": 1
-          },
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
-          "note": "the contract stays active/undelivered -- this file's own \"contract delivery\" step in its description is a queued attempt, not a completed one; economy-full-loop.json is the file that actually hauls stock and completes a delivery"
+      "command": "contract deliver 1 amount:500",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:500"
+        }
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of dirtite in storage against a 320 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "cash": 45800,
+          "activeContractCount": 1
         },
-        "role": "guard"
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
+        "note": "the contract stays active/undelivered -- this file's own \"contract delivery\" step in its description is a queued attempt, not a completed one; economy-full-loop.json is the file that actually hauls stock and completes a delivery"
+      },
+      "role": "guard"
     },
     {
       "command": "finances",

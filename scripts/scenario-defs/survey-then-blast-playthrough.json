@@ -658,19 +658,19 @@
       "role": "player"
     },
     {
-        "command": "contract deliver 1 amount:500",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 1 amount:500"
-          }
-        ],
-        "description": "BLOCKED, and deliberately not converted to a click: nothing is in storage at this point, so ContractsPanel disables the amount box, MAX and DELIVER together (maxDeliverable = min(remaining, stored) is 0). The console command is no better -- it returns success:false and command mode only fails a step on a thrown exception, so this step is a silent no-op in both modes. Two modes genuinely disagree on WHY, and that is worth knowing: in command mode `contract accept 1` above fails outright (\"Contract #1 not found or already completed\"), leaving activeContractCount at 0 and no card at all, while the interaction-mode click on `.bs-contract-accept` accepts whichever contract is really on offer. So no `equals` is asserted here -- only `expect.blocked`, which is interaction-mode-only and therefore checks the mode where a card actually exists.",
-        "expect": {
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
-        },
-        "role": "guard"
+      "command": "contract deliver 1 amount:500",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:500"
+        }
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: nothing is in storage at this point, so ContractsPanel disables the amount box, MAX and DELIVER together (maxDeliverable = min(remaining, stored) is 0). The console command is no better -- it returns success:false and command mode only fails a step on a thrown exception, so this step is a silent no-op in both modes. Two modes genuinely disagree on WHY, and that is worth knowing: in command mode `contract accept 1` above fails outright (\"Contract #1 not found or already completed\"), leaving activeContractCount at 0 and no card at all, while the interaction-mode click on `.bs-contract-accept` accepts whichever contract is really on offer. So no `equals` is asserted here -- only `expect.blocked`, which is interaction-mode-only and therefore checks the mode where a card actually exists.",
+      "expect": {
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "finances",

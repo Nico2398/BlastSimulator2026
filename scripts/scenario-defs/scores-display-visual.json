@@ -185,20 +185,20 @@
       }
     },
     {
-        "command": "charge hole:* explosive:boomite amount:8 stemming:0",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "charge hole:* explosive:boomite amount:8 stemming:0"
-          }
-        ],
-        "description": "role: bootstrap (issue #515): `stemming:0` is below the Charge panel's own floor \u2014 `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) \u2014 so no click sequence can ever reach it while `createCharge` (ChargePlan.ts) itself has no lower bound and accepts 0 freely. A real, narrow UI/console gap, not a missing selector.",
-        "expect": {
-          "equals": {
-            "chargedCount": 4
-          }
-        },
-        "role": "bootstrap"
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:8 stemming:0"
+        }
+      ],
+      "description": "role: bootstrap (issue #515): `stemming:0` is below the Charge panel's own floor \u2014 `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) \u2014 so no click sequence can ever reach it while `createCharge` (ChargePlan.ts) itself has no lower bound and accepts 0 freely. A real, narrow UI/console gap, not a missing selector.",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "sequence auto",

@@ -206,24 +206,24 @@
       "role": "player"
     },
     {
-        "command": "contract deliver 2 amount:300",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 2 amount:300"
-          }
-        ],
-        "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 because this scenario never mines or hauls, so nothing is ever in storage (0.0 kg available). A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-id=\"2\"]`, issue #513) rather than performing one.",
-        "expect": {
-          "equals": {
-            "activeContractCount": 2,
-            "cash": 50000
-          },
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver",
-          "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
+      "command": "contract deliver 2 amount:300",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 2 amount:300"
+        }
+      ],
+      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 because this scenario never mines or hauls, so nothing is ever in storage (0.0 kg available). A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-id=\"2\"]`, issue #513) rather than performing one.",
+      "expect": {
+        "equals": {
+          "activeContractCount": 2,
+          "cash": 50000
         },
-        "role": "guard"
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver",
+        "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
+      },
+      "role": "guard"
     },
     {
       "command": "contract status",

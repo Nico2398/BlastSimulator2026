@@ -174,28 +174,27 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'weather set',
   'weather',
   'event fire',
-  'corrupt target:witness',
   'drill_plan grid',
   'sequence auto',
   'blast',
   'charge hole',
-  // Broader than the others on purpose, for two independent reasons, both
-  // confined to level1-lose-arrest.json (issue #515):
+  // Broader than the others on purpose, for two independent reasons:
   //  1. `corrupt target:X cost:Y` — the scenario overrides the bribe's cost
   //     to hit an exact scripted cash delta; ShadyPanel's real "Make the
   //     Call" button always bribes at the fixed TARGET_COSTS rate
   //     (Corruption.ts) and has no control for a custom amount, so no real
-  //     click can reproduce this exact state change. No token-prefix rule
-  //     can admit this without also admitting every OTHER `corrupt target:X`
-  //     (the file's opening 8 bribes all carry a `cost:` override) — the
-  //     same shape of gap already accepted for bare `weather` above.
+  //     click can reproduce this exact state change (level1-lose-arrest.json's
+  //     opening 8 bribes all carry a `cost:` override) — the same shape of
+  //     gap already accepted for bare `weather` above.
   //  2. Bare `corrupt` — the read-only status query — shares that same verb,
   //     so it rides the same entry.
-  //  Every `corrupt target:*` step WITHOUT a `cost:` override elsewhere in
-  //  the suite (e.g. insufficient-funds-guards-visual.json's guard checks)
-  //  is still a real click or a narrower entry (`corrupt target:witness`);
-  //  this broader entry only ever applies where a `cost:` override or the
-  //  bare form makes a click genuinely impossible.
+  //  This entry is not file-scoped: the allowlist has no per-file mechanism,
+  //  it is a flat global list, so any `bootstrap`-tagged step anywhere that
+  //  runs `corrupt ...` (with or without a `cost:` override, e.g.
+  //  insufficient-funds-guards-visual.json's plain `corrupt target:witness`
+  //  bootstrap steps) is admitted by this one entry too. Accepted tradeoff
+  //  for now — narrower only buys back a `target:witness`-shaped case that
+  //  needs the override anyway, elsewhere in the same file.
   'corrupt',
   // building-lifecycle.json exercises the console's own bad-id rejection
   // (building #2 was never placed) — there is no row, so no button exists
@@ -316,8 +315,8 @@ export function isAllowedBootstrapCommand(command: string): boolean {
 
 /**
  * Whether `action` (already known to be a `command`) may run inside `step`,
- * given the step's role (issue #479). Returns a message naming the step and
- * the reason when it may not; `null` when it is fine.
+ * given the step's role (issue #479, extended by #515). Returns a message
+ * naming the step and the reason when it may not; `null` when it is fine.
  *
  * A player step may not reach the console at all — a click that was awkward
  * is a playability finding, not license to type it instead. A setup step may
@@ -326,8 +325,11 @@ export function isAllowedBootstrapCommand(command: string): boolean {
  * than reinvented so there is exactly one place that decides what counts as
  * "setup" instead of two that can drift apart. An observe step is held to
  * `isObservationCommand`, so "I only wanted to read the state" cannot smuggle
- * a `build` through. A step with no role is unconstrained — see
- * {@link ScenarioStepRole}.
+ * a `build` through. A bootstrap step is held to the narrower
+ * `isAllowedBootstrapCommand`. A guard step is not checked against a command
+ * allowlist at all — it must instead carry `expect.blocked`, since a guard
+ * step proves a control is unreachable rather than running one. A step with
+ * no role is unconstrained — see {@link ScenarioStepRole}.
  */
 export function checkStepActionAllowed(
   step: ScenarioStepDef,

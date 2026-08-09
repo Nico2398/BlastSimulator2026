@@ -10,23 +10,11 @@
 // against `BOOTSTRAP_COMMAND_ALLOWLIST`), and a step proving a control is
 // unreachable is `guard` (checked against `expect.blocked`).
 //
-// This suite is NOT conditional on today's retagging state — it names the
-// end state issue #515 requires and stays in the tree once reached. Written
-// during the RED (test-writer) phase against ~280 untagged steps across ~68
-// scenario-defs files, so every `it` below is expected to fail today:
-//   - "every scenario step has a role" — most steps have no `role` at all.
-//   - "every guard-role step proves a control is disabled" — vacuously
-//     passes today (no step is tagged `guard` yet) but is the permanent
-//     proof once retagging lands.
-//   - "every bootstrap-role step's command is on the audited allowlist" —
-//     `isAllowedBootstrapCommand` (scripts/shared/interaction-executor.ts)
-//     is still a `throw new Error('not implemented')` stub, so this `it`
-//     errors out rather than merely failing an assertion — an acceptable RED
-//     state per the test-writer brief, not something to work around here.
-//
-// @implementer's job is the retagging (scripts/scenario-defs/*.json) and
-// filling in isAllowedBootstrapCommand/BOOTSTRAP_COMMAND_ALLOWLIST
-// (scripts/shared/interaction-executor.ts) — not this test file.
+// This suite names the end state issue #515 requires and stays in the tree
+// permanently: every scenario step in scripts/scenario-defs/*.json now
+// carries a role, every `guard`-role step proves its control is disabled via
+// `expect.blocked`, and every `bootstrap`-role step's command is on the
+// audited `BOOTSTRAP_COMMAND_ALLOWLIST`.
 
 import { describe, it, expect } from 'vitest';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';

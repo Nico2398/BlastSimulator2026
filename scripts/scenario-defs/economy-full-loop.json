@@ -243,52 +243,52 @@
       "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
     },
     {
-        "command": "charge hole:* explosive:boomite amount:3 stemming:2",
-        "interaction": [
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-step=\"2\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "3 kg"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "2.0 m"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-          }
-        ],
-        "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-        "expect": {
-          "equals": {
-            "chargedCount": 4
-          }
+      "command": "charge hole:* explosive:boomite amount:3 stemming:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
-        "role": "player"
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "expect": {
+        "equals": {
+          "chargedCount": 4
+        }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto",

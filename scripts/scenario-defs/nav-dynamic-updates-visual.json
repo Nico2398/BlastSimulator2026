@@ -56,56 +56,56 @@
       }
     },
     {
-        "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m",
-        "interaction": [
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-step=\"2\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "8 kg"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "2.0 m"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
-          }
-        ],
-        "description": "role: player (issue #515): the old \"no UI feature\" reasoning is stale \u2014 Charge.ts's own header comment records that per-hole charging (gap G3) got a real control, ChargeHoleList's `[data-hole=\"H1\"] [data-action=\"charge-hole\"]`, which commits the panel's current product/amount/stemming to one hole instead of all of them.",
-        "expect": {
-          "equals": {
-            "chargedCount": 1
-          }
+      "command": "charge hole:H1 explosive:boomite amount:8kg stemming:2m",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
-        "role": "player"
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "8 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "2.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the old \"no UI feature\" reasoning is stale \u2014 Charge.ts's own header comment records that per-hole charging (gap G3) got a real control, ChargeHoleList's `[data-hole=\"H1\"] [data-action=\"charge-hole\"]`, which commits the panel's current product/amount/stemming to one hole instead of all of them.",
+      "expect": {
+        "equals": {
+          "chargedCount": 1
+        }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto",

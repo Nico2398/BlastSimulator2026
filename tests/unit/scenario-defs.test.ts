@@ -802,9 +802,7 @@ describe('Role-marked steps obey checkStepActionAllowed (issue #479)', () => {
 // ScenarioStepRole gained beyond #479's player/setup/observe. `bootstrap`
 // covers a mutating command with no UI equivalent and no business having one
 // (e.g. `employee assign_skill`); `guard` covers a step proving a control is
-// unreachable rather than clicking one. Both isAllowedBootstrapCommand and
-// checkStepActionAllowed's bootstrap/guard branches are still skeleton stubs
-// (throw), so every assertion below is expected to fail or error today.
+// unreachable rather than clicking one.
 // ──────────────────────────────────────────────
 describe('isAllowedBootstrapCommand (issue #515)', () => {
   it('allows the plan\'s audited bootstrap commands', () => {

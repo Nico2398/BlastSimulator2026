@@ -33,21 +33,21 @@
       }
     },
     {
-        "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
-        "timeout": 30,
-        "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran. No dragTiles-based grid-tool conversion was attempted here for that reason, not because one doesn't exist for a 1x1 grid.",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6"
-          }
-        ],
-        "expect": {
-          "equals": {
-            "holeCount": 1
-          }
-        },
-        "role": "bootstrap"
+      "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6",
+      "timeout": 30,
+      "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran. No dragTiles-based grid-tool conversion was attempted here for that reason, not because one doesn't exist for a 1x1 grid.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid origin:10,10 rows:1 cols:1 spacing:3 depth:6"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 1
+        }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",
@@ -87,21 +87,21 @@
       }
     },
     {
-        "command": "sequence set hole:H1 delay:0ms",
-        "timeout": 30,
-        "description": "role: bootstrap (issue #515): `sequence set hole:H1 delay:0ms` sets an ABSOLUTE per-hole delay \u2014 the panel only exposes relative +/- steppers ([data-hole=\"H1\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), so there is no click path to a specific value, only to whatever the steppers already show.",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "sequence set hole:H1 delay:0ms"
-          }
-        ],
-        "expect": {
-          "equals": {
-            "sequencedCount": 1
-          }
-        },
-        "role": "bootstrap"
+      "command": "sequence set hole:H1 delay:0ms",
+      "timeout": 30,
+      "description": "role: bootstrap (issue #515): `sequence set hole:H1 delay:0ms` sets an ABSOLUTE per-hole delay \u2014 the panel only exposes relative +/- steppers ([data-hole=\"H1\"] [data-action=\"delay-inc\"/\"delay-dec\"], Sequence.ts), so there is no click path to a specific value, only to whatever the steppers already show.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence set hole:H1 delay:0ms"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "sequencedCount": 1
+        }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "state",

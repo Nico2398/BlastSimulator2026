@@ -33,21 +33,21 @@
       }
     },
     {
-        "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6",
-        "timeout": 30,
-        "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran.",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6"
-          }
-        ],
-        "expect": {
-          "equals": {
-            "holeCount": 4
-          }
-        },
-        "role": "bootstrap"
+      "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6",
+      "timeout": 30,
+      "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "holeCount": 4
+        }
+      },
+      "role": "bootstrap"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5kg stemming:2m",

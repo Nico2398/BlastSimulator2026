@@ -242,9 +242,7 @@ describe('isAllowedSetupCommand', () => {
   // same allowlist for scenario steps (not just playtest beats), and
   // scenario-defs retagging needs save/load/sandbox admitted as world
   // bootstrapping so a scenario can set up a save-game state without being
-  // forced to click through it. Skeleton phase deliberately left
-  // playtest-types.ts untouched (a pure data change for @implementer), so
-  // these are expected to fail today.
+  // forced to click through it.
   it('allows save/load/sandbox as setup commands (#515)', () => {
     expect(isAllowedSetupCommand('save slot:quicksave')).toBe(true);
     expect(isAllowedSetupCommand('load slot:quicksave')).toBe(true);

@@ -1283,26 +1283,26 @@
       }
     },
     {
-        "command": "contract deliver 1 amount:800",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 1 amount:800"
-          }
-        ],
-        "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of blingite in storage against a 360 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:800` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
-        "expect": {
-          "equals": {
-            "tickCount": 38,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 1,
-            "surveyCount": 3
-          },
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
+      "command": "contract deliver 1 amount:800",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 1 amount:800"
+        }
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of blingite in storage against a 360 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:800` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "tickCount": 38,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 1,
+          "surveyCount": 3
         },
-        "role": "guard"
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "contract accept 2",
@@ -1328,26 +1328,26 @@
       }
     },
     {
-        "command": "contract deliver 2 amount:600",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 2 amount:600"
-          }
-        ],
-        "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows both active cards at 0.0 kg stored (blingite #1, rubble #2) -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 2 amount:600` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
-        "expect": {
-          "equals": {
-            "tickCount": 38,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 2,
-            "surveyCount": 3
-          },
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
+      "command": "contract deliver 2 amount:600",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 2 amount:600"
+        }
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows both active cards at 0.0 kg stored (blingite #1, rubble #2) -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 2 amount:600` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "tickCount": 38,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 2,
+          "surveyCount": 3
         },
-        "role": "guard"
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "finances",
@@ -1417,71 +1417,71 @@
       }
     },
     {
-        "command": "charge hole:* explosive:krackle amount:5 stemming:3",
-        "interaction": [
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-step=\"2\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "5 kg"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "3.0 m"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-          }
-        ],
-        "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-        "expect": {
-          "equals": {
-            "tickCount": 38,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 2,
-            "surveyCount": 3,
-            "holeCount": 25,
-            "chargedCount": 25,
-            "sequencedCount": 0
-          }
+      "command": "charge hole:* explosive:krackle amount:5 stemming:3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
-        "role": "player"
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "5 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "expect": {
+        "equals": {
+          "tickCount": 38,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 2,
+          "surveyCount": 3,
+          "holeCount": 25,
+          "chargedCount": 25,
+          "sequencedCount": 0
+        }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:20",
@@ -1744,26 +1744,26 @@
       }
     },
     {
-        "command": "contract deliver 3 amount:1200",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 3 amount:1200"
-          }
-        ],
-        "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all three active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 3 amount:1200` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
-        "expect": {
-          "equals": {
-            "tickCount": 44,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 3,
-            "surveyCount": 3
-          },
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
+      "command": "contract deliver 3 amount:1200",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 3 amount:1200"
+        }
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all three active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 3 amount:1200` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "tickCount": 44,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 3,
+          "surveyCount": 3
         },
-        "role": "guard"
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "contract status",
@@ -1852,55 +1852,55 @@
       }
     },
     {
-        "command": "charge hole:* explosive:boomite amount:6 stemming:3",
-        "interaction": [
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-step=\"2\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "6 kg"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "3.0 m"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-          }
-        ],
-        "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-        "expect": {
-          "equals": {
-            "tickCount": 44,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 3,
-            "surveyCount": 3,
-            "holeCount": 30,
-            "chargedCount": 30,
-            "sequencedCount": 0
-          }
+      "command": "charge hole:* explosive:boomite amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
-        "role": "player"
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "6 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "expect": {
+        "equals": {
+          "tickCount": 44,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 3,
+          "surveyCount": 3,
+          "holeCount": 30,
+          "chargedCount": 30,
+          "sequencedCount": 0
+        }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:20",
@@ -2123,26 +2123,26 @@
       }
     },
     {
-        "command": "contract deliver 4 amount:1500",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 4 amount:1500"
-          }
-        ],
-        "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all four active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 4 amount:1500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
-        "expect": {
-          "equals": {
-            "tickCount": 50,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 4,
-            "surveyCount": 3
-          },
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+      "command": "contract deliver 4 amount:1500",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 4 amount:1500"
+        }
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all four active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 4 amount:1500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "tickCount": 50,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 4,
+          "surveyCount": 3
         },
-        "role": "guard"
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "finances",
@@ -2313,51 +2313,51 @@
       }
     },
     {
-        "command": "charge hole:* explosive:krackle amount:6 stemming:3",
-        "interaction": [
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-step=\"2\"]"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "6 kg"
-          },
-          {
-            "type": "assert",
-            "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-            "property": "textContent",
-            "expectedValue": "3.0 m"
-          },
-          {
-            "type": "clickSelector",
-            "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-          }
-        ],
-        "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-        "expect": {
-          "equals": {
-            "tickCount": 50,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 4,
-            "surveyCount": 3,
-            "holeCount": 48,
-            "chargedCount": 48,
-            "sequencedCount": 0
-          }
+      "command": "charge hole:* explosive:krackle amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
-        "role": "player"
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "6 kg"
+        },
+        {
+          "type": "assert",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
+          "property": "textContent",
+          "expectedValue": "3.0 m"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "expect": {
+        "equals": {
+          "tickCount": 50,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 4,
+          "surveyCount": 3,
+          "holeCount": 48,
+          "chargedCount": 48,
+          "sequencedCount": 0
+        }
+      },
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:20",
@@ -2580,26 +2580,26 @@
       }
     },
     {
-        "command": "contract deliver 5 amount:2000",
-        "interaction": [
-          {
-            "type": "command",
-            "command": "contract deliver 5 amount:2000"
-          }
-        ],
-        "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all five active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 5 amount:2000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
-        "expect": {
-          "equals": {
-            "tickCount": 62,
-            "deathCount": 2,
-            "employeeCount": 7,
-            "activeContractCount": 5,
-            "surveyCount": 3
-          },
-          "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-          "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
+      "command": "contract deliver 5 amount:2000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract deliver 5 amount:2000"
+        }
+      ],
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all five active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 5 amount:2000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "expect": {
+        "equals": {
+          "tickCount": 62,
+          "deathCount": 2,
+          "employeeCount": 7,
+          "activeContractCount": 5,
+          "surveyCount": 3
         },
-        "role": "guard"
+        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
+        "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
+      },
+      "role": "guard"
     },
     {
       "command": "finances",
