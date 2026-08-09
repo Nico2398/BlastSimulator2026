@@ -253,32 +253,23 @@ export function demolishBuilding(state: BuildingState, buildingId: number): Demo
   return { success: true, freedCells };
 }
 
-/**
- * Cost to demolish a building ($). Stub — see `demolishBuildingResult.cost`
- * wiring, not yet consumed by `demolishBuilding`.
- */
+/** Cost to demolish a building ($): the demolish cost of its current type/tier. */
 export function getDemolishCost(building: Building): number {
-  void building;
-  return 0;
+  return getBuildingDef(building.type, building.tier).demolishCost;
 }
 
 /**
- * Cost to upgrade a building to `nextTier` ($). Stub — not yet consumed by
- * any upgrade command.
+ * Cost to upgrade a building to `nextTier` ($): demolishing the current tier
+ * plus constructing the next one.
  */
 export function getUpgradeCost(building: Building, nextTier: BuildingTier): number {
-  void building;
-  void nextTier;
-  return 0;
+  return getBuildingDef(building.type, building.tier).demolishCost
+    + getBuildingDef(building.type, nextTier).constructionCost;
 }
 
-/**
- * Cost to relocate a building ($). Stub — mirrors the 50%-of-construction
- * calculation inlined in `moveBuilding` today; not yet consumed there.
- */
+/** Cost to relocate a building ($): 50% of its construction cost. */
 export function getMoveCost(building: Building): number {
-  void building;
-  return 0;
+  return Math.round(getBuildingDef(building.type, building.tier).constructionCost * 0.5);
 }
 
 /** Move a building to new coordinates. Returns relocation cost (50% of construction). */
@@ -308,8 +299,7 @@ export function moveBuilding(
 
   building.x = newX;
   building.z = newZ;
-  const relocCost = Math.round(def.constructionCost * 0.5);
-  return { success: true, building, cost: relocCost };
+  return { success: true, building, cost: getMoveCost(building) };
 }
 
 /** Calculate total operating cost for all active buildings. */
