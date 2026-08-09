@@ -38,7 +38,7 @@ Never restate content across layers. Reference it by name.
 
 Prefix categories:
 - `gameplay-*` — game mechanics specs (blast, buildings, navmesh, survey, vehicles, employee skills/needs, game design)
-- `dev-*` — architecture, coding conventions, testing strategy, visual testing, playability testing
+- `dev-*` — architecture, coding conventions, testing strategy, visual testing
 - `agentic-*` — pipeline orchestration, decision autonomy, context authoring, issue creation
 
 **Skills-First:** before any task, load related skill(s) for domain rules, procedures, and constraints.
@@ -51,15 +51,14 @@ A session started by the autonomous pipeline — a GitHub Actions run woken by t
 
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE
 
-Five independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.
+Four independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.
 
 | Channel | Command | Proves | Required when |
 |---------|---------|--------|---------------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Every code change |
 | `logic` | `npm run test` | Unit + integration behaviour matches expectations | Every code change |
 | `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Gameplay, console, economy, campaign changes |
-| `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshots` | The game renders correctly and the UI responds to real clicks | Any change to `src/renderer/`, `src/ui/`, or anything a player sees |
-| `playability` | `npm run playtest` | A player can actually reach the goal by clicking — no console command stands in for a player action | Any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
+| `visual` | `npm run screenshot`, `npm run scenario -- --mode interaction --screenshots` | The game renders correctly, the UI responds to real clicks, and a player can actually reach the goal by clicking — no console command stands in for a player action | Any change to `src/renderer/`, `src/ui/`, or anything a player sees; any change to a player-facing flow: tutorial, panels, hiring, skills, contracts, building, vehicles |
 
 1. Run `npm run verify:env` when unsure a channel is usable. It reports each channel as READY or BLOCKED with the remedy.
 2. Pick every channel the change touches, not the cheapest one.
@@ -68,9 +67,7 @@ Five independent channels prove a change works. Each catches what the others mis
 5. **"Already fixed" and "no change needed" are claims about the whole issue, not about a diff.** With no diff there is nothing to scope the channels down to, so run every channel the issue's own verification list names. A verdict of already-resolved reached on a subset of them is unproven.
 6. **A channel already red before you arrived is a finding, not a precondition.** Never skip, downgrade, or discount a channel because it was failing on `main` when you started — that is how a red channel outlives the one session positioned to notice it. Fix it, or state plainly that it is red, what fails, and why you are not fixing it. Reporting work done while a required channel is red is a false report no matter who broke it.
 
-**The other four channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `playability` is the only channel that plays the game. Procedures live in the `dev-playability-testing` skill.
-
-**`playability` is folding into `visual`.** Tracked by issue #515: once the scenario suite's click-only enforcement is total, interaction-mode `expect` checks prove what a playtest beat proves today, and this row retires. Until then it remains required exactly as below.
+**The other three channels can all pass on an unplayable game.** They drive the simulation through `src/console/`, which has commands no button exposes — so a feature can be fully correct in the model and completely unreachable by a player. `visual`'s interaction-mode scenarios are the only channel that plays the game: a `role: 'player'` scenario step can never fall back to a console command (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts`), so a click that cannot complete fails the scenario and names the blocking control. Procedures live in the `dev-visual-testing` skill; step roles in `.claude/rules/scenario-defs.md`.
 
 **You have vision.** Screenshots are readable evidence: capture the PNG, then open it with the Read tool and describe what is actually on screen. A rendering change is unverified until an image has been inspected — a green test suite proves the logic, not the picture. Procedures live in the `dev-visual-testing` skill.
 
@@ -80,7 +77,7 @@ Five independent channels prove a change works. Each catches what the others mis
 
 **Deliberately not mirrored into `.github/copilot-instructions.md` or `.opencode/AGENTS.md`.** Entry points are the one layer whose bodies are allowed to diverge — each runtime holds its own, and `validate:context` checks only that all three name the same gates and channels, not that they read alike. This section describes how *this* runtime executes: long-running processes it starts in the background and watches across turns. The other two runtimes drive their harnesses differently, so their authors decide their own wording. Its absence there is intentional; do not sync it.
 
-Without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475). Loading a level is cheap — a `new_game` is ~4 s and a campaign start ~16 s. What is expensive is *waiting on frames*: the browser harnesses poll the page over CDP, and every such call waits a full frame, so a single player action costs tens of seconds and a playtest beat costs minutes. Measured on a CI runner, one playtest definition takes 32 minutes. That is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
+Without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475). Loading a level is cheap — a `new_game` is ~4 s and a campaign start ~16 s. What is expensive is *waiting on frames*: the browser harnesses poll the page over CDP, and every such call waits a full frame, so a single player action costs tens of seconds and an interaction-mode scenario beat costs minutes. That is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
 
 The game's own simulation is not the cost — turning ticking off changes the frame by 1.7%. Do not go looking for it in world size, navgrid rebuilds, or terrain generation.
 
@@ -88,10 +85,9 @@ The game's own simulation is not the cost — turning ticking off changes the fr
 |-----|-------|
 | `typecheck`, `test`, `scenarios` (command mode), `build` | Either. CI runs all four on every push and PR. |
 | `screenshot`, one named scenario in interaction mode | Your session — this is the visual channel's working loop. |
-| Whole playability suite (`npm run playtest`) | CI job `Playtest (playability)` (label the PR `full-ci`). |
 | All scenarios in interaction mode | CI job `Scenarios (interaction mode)` (label the PR `full-ci`). |
 
-Both browser jobs are gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. Together they add ~50 minutes to the merge path, so the label goes on a PR whose change a playtest definition actually drives, or which touches machinery every scenario runs through — not on every diff that a player can see. `agentic-pipeline-pr-management` holds the test and the cost.
+The interaction-mode job is gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. It adds ~30 minutes to the merge path, so the label goes on a PR whose change an interaction-mode scenario actually drives, or which touches machinery every scenario runs through — not on every diff that a player can see. `agentic-pipeline-pr-management` holds the test and the cost.
 
 Push, then read the CI job — its result *is* the channel's result, and its artifacts carry the FAIL screenshots. Locally, run one named definition you are actively debugging, never the whole suite.
 
@@ -110,8 +106,7 @@ npm run verify:env      # which verification channels are live
 npm run validate        # TypeScript → coverage → integration → scenario defs → build
 npm run test            # Vitest unit + integration
 npm run scenarios       # all scenarios, command mode, no browser
-npm run playtest        # plays the game through its own UI, clicks only
-npm run dev             # dev server on :5173, required by the visual and playability channels
+npm run dev             # dev server on :5173, required by the visual channel
 npm run console         # interactive gameplay REPL, no browser
 ```
 

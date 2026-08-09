@@ -25,3 +25,5 @@ Headless Chrome has no GPU — jagged edges and slightly dark shadows are artifa
 - Renderer and UI read `GameState` and subscribe to core events. They never mutate core state directly.
 - Player-visible text goes through `t('key')` with matching `en.json` and `fr.json` entries — including fictional rock, ore, and explosive names.
 - In `GameRenderer.update(dt)`, ambient/decorative modules (wind, clouds, birds, chimney smoke, water surface, dust devils, fireflies, vegetation sway) run on game time: feed them `gameDt` (`dt * state.timeScale`, `0` while `state.isPaused`), never raw `dt`, so they scale and pause with the sim. Playback/UI/camera modules (fragment collapse, skybox, blast effects, characters, ghosts, border wall, vehicles) stay on raw `dt`. New ambient modules follow the `gameDt` convention.
+- Panels that own a `TileSelectOverlay` scope element lookups to their own root. Ids are reused across pickers, so `document.getElementById` can resolve to a closed one.
+- A tutorial step advances only on genuine completion. The tutorial never runs the player's commands for them; `autoCommands` (`src/ui/tutorialStages.ts`) is for scripted demonstrations only.

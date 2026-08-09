@@ -22,7 +22,7 @@ describe('probeUiActions — selection bar region (redesign P2)', () => {
     // jsdom has no layout engine — getBoundingClientRect() is always zero, so
     // probeUiActions() reports every control 'zero-size' regardless of the
     // real DOM here. That check only means something in a real browser (the
-    // visual/playability channels); this test covers the layout-independent
+    // visual channel); this test covers the layout-independent
     // half: the controls are discovered at all, and none is disabled/hidden.
     document.body.innerHTML = '';
     const container = document.createElement('div');

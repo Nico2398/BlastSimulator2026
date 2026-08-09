@@ -48,10 +48,4 @@ describe('verification channel npm scripts', () => {
       expect(scripts[name]).toContain(target);
     });
   });
-
-  describe('playability channel', () => {
-    it('runs the playtest harness', () => {
-      expect(scripts['playtest']).toContain('scripts/playtest.ts');
-    });
-  });
 });

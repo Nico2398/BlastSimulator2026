@@ -19,9 +19,9 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   'wait', 'waitForSelector', 'waitForTutorialStep', 'type',
   'assert', 'viewport', 'command', 'screenshot',
   'loadingScreenDebug',
-  // Shared with the playability harness (issue #479) — same names, same
-  // implementations, so a converted step and its playtest counterpart do the
-  // same thing. See InteractionStepAction in scripts/shared/scenario-types.ts.
+  // Ported from the former playtest harness (issue #479) — same names, same
+  // implementations, so a converted step behaves the same way the harness's
+  // beats used to. See InteractionStepAction in scripts/shared/scenario-types.ts.
   'set', 'clickLabel', 'awaitUsable', 'zoomOut', 'focusTile', 'clickEntity',
   // Conditional click for genuinely nondeterministic beats (`event choose`
   // after a bare tick). Not an escape hatch — see InteractionStepAction.

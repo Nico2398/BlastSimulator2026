@@ -5,7 +5,7 @@
 // measured in #479. These tests cover the mechanism that closes that gap:
 // a player-marked step's interaction may never fall back to a console
 // command, and a step whose click cannot actually complete fails the
-// scenario and names the control, the way `npm run playtest` already does.
+// scenario and names the control (issue #515's playability fold-in).
 //
 // No real Puppeteer browser is involved — `Page` is faked at the I/O
 // boundary (`evaluate`, `click`, `waitForSelector`) so these stay in the
