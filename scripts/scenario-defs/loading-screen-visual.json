@@ -148,7 +148,8 @@
         {
           "type": "screenshot"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
@@ -171,7 +172,8 @@
         {
           "type": "screenshot"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
@@ -199,7 +201,8 @@
         {
           "type": "screenshot"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
@@ -232,7 +235,8 @@
         {
           "type": "screenshot"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "state",
@@ -252,7 +256,8 @@
           "property": "visible",
           "expectedValue": false
         }
-      ]
+      ],
+      "role": "observe"
     }
   ]
 }

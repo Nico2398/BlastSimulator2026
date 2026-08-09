@@ -146,7 +146,8 @@
           "type": "clickSelector",
           "selector": "#bs-saves-modal button:not([data-action])"
         }
-      ]
+      ],
+      "role": "observe"
     },
     {
       "command": "time pause",
@@ -156,7 +157,8 @@
           "type": "command",
           "command": "time pause"
         }
-      ]
+      ],
+      "role": "setup"
     },
     {
       "command": "event fire tutorial_synergy_consultant",
