@@ -16,6 +16,7 @@ import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
+import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 
 function makeState() {
   const state = createGame({ seed: 1, mineType: 'desert' });
@@ -403,5 +404,58 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     expect(() => uiManager.closeStaleLevelOverlays()).not.toThrow();
 
     expect(uiManager.blastReportModalVisible).toBe(false);
+  });
+});
+
+// ── Fleet panel vehicle-select delegation (#512) ────────────────────────────
+//
+// A 3+ vehicle fleet gets snapped onto the same NavGrid cell by `vehicle
+// buy`, so scene-raycast selection can only ever hit one of them.
+// setSelectVehicleHandler delegates to FleetPanel, whose rows are clickable
+// and route through ScenePicking.select() (main.ts owns that wiring). This
+// only proves UIManager's own delegation plumbing — FleetPanel's click
+// behavior itself is covered by FleetPanel.test.ts.
+
+function makeVehicle(id: number): Vehicle {
+  return {
+    id, type: 'debris_hauler', tier: 1, x: 5, z: 5, hp: 100, task: 'idle',
+    targetX: 5, targetZ: 5, driverId: null, state: 'idle', payloadKg: 0,
+    waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
+    haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
+  };
+}
+
+describe('UIManager — Fleet panel vehicle-select delegation (#512)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('setSelectVehicleHandler(cb) + a real click on a Fleet panel vehicle row invokes cb with that vehicle\'s real id', () => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+    const cb = vi.fn();
+    uiManager.setSelectVehicleHandler(cb);
+    uiManager.showPanel('vehicles');
+
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.vehicles.vehicles = [makeVehicle(1), makeVehicle(2), makeVehicle(3)];
+    state.vehicles.nextId = 4;
+    uiManager.update(state);
+
+    const row = container.querySelector('#bs-vehicle-panel [data-vehicle-id="2"]') as HTMLElement;
+    expect(row).not.toBeNull();
+    row.click();
+
+    expect(cb).toHaveBeenCalledWith(2);
   });
 });

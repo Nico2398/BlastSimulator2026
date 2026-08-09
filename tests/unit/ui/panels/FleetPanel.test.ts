@@ -246,4 +246,73 @@ describe('FleetPanel', () => {
     panel.dispose();
     expect(container.contains(panel.root)).toBe(false);
   });
+
+  // ── vehicle selection via Fleet panel row click (issue #512) ──────────────
+  //
+  // A 3+ vehicle fleet gets snapped onto the same NavGrid cell by `vehicle
+  // buy`, so scene-raycast selection can only ever hit one of them. Fleet
+  // panel rows become clickable instead, routing through ScenePicking.select()
+  // (wired by UIManager/main.ts) — these tests cover only FleetPanel's own
+  // click-to-handler plumbing.
+
+  it('clicking a rendered vehicle card fires the select handler with the real vehicle id', () => {
+    const { panel } = makePanel();
+    let selectedId: number | null = null;
+    panel.setSelectVehicleHandler(id => { selectedId = id; });
+    panel.update(makeState([makeVehicle({ id: 3 })]));
+
+    const card = panel.root.querySelector('[data-vehicle-id="3"]') as HTMLElement;
+    expect(card).not.toBeNull();
+    card.click();
+
+    expect(selectedId).toBe(3);
+  });
+
+  it('clicking a nested interactive control inside the card does not also fire the select handler', () => {
+    const { panel } = makePanel();
+    let selectedId: number | null = null;
+    panel.setSelectVehicleHandler(id => { selectedId = id; });
+    panel.setConfirmHandler(config => config.onConfirm());
+    panel.update(makeState([makeVehicle({ id: 4, type: 'debris_hauler', tier: 1, hp: 100 })]));
+
+    const scrapBtn = panel.root.querySelector('button[title="Scrap"]') as HTMLButtonElement;
+    expect(scrapBtn).not.toBeNull();
+    scrapBtn.click();
+
+    expect(selectedId).toBeNull();
+  });
+
+  it('clicking the driver-assign select control does not fire the select handler', () => {
+    const { panel } = makePanel();
+    let selectedId: number | null = null;
+    panel.setSelectVehicleHandler(id => { selectedId = id; });
+    const eligible = makeEmployee({ id: 6, name: 'Dorian Kask', qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }] });
+    panel.update(makeState([makeVehicle({ id: 2, type: 'debris_hauler' })], [eligible]));
+
+    const select = panel.root.querySelector('select') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    select.click();
+
+    expect(selectedId).toBeNull();
+  });
+
+  it('clicking a vehicle card does not throw when no select handler is registered', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 7 })]));
+
+    const card = panel.root.querySelector('[data-vehicle-id="7"]') as HTMLElement;
+    expect(() => card.click()).not.toThrow();
+  });
+
+  it('two different vehicle cards fire the select handler with two different, correct ids', () => {
+    const { panel } = makePanel();
+    const selected: number[] = [];
+    panel.setSelectVehicleHandler(id => { selected.push(id); });
+    panel.update(makeState([makeVehicle({ id: 2 }), makeVehicle({ id: 3 })]));
+
+    (panel.root.querySelector('[data-vehicle-id="2"]') as HTMLElement).click();
+    (panel.root.querySelector('[data-vehicle-id="3"]') as HTMLElement).click();
+
+    expect(selected).toEqual([2, 3]);
+  });
 });
