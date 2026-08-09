@@ -17,7 +17,7 @@ No layer optional. **More tests always better** — do not limit test cases.
 4. **Visual scenario tests** — Full browser sessions (Puppeteer). Screenshots + JSON state dumps after every command.
 5. **Playtests** — The game played through its own UI, clicks only. Proves a player can reach the goal.
 
-All five layers must pass before any PR is merged.
+All five layers must pass before any PR is merged. **`playability` is scheduled to fold into `visual`/`scenario` once issue #515 lands** — see the transitional note in `dev-playability-testing`.
 
 ## Verification Channels
 
@@ -46,7 +46,7 @@ npm run typecheck         # TypeScript across src/ and scripts/
 npm run test              # Unit + integration tests
 npm run test:integration  # Integration tests only
 npm run test:scenarios    # Validates scenario definition files (not the scenario runner)
-npm run scenarios         # Runs all 99 scenarios, command mode
+npm run scenarios         # Runs all 126 scenarios, command mode
 npm run playtest          # Plays the game through its UI, clicks only
 npm run console           # Interactive gameplay testing (no browser)
 ```
@@ -135,6 +135,8 @@ JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON 
 
 Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 
+Steps also carry `role: 'player' | 'setup' | 'observe'` and `expect` (`ScenarioStepGoal`) — `role` constrains which commands an interaction array may reach for, `expect` proves the step's actions actually moved game state rather than merely not throwing. Full field list and current tagging state: `scripts/shared/scenario-types.ts`'s doc comments (Claude Code sessions also have the narrative version in `.claude/rules/scenario-defs.md`).
+
 **Async commands need tick padding.** A command that queues async work (e.g. `survey seismic`) must be followed by enough `tick` steps to let it resolve before a dependent step runs, or the dependent step reads stale state. Insert several `tick 10` steps after the async command, matching `survey-then-blast.json`.
 
 ### Feature Scenarios (Ch.1–7 visual regression)
@@ -212,9 +214,11 @@ CI has 3 tiers of scenario testing:
 
 | Tier | What | When | Time |
 |------|------|------|------|
-| **1 — Command** | All 99 scenarios in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
-| **2 — Interaction** | All 99 scenarios in interaction mode (Puppeteer, real browser) | Push to main, schedule (weekly), workflow_dispatch, **or PR with `full-ci` label** | ~16 min |
-| **3 — Full** | Tiers 1 + 2 combined | Automatic on schedule/weekly; opt-in via `full-ci` label on PR | ~18 min |
+| **1 — Command** | All 126 scenarios in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
+| **2 — Interaction** | All 126 scenarios in interaction mode (Puppeteer, real browser) | Push to main, schedule (weekly), workflow_dispatch, **or PR with `full-ci` label** | tens of minutes† |
+| **3 — Full** | Tiers 1 + 2 combined | Automatic on schedule/weekly; opt-in via `full-ci` label on PR | tens of minutes† |
+
+† No GPU means ~6 s/frame in software rasterisation (#475) — a cached minute figure goes stale fast, so none is kept here. Current cost and the `full-ci` label rule: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.
 
 **Label convention:** Add `full-ci` to a PR when a playtest definition drives the change, or when it touches machinery every scenario runs through. The `full-ci` label on an issue MUST transfer to the opened PR. Most PRs — docs, config, logic-only, and UI no definition reaches — skip both browser jobs safely; the `visual` channel covers those against the one scenario that exercises them. Rule and cost: `agentic-pipeline-pr-management`.
 
