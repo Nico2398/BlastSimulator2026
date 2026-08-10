@@ -66,7 +66,7 @@ const aliveCount = (ctx: MiningContext, ids: number[]): number =>
 beforeEach(() => resetHoleIds());
 
 describe('Blast flyrock — danger reaches the crew', () => {
-  it('an unstemmed overcharge throws rock that hurts people standing nearby', () => {
+  it('a minimally stemmed overcharge throws rock that hurts people standing nearby', () => {
     const ctx = makeCtx();
     const crew = crewBesideTheBlast(ctx);
     const before = aliveCount(ctx, crew);
@@ -74,7 +74,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     blastAt(ctx, '0.5');
 
     expect(before).toBeGreaterThan(0);
-    expect(aliveCount(ctx, crew), 'unstemmed flyrock hurt nobody').toBeLessThan(before);
+    expect(aliveCount(ctx, crew), 'minimally stemmed flyrock hurt nobody').toBeLessThan(before);
     expect(ctx.state!.damage.accidents.length).toBeGreaterThan(0);
   });
 
