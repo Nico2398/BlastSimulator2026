@@ -40,6 +40,16 @@ const ORBIT_SPEED = 0.005; // radians per pixel
 // Scales with distance so panning feels consistent at all zoom levels
 const PAN_SPEED_FACTOR = 0.001;
 
+/**
+ * Pixel movement below this between right-button mousedown and release still
+ * reads as a click, not a drag — mirrors ScenePicking's
+ * CLICK_MOVE_THRESHOLD_PX for the analogous left-button distinction. Below
+ * this, PlacementController's contextmenu handler still cancels the armed
+ * tool; at or above it, a right-drag used purely to orbit the camera leaves
+ * the tool untouched (#544).
+ */
+const RIGHT_DRAG_THRESHOLD_PX = 5;
+
 // Vertical angle limits. `phi` is measured from straight up, so a small value
 // puts the camera overhead looking down and a value near π/2 puts it level
 // with the target. Stopping short of both ends keeps the camera from flipping
@@ -87,6 +97,19 @@ export class CameraController {
   private prevMouseX = 0;
   private prevMouseY = 0;
 
+  private rightButtonDown = false;
+  private rightDownX = 0;
+  private rightDownY = 0;
+  /**
+   * True once the current (or just-finished) right-button gesture has moved
+   * past RIGHT_DRAG_THRESHOLD_PX from its mousedown position. Single source
+   * of truth for "was this a drag, not a click" — PlacementController reads
+   * it instead of re-deriving pixel distance itself (#544). Reset on the
+   * next right-button mousedown; persists across mouseup so a `contextmenu`
+   * handler firing afterward can still read it.
+   */
+  private rightGestureMoved = false;
+
   /**
    * True while a placement tool (P3 grid select) has taken the left button.
    * Right swaps to orbit for the duration and left is ignored here entirely —
@@ -109,6 +132,15 @@ export class CameraController {
     this.camera = camera;
     this.target = target.clone();
     this.canvas = canvas;
+
+    // Skeleton stage (#544): rightButtonDown/rightDownX/rightDownY and
+    // RIGHT_DRAG_THRESHOLD_PX are read by @implementer's tracking logic in
+    // onMouseDown/onMouseMove/onMouseUp, not yet wired in. These no-op reads
+    // satisfy noUnusedLocals until that wiring lands.
+    void this.rightButtonDown;
+    void this.rightDownX;
+    void this.rightDownY;
+    void RIGHT_DRAG_THRESHOLD_PX;
 
     // Initialise spherical from current camera position
     const offset = camera.position.clone().sub(this.target);
@@ -137,6 +169,11 @@ export class CameraController {
    */
   get viewTarget(): THREE.Vector3 {
     return this.target;
+  }
+
+  /** True if the right-button gesture just released (or still held) moved past RIGHT_DRAG_THRESHOLD_PX — a drag, not a click (#544). */
+  get rightButtonDragged(): boolean {
+    return this.rightGestureMoved;
   }
 
   /** Point the camera looks at (can be updated externally for tracking). */
