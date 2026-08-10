@@ -257,13 +257,22 @@ job. Going the other way, 2 shards would land near ~1 331 s (~22 min) per
 shard — worse than today for no benefit.
 
 Rather than pick a new fixed number, the shard count is now the repo
-variable `SCENARIO_INTERACTION_SHARDS` (`.github/workflows/ci.yml`,
-`strategy.matrix.shard: ${{ fromJson(vars.SCENARIO_INTERACTION_SHARDS || '[1,2,3,4]') }}`).
-This adds no real complexity: `run-all-scenarios.ts`'s `--shard i/N` parsing
-already accepts any `N` (`parseShardArg`/`selectShard`), and the CI step
-already passes `${{ strategy.job-total }}` instead of a hardcoded `4`, so
-the harness's own shard-total argument stays correct for whatever the
-variable holds. Changing shard count is a Settings → Variables edit, not a
+variable `SCENARIO_INTERACTION_SHARDS` — a plain integer (`"8"`, not a JSON
+array), so setting it is typing a number, not composing a literal. The
+GitHub Actions expression language has no range/loop primitive, so turning
+that integer into the `[1..N]` array `strategy.matrix.shard` needs is a real
+step, not an inline expression: a small `shard-config` job
+(`.github/workflows/ci.yml`) runs one shell step —
+`seq 1 "$N" | jq -s -c .` after validating `$N` is a positive integer,
+falling back to 4 otherwise — and publishes the array as a job output that
+`scenario-interaction`'s matrix reads via `fromJson(needs.shard-config.outputs.shards)`.
+That's the one piece of real added complexity: one previously-unneeded job,
+finishing in seconds since it does no checkout or install. `run-all-scenarios.ts`'s
+`--shard i/N` parsing already accepts any `N` (`parseShardArg`/`selectShard`)
+unchanged, and the CI step already passes `${{ strategy.job-total }}` instead
+of a hardcoded `4`, so the harness's own shard-total argument stays correct
+for whatever the variable holds. Changing shard count is a Settings →
+Variables edit, not a
 workflow change.
 
 ### Measured and rejected

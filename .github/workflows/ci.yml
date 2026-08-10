@@ -175,6 +175,36 @@ jobs:
           fi
           echo "All scenarios passed in command mode."
 
+  # Resolves the interaction job's shard count. The GitHub Actions expression
+  # language has no range/loop primitive, so turning a plain integer variable
+  # into a [1..N] matrix array needs one real step, not just an expression —
+  # this job is that step. Runs only when scenario-interaction itself would
+  # (same condition below), and finishes in seconds (no checkout, no install).
+  shard-config:
+    name: Resolve interaction shard count
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci')
+    outputs:
+      shards: ${{ steps.compute.outputs.shards }}
+    steps:
+      - name: Build [1..N] from the SCENARIO_INTERACTION_SHARDS repo variable
+        id: compute
+        env:
+          RAW: ${{ vars.SCENARIO_INTERACTION_SHARDS }}
+        run: |
+          # Repo variable holds a plain positive integer, e.g. "8". Falls back
+          # to 4 shards when unset or not a positive integer.
+          if [[ "$RAW" =~ ^[1-9][0-9]*$ ]]; then
+            N="$RAW"
+          else
+            N=4
+          fi
+          SHARDS=$(seq 1 "$N" | jq -s -c .)
+          echo "Resolved SCENARIO_INTERACTION_SHARDS=\"$RAW\" -> $N shards: $SHARDS"
+          echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
+
   # Runs all scenarios in interaction mode (Puppeteer, slow).
   # Runs only on:
   #   - Push to main (catches regressions after merge)
@@ -190,14 +220,11 @@ jobs:
     needs:
       - typecheck
       - test
+      - shard-config
     strategy:
       fail-fast: false
-      # Shard count comes from the repo variable SCENARIO_INTERACTION_SHARDS
-      # (Settings → Secrets and variables → Actions → Variables), a JSON array
-      # literal like "[1,2,3,4]" — falls back to 4 shards when unset. Changing
-      # shard count is then a variable edit, no workflow change.
       matrix:
-        shard: ${{ fromJson(vars.SCENARIO_INTERACTION_SHARDS || '[1,2,3,4]') }}
+        shard: ${{ fromJson(needs.shard-config.outputs.shards) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
