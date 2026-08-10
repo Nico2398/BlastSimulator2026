@@ -127,6 +127,16 @@ export class CharacterMesh {
   }
 
   /**
+   * Correct a character's terrain-surface Y immediately, leaving x/z motion
+   * to the eased tween (#520 — GameRenderer.syncFromContext() should no
+   * longer hard-snap x/z every sync).
+   */
+  setSurfaceY(_id: number, _y: number): void {
+    // TODO: implement
+    throw new Error('not implemented');
+  }
+
+  /**
    * Mark a character as evacuating (will blink to indicate urgency).
    */
   setEvacuating(employeeId: number, evacuating: boolean): void {
