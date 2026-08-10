@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import type { Employee, EmployeeRole } from '../core/entities/Employee.js';
 import { tagPickable } from './Pickable.js';
+import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
 
 // ---------- Role colors (bright, distinct) ----------
 // Exported for the Crew panel's roster avatars (redesign P6) — same hue as
@@ -28,9 +29,6 @@ const BODY_RADIUS   = 0.22;
 const BODY_HEIGHT   = 0.55;
 const HEAD_RADIUS   = 0.20;
 
-// ---------- Movement ----------
-const MOVE_LERP = 0.10;
-
 // ---------- Main class ----------
 
 export class CharacterMesh {
@@ -41,6 +39,7 @@ export class CharacterMesh {
     headMat: THREE.MeshPhongMaterial;
     employee: Employee;
     evacuating: boolean;
+    tween: MovementTween;
   }>();
   private time = 0;
 
@@ -79,7 +78,10 @@ export class CharacterMesh {
     group.position.set(employee.x, surfaceY, employee.z);
     tagPickable(group, 'employee', employee.id);
     this.scene.add(group);
-    this.characters.set(employee.id, { group, bodyMat, headMat, employee, evacuating: false });
+    this.characters.set(employee.id, {
+      group, bodyMat, headMat, employee, evacuating: false,
+      tween: createTween(employee.x, employee.z),
+    });
   }
 
   /**
@@ -96,9 +98,10 @@ export class CharacterMesh {
 
       entry.employee = emp;
 
-      // Lerp toward work position
-      entry.group.position.x += (emp.x - entry.group.position.x) * MOVE_LERP;
-      entry.group.position.z += (emp.z - entry.group.position.z) * MOVE_LERP;
+      // Ease toward work position (duration-aware tween, #520)
+      const eased = stepTween(entry.tween, entry.group.position.x, entry.group.position.z, emp.x, emp.z, dt);
+      entry.group.position.x = eased.x;
+      entry.group.position.z = eased.z;
 
       // Update body color for injury state
       const roleColor = ROLE_COLORS[emp.role];
@@ -117,12 +120,25 @@ export class CharacterMesh {
 
   /**
    * Snap a character to an exact position (e.g. after terrain rebuild repositions surface).
-   * Unlike the lerp-based update(), this sets the position immediately.
+   * Unlike the tween-based update(), this sets the position immediately.
    */
   snapPosition(id: number, x: number, y: number, z: number): void {
     const entry = this.characters.get(id);
     if (entry) {
       entry.group.position.set(x, y, z);
+      entry.tween = createTween(x, z);
+    }
+  }
+
+  /**
+   * Correct a character's terrain-surface Y immediately, leaving x/z motion
+   * to the eased tween (#520 — GameRenderer.syncFromContext() should no
+   * longer hard-snap x/z every sync).
+   */
+  setSurfaceY(id: number, y: number): void {
+    const entry = this.characters.get(id);
+    if (entry) {
+      entry.group.position.y = y;
     }
   }
 
