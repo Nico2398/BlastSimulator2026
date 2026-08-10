@@ -36,6 +36,7 @@ import {
 import { TARGET_COSTS, MAFIA_THRESHOLD } from '../../../src/core/economy/Corruption.js';
 import { ACCIDENT_COST, FRAME_COST, FRAME_EVIDENCE_TICKS } from '../../../src/core/events/MafiaActions.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { STARTING_CASH } from '../../../src/core/config/balance.js';
 
 function makeCtx(cash: number): MiningContext {
   const ctx: MiningContext = {
@@ -585,5 +586,150 @@ describe('mafia frame — insufficient funds guard', () => {
     expect(completeResult.success).toBe(true);
     expect(completeResult.output).not.toContain('Insufficient funds');
     expect(ctx.state!.cash).toBe(0);
+  });
+});
+
+// ── employee raise — invalid amount override sanitization (#534) ──
+//
+// `employee raise <id> amount:<n>` guards with `isNaN(id) || amount <= 0`.
+// A non-numeric amount (`parseFloat('notanumber')` → `NaN`) slips past that:
+// `NaN <= 0` is `false`, so the guard never fires, giveRaise runs, and
+// `emp.salary += NaN` poisons the employee's salary permanently — later
+// picked up by payroll and spread into `state.cash`. `amount:Infinity` is
+// the sharper case: `parseFloat('Infinity')` is a legitimate finite-looking
+// number to `isNaN` (`isNaN(Infinity)` is `false`) and `Infinity > 0`, so a
+// naive `isNaN`-only fix would still let it through — only
+// `Number.isFinite(amount) && amount > 0` rejects it. The fix mirrors #519's
+// `corrupt cost:` sanitization.
+
+describe('employee raise — invalid amount override sanitization (#534)', () => {
+  function hireTestEmployee(ctx: MiningContext) {
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1));
+    return employee;
+  }
+
+  it('refuses amount:notanumber, leaving salary and cash untouched', () => {
+    const ctx = makeCtx(100_000);
+    const emp = hireTestEmployee(ctx);
+    const salaryBefore = emp.salary;
+    const cashBefore = ctx.state!.cash;
+    const result = employeeCommand(ctx, ['raise', String(emp.id)], { amount: 'notanumber' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: employee raise <id> amount:500');
+    expect(emp.salary).toBe(salaryBefore);
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('refuses amount:Infinity — Infinity > 0 passes the naive amount <= 0 check', () => {
+    const ctx = makeCtx(100_000);
+    const emp = hireTestEmployee(ctx);
+    const salaryBefore = emp.salary;
+    const cashBefore = ctx.state!.cash;
+    const result = employeeCommand(ctx, ['raise', String(emp.id)], { amount: 'Infinity' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: employee raise <id> amount:500');
+    expect(emp.salary).toBe(salaryBefore);
+    expect(ctx.state!.cash).toBe(cashBefore);
+  });
+
+  it('refuses amount:NaN (literal string), same path as notanumber', () => {
+    const ctx = makeCtx(100_000);
+    const emp = hireTestEmployee(ctx);
+    const salaryBefore = emp.salary;
+    const result = employeeCommand(ctx, ['raise', String(emp.id)], { amount: 'NaN' });
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: employee raise <id> amount:500');
+    expect(emp.salary).toBe(salaryBefore);
+  });
+
+  it('rejects amount:-5 (boundary, already correct pre-fix — must stay correct)', () => {
+    const ctx = makeCtx(100_000);
+    const emp = hireTestEmployee(ctx);
+    const salaryBefore = emp.salary;
+    const result = employeeCommand(ctx, ['raise', String(emp.id)], { amount: '-5' });
+    expect(result.success).toBe(false);
+    expect(emp.salary).toBe(salaryBefore);
+  });
+
+  it('rejects amount:0 (boundary, already correct pre-fix — must stay correct)', () => {
+    const ctx = makeCtx(100_000);
+    const emp = hireTestEmployee(ctx);
+    const salaryBefore = emp.salary;
+    const result = employeeCommand(ctx, ['raise', String(emp.id)], { amount: '0' });
+    expect(result.success).toBe(false);
+    expect(emp.salary).toBe(salaryBefore);
+  });
+
+  it('accepts amount:500 on a valid id — salary increases by exactly 500 and stays finite', () => {
+    const ctx = makeCtx(100_000);
+    const emp = hireTestEmployee(ctx);
+    const salaryBefore = emp.salary;
+    const result = employeeCommand(ctx, ['raise', String(emp.id)], { amount: '500' });
+    expect(result.success).toBe(true);
+    expect(emp.salary).toBe(salaryBefore + 500);
+    expect(Number.isFinite(emp.salary)).toBe(true);
+  });
+
+  it('does not permanently disable funds guards after a rejected non-numeric raise', () => {
+    const ctx = makeCtx(0);
+    const emp = hireTestEmployee(ctx);
+    employeeCommand(ctx, ['raise', String(emp.id)], { amount: 'notanumber' });
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+    const buildResult = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(buildResult.success).toBe(false);
+    expect(buildResult.output).toContain('Insufficient funds');
+  });
+});
+
+// ── new_game cash: — invalid cash override sanitization (#534) ──
+//
+// `new_game cash:<n>` gates the override with `named['cash'] ? {...} : {}` —
+// a truthy *string* still applies even when `parseInt` on it is `NaN`, so
+// `new_game cash:notanumber` spreads `{ startingCash: NaN }` into
+// `createGame`, and `NaN ?? STARTING_CASH` keeps the `NaN` (nullish
+// coalescing only replaces `null`/`undefined`) — `state.cash` starts the
+// session poisoned. Same root cause and fix shape as #519/#533's `corrupt
+// cost:` and this file's `employee raise amount:` sanitization above.
+
+describe('new_game cash: — invalid cash override sanitization (#534)', () => {
+  function freshCtx(): MiningContext {
+    return { state: null, grid: null, emitter: new EventEmitter() };
+  }
+
+  it('falls back to STARTING_CASH for cash:notanumber', () => {
+    const ctx = freshCtx();
+    const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', cash: 'notanumber' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(STARTING_CASH);
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+  });
+
+  it('falls back to STARTING_CASH for cash:Infinity — parseInt("Infinity", 10) is NaN, same path as notanumber', () => {
+    const ctx = freshCtx();
+    const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', cash: 'Infinity' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(STARTING_CASH);
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+  });
+
+  it('honors a legitimate cash:50000 override exactly (must not regress)', () => {
+    const ctx = freshCtx();
+    const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', cash: '50000' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(50000);
+  });
+
+  it('honors cash:0 as a legitimate override, distinct from absent (must not regress)', () => {
+    const ctx = freshCtx();
+    const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', cash: '0' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(0);
+  });
+
+  it('falls back to STARTING_CASH when cash: is present but empty (pre-existing behavior, must not regress)', () => {
+    const ctx = freshCtx();
+    const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', cash: '' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(STARTING_CASH);
   });
 });
