@@ -9,12 +9,14 @@
 //   building_destroyer → low yellow box + front blade (flat box)
 //   rock_fragmenter   → yellow box body + crusher head
 //
-// Vehicles move smoothly to their target position via lerp each frame.
+// Vehicles move smoothly to their target position via a duration-aware
+// tween each frame (#520 — see MovementInterpolation.ts).
 
 import * as THREE from 'three';
 import type { Vehicle, VehicleRole, VehicleTier, VehicleOperationalState } from '../core/entities/Vehicle.js';
 import { waitingQueueOffset, waitingRenderPosition } from './VehicleWaitingQueue.js';
 import { tagPickable } from './Pickable.js';
+import { createTween, stepTween, type MovementTween } from './MovementInterpolation.js';
 
 // ---------- Colors ----------
 const YELLOW = 0xf5c518;   // Caterpillar yellow
@@ -142,15 +144,11 @@ const VEHICLE_BUILDERS: Record<VehicleRole, GroupBuilder> = {
   },
 };
 
-// ---------- Movement lerp speed ----------
-// Fraction of remaining distance covered per frame (smooth follow)
-const MOVE_LERP = 0.08;
-
 // ---------- Main class ----------
 
 export class VehicleMesh {
   private readonly scene: THREE.Scene;
-  private readonly vehicles = new Map<number, { group: THREE.Group; vehicle: Vehicle }>();
+  private readonly vehicles = new Map<number, { group: THREE.Group; vehicle: Vehicle; tween: MovementTween }>();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -167,23 +165,25 @@ export class VehicleMesh {
     group.position.set(renderX, surfaceY, renderZ);
     tagPickable(group, 'vehicle', vehicle.id);
     this.scene.add(group);
-    this.vehicles.set(vehicle.id, { group, vehicle });
+    this.vehicles.set(vehicle.id, { group, vehicle, tween: createTween(renderX, renderZ) });
   }
 
   /**
    * Update vehicle positions. Call every frame.
-   * Lerps toward the target position to give smooth movement.
+   * Eases toward the target position (duration-aware tween, #520) to give
+   * smooth movement.
    */
-  update(vehicles: Vehicle[]): void {
+  update(vehicles: Vehicle[], dt: number): void {
     for (const v of vehicles) {
       const entry = this.vehicles.get(v.id);
       if (!entry) continue;
       // Update stored reference
       entry.vehicle = v;
-      // Lerp toward target (+ queue offset for fused 'waiting' vehicles, #411 round 2)
+      // Ease toward target (+ queue offset for fused 'waiting' vehicles, #411 round 2)
       const [targetX, targetZ] = this.waitingRenderPosition(v, vehicles);
-      entry.group.position.x += (targetX - entry.group.position.x) * MOVE_LERP;
-      entry.group.position.z += (targetZ - entry.group.position.z) * MOVE_LERP;
+      const eased = stepTween(entry.tween, entry.group.position.x, entry.group.position.z, targetX, targetZ, dt);
+      entry.group.position.x = eased.x;
+      entry.group.position.z = eased.z;
       applyStateIndicator(entry.group, v.state);
     }
   }
@@ -210,6 +210,7 @@ export class VehicleMesh {
     const entry = this.vehicles.get(vehicleId);
     if (entry) {
       entry.group.position.set(x, y, z);
+      entry.tween = createTween(x, z);
     }
   }
 
@@ -218,9 +219,11 @@ export class VehicleMesh {
    * to the eased tween (#520 — GameRenderer.syncFromContext() should no
    * longer hard-snap x/z every sync).
    */
-  setSurfaceY(_vehicleId: number, _y: number): void {
-    // TODO: implement
-    throw new Error('not implemented');
+  setSurfaceY(vehicleId: number, y: number): void {
+    const entry = this.vehicles.get(vehicleId);
+    if (entry) {
+      entry.group.position.y = y;
+    }
   }
 
   removeVehicle(vehicleId: number): void {

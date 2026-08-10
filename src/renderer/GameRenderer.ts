@@ -177,8 +177,7 @@ export class GameRenderer {
       for (const v of ctx.state.vehicles.vehicles) {
         if (this.renderedVehicleIds.has(v.id)) {
           const surfaceY = this.getTerrainSurfaceY(v.x, v.z);
-          const [renderX, renderZ] = this.vehicles.waitingRenderPosition(v, ctx.state.vehicles.vehicles);
-          this.vehicles.snapPosition(v.id, renderX, surfaceY, renderZ);
+          this.vehicles.setSurfaceY(v.id, surfaceY);
         }
       }
     }
@@ -188,7 +187,7 @@ export class GameRenderer {
       for (const e of ctx.state.employees.employees) {
         if (this.renderedEmployeeIds.has(e.id)) {
           const surfaceY = this.getTerrainSurfaceY(e.x, e.z);
-          this.characters.snapPosition(e.id, e.x, surfaceY, e.z);
+          this.characters.setSurfaceY(e.id, surfaceY);
         }
       }
     }
@@ -314,7 +313,7 @@ export class GameRenderer {
     }
 
     if (this.vehicles && this.lastState) {
-      this.vehicles.update(this.lastState.vehicles.vehicles);
+      this.vehicles.update(this.lastState.vehicles.vehicles, dt);
     }
 
     if (this.ghosts) {
