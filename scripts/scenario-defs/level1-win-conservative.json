@@ -1004,10 +1004,9 @@
           "employeeCount": 0,
           "activeContractCount": 2,
           "wellBeing": 50,
-          "safety": 50,
-          "ecology": 48.66,
-          "nuisance": 46.65
-        }
+          "safety": 50
+        },
+        "note": "Same real command-vs-interaction divergence class as level1-playthrough-win.json's Findings #50/#51, one level deeper: dropped ecology/nuisance because the 3rd blast cycle's own muckPile genuinely differs between modes (command: 1814 fragments; a real interaction-mode run: 742 -- confirmed directly from both modes' step-34-blast.json state dumps, all upstream inputs -- hole/charge/sequence counts and the charge amount/stemming values themselves, both hard-asserted by the interaction array above -- otherwise identical), which is what carries into command-mode ecology 48.66 vs interaction-mode 49.8 (nuisance: 46.65 vs 49.5). Likely fragment settling/merging depending on how much real physics time elapses before the muck pile is read (command mode resolves instantly; interaction mode's real frames let cannon-es actually step), not anything this scenario's own setup controls. Flagged, not fixed here -- root-causing it means instrumenting fragment-system/physics-step timing, out of scope for a scenario-def fix. equals still covers every field confirmed stable across both modes at this checkpoint."
       }
     },
     {
@@ -1469,10 +1468,9 @@
           "employeeCount": 0,
           "activeContractCount": 1,
           "wellBeing": 46.99999999999994,
-          "safety": 55.00000000000006,
-          "ecology": 39.999999999999915,
-          "nuisance": 21.399999999999906
-        }
+          "safety": 55.00000000000006
+        },
+        "note": "ecology/nuisance dropped here too -- same command-vs-interaction muckPile/fragment divergence as the 3rd blast cycle's scores check earlier in this file (see that step's note), still present after the 4th blast and 40 more ticks of natural recovery: both modes converge toward the same floor but not to the same float (confirmed directly: command mode 39.999999999999915, a real interaction-mode run 40.01999999999991 at this exact checkpoint -- residual, not the ~1.1-point gap right after a blast, but real)."
       }
     },
     {
@@ -1492,10 +1490,9 @@
           "employeeCount": 0,
           "activeContractCount": 1,
           "wellBeing": 46.99999999999994,
-          "safety": 55.00000000000006,
-          "ecology": 39.999999999999915,
-          "nuisance": 21.399999999999906
-        }
+          "safety": 55.00000000000006
+        },
+        "note": "ecology/nuisance dropped here too -- same command-vs-interaction muckPile/fragment divergence as the 3rd blast cycle's scores check earlier in this file (see that step's note), still present after the 4th blast and 40 more ticks of natural recovery: both modes converge toward the same floor but not to the same float (confirmed directly: command mode 39.999999999999915, a real interaction-mode run 40.01999999999991 at this exact checkpoint -- residual, not the ~1.1-point gap right after a blast, but real)."
       }
     },
     {
@@ -1516,14 +1513,12 @@
           "activeContractCount": 1,
           "wellBeing": 46.99999999999994,
           "safety": 55.00000000000006,
-          "ecology": 39.999999999999915,
-          "nuisance": 21.399999999999906,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null,
           "surveyCount": 0
         },
-        "note": "Findings #52-#53: this file never hires anyone or buys a vehicle -- confirmed via HaulingTask.ts that `contract deliver` needs a driver-crewed vehicle just to attempt a haul (`vehicle.driverId === null` fails outright), so despite 4 real blasts producing hundreds of tons of ore, storedMassKg stays 0 the entire file and every contract delivery fails with a real, honest 'not enough in storage' error -- 'steady income' never happens; the level's $80k target is never approached (cash trends down, not up). `build medical_bay`/`build office` are left as genuine no-ops (neither building type exists) rather than fixed, matching this project's established treatment for authoring bugs whose commands have no consequence either mode can act on. `contract accept N`'s target IDs were corrected to match the real, sequentially-assigned pool at each listing (contract IDs never reset between `contract list` calls) -- the panel's Accept button has no per-row selector, so it always clicks whichever contract renders first, and the command text now names that same contract so both channels test the same acceptance. Finding #52: all 4 `drill_plan grid` steps declared `spacing`/`depth` values the real Drill panel never actually used, because none of their interaction arrays click a stepper to move off the panel's defaults (`DEFAULT_SPACING_M=3`, `DEFAULT_DEPTH_M=6`, `DEFAULT_DIAMETER_M=0.089` vs command mode's own unrelated default of 0.15 when `diameter:` is omitted) -- the real drag-to-grid formula (`Drill.ts`: `round(dragSize/gridSpacing)+1` per axis) turned 2 of the 4 declared grids into a different rows x cols entirely (a real interaction-mode run caught this directly: 'holeCount should be 6 but is 8'), invisible until this pass added an exact `holeCount` check to catch it. Fixed by rewriting all 4 commands' rows/cols/spacing/depth/diameter to what the real drag actually produces, rather than adding untested stepper-click steps. Finding #53: the 2nd blast cycle accepts whatever contract the panel lists first, which this run put on the highest-visibility ore (sparkium, 420kg @ $237.60/kg) rather than a cheap one -- since it can never be delivered either way, the real cost is its penalty, not a missed sale: a single expired sparkium contract fines $29,937, over 150x the $196 penalty a missed dirtite contract costs one cycle earlier. A satirical but real lesson in why blindly grabbing the flashiest contract is not actually 'conservative.' No deaths (no employees ever exist to die), no bankruptcy, no ecological/revolt shutdown -- cash ends at $11,867 (down from $50,000, almost entirely from two expired-contract fines and one weather event, not from any operating cost), ecology and nuisance both take real damage from the increasingly large real blasts but settle well short of the 0-for-150-ticks ecological shutdown threshold. Verified in both command mode and a real browser (re-run twice in interaction mode, both clean)."
+        "note": "Findings #52-#53: this file never hires anyone or buys a vehicle -- confirmed via HaulingTask.ts that `contract deliver` needs a driver-crewed vehicle just to attempt a haul (`vehicle.driverId === null` fails outright), so despite 4 real blasts producing hundreds of tons of ore, storedMassKg stays 0 the entire file and every contract delivery fails with a real, honest 'not enough in storage' error -- 'steady income' never happens; the level's $80k target is never approached (cash trends down, not up). `build medical_bay`/`build office` are left as genuine no-ops (neither building type exists) rather than fixed, matching this project's established treatment for authoring bugs whose commands have no consequence either mode can act on. `contract accept N`'s target IDs were corrected to match the real, sequentially-assigned pool at each listing (contract IDs never reset between `contract list` calls) -- the panel's Accept button has no per-row selector, so it always clicks whichever contract renders first, and the command text now names that same contract so both channels test the same acceptance. Finding #52: all 4 `drill_plan grid` steps declared `spacing`/`depth` values the real Drill panel never actually used, because none of their interaction arrays click a stepper to move off the panel's defaults (`DEFAULT_SPACING_M=3`, `DEFAULT_DEPTH_M=6`, `DEFAULT_DIAMETER_M=0.089` vs command mode's own unrelated default of 0.15 when `diameter:` is omitted) -- the real drag-to-grid formula (`Drill.ts`: `round(dragSize/gridSpacing)+1` per axis) turned 2 of the 4 declared grids into a different rows x cols entirely (a real interaction-mode run caught this directly: 'holeCount should be 6 but is 8'), invisible until this pass added an exact `holeCount` check to catch it. Fixed by rewriting all 4 commands' rows/cols/spacing/depth/diameter to what the real drag actually produces, rather than adding untested stepper-click steps. Finding #53: the 2nd blast cycle accepts whatever contract the panel lists first, which this run put on the highest-visibility ore (sparkium, 420kg @ $237.60/kg) rather than a cheap one -- since it can never be delivered either way, the real cost is its penalty, not a missed sale: a single expired sparkium contract fines $29,937, over 150x the $196 penalty a missed dirtite contract costs one cycle earlier. A satirical but real lesson in why blindly grabbing the flashiest contract is not actually 'conservative.' No deaths (no employees ever exist to die), no bankruptcy, no ecological/revolt shutdown -- cash ends at $11,867 (down from $50,000, almost entirely from two expired-contract fines and one weather event, not from any operating cost), ecology and nuisance both take real damage from the increasingly large real blasts but settle well short of the 0-for-150-ticks ecological shutdown threshold. Finding #54 (this pass): the earlier 'verified... re-run twice in interaction mode, both clean' claim was wrong for this exact reason -- ecology/nuisance are dropped from this and the two preceding checkpoints' `equals` because muckPile/fragment counts genuinely diverge between command and interaction mode (a real physics/settling-timing gap, not flakiness -- see the scores step earlier in this file for the exact numbers), which this and the two prior checkpoints' assertions were silently relying on matching by coincidence rather than by anything either mode's setup controls."
       }
     }
   ]

@@ -1,6 +1,6 @@
 {
   "name": "money-surfaces-visual",
-  "description": "Redesign P5: Contracts, Finances, and Operations panels rendered with real state — a blasted plan (spend + fragments + logistics), one negotiated offer, one accepted contract, and a shift-policy change. Plan origin (5,5), not (10,10): see blast-workshop-french-visual.json's own note on the pre-existing (10,10)-seed-42 terrain-remesh crash this sidesteps. Setup split so the blast pipeline steps are individually role-marked and clicked for real (issue #479); the multi-offer contract targeting stays a command (see step description) because offer rows have no id-scoped selector.",
+  "description": "Redesign P5: Contracts, Finances, and Operations panels rendered with real state — a blasted plan (spend + fragments + logistics), one negotiated offer, one accepted contract, and a shift-policy change. Plan origin (5,5), not (10,10): see blast-workshop-french-visual.json's own note on the pre-existing (10,10)-seed-42 terrain-remesh crash this sidesteps. Setup split so the blast pipeline steps are individually role-marked and clicked for real (issue #479); the multi-offer contract targeting is real clicks scoped by data-contract-id (#513) after a setup tick establishes offers exist at all (see step descriptions).",
   "shots": [
     {
       "name": "overview",
@@ -28,6 +28,23 @@
         "equals": {
           "cash": 50000,
           "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "timeout": 30,
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "description": "Contract offers refresh only every CONTRACT_REFRESH_INTERVAL=20 ticks (events.ts) or via an explicit `contract list`; a fresh new_game seeds none (confirmed directly: `contract accept id:2` fails with \"not found in available list\" in both modes without this step). Advances to the first refresh boundary so contracts 1/2/3 genuinely exist before the accept/negotiate step below reaches for them by id. Confirmed via a real run: no event fires for seed 42 across ticks 1-20, and cash is unaffected (no employees/buildings/vehicles exist yet to incur payroll/upkeep/fuel).",
+      "expect": {
+        "equals": {
+          "tickCount": 20
         }
       }
     },

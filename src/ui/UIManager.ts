@@ -388,7 +388,11 @@ export class UIManager {
     // tied to blastUI's own, so gating on it here would miss real transitions.
     this.preflightModal.update(state, weather);
     this.blastReportModal.update(state);
-    if (this.contractsPanel.visible) this.contractsPanel.update(state);
+    // Unconditional like settingsPanel below, same reason: contracts can
+    // change (a blast finishing, a delivery landing) while the panel is
+    // closed, and the player expects current offers the instant they open
+    // it, not whatever rendered on the last frame it happened to be visible.
+    this.contractsPanel.update(state);
     if (this.financesPanel.visible) this.financesPanel.update(state);
     if (this.operationsPanel.visible) this.operationsPanel.update(state);
     if (this.buildMenu.visible) this.buildMenu.update(state);

@@ -221,6 +221,10 @@
       "interaction": [
         {
           "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
@@ -229,7 +233,8 @@
         "equals": {
           "sequencedCount": 9
         }
-      }
+      },
+      "description": "role: player: explicit [data-step=\"3\"] click before Sequence controls -- relying on the panel's own autoAdvance to have already landed there is unreliable in a real interaction-mode run (element present but zero-size, i.e. a hidden inactive tab), same finding as level1-win-efficient.json/level1-playthrough-win.json/tutorial-playthrough.json."
     },
     {
       "command": "blast",
