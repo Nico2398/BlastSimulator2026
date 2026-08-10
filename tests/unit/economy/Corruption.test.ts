@@ -7,6 +7,7 @@ import {
   isMafiaUnlocked,
   getSuccessRate,
   MAFIA_THRESHOLD,
+  TARGET_COSTS,
 } from '../../../src/core/economy/Corruption.js';
 
 describe('Corruption system', () => {
@@ -78,5 +79,34 @@ describe('Corruption system', () => {
       }
     }
     expect.unreachable('Mafia never unlocked');
+  });
+});
+
+// ── customCost sanitization (#519) ──
+//
+// `customCost` is caller-supplied (console `corrupt` command's `cost:` arg).
+// `cost = customCost ?? TARGET_COSTS[target]` only rejects null/undefined —
+// a negative number or NaN both pass straight through, letting a negative
+// cost invert `state.cash -= result.cost` into a cash increase and a NaN
+// cost poison state.cash for the rest of the session. The fix mirrors
+// Logistics.ts's `consumeStoredOre` validation: only accept customCost when
+// `Number.isFinite(customCost) && customCost >= 0`.
+describe('Corruption system — customCost sanitization (#519)', () => {
+  it('falls back to TARGET_COSTS[target] for a negative customCost', () => {
+    const state = createCorruptionState();
+    const result = attemptCorruption(state, 'inspector', 1, new Random(42), -5000);
+    expect(result.cost).toBe(TARGET_COSTS.inspector);
+  });
+
+  it('falls back to TARGET_COSTS[target] for a NaN customCost', () => {
+    const state = createCorruptionState();
+    const result = attemptCorruption(state, 'inspector', 1, new Random(42), NaN);
+    expect(result.cost).toBe(TARGET_COSTS.inspector);
+  });
+
+  it('accepts customCost of 0 as a valid override (boundary)', () => {
+    const state = createCorruptionState();
+    const result = attemptCorruption(state, 'inspector', 1, new Random(42), 0);
+    expect(result.cost).toBe(0);
   });
 });
