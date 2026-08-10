@@ -10,3 +10,16 @@ export function requireGame(ctx: GameContext): CommandResult | null {
   if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
   return null;
 }
+
+/**
+ * Sanitizes an already-parsed numeric console-arg override: keeps it only if
+ * finite (rejects NaN and ±Infinity) and, when `opts.min` is given, only if
+ * `>= opts.min` (inclusive). Returns undefined otherwise so the caller falls
+ * back to its own default. Takes the parsed number, not the raw string —
+ * callers keep their own `parseInt`/`parseFloat` choice.
+ */
+export function sanitizeFiniteOverride(parsed: number, opts?: { min?: number }): number | undefined {
+  void parsed;
+  void opts;
+  throw new Error('not implemented');
+}
