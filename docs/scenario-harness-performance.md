@@ -13,21 +13,32 @@ needs a real CI run to confirm, not reproducible in this sandbox.
 
 | | Before | After | Change |
 |---|---|---|---|
-| Interaction suite, full 127 scenarios | 3 367 s (56 min) | **2 362 s (39 min)** | **−30%** |
+| Interaction suite, full 127 scenarios | 3 367 s (56 min) | **2 347–2 362 s (~39 min)** | **−30%** |
 | Command suite, full 127 scenarios | 70.2 s | 54–56 s | −22% (side effect of optimisation 3) |
-| Pass/fail split | 121 / 6 | **121 / 6 — identical scenarios** | Zero regressions |
+| Pass/fail split | 121 / 6 | **127 / 0** | Zero regressions; the 6 pre-existing failures are separately fixed on `main` (#532) |
 
 Verified via `npm run typecheck`, the full unit suite (299 files / 8 662
-tests), `npm run scenarios` (127/127), and two independent full
-`run-all-scenarios.ts --mode interaction` runs — one immediately after
-implementation, one after this document's own numbers were drafted — both
-landing on the same 121-passed/6-failed split, and the same 6 scenario names
+tests), `npm run scenarios` (127/127), and three independent full
+`run-all-scenarios.ts --mode interaction` runs: the first two (immediately
+after implementation, and again once this document's numbers were drafted)
+landed on an identical 121-passed/6-failed split — the same 6 scenario names
 this document already listed as pre-existing failures before any of this
-work started (see the last section). Sharding was spot-checked (round-robin
-partition math, one shard run in command mode) but not run in CI, since a
-CI-only wall-clock claim can't be reproduced in a sandbox — the number in
-row 4 of the ranked table stands as a projection, not a measurement, until
-a real four-way `full-ci` run confirms it.
+work started (kept below for the record). Between the second and third run,
+`main` merged an independent fix for exactly those 6 (#532) plus an
+unrelated rename (`playtest-driver.ts` → `interaction-driver.ts`, #516) that
+directly touched the files this work also modified; merging `main` into this
+branch needed manual conflict resolution in three files (all successfully
+reconciled — the rename's side and this work's side touched the same
+functions for unrelated reasons). The third run, on the merged result, is
+**127/127 passed** at 2 347 s — confirming both that `main`'s fix holds
+together with these optimisations and that the merge itself introduced
+nothing new.
+
+Sharding was spot-checked (round-robin partition math, one shard run in
+command mode) but not run in CI, since a CI-only wall-clock claim can't be
+reproduced in a sandbox — the number in row 4 of the ranked table stands as
+a projection, not a measurement, until a real four-way `full-ci` run
+confirms it.
 
 ### Tab reuse (optimisation 1) — implemented, reverted
 
@@ -230,10 +241,10 @@ min** if the projection in row 4 holds — not yet confirmed by a real run.
 - **The simulation itself** — `tick 10` is 5.4 ms in the browser. Ticking is not
   where the time is, in either mode.
 
-## Unrelated finding: 6 scenarios fail in interaction mode on this runner
+## Unrelated finding: 6 scenarios fail in interaction mode on this runner — fixed on `main`, #532
 
-The profiling run reproduced these (each aborts its scenario at the failing
-step, so a fully green suite would run slightly longer than 56 min):
+The profiling run reproduced these (each aborted its scenario at the failing
+step, so a fully green suite ran slightly longer than 56 min at the time):
 
 | Scenario | Step | Failure |
 |---|---|---|
@@ -244,4 +255,11 @@ step, so a fully green suite would run slightly longer than 56 min):
 | `money-surfaces-visual` | 5 | `#bs-contract-panel [data-contract-id="1"] [data-action="negotiate"]` never appeared (10 s) |
 | `survey-then-blast-playthrough` | 45 | `#bs-contract-panel [data-contract-id="1"] .bs-contract-deliver` not in the DOM, so `blocked` proves nothing — stale selector |
 
-Command mode is 127/127 green, which is the point of the interaction channel.
+Command mode was 127/127 green throughout, which is the point of the
+interaction channel — it caught three distinct real bugs (`BlastWorkshop`
+autoAdvance not switching tabs before a click; `ContractsPanel` only
+refreshing while visible; a stale hardcoded contract id) that command mode's
+console-only path never exercises. All three, and the two scenario-def
+corrections they needed, landed on `main` independently (#532) while this
+branch was in flight. Merging `main` in and re-running the full interaction
+suite confirms it: **127/127 passed**, per the "Implemented" section above.
