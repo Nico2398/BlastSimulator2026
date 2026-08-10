@@ -161,12 +161,6 @@ export function isObservationCommand(command: string): boolean {
  * setup a player never does. Kept as an explicit list for the same reason
  * {@link OBSERVATION_COMMANDS} is: adding an entry is a visible edit here,
  * not an accident of what a step happened to call.
- *
- * The last four (`drill_plan grid`, `sequence auto`, `blast`, `charge hole`)
- * are a documented temporary exception: `sandbox-mode.json` steps 2-5 are
- * blocked on a separate, real, undiagnosed rendering bug (`#bs-toolbar` is
- * zero-sized after a console `sandbox start` bootstrap in interaction mode).
- * These stay commands until that bug is fixed, not permanently.
  */
 export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'employee assign_skill',
@@ -174,10 +168,6 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'weather set',
   'weather',
   'event fire',
-  'drill_plan grid',
-  'sequence auto',
-  'blast',
-  'charge hole',
   // Broader than the others on purpose, for two independent reasons:
   //  1. `corrupt target:X cost:Y` — the scenario overrides the bribe's cost
   //     to hit an exact scripted cash delta; ShadyPanel's real "Make the
