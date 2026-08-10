@@ -62,6 +62,8 @@ const DEFAULT_TIMEOUT_MS = 6000;
 const ENTITY_SETTLE_EPSILON = 0.01;
 const ENTITY_SETTLE_INTERVAL_MS = 25;
 const ENTITY_SETTLE_MAX_POLLS = 40;
+/** Re-aims allowed when the mesh moves while the camera is being aimed at it. */
+const ENTITY_AIM_ATTEMPTS = 3;
 
 /**
  * Wait for the render loop's rAF callback to run twice. That callback drives
@@ -327,13 +329,40 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
         if (settled) break;
       }
 
-      await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
-        (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
-        // Interaction mode suspends the draw loop (#475) — force a frame so
-        // the new camera position and the scene's entity transforms are
-        // current before the click below raycasts.
-        (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
-      }, { x: pos.x, z: pos.z, distance: action.distance ?? 15 });
+      const aimAt = (at: { x: number; z: number }) =>
+        page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
+          (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
+          // Interaction mode suspends the draw loop (#475) — force a frame so
+          // the new camera position and the scene's entity transforms are
+          // current before the click below raycasts.
+          (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+        }, { x: at.x, z: at.z, distance: action.distance ?? 15 });
+
+      // Settling above samples over time, which a throttled rAF can defeat:
+      // a background page in batch mode advances the tween in bursts, so two
+      // reads an interval apart can both land in a still gap and read as
+      // settled while the mesh is still short of its target. The forced frame
+      // is also the most expensive step here (a real draw, seconds without a
+      // GPU) and frames land during it. So confirm the mesh is still where we
+      // aimed, and re-aim at where it actually got to if not — never click a
+      // point it has already left.
+      let reAims = 0;
+      for (;;) {
+        await aimAt(pos);
+        const after = await readPos();
+        if (!after) break;
+        if (Math.hypot(after.x - pos.x, after.z - pos.z) < ENTITY_SETTLE_EPSILON) break;
+        pos = after;
+        if (++reAims >= ENTITY_AIM_ATTEMPTS) {
+          await aimAt(pos);
+          break;
+        }
+      }
+      if (reAims > 0) {
+        // Surfaces the glide in the run log, so a future miss is diagnosable
+        // from CI output instead of needing a local repro that may not exist.
+        console.log(`  clickEntity: ${action.kind} #${action.id} still gliding — re-aimed ${reAims}x`);
+      }
       const viewport = page.viewport();
       await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);
       break;
