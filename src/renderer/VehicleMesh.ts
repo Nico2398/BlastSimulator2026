@@ -205,7 +205,7 @@ export class VehicleMesh {
     return waitingRenderPosition(vehicle, pool);
   }
 
-  /** Snap a vehicle directly to its world position (no lerp — use after teleport or initial placement). */
+  /** Snap a vehicle directly to its world position (no tween — use after teleport or initial placement). */
   snapPosition(vehicleId: number, x: number, y: number, z: number): void {
     const entry = this.vehicles.get(vehicleId);
     if (entry) {

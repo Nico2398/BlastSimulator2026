@@ -17,10 +17,10 @@ import { WAITING_QUEUE_SLOT_OFFSETS } from '../core/config/balance.js';
  * vehicles sharing that target, so it stays stable frame to frame.
  *
  * Public: GameRenderer's terrain-surface-height correction (syncFromContext)
- * calls snapPosition with x/z straight from GameState every sync, which
- * would otherwise stomp this offset back to the fused raw position between
- * update()'s per-frame lerps — GameRenderer must fold this same offset into
- * the x/z it passes to snapPosition.
+ * only corrects `y` (setSurfaceY) and never touches x/z (#520) — this offset
+ * is applied every frame inside VehicleMesh's own update() call, as the
+ * target of its per-frame tween, so it survives syncs without any snap-time
+ * folding.
  *
  * Round 3 (#411 issue A): an `idle` vehicle already sitting at that exact
  * target cell (x/z equal to the target, e.g. it arrived and stopped) also

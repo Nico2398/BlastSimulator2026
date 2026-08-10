@@ -167,12 +167,11 @@ export class GameRenderer {
       (x, z) => this.getTerrainSurfaceY(x, z),
     );
 
-    // Place vehicles at terrain surface height (not buried at y=0).
-    // Also fold in the waiting-queue render offset (#411 round 2, anchored to
-    // the shared target point since round 4) — this snap runs on every sync
-    // (not just once per frame like update()'s lerp), so without it every
-    // sync would stomp fused 'waiting' vehicles back to their raw, near-
-    // identical GameState x/z.
+    // Place vehicles at terrain surface height (not buried at y=0). This
+    // corrects only the instant terrain-surface `y` value via setSurfaceY();
+    // x/z motion (including the waiting-queue render offset, #411) is left
+    // entirely to the per-frame tween inside VehicleMesh.update() (#520), so
+    // this sync never stomps a mid-glide or fused 'waiting' vehicle's x/z.
     if (this.vehicles && this.lastGrid) {
       for (const v of ctx.state.vehicles.vehicles) {
         if (this.renderedVehicleIds.has(v.id)) {

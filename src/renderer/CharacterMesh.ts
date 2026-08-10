@@ -120,7 +120,7 @@ export class CharacterMesh {
 
   /**
    * Snap a character to an exact position (e.g. after terrain rebuild repositions surface).
-   * Unlike the lerp-based update(), this sets the position immediately.
+   * Unlike the tween-based update(), this sets the position immediately.
    */
   snapPosition(id: number, x: number, y: number, z: number): void {
     const entry = this.characters.get(id);
