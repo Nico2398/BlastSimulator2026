@@ -34,15 +34,15 @@ export function setPolicyCommand(
   // #539: guards below must reject non-finite parseInt results (NaN and Infinity)
   if (named['hunger'] !== undefined) {
     const v = parseInt(named['hunger'], 10);
-    if (!isNaN(v)) state.sitePolicy.hungerRestThreshold = v;
+    if (Number.isFinite(v)) state.sitePolicy.hungerRestThreshold = v;
   }
   if (named['fatigue'] !== undefined) {
     const v = parseInt(named['fatigue'], 10);
-    if (!isNaN(v)) state.sitePolicy.fatigueRestThreshold = v;
+    if (Number.isFinite(v)) state.sitePolicy.fatigueRestThreshold = v;
   }
   if (named['social'] !== undefined) {
     const v = parseInt(named['social'], 10);
-    if (!isNaN(v)) state.sitePolicy.socialBreakThreshold = v;
+    if (Number.isFinite(v)) state.sitePolicy.socialBreakThreshold = v;
   }
 
   // Bumped even when every value is unchanged: applying the policy already in
