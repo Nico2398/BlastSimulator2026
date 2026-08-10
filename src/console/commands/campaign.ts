@@ -111,7 +111,7 @@ export function campaignStartCommand(
   // new_game's, and deliberately applied to both the flat field and the
   // ledger so they cannot disagree (Finding #36's class).
   const cashOverride = named['cash'] !== undefined ? parseInt(named['cash'], 10) : NaN;
-  if (!isNaN(cashOverride)) {
+  if (Number.isFinite(cashOverride)) {
     ctx.state.cash = cashOverride;
     ctx.state.finances.cash = cashOverride;
   }
