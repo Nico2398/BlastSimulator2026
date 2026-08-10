@@ -83,11 +83,14 @@ The game's own simulation is not the cost — turning ticking off changes the fr
 
 | Run | Where |
 |-----|-------|
-| `typecheck`, `test`, `scenarios` (command mode), `build` | Either. CI runs all four on every push and PR. |
+| `typecheck`, `test`, `scenarios` (command mode) | Either. CI runs all three on every push and PR. |
 | `screenshot`, one named scenario in interaction mode | Your session — this is the visual channel's working loop. |
+| `build` (production bundle) | CI job `Production build` on push/schedule/dispatch, or PRs labeled `build-check` or `full-ci`. |
 | All scenarios in interaction mode | CI job `Scenarios (interaction mode)` (label the PR `full-ci`). |
 
 The interaction-mode job is gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. It adds ~30 minutes to the merge path, so the label goes on a PR whose change an interaction-mode scenario actually drives, or which touches machinery every scenario runs through — not on every diff that a player can see. `agentic-pipeline-pr-management` holds the test and the cost.
+
+The `Production build` job is gated behind `build-check` (or `full-ci`, which already implies it) because it doesn't need proving on every diff — `typecheck` already catches what would break the bundle far more often than a Vite-specific build failure does. Apply `build-check` when a change touches build config (`vite.config.ts`, `tsconfig*.json`, `package.json`'s dependencies) or anything about bundling/chunking itself.
 
 Push, then read the CI job — its result *is* the channel's result, and its artifacts carry the FAIL screenshots. Locally, run one named definition you are actively debugging, never the whole suite.
 
