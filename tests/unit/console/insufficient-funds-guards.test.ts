@@ -439,6 +439,88 @@ describe('corrupt — insufficient funds guard', () => {
   });
 });
 
+// ── corrupt — invalid cost override sanitization (#519) ──
+//
+// `corrupt target:<t> cost:<n>` lets a player override the default bribe
+// cost. Two unsanitized inputs break that: a negative cost passes the funds
+// guard (which only rejects cash < cost) and then *increases* cash via
+// `state.cash -= result.cost`; a non-numeric cost produces NaN, which
+// `?? TARGET_COSTS[target]` does not catch (nullish coalescing only replaces
+// null/undefined), poisoning state.cash with NaN for the rest of the session
+// — every later `cash < X` guard is false because any NaN comparison is
+// false. The fix sanitizes with `Number.isFinite(cost) && cost >= 0`,
+// falling back to TARGET_COSTS[target] silently otherwise (same convention
+// as `set_policy` and `new_game`'s optional numeric overrides).
+
+describe('corrupt — invalid cost override sanitization (#519)', () => {
+  const WITNESS_COST = TARGET_COSTS.witness;
+
+  it('refuses a negative cost override when cash is below the real target cost', () => {
+    const ctx = makeCtx(WITNESS_COST - 1);
+    const before = ctx.state!.cash;
+    const result = corruptCommand(ctx, [], { target: 'witness', cost: '-1000000' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(ctx.state!.cash).toBe(before);
+  });
+
+  it('charges the real target cost, never the negative override, when cash covers it', () => {
+    const ctx = makeCtx(WITNESS_COST);
+    const before = ctx.state!.cash;
+    corruptCommand(ctx, [], { target: 'witness', cost: '-1000000' });
+    expect(ctx.state!.cash).toBe(before - WITNESS_COST);
+    expect(ctx.state!.cash).not.toBeGreaterThan(before);
+  });
+
+  it('never leaves cash as NaN after a non-numeric cost override', () => {
+    const ctx = makeCtx(WITNESS_COST);
+    corruptCommand(ctx, [], { target: 'witness', cost: 'notanumber' });
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+  });
+
+  it('does not permanently disable funds guards after a negative cost override', () => {
+    const ctx = makeCtx(WITNESS_COST);
+    corruptCommand(ctx, [], { target: 'witness', cost: '-1000000' });
+    expect(ctx.state!.cash).toBe(0);
+    const buildResult = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(buildResult.success).toBe(false);
+    expect(buildResult.output).toContain('Insufficient funds');
+  });
+
+  it('does not permanently disable funds guards after a non-numeric cost override', () => {
+    const ctx = makeCtx(WITNESS_COST);
+    corruptCommand(ctx, [], { target: 'witness', cost: 'notanumber' });
+    expect(ctx.state!.cash).toBe(0);
+    const buildResult = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    expect(buildResult.success).toBe(false);
+    expect(buildResult.output).toContain('Insufficient funds');
+  });
+
+  it('accepts cost:0 as a valid override — zero is not negative', () => {
+    const ctx = makeCtx(0);
+    const result = corruptCommand(ctx, [], { target: 'witness', cost: '0' });
+    expect(result.success).toBe(true);
+    expect(result.output).not.toContain('Insufficient funds');
+    expect(ctx.state!.cash).toBe(0);
+  });
+
+  it('rejects cost:-1 and falls back to the default target cost (boundary)', () => {
+    const ctx = makeCtx(WITNESS_COST - 1);
+    const result = corruptCommand(ctx, [], { target: 'witness', cost: '-1' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Insufficient funds');
+    expect(ctx.state!.cash).toBe(WITNESS_COST - 1);
+  });
+
+  it('still honors a legitimate positive cost override below the default target cost', () => {
+    const ctx = makeCtx(WITNESS_COST);
+    const before = ctx.state!.cash;
+    const result = corruptCommand(ctx, [], { target: 'witness', cost: '5000' });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(before - 5000);
+  });
+});
+
 // ── mafia accident — issue #511 ──
 
 describe('mafia accident — insufficient funds guard', () => {

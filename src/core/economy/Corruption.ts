@@ -65,7 +65,9 @@ export function attemptCorruption(
   rng: Random,
   customCost?: number,
 ): CorruptionResult {
-  const cost = customCost ?? TARGET_COSTS[target];
+  const cost = customCost !== undefined && Number.isFinite(customCost) && customCost >= 0
+    ? customCost
+    : TARGET_COSTS[target];
   const successRate = Math.max(0.1,
     BASE_SUCCESS_RATE - state.attempts.length * HISTORY_PENALTY,
   );
