@@ -87,7 +87,7 @@ The game's own simulation is not the cost — turning ticking off changes the fr
 | `screenshot`, one named scenario in interaction mode | Your session — this is the visual channel's working loop. |
 | All scenarios in interaction mode | CI job `Scenarios (interaction mode)` (label the PR `full-ci`). |
 
-The interaction-mode job is gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. It adds ~30 minutes to the merge path, so the label goes on a PR whose change an interaction-mode scenario actually drives, or which touches machinery every scenario runs through — not on every diff that a player can see. `agentic-pipeline-pr-management` holds the test and the cost.
+The interaction-mode job is gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. It is sharded 4 ways as of #530, and #530 also cut the harness's own overhead ~30% (3367s → 2362s single-threaded, sandbox-measured) — real sharded CI wall-clock not yet independently confirmed — but it remains real added time to the merge path, so the label goes on a PR whose change an interaction-mode scenario actually drives, or which touches machinery every scenario runs through — not on every diff that a player can see. `agentic-pipeline-pr-management` holds the test and the cost.
 
 Push, then read the CI job — its result *is* the channel's result, and its artifacts carry the FAIL screenshots. Locally, run one named definition you are actively debugging, never the whole suite.
 

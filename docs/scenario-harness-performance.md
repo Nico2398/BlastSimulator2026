@@ -4,6 +4,79 @@ Measured 2026-08-09/10 on the sandbox runner (4 cores, headless Chromium,
 software rasterisation, Vite dev server on :5173). Both modes ran the same 127
 scenario definitions / 2 950 steps.
 
+## Implemented (2026-08-10)
+
+Optimisations 2, 3, 5, 6 below are shipped. Optimisation 1 (tab reuse) was
+implemented, found to have deeper problems than scoped, and reverted — see
+its own section. 4 (sharding) is shipped as CI config; its wall-clock benefit
+needs a real CI run to confirm, not reproducible in this sandbox.
+
+| | Before | After | Change |
+|---|---|---|---|
+| Interaction suite, full 127 scenarios | 3 367 s (56 min) | **2 362 s (39 min)** | **−30%** |
+| Command suite, full 127 scenarios | 70.2 s | 54–56 s | −22% (side effect of optimisation 3) |
+| Pass/fail split | 121 / 6 | **121 / 6 — identical scenarios** | Zero regressions |
+
+Verified via `npm run typecheck`, the full unit suite (299 files / 8 662
+tests), `npm run scenarios` (127/127), and two independent full
+`run-all-scenarios.ts --mode interaction` runs — one immediately after
+implementation, one after this document's own numbers were drafted — both
+landing on the same 121-passed/6-failed split, and the same 6 scenario names
+this document already listed as pre-existing failures before any of this
+work started (see the last section). Sharding was spot-checked (round-robin
+partition math, one shard run in command mode) but not run in CI, since a
+CI-only wall-clock claim can't be reproduced in a sandbox — the number in
+row 4 of the ranked table stands as a projection, not a measurement, until
+a real four-way `full-ci` run confirms it.
+
+### Tab reuse (optimisation 1) — implemented, reverted
+
+Building `window.__resetForScenario()` and switching
+`run-all-scenarios.ts`'s batch loop to one page, reset between scenarios
+instead of a fresh tab, surfaced two distinct bugs during full-suite
+verification — not the hand-picked two-scenario check run first, which
+passed clean and gave false confidence:
+
+1. **Real bug, fixed.** The reset bridge called `window.__setRenderEnabled(true)`
+   to defensively undo a scenario that might have left drawing on. No
+   interaction action ever touches render-enabled state, so this was
+   undoing the harness's *own* `suspendDrawing()` call every single time —
+   after the first reset, every scenario for the rest of the run paid the
+   ~6.4 s/frame software-rasterisation cost on every CDP call again (#475),
+   the exact cost `suspendDrawing` exists to avoid. This alone explained a
+   127-scenario run degrading to 24 of the first 51 scenarios failing on
+   step timeouts. Fixed by deleting the line — nothing needed re-enabling
+   drawing in the first place.
+
+2. **Real bug, not fixed — this is why optimisation 1 is reverted.** After
+   fixing (1), a full run still showed a new failure
+   (`blast-drill-plan-ui`, `holeCount` 6 instead of 12) that reproduced
+   only after another scenario ran first, never on a fresh page. Root
+   cause: `DrillStep.gridSpacing` (`src/ui/panels/blastSteps/Drill.ts`) is
+   a plain instance field, initialised to `DEFAULT_SPACING_M` once at
+   construction and never reset — incremented/decremented by its stepper
+   button for the lifetime of the `DrillStep` object. On a fresh page that
+   object is constructed fresh per scenario, so the field is always at its
+   default. On a reused page it is the *same* object for the entire batch,
+   so a value one scenario's stepper clicks left behind silently carries
+   into the next scenario's own stepper clicks. `BuildMenu.rampDepth` is
+   the same pattern. Both are two instances of a class of bug the reset
+   bridge cannot close by construction: it resets panel *visibility* and a
+   short, explicitly-enumerated list of cross-cutting state (tutorial,
+   camera, locale, selection), but has no way to discover or reset every
+   panel's own internal form defaults without reading every panel's source
+   individually — an open-ended, easy-to-under-scope audit, not a fix with
+   a knowable size. Getting it wrong produces exactly the failure mode a
+   test suite can least afford: a scenario's result silently depending on
+   which scenario happened to run before it.
+
+Given that, tab reuse is reverted rather than shipped partially fixed. The
+render-enabled bug's fix is a one-line deletion and is easy to redo; the
+sticky-instance-field class of bug is the real blocker, and the honest
+scope of fixing it is auditing every panel component for non-GameState-backed
+mutable fields, or redesigning the reset to reconstruct the UI component
+tree instead of resetting it field-by-field. Neither is a quick follow-up.
+
 Reproduce with:
 
 ```bash
@@ -17,6 +90,14 @@ npx tsx scripts/bench-hotspots.ts                        # boot, level entry, cl
 The profiler mirrors the two runners rather than wrapping them. Cross-checked
 against the real batch runner on four scenarios: 16.4 / 13.0 / 15.8 / 13.2 s
 real versus 16.8 / 12.6 / 15.0 / 13.1 s profiled — within 4%.
+
+Everything below this point, including the "Reproduce with" timings just
+above, is the **original, pre-optimisation measurement** that motivated the
+work — kept as-is since it is what the ranked list at the bottom is
+evaluated against. `bench-scenarios.ts`/`bench-hotspots.ts` import the same
+shared modules the real harness does, so re-running either one today
+measures the *post*-optimisation code and will not reproduce these numbers;
+see "Implemented" above for what changed and the current numbers.
 
 ## Headline
 
@@ -124,17 +205,19 @@ scenarios purely because of it.
 
 ## Optimisations, ranked — none of them removes coverage
 
-| # | Change | Saving | Coverage impact | Risk |
+| # | Change | Projected saving | Measured | Status |
 |---|---|---|---|---|
-| 1 | **Reuse one tab across scenarios**, reloading only where a scenario needs a fresh boot | ~950 s (28%) | None — 124/127 scenarios open with `new_game`, which already replaces state, hides the main menu and closes stale overlays | Cross-scenario leakage. Needs a `__resetForScenario()` bridge (stop tutorial, close panels, clear selection and event dialog, reset locale) plus a per-scenario `freshPage` opt-out for `main-menu-visual` and `loading-screen-visual`. Hedge: reload every N scenarios |
-| 2 | **Replace the 300 ms sleep with a two-frame rAF wait** | ~646 s (19%) | None — and it is *more* correct: it waits for the `uiManager.update` the comment names, rather than guessing 300 ms | Low. Removes a wall-clock gamble that a slow CI runner can lose |
-| 3 | **Let `campaign start` run without a prior `new_game`**, and drop the throwaway from the 62 scenario definitions | 262 s interaction (8%), 12 s command (17% of command mode) | None — the discarded world is never observed. Arguably a real fix: a player starts a campaign level from the main menu without creating a sandbox first | Touches a console command's contract plus 62 JSON files; both channels must stay green |
-| 4 | **Shard the suite across workers** (`--shard i/n` + a CI matrix, or N pages in one browser) | Near-linear on whatever remains | None | Low. Composes with 1–3; the CI job's wall clock is what the `full-ci` label costs |
-| 5 | **Collapse per-step state extraction into one evaluate** returning `{game, ui, output}`, and reuse that snapshot in `checkGoal` | ~130 s (4%) | None — same data, fewer round-trips. Today a step does 4 evaluates plus a `before`, and `checkGoal` re-reads state once per goal kind (164 steps read it 2–3×) | Low |
-| 6 | **Drop the `waitForSelector` at the top of `clickSelector`** — the probe loop that follows already reports `absent` and honours the same deadline | ~15 s | None | Low |
+| 1 | **Reuse one tab across scenarios**, reloading only where a scenario needs a fresh boot | ~950 s (28%) | — | **Reverted.** Implemented, found two bugs during verification (one fixed, one — sticky per-panel instance state — an open-ended audit, not a quick fix). See its own section above |
+| 2 | **Replace the 300 ms sleep with a two-frame rAF wait** | ~646 s (19%) | Included in the −1 005 s measured below | **Shipped.** Surfaced a real, separate race while landing it — `PlacementController.confirm()` holds `isArmed()` true for a fixed 220 ms flash via `setTimeout`, not a frame callback, so two rAF frames could lose that race where the old, generous 300 ms sleep happened to win it. Fixed by exposing `currentPhase()` and polling it, not by lengthening the wait |
+| 3 | **Let `campaign start` run without a prior `new_game`**, and drop the throwaway from the scenario definitions | 262 s interaction (8%), 12 s command (17% of command mode) | Included in the −1 005 s measured below | **Shipped**, scoped down from all 62 to 38 of the 62 campaign scenarios — the other 24 either deliberately exercise `campaign start` as a rejection path that continues on the discarded sandbox world instead of replacing it (locked tier-2/3 levels — removing their `new_game` would leave them no world at all), or assert `worldSizeX` actually grew from the sandbox default (a real regression check for "campaign start's regenerateGrid call ran," which a world that was never created can't prove) |
+| 4 | **Shard the suite across workers** (`--shard i/n` CI matrix) | Near-linear on whatever remains | Not measured — sandbox has no CI runner to time | **Shipped** as a 4-way GitHub Actions matrix + `--shard` flag, round-robin partitioned. Needs a real `full-ci` PR run to confirm the wall-clock claim |
+| 5 | **Collapse per-step state extraction into one evaluate**, and reuse that snapshot in `checkGoal` instead of re-fetching | ~130 s (4%) | Included in the −1 005 s measured below | **Shipped** |
+| 6 | **Drop the `waitForSelector` at the top of `clickSelector`** — the probe loop that follows already reports `absent` and honours the same deadline | ~15 s | Included in the −1 005 s measured below | **Shipped** |
 
-Applied together, 1–3, 5 and 6 take the suite from **3 367 s to ~1 285 s (21
-min)**; four-way sharding on top puts the CI job near **6 min**.
+2, 3, 5, 6 together measure **3 367 s → 2 362 s (−1 005 s, −30%)** on a full
+127-scenario run, verified twice with an identical 121-passed/6-failed split
+both times. Four-way sharding on top of that would put a CI job near **10
+min** if the projection in row 4 holds — not yet confirmed by a real run.
 
 ### Measured and rejected
 
