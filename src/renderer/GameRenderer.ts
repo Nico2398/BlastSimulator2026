@@ -466,7 +466,7 @@ export class GameRenderer {
    * Exact rendered-mesh height at (x, z), found by raycasting straight down
    * through the terrain meshes — unlike surfaceYAt's voxel-column lookup,
    * this matches the smoothed mesh surface a pointer raycast actually hits.
-   * Used as the starting guess for the playtest harness's world-to-screen
+   * Used as the starting guess for interaction mode's world-to-screen
    * bridge (window.__worldToScreen, main.ts) — see raycastTerrainFromNDC for
    * why a single vertical raycast still isn't the whole fix. Returns null
    * off the terrain (no grid, or (x, z) outside every chunk).

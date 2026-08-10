@@ -4,7 +4,7 @@
 // history. Replaces ContractUI.ts's role (deleted in the P5 cleanup task).
 //
 // Root id and the accept/deliver/amount classes are preserved from the old
-// panel so tutorialStages.ts and the tutorial scenario/playtest defs keep
+// panel so tutorialStages.ts and the tutorial scenario defs keep
 // resolving unchanged — same convention ParamStrip.ts used for
 // #bs-tile-select-confirm in P3.
 //

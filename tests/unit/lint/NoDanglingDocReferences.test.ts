@@ -79,8 +79,15 @@ const DANGLING_REFERENCE_ALLOWLIST: readonly string[] = [
   'docs/plans/scenario-assertions-and-playtest-removal.md:1470',
   'docs/plans/scenario-assertions-and-playtest-removal.md:1479',
   'docs/plans/scenario-assertions-and-playtest-removal.md:1784',
-  'records/tutorial-visual-expectations.md:290',
-  'records/tutorial-visual-expectations.md:322',
+  // Issue #516 renamed scripts/shared/playtest-{driver,types}.ts to
+  // interaction-{driver,types}.ts (the plan's original Phase 3 item 2,
+  // deferred by #515). The entries below predate that rename — design
+  // narrative and a Phase 3 execution log entry naming the files by their
+  // filename *at the time each passage was written* — same historical-record
+  // reasoning as the block above, not a live citation to repoint.
+  'docs/plans/issue-479-interaction-conversion.md:65',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:705',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:2938',
 ];
 
 interface DanglingReference {

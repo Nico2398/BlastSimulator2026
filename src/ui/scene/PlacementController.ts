@@ -188,10 +188,11 @@ export class PlacementController {
 
   /**
    * Set the selection directly and enter 'selected', bypassing real pointer
-   * events. For the scenario harness only (window.__placement) — scenario
-   * defs aren't bound by playability's "must be clicked" rule the way
-   * playtests are, and re-deriving screen pixels for a 3D world tile on every
-   * call would be fragile where this is exact. Works for point mode too
+   * events. For the command-mode scenario harness only (window.__placement)
+   * — a `role: 'player'` step's `interaction` array is what carries the
+   * click-only requirement, and command mode has no such step, so this
+   * shortcut is exact rather than fragile where re-deriving screen pixels
+   * for a 3D world tile on every call would be. Works for point mode too
    * (pass the same tile twice). No-op while idle/confirmed, same as a real drag.
    */
   paintRect(x1: number, z1: number, x2: number, z2: number): void {

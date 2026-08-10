@@ -1,6 +1,6 @@
 {
   "name": "employee-training",
-  "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs playtests/training.json's beats require -- then complete a blast task",
+  "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs the deleted playtests/training.json's beats required -- then complete a blast task",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -73,7 +73,7 @@
     },
     {
       "command": "build driving_center at:5,5",
-      "description": "Real UI training gap (parity with playtests/training.json, #479): driving.excavator belongs to no hiring role (ROLE_STARTING_QUALIFICATION), so a driving_center -- the only school that teaches it -- is the sole in-game path to ever holding it. Placed away from the drill grid below (15,15)-(20,20).",
+      "description": "Real UI training gap (parity with the deleted playtests/training.json, #479): driving.excavator belongs to no hiring role (ROLE_STARTING_QUALIFICATION), so a driving_center -- the only school that teaches it -- is the sole in-game path to ever holding it. Placed away from the drill grid below (15,15)-(20,20).",
       "interaction": [
         {
           "type": "clickSelector",

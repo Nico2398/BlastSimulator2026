@@ -99,7 +99,7 @@
           "command": "build move 2 to:10,5"
         }
       ],
-      "description": "role: bootstrap (issue #515): building #2 was never placed, so there is no row and no button in the DOM at all — not merely disabled. `expect.blocked` needs a present-but-unusable control (playtest-driver.ts's checkGoal refuses an absent selector: \"not in the DOM, so blocked proves nothing\"), which doesn't exist here, and no player can ever target an id that was never shown to them. Genuinely bootstrap: this exercises the console's own bad-id guard, not a control a player could reach either way.",
+      "description": "role: bootstrap (issue #515): building #2 was never placed, so there is no row and no button in the DOM at all — not merely disabled. `expect.blocked` needs a present-but-unusable control (interaction-driver.ts's checkGoal refuses an absent selector: \"not in the DOM, so blocked proves nothing\"), which doesn't exist here, and no player can ever target an id that was never shown to them. Genuinely bootstrap: this exercises the console's own bad-id guard, not a control a player could reach either way.",
       "expect": {
         "equals": {
           "buildingCount": 1

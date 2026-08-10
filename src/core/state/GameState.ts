@@ -335,7 +335,7 @@ export function buildGameNavGrid(
 
 /**
  * Copy the grid's live bounding box onto `state.world`, so everything reading
- * the state dump (minimap, UI pickers, playtest harness) follows the site as
+ * the state dump (minimap, UI pickers, interaction mode) follows the site as
  * it grows. `baseSizeX`/`baseSizeZ` are left untouched — they are the
  * generation datum, not a measurement of the site.
  */

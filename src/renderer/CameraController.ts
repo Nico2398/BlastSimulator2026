@@ -182,8 +182,9 @@ export class CameraController {
    * axis; z > 1 means behind the camera). The DOM-side conversion to screen
    * pixels needs the canvas's live CSS rect, so that half stays with the
    * caller — same screen↔world split ScenePicking uses in the other
-   * direction. Used by the playtest harness to click a world tile for real
-   * rather than reaching for a console-equivalent shortcut (playability.md).
+   * direction. Used by interaction mode to click a world tile for real
+   * rather than reaching for a console-equivalent shortcut
+   * (`.claude/rules/scenario-defs.md`'s click-only `role: 'player'` invariant).
    */
   projectToNDC(x: number, y: number, z: number): THREE.Vector3 {
     return new THREE.Vector3(x, y, z).project(this.camera);
