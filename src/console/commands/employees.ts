@@ -100,6 +100,8 @@ export function employeeCommand(
     case 'raise': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       const amount = parseFloat(named['amount'] ?? '0');
+      // guard fix incoming (#534): non-numeric amount ("abc") parses to NaN,
+      // and NaN <= 0 is false, so it slips past this check and poisons salary.
       if (isNaN(id) || amount <= 0) {
         return { success: false, output: 'Usage: employee raise <id> amount:500' };
       }
