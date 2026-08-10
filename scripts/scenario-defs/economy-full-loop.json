@@ -3,22 +3,6 @@
   "description": "Full economy pipeline: blast spawns fragments without instant payout, a debris_hauler hauls them into a freight_warehouse, and contract delivery pays out only from that stored inventory (issue #456).",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "buildingCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:tutorial_pit",
       "interaction": [
         {

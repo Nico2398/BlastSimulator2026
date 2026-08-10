@@ -3,23 +3,6 @@
   "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face/sequence, buildings/vehicles in projection path, and post-blast damage assessment.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "buildingCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

@@ -3,23 +3,6 @@
   "description": "Visual verification of the save/load UI: multiple save slots, auto-save indicator, save/load buttons, export/import options, slot metadata display (date, level, cash, playtime), and IndexedDB backend for web persistence.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "holeCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

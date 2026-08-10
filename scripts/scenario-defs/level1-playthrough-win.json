@@ -3,21 +3,6 @@
   "description": "Full Level 1 (Dusty Hollow) playthrough: a survey, 2 blast cycles, vehicle-hauled contract fulfillment, and building infrastructure. Named for an $80k profit target and originally scoped for 3 blast cycles; see Findings #45-#50 for why that target is not reachable within this file's budget even after fixing the missing hauling infrastructure that made every contract delivery fail outright, and why a 3rd cycle was cut.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "cash": 50000
-        }
-      },
-      "role": "setup"
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

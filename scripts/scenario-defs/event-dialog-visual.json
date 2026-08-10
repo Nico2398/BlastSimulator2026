@@ -3,22 +3,6 @@
   "description": "Visual verification of the event dialog system: event categories (Unions, Politics, Weather, Mafia, Lawsuits), dialog with title/description/options, consequence display, and state updates after resolution. Every event raised by an explicit `event fire` is now answered and dismissed by clicking the dialog's own buttons (issue #479); `event fire` itself stays a command because it is a test hook with no player-facing equivalent.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

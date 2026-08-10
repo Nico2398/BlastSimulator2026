@@ -3,22 +3,6 @@
   "description": "Negotiate contracts repeatedly to observe both improved and worsened pricing outcomes -- the file's original version never called `contract negotiate` at all, only accept/deliver; rewritten to exercise the actual negotiation mechanic (issue #479 follow-up).",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

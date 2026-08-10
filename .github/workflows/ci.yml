@@ -172,7 +172,7 @@ jobs:
   #   - workflow_dispatch (manual trigger)
   #   - PRs labeled "full-ci" (opts in for risky changes)
   scenario-interaction:
-    name: "Scenarios (interaction mode)"
+    name: "Scenarios (interaction mode) — shard ${{ matrix.shard }}/${{ strategy.job-total }}"
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
@@ -180,6 +180,10 @@ jobs:
     needs:
       - typecheck
       - test
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -212,16 +216,16 @@ jobs:
           sleep 5
           curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
 
-      - name: Run all scenarios (interaction mode — batch, shared browser)
+      - name: Run scenario shard ${{ matrix.shard }}/4 (interaction mode — batch, shared browser)
         run: |
-          if ! npx tsx scripts/run-all-scenarios.ts --mode interaction; then
+          if ! npx tsx scripts/run-all-scenarios.ts --mode interaction --shard ${{ matrix.shard }}/4; then
             echo ""
             echo "========================================"
-            echo "Some interaction-mode scenarios failed. Check logs above."
+            echo "Some interaction-mode scenarios failed in shard ${{ matrix.shard }}/4. Check logs above."
             echo "========================================"
             exit 1
           fi
-          echo "All scenarios passed in interaction mode."
+          echo "Shard ${{ matrix.shard }}/4 passed in interaction mode."
 
       - name: Stop dev server
         if: always()

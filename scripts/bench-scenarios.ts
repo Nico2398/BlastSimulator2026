@@ -179,7 +179,10 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
                 ? await timed(ops, 'state.before', () => gameState(page))
                 : {};
               await runStepActions(page, step);
-              if (step.expect) await timed(ops, 'expect.checkGoal', () => checkGoal(page, step.expect!, before));
+              if (step.expect) {
+                await timed(ops, 'expect.checkGoal', () =>
+                  checkGoal(page, step.expect!, before, (lastState as Record<string, unknown> | null) ?? undefined));
+              }
               if (screenshots) {
                 await timed(ops, 'screenshot.capture', () => captureFrame(page,
                   resolve(OUT_DIR, `${name}-${formatStepIndex(s)}-${formatCommandSlug(step.command)}.png`)));

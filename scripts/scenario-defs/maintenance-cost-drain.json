@@ -3,23 +3,6 @@
   "description": "Owned buildings and vehicles drain cash every tick via maintenance and fuel operating costs, even with no active tasks assigned (issue #456).",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "buildingCount": 0,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:tutorial_pit",
       "interaction": [
         {

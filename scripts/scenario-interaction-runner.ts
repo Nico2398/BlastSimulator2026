@@ -119,9 +119,12 @@ export async function runScenarioInteraction(
             // playtest-driver.ts's checkGoal so a step's `expect` and a
             // playtest beat's `expect` are proven the same way (issue #479
             // follow-up: scenarios gained assertions instead of staying a
-            // pass/fail-on-exception-only channel).
+            // pass/fail-on-exception-only channel). Passes the state
+            // executeInteractionActions already fetched moments ago — nothing
+            // between the two calls can have mutated it — instead of having
+            // checkGoal re-fetch its own "after" snapshot.
             if (step.expect) {
-              await checkGoal(page, step.expect, before);
+              await checkGoal(page, step.expect, before, interactionResult.gameState ?? undefined);
             }
 
             let screenshotPath = '';

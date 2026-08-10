@@ -3,26 +3,6 @@
   "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbor Nuisance scores (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "wellBeing": 50,
-          "safety": 50,
-          "ecology": 50,
-          "nuisance": 50
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

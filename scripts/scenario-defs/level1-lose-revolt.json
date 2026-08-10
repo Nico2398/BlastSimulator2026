@@ -3,21 +3,6 @@
   "description": "Level 1 losing scenario: neglect employee well-being with massive blasting. The premise does not hold in the current implementation, confirmed via direct trace: wellBeing does not crash from idle neglect -- it RISES to 99.95 and stays there, because avgMorale (events.ts) only drops from active negative events (accidents, specific bad event outcomes), never from mere passive neglect, and this file's 6 hired employees are never dispatched anywhere or otherwise harmed. `revolted` (WorkerRevolt.ts, wellBeing<=0 for REVOLT_TICKS consecutive ticks) never triggers as a direct consequence -- it structurally cannot, since wellBeing never even approaches 0. Unlike level1-lose-ecology.json's fix (more ticks of an already-collapsing score), there is no small extension that reaches revolt here, since wellBeing is trending the wrong direction entirely; documenting the real, verified trajectory instead, per the same treatment as Findings #20/#21/#26/#27/#41. depth:6 (not the originally-declared 12) on both drill_plan grid steps, Finding #42/Ground rule #15's class.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

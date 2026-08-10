@@ -38,7 +38,45 @@ export class PlaytestFailure extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = 6000;
-const SETTLE_MS = 350;
+
+/**
+ * Wait for the render loop's rAF callback to run twice. That callback drives
+ * `uiManager.update` once per frame regardless of whether drawing itself is
+ * suspended (#475), so two passes is the actual event a post-action settle is
+ * waiting on — not a guess at how long that takes. Measured at ~33ms with a
+ * level loaded (one frame's margin over the ~17ms a single pass costs),
+ * replacing a flat 300-350ms sleep that used to pay for the same wait as
+ * wall-clock time whether or not the frame had already run.
+ *
+ * Also waits out a placement confirm's 220ms flash window (phase
+ * 'confirmed', `PlacementController.confirm`/`CONFIRM_FLASH_MS`) when one is
+ * in flight: `isArmed()` stays true for that whole window before its
+ * `setTimeout`-scheduled `disarm()` fires, and arming a *different* build
+ * type while it is still true finds the tool "already armed" and cancels
+ * instead of arming (`BuildMenu.armBuildingPointTool`'s own guard) — a
+ * wall-clock timer no number of animation frames can outrun. `currentPhase`
+ * is what distinguishes this from a freshly-armed tool correctly staying
+ * armed (which must never be waited out here) — both read `isArmed() ===
+ * true` identically, only the phase tells them apart. A confirm the harness
+ * never sees this frame (nothing armed at all) skips the poll immediately.
+ */
+export async function waitForUiUpdate(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>(res => {
+    requestAnimationFrame(() => requestAnimationFrame(() => res()));
+  }));
+  // Node-side poll loop, matching awaitPlacementArmed (tile-picker.ts) —
+  // a *browser*-side recursive poll would need a named inner function to
+  // reschedule itself, and esbuild's keepNames helper (`__name`) it would
+  // inject is module-scoped in the harness bundle, unreachable from a
+  // callback's stringified, sandboxed evaluation in the page.
+  for (;;) {
+    const phase = await page.evaluate(() => (window as unknown as {
+      __placement?: { currentPhase?: () => string };
+    }).__placement?.currentPhase?.() ?? null);
+    if (phase !== 'confirmed') return;
+    await new Promise(r => setTimeout(r, 20));
+  }
+}
 
 export async function probe(page: Page): Promise<ProbedAction[]> {
   return page.evaluate(() => (window as unknown as {
@@ -315,7 +353,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
   }
-  await new Promise(r => setTimeout(r, SETTLE_MS));
+  await waitForUiUpdate(page);
 }
 
 /** Check a beat's goal, throwing PlaytestFailure with a diagnosis when unmet. */
@@ -323,6 +361,7 @@ export async function checkGoal(
   page: Page,
   goal: PlaytestGoal,
   before: Record<string, unknown>,
+  after?: Record<string, unknown>,
 ): Promise<void> {
   if (goal.tutorialStep !== undefined) {
     const tut = await tutorialState(page);
@@ -334,46 +373,51 @@ export async function checkGoal(
     }
   }
 
-  if (goal.increased) {
-    const after = await gameState(page);
-    for (const field of goal.increased) {
-      const wasRaw = before[field];
-      const nowRaw = after[field];
-      const was = typeof wasRaw === 'number' ? wasRaw : 0;
-      const now = typeof nowRaw === 'number' ? nowRaw : 0;
-      if (!(now > was)) {
-        throw new PlaytestFailure(
-          `${field} should have increased but went ${was} → ${now}`,
-          describeAvailable(await probe(page)),
-        );
+  // One fetch (or the caller's own already-current snapshot) serves all three
+  // state-reading goal kinds below — up to three separate evaluates for a
+  // step whose expect combines increased/decreased/equals, on every step of
+  // every scenario, for state that cannot have changed between them.
+  if (goal.increased || goal.decreased || goal.equals) {
+    const state = after ?? await gameState(page);
+
+    if (goal.increased) {
+      for (const field of goal.increased) {
+        const wasRaw = before[field];
+        const nowRaw = state[field];
+        const was = typeof wasRaw === 'number' ? wasRaw : 0;
+        const now = typeof nowRaw === 'number' ? nowRaw : 0;
+        if (!(now > was)) {
+          throw new PlaytestFailure(
+            `${field} should have increased but went ${was} → ${now}`,
+            describeAvailable(await probe(page)),
+          );
+        }
       }
     }
-  }
 
-  if (goal.decreased) {
-    const after = await gameState(page);
-    for (const field of goal.decreased) {
-      const wasRaw = before[field];
-      const nowRaw = after[field];
-      const was = typeof wasRaw === 'number' ? wasRaw : 0;
-      const now = typeof nowRaw === 'number' ? nowRaw : 0;
-      if (!(now < was)) {
-        throw new PlaytestFailure(
-          `${field} should have decreased but went ${was} → ${now}`,
-          describeAvailable(await probe(page)),
-        );
+    if (goal.decreased) {
+      for (const field of goal.decreased) {
+        const wasRaw = before[field];
+        const nowRaw = state[field];
+        const was = typeof wasRaw === 'number' ? wasRaw : 0;
+        const now = typeof nowRaw === 'number' ? nowRaw : 0;
+        if (!(now < was)) {
+          throw new PlaytestFailure(
+            `${field} should have decreased but went ${was} → ${now}`,
+            describeAvailable(await probe(page)),
+          );
+        }
       }
     }
-  }
 
-  if (goal.equals) {
-    const after = await gameState(page);
-    for (const [field, expected] of Object.entries(goal.equals)) {
-      if (after[field] !== expected) {
-        throw new PlaytestFailure(
-          `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(after[field])}`,
-          describeAvailable(await probe(page)),
-        );
+    if (goal.equals) {
+      for (const [field, expected] of Object.entries(goal.equals)) {
+        if (state[field] !== expected) {
+          throw new PlaytestFailure(
+            `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(state[field])}`,
+            describeAvailable(await probe(page)),
+          );
+        }
       }
     }
   }

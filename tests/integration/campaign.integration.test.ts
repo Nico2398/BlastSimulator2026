@@ -415,6 +415,31 @@ describe('Campaign', () => {
     expect(ctx.state!.campaign.activeLevelId).toBeNull();
   });
 
+  // ── 12. campaign start with no prior game ──────────────────────────────────
+
+  it('campaign start succeeds with no prior game, same as after a fresh new_game', () => {
+    const freshCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+
+    const result = campaignStartCommand(freshCtx, [], { level: 'tutorial_pit' });
+
+    expect(result.success).toBe(true);
+    expect(freshCtx.state).not.toBeNull();
+    expect(freshCtx.state!.cash).toBe(TUTORIAL_START_CASH);
+    expect(freshCtx.state!.campaign.activeLevelId).toBe('tutorial_pit');
+    expect(freshCtx.grid).not.toBeNull();
+    expect(freshCtx.grid!.sizeX).toBe(32);
+  });
+
+  it('campaign start with no prior game rejects a locked level, same as with one', () => {
+    const freshCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+
+    const result = campaignStartCommand(freshCtx, [], { level: 'grumpstone_ridge' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('locked');
+    expect(freshCtx.state).toBeNull();
+  });
+
   // ── 12. campaign status command output ─────────────────────────────────────
 
   it('campaign status command reports level progress', () => {

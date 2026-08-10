@@ -188,10 +188,11 @@ worldMap.setOnBack(() => {
 });
 worldMap.setOnStartLevel((levelId) => {
   worldMap.hide();
-  // Ensure a base GameState (with campaign) exists before starting a level.
-  const commands = ctx.state ? [] : ['new_game'];
+  // `campaign start` builds its own CampaignState when none exists yet, so a
+  // first-ever level entry needs no priming new_game (and no throwaway
+  // terrain generation for a sandbox world this never shows).
   const level = getLevel(levelId);
-  void enterLevel([...commands, `campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined).then(() => {
+  void enterLevel([`campaign start level:${levelId}`], level ? buildLoadingSiteInfo(level) : undefined).then(() => {
     // First-time players get tutorial guidance once their level is actually
     // loaded, not while still picking one from the world map.
     if (!TutorialOverlay.isCompleted()) tutorial.start(ctx.state ?? undefined);
@@ -387,6 +388,16 @@ declare global {
     /** Scenario-harness hooks for the P3 in-scene placement tool — see PlacementController.paintRect for why this bypasses real pointer events. */
     __placement: {
       isArmed: () => boolean;
+      /**
+       * 'confirmed' is the 220ms confirm-flash window (PlacementController's
+       * CONFIRM_FLASH_MS) between a successful confirm() and its scheduled
+       * disarm() — isArmed() is still true throughout it, indistinguishable
+       * from a fresh, correctly-staying-armed tool without this. The
+       * interaction harness polls this to wait out that specific window
+       * before arming a different build type, instead of racing a setTimeout
+       * with a fixed frame count that cannot see it.
+       */
+      currentPhase: () => string;
       paintRect: (x1: number, z1: number, x2: number, z2: number) => void;
       confirm: () => void;
       cancel: () => void;
@@ -719,6 +730,7 @@ window.__entityWorldPosition = (kind, id) => {
 };
 window.__placement = {
   isArmed: () => placementController.isArmed,
+  currentPhase: () => placementController.currentPhase,
   paintRect: (x1, z1, x2, z2) => placementController.paintRect(x1, z1, x2, z2),
   confirm: () => placementController.confirm(),
   cancel: () => placementController.cancel(),

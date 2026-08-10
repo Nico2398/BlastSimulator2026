@@ -3,26 +3,6 @@
   "description": "Level 1 (Dusty Hollow): 3 blasts, 2 surveys, and 3 contract attempts with no vehicle ever bought -- named for an efficient $80k win, but no hauling infrastructure means no delivery ever succeeds; see Findings #54-#57 for the real trajectory asserted instead, and for confirmation (via an inspected screenshot, not just source reading) that the survey confidence overlay this file was originally written to gate on now genuinely renders -- the stale 'FAILS until GameRenderer wires survey overlay into syncFromContext()' warning this file previously carried is no longer true.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0,
-          "surveyCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {
