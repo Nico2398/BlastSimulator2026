@@ -46,7 +46,7 @@ import {
   ACCIDENT_COST,
   FRAME_COST,
 } from '../../core/events/MafiaActions.js';
-import { requireGame } from './commandUtils.js';
+import { requireGame, sanitizeFiniteOverride } from './commandUtils.js';
 import type { GameState } from '../../core/state/GameState.js';
 
 /** Deduct a cash cost and log it as a finance expense, if the cost is positive. */
@@ -485,8 +485,7 @@ export function corruptCommand(
     return { success: false, output: `Invalid target. Valid: ${validTargets.join(', ')}` };
   }
 
-  const rawCost = named['cost'] ? parseInt(named['cost'], 10) : undefined;
-  const cost = rawCost !== undefined && Number.isFinite(rawCost) && rawCost >= 0 ? rawCost : undefined;
+  const cost = named['cost'] ? sanitizeFiniteOverride(parseInt(named['cost'], 10), { min: 0 }) : undefined;
   const resolvedCost = cost ?? TARGET_COSTS[target];
   if (state.cash < resolvedCost) {
     return {

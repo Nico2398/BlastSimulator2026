@@ -15,6 +15,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
+import { sanitizeFiniteOverride } from './commandUtils.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -206,8 +207,7 @@ export function newGameCommand(
   // the larger campaign sizes (#458 T6.1/D13) are not cubic, and console
   // testing at those aspect ratios shouldn't require a same-sized cube.
   const sizeY = named['size_y'] ? parseInt(named['size_y'], 10) : size;
-  const parsedCash = named['cash'] ? parseInt(named['cash'], 10) : undefined;
-  const startingCash = parsedCash !== undefined && Number.isFinite(parsedCash) ? parsedCash : undefined;
+  const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
   ctx.state = createGame({
     seed, mineType,
     ...(startingCash !== undefined ? { startingCash } : {}),

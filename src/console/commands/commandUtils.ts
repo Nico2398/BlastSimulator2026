@@ -19,7 +19,7 @@ export function requireGame(ctx: GameContext): CommandResult | null {
  * callers keep their own `parseInt`/`parseFloat` choice.
  */
 export function sanitizeFiniteOverride(parsed: number, opts?: { min?: number }): number | undefined {
-  void parsed;
-  void opts;
-  throw new Error('not implemented');
+  if (!Number.isFinite(parsed)) return undefined;
+  if (opts?.min !== undefined && parsed < opts.min) return undefined;
+  return parsed;
 }
