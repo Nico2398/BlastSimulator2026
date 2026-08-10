@@ -31,6 +31,7 @@ import { ChargeHoleList, holeChargeSignature } from './ChargeHoleList.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { TUBING_COST } from '../../../core/mining/Tubing.js';
+import { MIN_STEMMING_M } from '../../../core/config/balance.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
@@ -304,7 +305,7 @@ export class ChargeStep {
   }
 
   private adjustStemming(delta: number): void {
-    this.stemmingM = Math.max(0.5, +(this.stemmingM + delta).toFixed(1));
+    this.stemmingM = Math.max(MIN_STEMMING_M, +(this.stemmingM + delta).toFixed(1));
     this.stemmingValueEl.textContent = `${this.stemmingM.toFixed(1)} m`;
     this.lastSignature = '';
   }

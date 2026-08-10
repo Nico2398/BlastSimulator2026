@@ -220,6 +220,11 @@ export const TRANSMISSION_LOSS_POROSITY_SCALE = 0.40;
  *  of pushing harder on the same voxel. */
 export const CHARGE_KG_PER_METRE = 2.0;
 
+/** Minimum stemming column (m) a charge can carry. Matches the Charge
+ *  panel's own floor (Charge.ts adjustStemming) so a console charge can
+ *  never under-stem what a player could ever click. */
+export const MIN_STEMMING_M = 0.5;
+
 /** Converts catalog `energyPerKg` into the energy units voxel absorption thresholds
  *  are written in. The catalog numbers were tuned against an inverse-square field
  *  whose epsilon amplified them at close range; propagation conserves energy instead,

@@ -185,14 +185,14 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:0",
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
           "type": "command",
-          "command": "charge hole:* explosive:boomite amount:8 stemming:0"
+          "command": "charge hole:* explosive:boomite amount:8 stemming:0.5"
         }
       ],
-      "description": "role: bootstrap (issue #515): `stemming:0` is below the Charge panel's own floor \u2014 `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) \u2014 so no click sequence can ever reach it while `createCharge` (ChargePlan.ts) itself has no lower bound and accepts 0 freely. A real, narrow UI/console gap, not a missing selector.",
+      "description": "role: bootstrap (issue #515): `stemming:0.5` is the Charge panel's own floor \u2014 `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) \u2014 the minimal stemming value reachable by any click sequence. `createCharge` (ChargePlan.ts) now enforces the same MIN_STEMMING_M floor (#527), so this step stays a `bootstrap` role for its `hole:*` batch shorthand, not to reach a value a player could not.",
       "expect": {
         "equals": {
           "chargedCount": 4

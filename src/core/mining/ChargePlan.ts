@@ -2,6 +2,7 @@
 // Assigns explosives and stemming to each hole in the drill plan.
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
+import { MIN_STEMMING_M } from '../config/balance.js';
 
 export interface HoleCharge {
   explosiveId: string;
@@ -25,10 +26,13 @@ export function createCharge(
   if (!explosive) {
     return { error: `Unknown explosive: "${explosiveId}"` };
   }
-  if (amountKg < explosive.minChargeKg || amountKg > explosive.maxChargeKg) {
+  if (!Number.isFinite(amountKg) || amountKg < explosive.minChargeKg || amountKg > explosive.maxChargeKg) {
     return {
       error: `Amount ${amountKg}kg out of range [${explosive.minChargeKg}–${explosive.maxChargeKg}kg] for ${explosiveId}`,
     };
+  }
+  if (!Number.isFinite(stemmingM) || stemmingM < MIN_STEMMING_M) {
+    return { error: `Stemming ${stemmingM}m below minimum ${MIN_STEMMING_M}m` };
   }
   if (stemmingM > holeDepth) {
     return { error: `Stemming ${stemmingM}m exceeds hole depth ${holeDepth}m` };
