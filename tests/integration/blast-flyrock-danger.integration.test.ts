@@ -45,13 +45,16 @@ function blastAt(ctx: MiningContext, stemming: string): void {
 
 /**
  * Stand a crew just outside the pattern — holes span x=15..21, z=15..21, so
- * this is clear of the ground that disappears but well inside the throw.
+ * this is clear of the ground that disappears (at every stemming this suite
+ * fires, including the well-stemmed '2' case, which clears *more* ground than
+ * a poorly-stemmed shot since more of its energy goes down instead of up) but
+ * well inside a minimally-stemmed (0.5m, the createCharge floor) shot's throw.
  */
 function crewBesideTheBlast(ctx: MiningContext, count = 12): number[] {
   const rng = new Random(7);
   const ids: number[] = [];
   for (let i = 0; i < count; i++) {
-    const hire = hireEmployee(ctx.state!.employees, 'driller', rng, 25 + (i % 4), 16 + Math.floor(i / 4));
+    const hire = hireEmployee(ctx.state!.employees, 'driller', rng, 24 + (i % 4), 14 + Math.floor(i / 4));
     if (hire.employee) ids.push(hire.employee.id);
   }
   return ids;
@@ -68,7 +71,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const crew = crewBesideTheBlast(ctx);
     const before = aliveCount(ctx, crew);
 
-    blastAt(ctx, '0');
+    blastAt(ctx, '0.5');
 
     expect(before).toBeGreaterThan(0);
     expect(aliveCount(ctx, crew), 'unstemmed flyrock hurt nobody').toBeLessThan(before);
@@ -89,7 +92,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const ctx = makeCtx();
     crewBesideTheBlast(ctx);
 
-    blastAt(ctx, '0');
+    blastAt(ctx, '0.5');
 
     const casualties = ctx.state!.damage.accidents.filter(a => a.type === 'death' || a.type === 'injury');
     expect(casualties.length).toBeGreaterThan(0);
@@ -102,7 +105,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
   it('a blast with nobody around hurts nobody', () => {
     const ctx = makeCtx();
 
-    blastAt(ctx, '0');
+    blastAt(ctx, '0.5');
 
     expect(ctx.state!.damage.accidents.filter(a => a.type === 'death').length).toBe(0);
     expect(ctx.state!.damage.deathCount).toBe(0);
@@ -135,7 +138,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const rng = new Random(11);
     const farAway = hireEmployee(ctx.state!.employees, 'driller', rng, 44, 44).employee;
 
-    blastAt(ctx, '0');
+    blastAt(ctx, '0.5');
 
     expect(farAway.alive).toBe(true);
     expect(farAway.injured).toBe(false);
@@ -143,14 +146,14 @@ describe('Blast flyrock — danger reaches the crew', () => {
 
   it('reports how far the rock was thrown, and rates the blast on it', () => {
     const reckless = makeCtx();
-    blastAt(reckless, '0');
+    blastAt(reckless, '0.5');
     const careful = makeCtx();
     blastAt(careful, '2');
 
     // Both reports exist; the reckless one threw rock further and rates worse.
     resetHoleIds();
     drillPlanCommand(reckless, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', start: '30,30' });
-    chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0' });
+    chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
     sequenceCommand(reckless, ['auto'], {});
     const output = blastCommand(reckless, [], {}).output;
 

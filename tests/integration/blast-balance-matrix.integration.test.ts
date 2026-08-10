@@ -89,8 +89,8 @@ describe('Blast balance — more explosive does more', () => {
 });
 
 describe('Blast balance — stemming decides whether rock is thrown', () => {
-  it('an unstemmed hole throws rock further than a stemmed one', () => {
-    expect(fire({ stemming: 0 }).maxThrowDistance)
+  it('a minimally stemmed hole throws rock further than a stemmed one', () => {
+    expect(fire({ stemming: 0.5 }).maxThrowDistance)
       .toBeGreaterThan(fire({ stemming: 3 }).maxThrowDistance);
   });
 
@@ -98,12 +98,12 @@ describe('Blast balance — stemming decides whether rock is thrown', () => {
     expect(fire({ stemming: 3 }).projectionCount).toBe(0);
   });
 
-  it('an unstemmed overcharge does', () => {
-    expect(fire({ stemming: 0, kg: 8 }).projectionCount).toBeGreaterThan(0);
+  it('a minimally stemmed overcharge does', () => {
+    expect(fire({ stemming: 0.5, kg: 8 }).projectionCount).toBeGreaterThan(0);
   });
 
   it('and is rated worse for it', () => {
-    const careless = fire({ stemming: 0, kg: 8 });
+    const careless = fire({ stemming: 0.5, kg: 8 });
     const careful = fire({ stemming: 3, kg: 8 });
 
     expect(['bad', 'catastrophic']).toContain(careless.rating);
@@ -113,7 +113,7 @@ describe('Blast balance — stemming decides whether rock is thrown', () => {
   it('stemming does not cost breakage — the careful shot still moves rock', () => {
     // The stemmed shot keeps its energy in the rock, so it must break at least
     // as much as the one that vented up the hole.
-    expect(fire({ stemming: 3 }).clearedVoxels).toBeGreaterThanOrEqual(fire({ stemming: 0 }).clearedVoxels);
+    expect(fire({ stemming: 3 }).clearedVoxels).toBeGreaterThanOrEqual(fire({ stemming: 0.5 }).clearedVoxels);
   });
 });
 
@@ -173,7 +173,7 @@ describe('Blast balance — the pipeline stays coherent', () => {
   });
 
   it('never flies more projectiles than fragments', () => {
-    const r = fire({ stemming: 0, kg: 8 });
+    const r = fire({ stemming: 0.5, kg: 8 });
     expect(r.projectileCount).toBeLessThanOrEqual(r.fragmentCount);
   });
 
@@ -186,7 +186,7 @@ describe('Blast balance — the pipeline stays coherent', () => {
     // The one failure the other channels cannot see: a fragment whose resting
     // place has nothing under it. It reads as a floating boulder on screen and
     // as a perfectly ordinary blast in every number the report carries.
-    for (const shot of [{ kg: 8 }, { kg: 8, stemming: 0 }, { kg: 20, stemming: 0, explosive: 'dynatomics' }]) {
+    for (const shot of [{ kg: 8 }, { kg: 8, stemming: 0.5 }, { kg: 20, stemming: 0.5, explosive: 'dynatomics' }]) {
       const { result, grid } = fireOnto(shot);
       const pile = summariseMuckPile(result.fragments, grid);
 
