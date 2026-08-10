@@ -32,13 +32,14 @@
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20",
       "interaction": [
-        {
-          "type": "command",
-          "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20"
-        }
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"grid-tool\"]" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "clickSelector", "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child" },
+        { "type": "dragTiles", "x1": 20, "z1": 20, "x2": 28, "z2": 28 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
-      "description": "role: bootstrap, temporary exception (issue #515): bootstrapping via console `sandbox start` (not `new_game`/`campaign start`) leaves #bs-toolbar with zero size -- confirmed by the first interaction-mode run failing here with exactly that. Whether the real Sandbox Mode panel flow (SandboxPanel.ts's #bs-sandbox-start) triggers a UI transition console bootstrap skips is unverified; left as a command rather than guess at a fix for a UI path this batch never drives for real (see SANDBOX_START_DESC above). Not a permanent bootstrap primitive like `employee assign_skill` -- once the #bs-toolbar zero-size bug is fixed, this step should convert to a real click.",
-      "role": "bootstrap",
+      "role": "player",
       "expect": {
         "equals": {
           "holeCount": 9,
@@ -49,13 +50,9 @@
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
-        {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
-        }
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"charge-all\"]" }
       ],
-      "description": "role: bootstrap, temporary exception (issue #515) -- see the preceding drill_plan step's description for the #bs-toolbar zero-size rationale.",
-      "role": "bootstrap",
+      "role": "player",
       "expect": {
         "equals": {
           "chargedCount": 9,
@@ -66,13 +63,9 @@
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
-        {
-          "type": "command",
-          "command": "sequence auto delay_step:25"
-        }
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]" }
       ],
-      "description": "role: bootstrap, temporary exception (issue #515) -- see the drill_plan step's description for the #bs-toolbar zero-size rationale.",
-      "role": "bootstrap",
+      "role": "player",
       "expect": {
         "equals": {
           "sequencedCount": 9
@@ -81,14 +74,15 @@
     },
     {
       "command": "blast",
-      "description": "role: bootstrap, temporary exception (issue #515) -- see the drill_plan step's description for the #bs-toolbar zero-size rationale.",
-      "role": "bootstrap",
+      "role": "player",
       "interaction": [
-        {
-          "type": "command",
-          "command": "blast"
-        }
+        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"execute\"]" },
+        { "type": "waitForSelector", "selector": ".bs-confirm-overlay .bs-btn-danger" },
+        { "type": "clickSelector", "selector": ".bs-confirm-overlay .bs-btn-danger" },
+        { "type": "waitForSelector", "selector": "[data-action=\"report-close\"]" },
+        { "type": "clickSelector", "selector": "[data-action=\"report-close\"]" }
       ],
+      "timeout": 15,
       "expect": {
         "equals": {
           "holeCount": 0,
