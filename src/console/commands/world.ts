@@ -206,11 +206,11 @@ export function newGameCommand(
   // the larger campaign sizes (#458 T6.1/D13) are not cubic, and console
   // testing at those aspect ratios shouldn't require a same-sized cube.
   const sizeY = named['size_y'] ? parseInt(named['size_y'], 10) : size;
-  // guard fix incoming (#534): non-numeric cash:abc parses to NaN, which is
-  // truthy-guarded here but still gets spread in and poisons state.cash.
+  const parsedCash = named['cash'] ? parseInt(named['cash'], 10) : undefined;
+  const startingCash = parsedCash !== undefined && Number.isFinite(parsedCash) ? parsedCash : undefined;
   ctx.state = createGame({
     seed, mineType,
-    ...(named['cash'] ? { startingCash: parseInt(named['cash'], 10) } : {}),
+    ...(startingCash !== undefined ? { startingCash } : {}),
   });
   ctx.state.world = createWorldState(size, sizeY, size, true);
   regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY, sizeZ: size });
