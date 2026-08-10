@@ -31,7 +31,7 @@ export function createCharge(
       error: `Amount ${amountKg}kg out of range [${explosive.minChargeKg}–${explosive.maxChargeKg}kg] for ${explosiveId}`,
     };
   }
-  if (stemmingM < MIN_STEMMING_M) {
+  if (!Number.isFinite(stemmingM) || stemmingM < MIN_STEMMING_M) {
     return { error: `Stemming ${stemmingM}m below minimum ${MIN_STEMMING_M}m` };
   }
   if (stemmingM > holeDepth) {

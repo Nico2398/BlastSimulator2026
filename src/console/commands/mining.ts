@@ -9,6 +9,7 @@ import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
+import { MIN_STEMMING_M } from '../../core/config/balance.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { processProjections } from '../../core/entities/Damage.js';
@@ -190,7 +191,7 @@ export function chargeCommand(
   const holeSpec = named['hole'] ?? '';
   const explosiveId = named['explosive'] ?? '';
   const amount = parseFloat((named['amount'] ?? '0').replace('kg', ''));
-  const stemming = parseFloat((named['stemming'] ?? '0').replace('m', ''));
+  const stemming = parseFloat((named['stemming'] ?? String(MIN_STEMMING_M)).replace('m', ''));
 
   if (!explosiveId) return { success: false, output: 'Missing explosive. Usage: charge hole:1 explosive:boomite amount:5kg stemming:2m' };
 
