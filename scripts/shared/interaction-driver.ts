@@ -40,6 +40,30 @@ export class InteractionFailure extends Error {
 const DEFAULT_TIMEOUT_MS = 6000;
 
 /**
+ * How long `clickEntity` waits for an entity's *rendered* position to stop
+ * moving before it aims at it.
+ *
+ * Since #535 a mesh's x/z is driven only by the per-frame tween:
+ * `GameRenderer.syncFromContext` sets `y` and leaves x/z to
+ * `VehicleMesh.update`/`CharacterMesh.update`, where it used to snap both on
+ * every sync. `SceneManager.start` caps `dt` at 100ms against
+ * `MOVE_TWEEN_DURATION_S` (1s), so a mesh needs ~10 rAF frames to reach the
+ * position `GameState` already reports — and those frames fire between the
+ * harness's CDP calls, not under its control. A position read before the
+ * click can therefore be stale by the time the click lands, the ray misses
+ * the entity, nothing is selected, and the failure surfaces as an unrelated
+ * control never becoming usable (#530: `nav-ramp-routing-visual` failing on
+ * `move_here` "present but hidden", reproducible in CI, never locally).
+ *
+ * Two consecutive reads under this epsilon mean the tween has converged (or
+ * is not running at all), so the position is safe to aim at. Costs two cheap
+ * `evaluate` round trips when the mesh is already settled, which is the norm.
+ */
+const ENTITY_SETTLE_EPSILON = 0.01;
+const ENTITY_SETTLE_INTERVAL_MS = 25;
+const ENTITY_SETTLE_MAX_POLLS = 40;
+
+/**
  * Wait for the render loop's rAF callback to run twice. That callback drives
  * `uiManager.update` once per frame regardless of whether drawing itself is
  * suspended (#475), so two passes is the actual event a post-action settle is
@@ -273,16 +297,36 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'clickEntity': {
-      const pos = await page.evaluate(({ kind, id }: { kind: string; id: number }) =>
+      // Arrow, not a named function: this body is stringified into the page,
+      // and esbuild's keepNames wraps named functions in a `__name()` call
+      // that does not exist in that context.
+      const readPos = () => page.evaluate(({ kind, id }: { kind: string; id: number }) =>
         (window as unknown as {
           __entityWorldPosition: (k: string, i: number) => { x: number; z: number } | null;
         }).__entityWorldPosition(kind, id), { kind: action.kind, id: action.id });
+
+      let pos = await readPos();
       if (!pos) {
         throw new InteractionFailure(
           `no ${action.kind} #${action.id} is on the scene to click`,
           describeAvailable(await probe(page)),
         );
       }
+
+      // Aim at where the mesh has come to rest, not where it happened to be
+      // mid-glide — see ENTITY_SETTLE_EPSILON for why a moving mesh makes the
+      // click miss entirely. Forcing a frame does not help: `__renderFrame`
+      // calls `drawFrame` only, never the loop's `onUpdate`, so it refreshes
+      // camera matrices without advancing the tween.
+      for (let i = 0; i < ENTITY_SETTLE_MAX_POLLS; i++) {
+        await new Promise(r => setTimeout(r, ENTITY_SETTLE_INTERVAL_MS));
+        const next = await readPos();
+        if (!next) break;
+        const settled = Math.hypot(next.x - pos.x, next.z - pos.z) < ENTITY_SETTLE_EPSILON;
+        pos = next;
+        if (settled) break;
+      }
+
       await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
         (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
         // Interaction mode suspends the draw loop (#475) — force a frame so
