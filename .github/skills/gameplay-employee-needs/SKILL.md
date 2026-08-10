@@ -4,7 +4,7 @@ description: >
   Employee needs system for BlastSimulator2026: 3 need gauges (hunger, fatigue, break pressure),
   morale effects, collapse and interruption, proactive queue insertion, building replenishment
   and shift cycles. Use when implementing or modifying employee
-  well-being, rest mechanics, canteen, bunkhouse, break room, or shift systems.
+  well-being, rest mechanics, living quarters replenishment, or shift systems.
 ---
 
 ## Design Goals
@@ -17,9 +17,9 @@ Each employee has three gauges (0–100; 100 = fully satisfied):
 
 | Gauge | Fills at | Drains at | Collapse Threshold |
 |-------|----------|------------|-------------------|
-| `hunger` | Eating at Canteen | −1/tick (working) / −0.5/tick (idle) | ≤ 10 |
-| `fatigue` | Sleeping at Bunkhouse | −0.5/tick (awake) / −2/tick (active task) | ≤ 5 |
-| `breakNeed` | Taking break at Break Room | −0.8/tick (working) | ≤ 15 |
+| `hunger` | Eating at Living Quarters | −1/tick (working) / −0.5/tick (idle) | ≤ 10 |
+| `fatigue` | Sleeping at Living Quarters | −0.5/tick (awake) / −2/tick (active task) | ≤ 5 |
+| `breakNeed` | Taking break at Living Quarters | −0.8/tick (working) | ≤ 15 |
 
 **Rate modifiers:**
 - High morale (>70): drain rate ×0.85
@@ -50,9 +50,9 @@ When any gauge hits its collapse threshold:
 
 | Collapsed Gauge | Rest Building | Rest Duration (ticks) |
 |----------------|--------------|----------------------|
-| `hunger` | Canteen | 2 |
-| `fatigue` | Bunkhouse | 8 |
-| `breakNeed` | Break Room | 3 |
+| `hunger` | Living Quarters | 2 |
+| `fatigue` | Living Quarters | 8 |
+| `breakNeed` | Living Quarters | 3 |
 
 If no suitable building within 20 cells: employee collapses in place, rest duration doubled.
 
@@ -73,9 +73,9 @@ A gauge already above the ceiling is left alone, not pulled down to it. Per-visi
 
 | Building | Tier 1 | Tier 2 | Tier 3 |
 |---------|--------|--------|--------|
-| Canteen | +12 hunger/tick | +18 hunger/tick | +25 hunger/tick |
-| Bunkhouse | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick |
-| Break Room | +10 breakNeed/tick | +16 breakNeed/tick | +22 breakNeed/tick |
+| Living Quarters (hunger) | +12 hunger/tick | +18 hunger/tick | +25 hunger/tick |
+| Living Quarters (fatigue) | +8 fatigue/tick | +14 fatigue/tick | +20 fatigue/tick |
+| Living Quarters (breakNeed) | +10 breakNeed/tick | +16 breakNeed/tick | +22 breakNeed/tick |
 
 Building full → employee waits in queue (gauges drain at normal awake rate while waiting). Route to next nearest if no capacity.
 
@@ -85,26 +85,28 @@ Auto-insert rest tasks at warning thresholds — don't wait for collapse:
 
 | Gauge | Warning Threshold | Auto-Insert Behaviour |
 |-------|------------------|----------------------|
-| `hunger` | 35 | Insert `rest(canteen)` after current task if not already queued |
-| `fatigue` | 25 | Insert `rest(bunkhouse)` after current task if not already queued |
-| `breakNeed` | 30 | Insert `rest(break_room)` after current task if not already queued |
+| `hunger` | 35 | Insert `rest(living_quarters)` after current task if not already queued |
+| `fatigue` | 25 | Insert `rest(living_quarters)` after current task if not already queued |
+| `breakNeed` | 30 | Insert `rest(living_quarters)` after current task if not already queued |
 
 Queue full → skip auto-insert + emit `need_warning` event for player.
 
 ## Cost of Needs
 
-| Building | Cost per Visit |
-|---------|---------------|
-| Canteen | $10 (Tier 1) / $8 (Tier 2) / $6 (Tier 3) |
-| Bunkhouse | $0 (included in salary) |
-| Break Room | $5 per employee |
+Flat per-visit cost, not tier-scaled (`NEED_REST_COSTS` in `src/core/config/balance.ts`):
+
+| Building | Need Gauge | Cost per Visit |
+|---------|-----------|---------------|
+| Living Quarters | hunger | $50 |
+| Living Quarters | fatigue | $0 (included in salary) |
+| Living Quarters | breakNeed | $20 |
 
 ## Shift System
 
-If player builds a **Bunkhouse Tier 2+**, an 8-tick shift cycle activates:
-- Employees work 6 ticks → automatically enter 8-tick sleep rest at bunkhouse
+If player builds a **Living Quarters Tier 2+**, an 8-tick shift cycle activates:
+- Employees work 6 ticks → automatically enter 8-tick sleep rest at Living Quarters
 - `employee_shift_change` event fired at shift boundaries
-- Without Bunkhouse: employees remain awake indefinitely (fatigue accumulates faster)
+- Without Living Quarters Tier 2+: employees remain awake indefinitely (fatigue accumulates faster)
 
 ## TypeScript Reference
 

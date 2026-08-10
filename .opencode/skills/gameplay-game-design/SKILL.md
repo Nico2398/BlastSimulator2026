@@ -55,7 +55,7 @@ Fragments picked up by excavators → loaded onto trucks → sold via contracts
 - Each specifies: material type, quantity, unit price, deadline, penalties
 
 ### Buildings
-Worker quarters, storage depots, vehicle depot, office, break rooms, medical bay, explosives magazine.
+9 canonical building types (see gameplay-buildings skill for the full catalog).
 Can be placed, moved, destroyed. Projections can destroy them.
 
 ### Vehicle Fleet

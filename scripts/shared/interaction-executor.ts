@@ -201,10 +201,11 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // rejects with "Unknown subcommand or building type" (verified per-file).
   // No catalog row exists, or ever should, for a type that isn't real, so
   // there is nothing for a player to click; this is a permanent bootstrap
-  // primitive, not a temporary one. Flagged in the #515 implementation
-  // report as worth checking against gameplay-employee-needs, which
-  // describes canteen/bunkhouse/break-room-shaped replenishment despite the
-  // engine only ever having shipped `living_quarters` for that role.
+  // primitive, not a temporary one. Issue #526 confirmed these six strings
+  // are permanently non-real and reconciled the docs accordingly; the
+  // real-type mapping (office→management_office, storage_depot→freight_warehouse,
+  // canteen/bunkhouse/break_room/medical_bay→living_quarters) now lives in the
+  // gameplay-employee-needs skill doc.
   'build office',
   'build medical_bay',
   'build canteen',
