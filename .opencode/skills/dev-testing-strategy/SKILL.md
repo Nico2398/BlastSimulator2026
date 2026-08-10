@@ -212,8 +212,8 @@ CI has 3 tiers of scenario testing:
 
 | Tier | What | When | Time |
 |------|------|------|------|
-| **1 — Command** | All 126 scenarios in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
-| **2 — Interaction** | All 126 scenarios in interaction mode (Puppeteer, real browser) | Push to main, schedule (weekly), workflow_dispatch, **or PR with `full-ci` label** | tens of minutes† |
+| **1 — Command** | All 127 scenarios in command mode (pure Node.js, no browser) | Every push, PR, schedule, manual | ~1 min |
+| **2 — Interaction** | All 127 scenarios in interaction mode (Puppeteer, real browser) | Push to main, schedule (weekly), workflow_dispatch, **or PR with `full-ci` label** | tens of minutes† |
 | **3 — Full** | Tiers 1 + 2 combined | Automatic on schedule/weekly; opt-in via `full-ci` label on PR | tens of minutes† |
 
 † No GPU means ~6 s/frame in software rasterisation (#475) — a cached minute figure goes stale fast, so none is kept here. Current cost and the `full-ci` label rule: `agentic-pipeline-pr-management` skill. Claude Code session mechanics for these jobs: `.claude/CLAUDE.md`'s "Claude Code only" section.

@@ -1,18 +1,18 @@
 // BlastSimulator2026 — checkGoal (interaction-mode half of a step's expect)
 //
-// checkGoal (playtest-driver.ts) is shared, unmodified, between playtest
-// beats and scenario steps in interaction mode (scenario-interaction-runner.ts
-// and run-all-scenarios.ts's batch loop both call it directly) — one
-// evaluator instead of two that can drift. checkGoalAgainstState
-// (scenario-goal.ts, tests/unit/scenario-goal.test.ts) is the command-mode
-// half: equals/increased only, no DOM.
+// checkGoal (interaction-driver.ts) is shared, unmodified, between every
+// caller that needs it (scenario-interaction-runner.ts and
+// run-all-scenarios.ts's batch loop both call it directly) — one evaluator
+// instead of several that can drift. checkGoalAgainstState (scenario-goal.ts,
+// tests/unit/scenario-goal.test.ts) is the command-mode half: equals/increased
+// only, no DOM.
 //
 // No real Puppeteer browser — `Page` is faked at the `evaluate` boundary,
 // matching tests/unit/scenario-interaction.test.ts's approach.
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Page } from 'puppeteer';
-import { checkGoal, PlaytestFailure } from '../../scripts/shared/playtest-driver.js';
+import { checkGoal, InteractionFailure } from '../../scripts/shared/interaction-driver.js';
 
 /**
  * Builds a fake page whose `evaluate` dispatches on the bridge function it
@@ -49,7 +49,7 @@ describe('checkGoal — equals', () => {
     await expect(checkGoal(page, { equals: { cash: 70000, buildingCount: 1 } }, {})).resolves.toBeUndefined();
   });
 
-  it('throws PlaytestFailure naming the field, expected, and actual', async () => {
+  it('throws InteractionFailure naming the field, expected, and actual', async () => {
     const page = fakePage({ gameState: { cash: 80000 } });
     let caught: unknown;
     try {
@@ -57,7 +57,7 @@ describe('checkGoal — equals', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect(caught).toBeInstanceOf(InteractionFailure);
     expect((caught as Error).message).toContain('cash');
     expect((caught as Error).message).toContain('70000');
     expect((caught as Error).message).toContain('80000');
@@ -80,7 +80,7 @@ describe('checkGoal — increased', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect(caught).toBeInstanceOf(InteractionFailure);
     expect((caught as Error).message).toContain('1 → 1');
   });
 });
@@ -101,7 +101,7 @@ describe('checkGoal — decreased', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect(caught).toBeInstanceOf(InteractionFailure);
     expect((caught as Error).message).toContain('50 → 50');
   });
 });
@@ -124,7 +124,7 @@ describe('checkGoal — tutorialStep', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect(caught).toBeInstanceOf(InteractionFailure);
     expect((caught as Error).message).toContain('"survey"');
     expect((caught as Error).message).toContain('"hire-surveyor"');
   });
@@ -146,7 +146,7 @@ describe('checkGoal — blocked (a control must NOT be reachable)', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect(caught).toBeInstanceOf(InteractionFailure);
     expect((caught as Error).message).toContain('reachable but should not be');
   });
 
@@ -158,7 +158,7 @@ describe('checkGoal — blocked (a control must NOT be reachable)', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect(caught).toBeInstanceOf(InteractionFailure);
     expect((caught as Error).message).toContain('proves nothing');
   });
 });
@@ -192,7 +192,7 @@ describe('checkGoal — multiple fields, first violation wins', () => {
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(PlaytestFailure);
+    expect(caught).toBeInstanceOf(InteractionFailure);
     // The tutorialStep mismatch, not the (satisfied) increased check, is reported.
     expect((caught as Error).message).toContain('time-speed');
   });

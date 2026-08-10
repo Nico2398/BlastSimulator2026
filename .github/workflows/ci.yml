@@ -88,9 +88,18 @@ jobs:
           name: test-results
           path: test-results/
 
+  # Runs the production build check. Runs only on:
+  #   - Push to main (catches build breakage after merge)
+  #   - Schedule (weekly full scan)
+  #   - workflow_dispatch (manual trigger)
+  #   - PRs labeled "build-check" or "full-ci" (opts in when the build itself is worth proving)
   build:
     name: Production build
     runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'build-check') ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci')
     needs:
       - typecheck
       - test

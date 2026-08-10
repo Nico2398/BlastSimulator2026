@@ -11,9 +11,9 @@
 import type { Page, KeyInput } from 'puppeteer';
 import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
 import { awaitPlacementArmed } from './tile-picker.js';
-import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './playtest-types.js';
-import type { PlayerAction } from './playtest-types.js';
-import { runAction } from './playtest-driver.js';
+import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './interaction-types.js';
+import type { PlayerAction } from './interaction-types.js';
+import { runAction } from './interaction-driver.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -320,10 +320,10 @@ export function isAllowedBootstrapCommand(command: string): boolean {
  *
  * A player step may not reach the console at all — a click that was awkward
  * is a playability finding, not license to type it instead. A setup step may
- * still run a command, but only one `isAllowedSetupCommand` admits: the same
- * allowlist the playtest harness uses to bootstrap a world, reused rather
- * than reinvented so there is exactly one place that decides what counts as
- * "setup" instead of two that can drift apart. An observe step is held to
+ * still run a command, but only one `isAllowedSetupCommand` admits: the one
+ * allowlist every `setup`-role caller shares (`interaction-types.ts`), so
+ * there is exactly one place that decides what counts as "setup" instead of
+ * two that can drift apart. An observe step is held to
  * `isObservationCommand`, so "I only wanted to read the state" cannot smuggle
  * a `build` through. A bootstrap step is held to the narrower
  * `isAllowedBootstrapCommand`. A guard step is not checked against a command
@@ -431,9 +431,9 @@ export async function executeActionOnPage(
       break;
     }
     case 'pickTile': {
-      // P3: in-scene placement, not the old 2D canvas. Scenario mode drives it
-      // through window.__placement directly (playtest mode drives the same
-      // tool with real clicks instead — see playtest-driver.ts).
+      // P3: in-scene placement, not the old 2D canvas. Command mode drives it
+      // through window.__placement directly (interaction mode drives the same
+      // tool with real clicks instead — see interaction-driver.ts).
       await awaitPlacementArmed(page, PICKER_TIMEOUT_MS);
       await page.evaluate((x: number, z: number) => (window as unknown as {
         __placement: { paintRect: (x1: number, z1: number, x2: number, z2: number) => void };
@@ -644,11 +644,11 @@ export async function executeActionOnPage(
     case 'screenshot':
       // Screenshot is handled by the caller, not here
       break;
-    // The vocabulary shared with the playability harness (issue #479). These
+    // The vocabulary ported from the playability harness (issue #479). These
     // are structurally identical to their `PlayerAction` counterparts, so they
-    // run through `runAction` rather than being reimplemented here — one
-    // implementation means a converted scenario step and the playtest beat it
-    // mirrors genuinely do the same thing, including the failure diagnosis.
+    // run through `runAction` (`interaction-driver.ts`) rather than being
+    // reimplemented here — one implementation shared by every caller,
+    // including the failure diagnosis.
     case 'set':
     case 'clickLabel':
     case 'awaitUsable':

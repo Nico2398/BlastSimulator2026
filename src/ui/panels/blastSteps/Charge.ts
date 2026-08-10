@@ -84,7 +84,7 @@ export class ChargeStep {
 
     // data-field, same reasoning as ParamStrip.ts's grid spacing/depth
     // steppers (issue #479 follow-up, Finding #4): without it there is no
-    // selector a click-only scenario/playtest step can target to reach an
+    // selector a click-only scenario step can target to reach an
     // exact amount/stemming before Charge All, so a declared
     // `charge ... amount:8 stemming:0` silently charged at the panel's
     // 5kg/2m defaults instead whenever the click never touched these.

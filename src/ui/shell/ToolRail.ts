@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Tool rail (redesign P1)
 // Replaces the old vertical toolbar. Same panel-routing contract
 // (#bs-toolbar, [data-panel]) so tutorial highlight targets and the
-// playtest/scenario harnesses keep resolving it unchanged.
+// scenario/interaction harnesses keep resolving it unchanged.
 
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';

@@ -137,7 +137,7 @@ export class ParamStrip {
 
     const fieldEls = config.fields.map((f) => {
       // data-field, not just a positional wrapper: without it there is no
-      // selector a click-only scenario/playtest step can target to set an
+      // selector a click-only scenario step can target to set an
       // exact spacing/depth before confirming a grid — only the whole-strip
       // default was reachable, silently making an explicit spacing:N in a
       // scenario's command field describe a different grid than the click
@@ -168,7 +168,7 @@ export class ParamStrip {
       onClick: () => this.onConfirmHandler?.(),
       ...(config.confirmDisabledReason ? { title: config.confirmDisabledReason } : {}),
     });
-    confirmBtn.id = 'bs-tile-select-confirm'; // preserved id — every scenario/playtest def targeting the old 2D picker's Confirm keeps resolving
+    confirmBtn.id = 'bs-tile-select-confirm'; // preserved id — every scenario def targeting the old 2D picker's Confirm keeps resolving
     const escBtn = button('ghost', t('shell.placement.esc'), { onClick: () => this.onCancelHandler?.() });
     actions.append(confirmBtn, escBtn);
 

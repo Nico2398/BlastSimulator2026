@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut.",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the retired playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut.",
   "shots": [
     {
       "name": "overview",
@@ -695,7 +695,7 @@
     {
       "command": "tick 6",
       "timeout": 60,
-      "description": "tick-advance complete: the tutorial's own clock runs — the whole point of this step — until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the playtest's own beat, which is `letTimePass` only.",
+      "description": "tick-advance complete: the tutorial's own clock runs — the whole point of this step — until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the retired playtest's own beat, which was `letTimePass` only.",
       "role": "player",
       "interaction": [
         {

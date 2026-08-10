@@ -36,7 +36,7 @@ import {
   SCREENSHOT_DIR,
 } from './shared/puppeteer-utils.js';
 import { describeStepFailure } from './scenario-interaction-runner.js';
-import { checkGoal, gameState } from './shared/playtest-driver.js';
+import { checkGoal, gameState } from './shared/interaction-driver.js';
 
 const DEV_SERVER_PORT = 5173;
 

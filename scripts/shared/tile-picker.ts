@@ -1,7 +1,7 @@
 /**
  * BlastSimulator2026 — Tile picker coordinate mapping
  *
- * Shared by the `playability` and `scenario`/`visual` channels so both address
+ * Shared by the `scenario` and `visual` channels so both address
  * the tile picker the same way. Pixel coordinates baked into a definition are
  * a standing trap: the picker canvas moves whenever the HUD is relaid out, and
  * a click that lands one tile over — or on no tile at all — fails as "the step
@@ -106,13 +106,13 @@ export async function awaitPlacementArmed(page: Page, timeoutMs: number): Promis
 /**
  * Screen point for world tile (x, z), via the live camera projection —
  * recomputed on every call, same "never bake pixels" reasoning as the 2D
- * picker mapping above. Used by the playtest harness so a placement click is
+ * picker mapping above. Used by interaction mode so a placement click is
  * a real page.mouse click, not a call into __placement (that hook is for
  * scenario mode only — see PlacementController.paintRect).
  *
  * @throws when the tile projects off-screen or behind the camera — the
- *   caller (a playtest def) asked for a tile the player could not see either,
- *   which is itself the finding.
+ *   caller (an interaction-mode scenario step) asked for a tile the player
+ *   could not see either, which is itself the finding.
  */
 export async function worldToScreenPoint(page: Page, x: number, z: number): Promise<PickerPoint> {
   const point = await page.evaluate((wx: number, wz: number) => (window as unknown as {

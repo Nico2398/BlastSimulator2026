@@ -13,7 +13,7 @@ import type { Browser, Page, PuppeteerLaunchOptions } from 'puppeteer';
 import { resolve } from 'path';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './chrome.js';
 import { executeActionOnPage } from './interaction-executor.js';
-import { waitForUiUpdate } from './playtest-driver.js';
+import { waitForUiUpdate } from './interaction-driver.js';
 import type { ScenarioStepDef } from './scenario-types.js';
 
 /** Default timeout for scenario steps in seconds. */
@@ -145,9 +145,9 @@ export async function executeInteractionActions(
       await executeActionOnPage(page, action, step);
       // A click that mutates the DOM — opening a panel, then clicking a control
       // inside it — needs the panel's next-frame `uiManager.update` to run
-      // before the following action reads or clicks that control. The playtest
-      // driver settles after every action for exactly this; the interaction
-      // scenarios did not, so a hire button clicked in the same beat its panel
+      // before the following action reads or clicks that control. The
+      // interaction driver settles after every action for exactly this; the
+      // interaction scenarios did not, so a hire button clicked in the same beat its panel
       // opened fired against a not-yet-live control and the click was lost
       // (the tutorial-interactive surveyor hire, which stalled the whole run).
       // Only the mutating actions pay it; reads and explicit waits do not.

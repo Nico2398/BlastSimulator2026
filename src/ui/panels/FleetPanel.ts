@@ -8,7 +8,7 @@
 //
 // Root id and the dealership buttons' [data-vtype]/[data-tier] are preserved
 // from the old VehiclePanel so tutorialStages.ts, uiActionProbe.ts, and the
-// tutorial/scenario/playtest defs keep resolving unchanged — same convention
+// tutorial/scenario defs keep resolving unchanged — same convention
 // ContractsPanel.ts already established for #bs-contract-panel in P5.
 
 import { t } from '../../core/i18n/I18n.js';

@@ -27,7 +27,7 @@ import puppeteer from 'puppeteer';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './shared/chrome.js';
 import { executeActionOnPage } from './shared/interaction-executor.js';
 import { suspendDrawing, captureFrame, DEFAULT_STEP_TIMEOUT } from './shared/puppeteer-utils.js';
-import { checkGoal, gameState } from './shared/playtest-driver.js';
+import { checkGoal, gameState } from './shared/interaction-driver.js';
 import { createGameEngine } from './shared/command-runner.js';
 import { runCommand } from '../src/console/createRunner.js';
 import { serializeGameState } from '../src/console-api.js';

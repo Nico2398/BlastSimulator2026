@@ -402,7 +402,7 @@ declare global {
       confirm: () => void;
       cancel: () => void;
     };
-    /** World tile → screen pixel, for the playtest harness's real clicks on the P3 placement canvas (unlike __placement, which scenario-mode uses directly). */
+    /** World tile → screen pixel, for interaction mode's real clicks on the P3 placement canvas (unlike __placement, which scenario-mode uses directly). */
     __worldToScreen: (x: number, z: number) => { px: number; py: number; onScreen: boolean } | null;
     /**
      * Preview the loading screen without running a real (multi-second,
@@ -552,8 +552,8 @@ window.__gameState = () => {
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
-    // Qualifications the roster holds, so a playtest can prove a skill was
-    // actually obtained rather than that a button merely looked clickable.
+    // Qualifications the roster holds, so an interaction-mode check can prove
+    // a skill was actually obtained rather than that a button merely looked clickable.
     qualificationCount: s.employees.employees
       .reduce((n, e) => n + e.qualifications.length, 0),
     proficiencyTotal: s.employees.employees
@@ -618,7 +618,7 @@ window.__gameState = () => {
 
 window.__resetTickAccumulator = () => { accumulatedGameMs = 0; };
 
-// A Puppeteer-driven run (scenario/interaction mode, playtest) navigates with
+// A Puppeteer-driven run (scenario/interaction mode) navigates with
 // `?scenarioMode=1` so only its own scripted `tick N` commands advance
 // simulation time — otherwise the render loop's own real-time ticking races
 // scripted checkpoints and desyncs them (see #406). Exposed as a bridge too,
@@ -680,7 +680,7 @@ window.__uiState = () => {
   return { panels: panelStates, blastPanelButtons: buttons };
 };
 
-// What can a player actually click right now? Used by the playtest harness so a
+// What can a player actually click right now? Used by interaction mode so a
 // failure reports "Run is disabled because <hint>" rather than a selector timeout.
 window.__uiActions = () => probeUiActions();
 window.__probeSelector = (selector: string) => probeSelector(selector);
@@ -722,8 +722,8 @@ window.__cameraReset = () => {
   scene.cameraController.reset();
 };
 // Live entity position for harnesses that need to click a scene entity
-// without baking in a guessed world coordinate — a playtest that hires an
-// employee doesn't otherwise know where the game decided to spawn them.
+// without baking in a guessed world coordinate — a scenario step that hires
+// an employee doesn't otherwise know where the game decided to spawn them.
 window.__entityWorldPosition = (kind, id) => {
   const pos = gameRenderer.entityWorldPosition(kind, id);
   return pos ? { x: pos.x, z: pos.z } : null;
