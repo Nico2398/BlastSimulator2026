@@ -24,6 +24,8 @@ import { newGameCommand } from '../../../src/console/commands/world.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { corruptCommand, mafiaCommand } from '../../../src/console/commands/events.js';
+import { campaignStartCommand } from '../../../src/console/commands/campaign.js';
+import { getLevel } from '../../../src/core/campaign/Level.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { HIRING_COSTS, hireEmployee } from '../../../src/core/entities/Employee.js';
 import { getVehicleDefByTier } from '../../../src/core/entities/Vehicle.js';
@@ -731,5 +733,79 @@ describe('new_game cash: — invalid cash override sanitization (#534)', () => {
     const result = newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', cash: '' });
     expect(result.success).toBe(true);
     expect(ctx.state!.cash).toBe(STARTING_CASH);
+  });
+});
+
+// ── start_level — invalid cash override sanitization (#534 campaign.ts) ──
+//
+// `campaign start level:<id> cash:<n>` guards its override with
+// `parseInt(named['cash'], 10)` fed through `isNaN(cashOverride)`. Its own
+// issue claimed this "already guards correctly" — wrong, same bug class as
+// the other two #534 sites: `isNaN` only catches `NaN`, not `Infinity`, and
+// `parseInt` returns `Infinity` for a numeric digit string long enough to
+// overflow (e.g. `parseInt('1' + '0'.repeat(400), 10) === Infinity`).
+// `isNaN(Infinity)` is `false`, so `!isNaN(cashOverride)` is `true` and the
+// guard never fires — `ctx.state.cash` and `ctx.state.finances.cash` both get
+// set to `Infinity`, disabling every later `cash < X` funds guard for the
+// rest of the session, same end state as the `employee raise` and `new_game
+// cash:` sites already covered above. The fix (not made here) replaces
+// `!isNaN(cashOverride)` with `Number.isFinite(cashOverride)`.
+
+describe('start_level — invalid cash override sanitization (#534 campaign.ts)', () => {
+  const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
+
+  function freshCtx(): MiningContext {
+    return { state: null, grid: null, emitter: new EventEmitter() };
+  }
+
+  it('does not set cash to Infinity for a cash override that overflows parseInt', () => {
+    const overflowDigits = '1' + '0'.repeat(400);
+    expect(parseInt(overflowDigits, 10)).toBe(Infinity); // sanity check on the premise
+
+    const ctx = freshCtx();
+    const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', cash: overflowDigits });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).not.toBe(Infinity);
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+    expect(ctx.state!.finances.cash).not.toBe(Infinity);
+    expect(Number.isFinite(ctx.state!.finances.cash)).toBe(true);
+    // Rejected override falls back to the level's own starting cash, same as
+    // the non-numeric case below and the sibling #534 sites.
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
+    expect(ctx.state!.finances.cash).toBe(TUTORIAL_START_CASH);
+  });
+
+  it('falls back to the level default for cash:notanumber (regression boundary, already correct pre-fix)', () => {
+    const ctx = freshCtx();
+    const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', cash: 'notanumber' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
+    expect(ctx.state!.finances.cash).toBe(TUTORIAL_START_CASH);
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+  });
+
+  it('still honors a legitimate cash:50000 override exactly (must not regress)', () => {
+    const ctx = freshCtx();
+    const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', cash: '50000' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.cash).toBe(50000);
+    expect(ctx.state!.finances.cash).toBe(50000);
+  });
+
+  it('does not permanently disable funds guards after an Infinity-overflowing cash override', () => {
+    const ctx = freshCtx();
+    campaignStartCommand(ctx, [], { level: 'tutorial_pit', cash: '1' + '0'.repeat(400) });
+    expect(Number.isFinite(ctx.state!.cash)).toBe(true);
+
+    const buildResult = buildCommand(ctx, ['management_office'], { at: '0,0' });
+    // A guard poisoned to Infinity would let any purchase through; a sane
+    // guard still enforces affordability against the real (finite) balance.
+    if (ctx.state!.cash < getBuildingDef('management_office', 1).constructionCost) {
+      expect(buildResult.success).toBe(false);
+      expect(buildResult.output).toContain('Insufficient funds');
+    }
   });
 });
