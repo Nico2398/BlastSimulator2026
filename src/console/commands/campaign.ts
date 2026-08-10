@@ -11,6 +11,7 @@ import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
+import { sanitizeFiniteOverride } from './commandUtils.js';
 // ── campaign status ──
 
 export function campaignStatusCommand(
@@ -110,8 +111,8 @@ export function campaignStartCommand(
   // cash allows has nowhere else to get it. Debug grant, same class as
   // new_game's, and deliberately applied to both the flat field and the
   // ledger so they cannot disagree (Finding #36's class).
-  const cashOverride = named['cash'] !== undefined ? parseInt(named['cash'], 10) : NaN;
-  if (Number.isFinite(cashOverride)) {
+  const cashOverride = named['cash'] !== undefined ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
+  if (cashOverride !== undefined) {
     ctx.state.cash = cashOverride;
     ctx.state.finances.cash = cashOverride;
   }
