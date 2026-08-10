@@ -133,15 +133,6 @@ export class CameraController {
     this.target = target.clone();
     this.canvas = canvas;
 
-    // Skeleton stage (#544): rightButtonDown/rightDownX/rightDownY and
-    // RIGHT_DRAG_THRESHOLD_PX are read by @implementer's tracking logic in
-    // onMouseDown/onMouseMove/onMouseUp, not yet wired in. These no-op reads
-    // satisfy noUnusedLocals until that wiring lands.
-    void this.rightButtonDown;
-    void this.rightDownX;
-    void this.rightDownY;
-    void RIGHT_DRAG_THRESHOLD_PX;
-
     // Initialise spherical from current camera position
     const offset = camera.position.clone().sub(this.target);
     this.spherical = new THREE.Spherical().setFromVector3(offset);
@@ -304,6 +295,14 @@ export class CameraController {
       // Middle or Right button — pan
       this.isPanning = true;
     }
+    if (e.button === 2) {
+      // New right-button gesture starts clean — PlacementController's
+      // contextmenu handler reads rightGestureMoved after release (#544).
+      this.rightButtonDown = true;
+      this.rightDownX = e.clientX;
+      this.rightDownY = e.clientY;
+      this.rightGestureMoved = false;
+    }
     this.prevMouseX = e.clientX;
     this.prevMouseY = e.clientY;
   };
@@ -319,11 +318,22 @@ export class CameraController {
     } else if (this.isPanning) {
       this.pan(dx, dy);
     }
+
+    if (this.rightButtonDown && !this.rightGestureMoved) {
+      // Peak displacement from the press point, not net displacement — a
+      // drag that returns to the press point before release still counts.
+      const rdx = e.clientX - this.rightDownX;
+      const rdy = e.clientY - this.rightDownY;
+      if (Math.sqrt(rdx * rdx + rdy * rdy) > RIGHT_DRAG_THRESHOLD_PX) {
+        this.rightGestureMoved = true;
+      }
+    }
   };
 
   private onMouseUp = () => {
     this.isOrbiting = false;
     this.isPanning = false;
+    this.rightButtonDown = false;
   };
 
   private onWheel = (e: WheelEvent) => {

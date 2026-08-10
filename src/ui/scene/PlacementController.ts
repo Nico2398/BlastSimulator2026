@@ -284,6 +284,11 @@ export class PlacementController {
   private onContextMenu(e: MouseEvent): void {
     if (this.phase === 'idle' || this.phase === 'confirmed') return;
     e.preventDefault();
+    // A right-drag used purely to orbit the camera must not cancel the armed
+    // tool — only a right-button click (no meaningful movement) does. Single
+    // source of truth for the drag/click distinction lives on CameraController
+    // (RIGHT_DRAG_THRESHOLD_PX), not duplicated here (#544).
+    if (this.cameraController.rightButtonDragged) return;
     this.cancel();
   }
 
