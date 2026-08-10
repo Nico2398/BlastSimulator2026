@@ -3,17 +3,6 @@
   "description": "Closes the research-center-gate playtest's #442 parity gap (docs/plans/scenario-assertions-and-playtest-removal.md): clicking Queue Research on an already-placed building must be rejected on screen — not silently accepted — while zero Research Centers exist anywhere on site, and the identical click must succeed once one is placed. building-research-visual.json/building-research-progression-visual.json only ever exercise this after a Research Center already exists, so neither covers the no_research_center precondition (getQueueBlockCode, BuildingResearch.ts) at all.",
   "steps": [
     {
-      "command": "new_game seed:42 size:24",
-      "description": "Setup: matches the research-center-gate playtest's own beat 1 exactly.",
-      "role": "setup",
-      "interaction": [
-        { "type": "command", "command": "new_game seed:42 size:24" }
-      ],
-      "expect": {
-        "equals": { "cash": 50000 }
-      }
-    },
-    {
       "command": "campaign start level:tutorial_pit",
       "description": "Setup: load the Tutorial Pit terrain — tutorial_start is never called, so no rail restricts tile picks below.",
       "role": "setup",

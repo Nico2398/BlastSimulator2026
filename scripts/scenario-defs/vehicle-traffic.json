@@ -3,23 +3,6 @@
   "description": "Chapter 2: Add 4 haulers with drivers, converge 3 of them on one tile. Finding #21: TrafficJamEvent never actually fires here, at any tick budget — a direct engine trace confirms why: the redirect happens only 5 ticks after the initial move commands, nowhere near enough travel time from the shared vehicle spawn point to reach the 3 separate staging tiles first, so all 3 vehicles travel in perfect lockstep the whole way and arrive together with no contention. detectTrafficJam (EventEngine.ts) also requires TRAFFIC_JAM_MIN_VEHICLES=3 vehicles simultaneously in the 'waiting' state on the same target tile for TRAFFIC_JAM_MIN_TICKS=10+ ticks; with only 3 vehicles converging (1 occupies the tile, at most 2 can ever be blocked waiting on it), that threshold is structurally out of reach regardless of timing — a real jam would need a 4th vehicle also converging on the same point. This file exercises real vehicle pathing/redirection but does not exercise TrafficJamEvent; assertions reflect that.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "description": "Plain new_game at the sandbox default. The `cash:150000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow cash:150000",
       "interaction": [
         {

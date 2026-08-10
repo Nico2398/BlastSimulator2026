@@ -377,13 +377,16 @@ export async function executeActionOnPage(
     case 'clickSelector': {
       const btn = BUTTON_MAP[action.button ?? 'left'] ?? 'left';
       const timeoutMs = action.timeout ?? 5000;
-      await page.waitForSelector(action.selector, { timeout: timeoutMs });
-      // Wait until the page's own probe calls the control usable, the same
-      // gate interaction-driver.ts's own clicks go through. waitForSelector alone is not
-      // enough: panels pre-exist hidden, and the tutorial rails mark a control
-      // allowed only on the guide's next 250ms pass — a machine-speed click in
-      // that gap lands on `pointer-events: none` and falls through silently,
-      // because page.click does not throw for it (#481).
+      // Wait until the page's own probe calls the control usable — an absent
+      // selector reports 'absent' (uiActionProbe.ts) rather than null, so this
+      // loop alone covers "never appears" the same deadline as "appears but
+      // stays blocked"; a separate waitForSelector before it duplicated that
+      // wait and, when the selector genuinely never appeared, threw Puppeteer's
+      // own unnamed timeout instead of this loop's describeUnclickable
+      // diagnosis. panels pre-exist hidden, and the tutorial rails mark a
+      // control allowed only on the guide's next 250ms pass — a machine-speed
+      // click in that gap lands on `pointer-events: none` and falls through
+      // silently, because page.click does not throw for it (#481).
       const deadline = Date.now() + timeoutMs;
       for (;;) {
         const reason = await page.evaluate((sel: string) => {

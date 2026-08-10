@@ -3,23 +3,6 @@
   "description": "Visual verification of employee skills UI: skill categories, proficiency stars, XP bars, task queue (incl. overflow), salary breakdown, need gauges, training badges, an employee with no assigned extra skills, and modifiers",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 10,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "employeeCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

@@ -3,16 +3,6 @@
   "description": "Chapter 7: Hire 3 workers, advance 20 ticks, and verify living_quarters (hunger) auto-queue",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup"
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

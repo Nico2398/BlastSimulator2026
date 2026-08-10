@@ -3,22 +3,6 @@
   "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs the deleted playtests/training.json's beats required -- then complete a blast task",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "buildingCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

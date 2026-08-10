@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { regenerateGrid } from './world.js';
 import { getAllLevels, getLevel } from '../../core/campaign/Level.js';
-import { getLevelProgress } from '../../core/campaign/Campaign.js';
+import { getLevelProgress, createCampaignState } from '../../core/campaign/Campaign.js';
 import { addIncome } from '../../core/economy/Finance.js';
 import { createGameForLevel } from '../../core/campaign/LevelTransition.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
@@ -77,25 +77,29 @@ export function campaignStartCommand(
   _args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  if (!ctx.state) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
-  }
   const levelId = named['level'];
   if (!levelId) {
     return { success: false, output: 'Usage: campaign start level:<id>' };
   }
 
-  const newState = createGameForLevel(ctx.state.campaign, levelId);
+  // No prior game means no prior progress either — a fresh CampaignState is
+  // exactly what a preceding `new_game` would have produced, since neither
+  // this command nor createGameForLevel reads anything else off the old
+  // state. main.ts's own WorldMap "Start Level" handler already relies on
+  // this equivalence (`ctx.state ? [] : ['new_game']`) to skip a redundant
+  // new_game before a player's very first level; this makes the console
+  // command itself tolerate the same case instead of erroring on it.
+  const campaign = ctx.state?.campaign ?? createCampaignState();
+
+  const newState = createGameForLevel(campaign, levelId);
   if (!newState) {
     const lvl = getLevel(levelId);
     if (!lvl) return { success: false, output: `Unknown level: "${levelId}".` };
     return { success: false, output: `Level "${levelId}" is locked. Complete previous levels first.` };
   }
 
-  // Preserve campaign state from old game
-  const savedCampaign = ctx.state.campaign;
   ctx.state = newState;
-  ctx.state.campaign = savedCampaign;
+  ctx.state.campaign = campaign;
 
   // `cash:` override, mirroring new_game's own knob (world.ts). Without it a
   // scenario cannot fund itself at all on a campaign level: createGameForLevel

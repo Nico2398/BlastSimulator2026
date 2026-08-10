@@ -3,23 +3,6 @@
   "description": "Visual verification of the weather system: weather cycle (sunny → cloudy → rain → heavy rain → storm → heat wave → cold snap), weather indicator icon in HUD, weather command output, and visual effects on terrain appearance.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000
-        },
-        "note": "no expect.weather here: main.ts eagerly seeds ctx.weatherCycle the moment ctx.state is replaced (this command), so interaction mode already reads 'sunny' at this point, while command mode's weatherCommand only creates it lazily on the first `weather` command below -- asserting weather here would pass in one mode and fail in the other. Both modes converge from the first `weather` step onward."
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

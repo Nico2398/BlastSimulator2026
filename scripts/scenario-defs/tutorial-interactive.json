@@ -15,23 +15,6 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 size:24",
-      "timeout": 30,
-      "description": "Setup: the Tutorial menu button creates this exact game before starting the level (main.ts setOnTutorial)",
-      "role": "setup",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42 size:24"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "cash": 50000
-        }
-      }
-    },
-    {
       "command": "campaign start level:tutorial_pit",
       "timeout": 30,
       "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera",

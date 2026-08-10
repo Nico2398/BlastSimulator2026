@@ -3,24 +3,6 @@
   "description": "Visual check: multiple vehicles on shared navmesh cause congestion with waiting state and traffic jam alert. Confirmed via direct engine trace (Finding #22) that the traffic_jam event genuinely fires at tick 25 once the tick budget was corrected — see the tick 26 step for detail.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 10,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "description": "Plain new_game at the sandbox default. The `cash:150000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow cash:150000",
       "interaction": [
         {

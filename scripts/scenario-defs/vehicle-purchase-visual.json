@@ -3,23 +3,6 @@
   "description": "Visual check: purchase vehicle deducts cost from cash, mesh appears in scene, fleet shows idle state. Vehicle purchases are made by clicking the dealership rows in the Fleet panel (issue #479), not by typing `vehicle buy`; the list/scores steps stay observation commands.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 30,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow cash:100000",
       "interaction": [
         {
@@ -28,7 +11,7 @@
         }
       ],
       "role": "setup",
-      "description": "cash:100000 is set here, on `campaign start`, because this is the step that decides the level's cash: createGameForLevel builds a fresh GameState from dusty_hollow's own $50,000, so a bump on the preceding `new_game` would be discarded. $100,000 covers both purchases below (debris_hauler $25,000 + drill_rig $35,000) with headroom, so the Fleet panel's dealership buttons for both are enabled and a real player click lands.",
+      "description": "cash:100000 is set here, on `campaign start`, because this is the step that decides the level's cash: createGameForLevel builds a fresh GameState from dusty_hollow's own $50,000, so a bump on a `new_game` before it would be discarded. $100,000 covers both purchases below (debris_hauler $25,000 + drill_rig $35,000) with headroom, so the Fleet panel's dealership buttons for both are enabled and a real player click lands.",
       "expect": {
         "equals": {
           "cash": 100000,

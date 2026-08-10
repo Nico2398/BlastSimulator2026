@@ -3,28 +3,6 @@
   "description": "Visual verification of internationalization (i18n) system: English text displays correctly throughout UI including HUD, menus, contract panel, event dialogs, and score labels. All fictional names (rocks, explosives, buildings, vehicles) display without unresolved i18n keys.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "wellBeing": 50,
-          "safety": 50,
-          "ecology": 50,
-          "nuisance": 50,
-          "employeeCount": 0,
-          "buildingCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

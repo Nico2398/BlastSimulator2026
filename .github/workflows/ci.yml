@@ -92,14 +92,15 @@ jobs:
   #   - Push to main (catches build breakage after merge)
   #   - Schedule (weekly full scan)
   #   - workflow_dispatch (manual trigger)
-  #   - PRs labeled "build-check" or "full-ci" (opts in when the build itself is worth proving)
+  #   - PRs labeled "build-check" (opts in when the build itself is worth proving —
+  #     independent of "full-ci", which drives the interaction-mode scenarios and
+  #     implies nothing about the bundle)
   build:
     name: Production build
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'build-check') ||
-      contains(github.event.pull_request.labels.*.name, 'full-ci')
+      contains(github.event.pull_request.labels.*.name, 'build-check')
     needs:
       - typecheck
       - test
@@ -174,6 +175,36 @@ jobs:
           fi
           echo "All scenarios passed in command mode."
 
+  # Resolves the interaction job's shard count. The GitHub Actions expression
+  # language has no range/loop primitive, so turning a plain integer variable
+  # into a [1..N] matrix array needs one real step, not just an expression —
+  # this job is that step. Runs only when scenario-interaction itself would
+  # (same condition below), and finishes in seconds (no checkout, no install).
+  shard-config:
+    name: Resolve interaction shard count
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'full-ci')
+    outputs:
+      shards: ${{ steps.compute.outputs.shards }}
+    steps:
+      - name: Build [1..N] from the SCENARIO_INTERACTION_SHARDS repo variable
+        id: compute
+        env:
+          RAW: ${{ vars.SCENARIO_INTERACTION_SHARDS }}
+        run: |
+          # Repo variable holds a plain positive integer, e.g. "8". Falls back
+          # to 4 shards when unset or not a positive integer.
+          if [[ "$RAW" =~ ^[1-9][0-9]*$ ]]; then
+            N="$RAW"
+          else
+            N=4
+          fi
+          SHARDS=$(seq 1 "$N" | jq -s -c .)
+          echo "Resolved SCENARIO_INTERACTION_SHARDS=\"$RAW\" -> $N shards: $SHARDS"
+          echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
+
   # Runs all scenarios in interaction mode (Puppeteer, slow).
   # Runs only on:
   #   - Push to main (catches regressions after merge)
@@ -181,7 +212,7 @@ jobs:
   #   - workflow_dispatch (manual trigger)
   #   - PRs labeled "full-ci" (opts in for risky changes)
   scenario-interaction:
-    name: "Scenarios (interaction mode)"
+    name: "Scenarios (interaction mode) — shard ${{ matrix.shard }}/${{ strategy.job-total }}"
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'pull_request' ||
@@ -189,6 +220,11 @@ jobs:
     needs:
       - typecheck
       - test
+      - shard-config
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.shard-config.outputs.shards) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -221,16 +257,16 @@ jobs:
           sleep 5
           curl -s http://localhost:5173 > /dev/null || (echo "Dev server failed to start" && exit 1)
 
-      - name: Run all scenarios (interaction mode — batch, shared browser)
+      - name: Run scenario shard ${{ matrix.shard }}/${{ strategy.job-total }} (interaction mode — batch, shared browser)
         run: |
-          if ! npx tsx scripts/run-all-scenarios.ts --mode interaction; then
+          if ! npx tsx scripts/run-all-scenarios.ts --mode interaction --shard ${{ matrix.shard }}/${{ strategy.job-total }}; then
             echo ""
             echo "========================================"
-            echo "Some interaction-mode scenarios failed. Check logs above."
+            echo "Some interaction-mode scenarios failed in shard ${{ matrix.shard }}/${{ strategy.job-total }}. Check logs above."
             echo "========================================"
             exit 1
           fi
-          echo "All scenarios passed in interaction mode."
+          echo "Shard ${{ matrix.shard }}/${{ strategy.job-total }} passed in interaction mode."
 
       - name: Stop dev server
         if: always()

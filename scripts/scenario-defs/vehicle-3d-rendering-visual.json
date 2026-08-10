@@ -3,24 +3,6 @@
   "description": "Visual check: all 5 vehicle roles render distinct 3D shapes at spawn with correct positioning",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "description": "Plain new_game at the sandbox default. The `cash:200000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash; keeping a second copy here would set a figure nothing reads.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow cash:200000",
       "timeout": 15,
       "interaction": [

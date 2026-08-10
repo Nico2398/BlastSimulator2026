@@ -3,21 +3,6 @@
   "description": "Level 1 losing scenario: heavy corruption and mafia use, triggering criminal arrest. The full trajectory is more interesting than the name alone suggests: mafia smuggling's $8000/tick income (MafiaActions.ts's SMUGGLE_BASE_INCOME) is so lucrative that the level's own profit-threshold win condition fires first (levelEndReason:'completed' at tick 20) -- arrest doesn't happen until tick 50, by which point the level has already been won. Confirmed via direct trace; see the note on the second tick 10 step and the final campaign status step.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow cash:80000",
       "interaction": [
         {
@@ -31,7 +16,7 @@
           "cash": 80000
         }
       },
-      "description": "cash:80000 sits here because `campaign start` is the step that decides this level's cash: createGameForLevel builds a brand-new GameState from dusty_hollow's own $50,000, so a bump on the preceding `new_game` would be discarded. $80,000 covers the eight bribes below ($5,000 x5 + $10,000 x3 = $55,000) plus both hires ($1,000 driller + $1,500 blaster), keeping cash positive through the whole opening so the Crew panel's hire buttons stay enabled. The loss condition here is corruption-driven arrest, not money, so funding the level does not weaken what this scenario proves."
+      "description": "cash:80000 sits here because `campaign start` is the step that decides this level's cash: createGameForLevel builds a brand-new GameState from dusty_hollow's own $50,000, so a bump on a `new_game` before it would be discarded. $80,000 covers the eight bribes below ($5,000 x5 + $10,000 x3 = $55,000) plus both hires ($1,000 driller + $1,500 blaster), keeping cash positive through the whole opening so the Crew panel's hire buttons stay enabled. The loss condition here is corruption-driven arrest, not money, so funding the level does not weaken what this scenario proves."
     },
     {
       "command": "time resume",

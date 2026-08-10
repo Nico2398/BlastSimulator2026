@@ -3,23 +3,6 @@
   "description": "Visual verification of the contract panel UI: available contracts list with material type, quantity, unit price, deadline and penalties; active contracts with progress; completed contract history; accept/reject/negotiate buttons. Accept, the delivery amount and Deliver are all driven through the Contracts panel's own controls (issue #479); only the clock, world setup and the read-only list/status steps remain console commands The Contracts panel is opened once and left open: the tool rail TOGGLES a panel, so re-clicking its entry would close the panel the next step needs.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

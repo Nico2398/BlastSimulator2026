@@ -38,7 +38,71 @@ export class InteractionFailure extends Error {
 }
 
 const DEFAULT_TIMEOUT_MS = 6000;
-const SETTLE_MS = 350;
+
+/**
+ * How long `clickEntity` waits for an entity's *rendered* position to stop
+ * moving before it aims at it.
+ *
+ * Since #535 a mesh's x/z is driven only by the per-frame tween:
+ * `GameRenderer.syncFromContext` sets `y` and leaves x/z to
+ * `VehicleMesh.update`/`CharacterMesh.update`, where it used to snap both on
+ * every sync. `SceneManager.start` caps `dt` at 100ms against
+ * `MOVE_TWEEN_DURATION_S` (1s), so a mesh needs ~10 rAF frames to reach the
+ * position `GameState` already reports — and those frames fire between the
+ * harness's CDP calls, not under its control. A position read before the
+ * click can therefore be stale by the time the click lands, the ray misses
+ * the entity, nothing is selected, and the failure surfaces as an unrelated
+ * control never becoming usable (#530: `nav-ramp-routing-visual` failing on
+ * `move_here` "present but hidden", reproducible in CI, never locally).
+ *
+ * Two consecutive reads under this epsilon mean the tween has converged (or
+ * is not running at all), so the position is safe to aim at. Costs two cheap
+ * `evaluate` round trips when the mesh is already settled, which is the norm.
+ */
+const ENTITY_SETTLE_EPSILON = 0.01;
+const ENTITY_SETTLE_INTERVAL_MS = 25;
+const ENTITY_SETTLE_MAX_POLLS = 40;
+/** Re-aims allowed when the mesh moves while the camera is being aimed at it. */
+const ENTITY_AIM_ATTEMPTS = 3;
+
+/**
+ * Wait for the render loop's rAF callback to run twice. That callback drives
+ * `uiManager.update` once per frame regardless of whether drawing itself is
+ * suspended (#475), so two passes is the actual event a post-action settle is
+ * waiting on — not a guess at how long that takes. Measured at ~33ms with a
+ * level loaded (one frame's margin over the ~17ms a single pass costs),
+ * replacing a flat 300-350ms sleep that used to pay for the same wait as
+ * wall-clock time whether or not the frame had already run.
+ *
+ * Also waits out a placement confirm's 220ms flash window (phase
+ * 'confirmed', `PlacementController.confirm`/`CONFIRM_FLASH_MS`) when one is
+ * in flight: `isArmed()` stays true for that whole window before its
+ * `setTimeout`-scheduled `disarm()` fires, and arming a *different* build
+ * type while it is still true finds the tool "already armed" and cancels
+ * instead of arming (`BuildMenu.armBuildingPointTool`'s own guard) — a
+ * wall-clock timer no number of animation frames can outrun. `currentPhase`
+ * is what distinguishes this from a freshly-armed tool correctly staying
+ * armed (which must never be waited out here) — both read `isArmed() ===
+ * true` identically, only the phase tells them apart. A confirm the harness
+ * never sees this frame (nothing armed at all) skips the poll immediately.
+ */
+export async function waitForUiUpdate(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>(res => {
+    requestAnimationFrame(() => requestAnimationFrame(() => res()));
+  }));
+  // Node-side poll loop, matching awaitPlacementArmed (tile-picker.ts) —
+  // a *browser*-side recursive poll would need a named inner function to
+  // reschedule itself, and esbuild's keepNames helper (`__name`) it would
+  // inject is module-scoped in the harness bundle, unreachable from a
+  // callback's stringified, sandboxed evaluation in the page.
+  for (;;) {
+    const phase = await page.evaluate(() => (window as unknown as {
+      __placement?: { currentPhase?: () => string };
+    }).__placement?.currentPhase?.() ?? null);
+    if (phase !== 'confirmed') return;
+    await new Promise(r => setTimeout(r, 20));
+  }
+}
 
 async function probe(page: Page): Promise<ProbedAction[]> {
   return page.evaluate(() => (window as unknown as {
@@ -235,23 +299,70 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
     case 'clickEntity': {
-      const pos = await page.evaluate(({ kind, id }: { kind: string; id: number }) =>
+      // Arrow, not a named function: this body is stringified into the page,
+      // and esbuild's keepNames wraps named functions in a `__name()` call
+      // that does not exist in that context.
+      const readPos = () => page.evaluate(({ kind, id }: { kind: string; id: number }) =>
         (window as unknown as {
           __entityWorldPosition: (k: string, i: number) => { x: number; z: number } | null;
         }).__entityWorldPosition(kind, id), { kind: action.kind, id: action.id });
+
+      let pos = await readPos();
       if (!pos) {
         throw new InteractionFailure(
           `no ${action.kind} #${action.id} is on the scene to click`,
           describeAvailable(await probe(page)),
         );
       }
-      await page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
-        (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
-        // Interaction mode suspends the draw loop (#475) — force a frame so
-        // the new camera position and the scene's entity transforms are
-        // current before the click below raycasts.
-        (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
-      }, { x: pos.x, z: pos.z, distance: action.distance ?? 15 });
+
+      // Aim at where the mesh has come to rest, not where it happened to be
+      // mid-glide — see ENTITY_SETTLE_EPSILON for why a moving mesh makes the
+      // click miss entirely. Forcing a frame does not help: `__renderFrame`
+      // calls `drawFrame` only, never the loop's `onUpdate`, so it refreshes
+      // camera matrices without advancing the tween.
+      for (let i = 0; i < ENTITY_SETTLE_MAX_POLLS; i++) {
+        await new Promise(r => setTimeout(r, ENTITY_SETTLE_INTERVAL_MS));
+        const next = await readPos();
+        if (!next) break;
+        const settled = Math.hypot(next.x - pos.x, next.z - pos.z) < ENTITY_SETTLE_EPSILON;
+        pos = next;
+        if (settled) break;
+      }
+
+      const aimAt = (at: { x: number; z: number }) =>
+        page.evaluate(({ x, z, distance }: { x: number; z: number; distance: number }) => {
+          (window as unknown as { __cameraFocus: (x: number, z: number, d: number) => void }).__cameraFocus(x, z, distance);
+          // Interaction mode suspends the draw loop (#475) — force a frame so
+          // the new camera position and the scene's entity transforms are
+          // current before the click below raycasts.
+          (window as unknown as { __renderFrame?: () => void }).__renderFrame?.();
+        }, { x: at.x, z: at.z, distance: action.distance ?? 15 });
+
+      // Settling above samples over time, which a throttled rAF can defeat:
+      // a background page in batch mode advances the tween in bursts, so two
+      // reads an interval apart can both land in a still gap and read as
+      // settled while the mesh is still short of its target. The forced frame
+      // is also the most expensive step here (a real draw, seconds without a
+      // GPU) and frames land during it. So confirm the mesh is still where we
+      // aimed, and re-aim at where it actually got to if not — never click a
+      // point it has already left.
+      let reAims = 0;
+      for (;;) {
+        await aimAt(pos);
+        const after = await readPos();
+        if (!after) break;
+        if (Math.hypot(after.x - pos.x, after.z - pos.z) < ENTITY_SETTLE_EPSILON) break;
+        pos = after;
+        if (++reAims >= ENTITY_AIM_ATTEMPTS) {
+          await aimAt(pos);
+          break;
+        }
+      }
+      if (reAims > 0) {
+        // Surfaces the glide in the run log, so a future miss is diagnosable
+        // from CI output instead of needing a local repro that may not exist.
+        console.log(`  clickEntity: ${action.kind} #${action.id} still gliding — re-aimed ${reAims}x`);
+      }
       const viewport = page.viewport();
       await page.mouse.click((viewport?.width ?? 1280) / 2, (viewport?.height ?? 720) / 2);
       break;
@@ -316,7 +427,7 @@ export async function runAction(page: Page, action: PlayerAction): Promise<void>
       break;
     }
   }
-  await new Promise(r => setTimeout(r, SETTLE_MS));
+  await waitForUiUpdate(page);
 }
 
 /** Check a step's goal, throwing InteractionFailure with a diagnosis when unmet. */
@@ -324,6 +435,7 @@ export async function checkGoal(
   page: Page,
   goal: InteractionGoal,
   before: Record<string, unknown>,
+  after?: Record<string, unknown>,
 ): Promise<void> {
   if (goal.tutorialStep !== undefined) {
     const tut = await tutorialState(page);
@@ -335,46 +447,51 @@ export async function checkGoal(
     }
   }
 
-  if (goal.increased) {
-    const after = await gameState(page);
-    for (const field of goal.increased) {
-      const wasRaw = before[field];
-      const nowRaw = after[field];
-      const was = typeof wasRaw === 'number' ? wasRaw : 0;
-      const now = typeof nowRaw === 'number' ? nowRaw : 0;
-      if (!(now > was)) {
-        throw new InteractionFailure(
-          `${field} should have increased but went ${was} → ${now}`,
-          describeAvailable(await probe(page)),
-        );
+  // One fetch (or the caller's own already-current snapshot) serves all three
+  // state-reading goal kinds below — up to three separate evaluates for a
+  // step whose expect combines increased/decreased/equals, on every step of
+  // every scenario, for state that cannot have changed between them.
+  if (goal.increased || goal.decreased || goal.equals) {
+    const state = after ?? await gameState(page);
+
+    if (goal.increased) {
+      for (const field of goal.increased) {
+        const wasRaw = before[field];
+        const nowRaw = state[field];
+        const was = typeof wasRaw === 'number' ? wasRaw : 0;
+        const now = typeof nowRaw === 'number' ? nowRaw : 0;
+        if (!(now > was)) {
+          throw new InteractionFailure(
+            `${field} should have increased but went ${was} → ${now}`,
+            describeAvailable(await probe(page)),
+          );
+        }
       }
     }
-  }
 
-  if (goal.decreased) {
-    const after = await gameState(page);
-    for (const field of goal.decreased) {
-      const wasRaw = before[field];
-      const nowRaw = after[field];
-      const was = typeof wasRaw === 'number' ? wasRaw : 0;
-      const now = typeof nowRaw === 'number' ? nowRaw : 0;
-      if (!(now < was)) {
-        throw new InteractionFailure(
-          `${field} should have decreased but went ${was} → ${now}`,
-          describeAvailable(await probe(page)),
-        );
+    if (goal.decreased) {
+      for (const field of goal.decreased) {
+        const wasRaw = before[field];
+        const nowRaw = state[field];
+        const was = typeof wasRaw === 'number' ? wasRaw : 0;
+        const now = typeof nowRaw === 'number' ? nowRaw : 0;
+        if (!(now < was)) {
+          throw new InteractionFailure(
+            `${field} should have decreased but went ${was} → ${now}`,
+            describeAvailable(await probe(page)),
+          );
+        }
       }
     }
-  }
 
-  if (goal.equals) {
-    const after = await gameState(page);
-    for (const [field, expected] of Object.entries(goal.equals)) {
-      if (after[field] !== expected) {
-        throw new InteractionFailure(
-          `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(after[field])}`,
-          describeAvailable(await probe(page)),
-        );
+    if (goal.equals) {
+      for (const [field, expected] of Object.entries(goal.equals)) {
+        if (state[field] !== expected) {
+          throw new InteractionFailure(
+            `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(state[field])}`,
+            describeAvailable(await probe(page)),
+          );
+        }
       }
     }
   }

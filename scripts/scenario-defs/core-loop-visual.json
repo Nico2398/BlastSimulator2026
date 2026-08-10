@@ -3,25 +3,8 @@
   "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → sequence → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
   "steps": [
     {
-      "command": "new_game seed:42 size:24",
-      "timeout": 15,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42 size:24"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "employeeCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
-      "description": "campaign start replaces the site entirely with dusty_hollow's own fixed 96x96 grid -- new_game's size:24 above never actually takes effect once this runs.",
+      "description": "campaign start replaces any prior site entirely with dusty_hollow's own fixed 96x96 grid.",
       "interaction": [
         {
           "type": "command",

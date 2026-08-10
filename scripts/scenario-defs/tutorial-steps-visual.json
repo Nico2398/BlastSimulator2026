@@ -20,23 +20,6 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 30,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "buildingCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:tutorial_pit",
       "timeout": 15,
       "interaction": [

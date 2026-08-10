@@ -3,24 +3,6 @@
   "description": "Visual check: vehicle panel lists all 5 roles with tier names and purchase costs displayed",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 10,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "description": "Plain new_game at the sandbox default. The `cash:200000` bump that used to sit here has moved to `campaign start` below, which is the step that actually decides this scenario's cash.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "vehicleCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {

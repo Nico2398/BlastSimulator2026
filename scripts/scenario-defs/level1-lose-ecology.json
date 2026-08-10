@@ -3,21 +3,6 @@
   "description": "Level 1 losing scenario: massive blasts with max krackle, triggering ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). depth:6 (not the originally-declared 12) throughout: the Drill panel's real click always uses its own DEFAULT_DEPTH_M regardless of what a scenario's command field declares, a new sub-class of Finding #3/#4 caught only by a real interaction-mode run (see the note on the first blast step). With the corrected, shallower/more-violent holes, ecology bottoms out at exactly 0 after just the SECOND blast (not the fifth), and the file's own original tick budget already ticks past the 150-consecutive-ticks-at-zero threshold -- the shutdown this file is named for now fires for real, no extension needed.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:42"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {

@@ -13,6 +13,7 @@ import type { Browser, Page, PuppeteerLaunchOptions } from 'puppeteer';
 import { resolve } from 'path';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './chrome.js';
 import { executeActionOnPage } from './interaction-executor.js';
+import { waitForUiUpdate } from './interaction-driver.js';
 import type { ScenarioStepDef } from './scenario-types.js';
 
 /** Default timeout for scenario steps in seconds. */
@@ -22,13 +23,10 @@ export const DEFAULT_STEP_TIMEOUT = 60;
 export const SCREENSHOT_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', '..', 'screenshots');
 
 /**
- * Pause after a UI-mutating action so the next frame's `uiManager.update` runs
- * before the following action depends on it. 200 ms is the floor at which the
- * surveyor-hire race clears locally; 300 ms leaves margin for a slower CI
- * runner. Only the actions below pay it — reads and explicit waits already
- * block, and commands run synchronously in the game, not the DOM.
+ * Actions after which the next step depends on this frame's `uiManager.update`
+ * having run — see `waitForUiUpdate`. Reads and explicit waits already block,
+ * and commands run synchronously in the game, not the DOM, so only these pay it.
  */
-const INTERACTION_SETTLE_MS = 300;
 const SETTLE_AFTER = new Set([
   'click', 'clickSelector', 'pickTile', 'dragTiles', 'mousedown', 'mouseup', 'type',
 ]);
@@ -154,42 +152,31 @@ export async function executeInteractionActions(
       // (the tutorial-interactive surveyor hire, which stalled the whole run).
       // Only the mutating actions pay it; reads and explicit waits do not.
       if (SETTLE_AFTER.has(action.type)) {
-        await new Promise(r => setTimeout(r, INTERACTION_SETTLE_MS));
+        await waitForUiUpdate(page);
       }
     }
   }
 
-  // Reset tick accumulator
-  await page.evaluate(() => {
-    if (typeof (window as any).__resetTickAccumulator === 'function') {
-      (window as any).__resetTickAccumulator();
-    }
+  // Reset the tick accumulator and read back game/UI state in one round trip —
+  // was four separate evaluates, the last of which (commandOutput) re-called
+  // __gameState() a second time for a field the gameState evaluate just above
+  // it already carries (main.ts's __gameState always includes
+  // lastCommandOutput). Each evaluate is a CDP round trip; collapsing them
+  // matters here specifically because every scenario step pays it.
+  const tail = await page.evaluate(() => {
+    const w = window as any;
+    if (typeof w.__resetTickAccumulator === 'function') w.__resetTickAccumulator();
+    return {
+      gameState: typeof w.__gameState === 'function' ? w.__gameState() : null,
+      uiState: typeof w.__uiState === 'function' ? w.__uiState() : null,
+    };
   });
-
-  // Extract game state
-  const gameState = await page.evaluate(() => {
-    if (typeof (window as any).__gameState === 'function') {
-      return (window as any).__gameState();
-    }
-    return null;
-  });
-
-  // Extract UI state
-  const uiState = await page.evaluate(() => {
-    if (typeof (window as any).__uiState === 'function') {
-      return (window as any).__uiState();
-    }
-    return null;
-  });
-
-  // Capture command output
-  const commandOutput = await page.evaluate(() => {
-    if (typeof (window as any).__gameState === 'function') {
-      const state = (window as any).__gameState();
-      if (state && state.lastCommandOutput) return String(state.lastCommandOutput);
-    }
-    return '';
-  });
+  // Tolerates a test double's `evaluate` resolving to something other than
+  // the object literal above — a real page's evaluate always returns it.
+  const { gameState, uiState } = tail ?? { gameState: null, uiState: null };
+  const commandOutput = gameState && (gameState as Record<string, unknown>).lastCommandOutput
+    ? String((gameState as Record<string, unknown>).lastCommandOutput)
+    : '';
 
   return { commandOutput, gameState, uiState, screenshotPaths };
 }

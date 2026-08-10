@@ -55,7 +55,7 @@ So a channel this session cannot run but CI does — interaction-mode `visual`/`
 
 ## The `full-ci` label
 
-`full-ci` starts the `Scenarios (interaction mode)` browser job — roughly 30 minutes added to the merge path, because the terrain material costs ~6.4 s/frame without a GPU (#475). It buys evidence, so apply it where there is evidence to buy:
+`full-ci` starts the `Scenarios (interaction mode)` browser job — sharded via the repo variable `SCENARIO_INTERACTION_SHARDS` (a plain integer), defaulting to 4 shards as of #530 — a small `shard-config` job turns that integer into the `[1..N]` matrix array, since the workflow expression language has no range primitive to do it inline, each shard driving roughly 127/N of the scenarios; the terrain material still costs ~6.4 s/frame without a GPU (#475), so the job remains real added time to the merge path even sharded. #530 also cut the harness's own overhead by ~30% (measured 3367s -> ~2350s, single-threaded, in a sandbox) and, confirmed on #530's own PR checks, brings the sharded job to ~12 minutes wall clock at 4 shards — of each shard's ~11-12 min, ~30s is fixed per-job setup (checkout, install, Chrome, build, dev-server boot) that does not shrink with more shards, the rest is the harness's own batch time, which scales down roughly with shard count. Treat it as costly, not as free just because it is parallelised; apply it where there is evidence to buy:
 
 | Apply because | Test |
 |---------------|------|
@@ -63,7 +63,7 @@ So a channel this session cannot run but CI does — interaction-mode `visual`/`
 | An interaction-mode scenario drives the change | `scripts/scenario-defs/` holds the whole click-only, `role`-tagged suite (issue #515). Read the scenario: does one click its way through the control, panel or flow this diff changes? |
 | Every scenario runs through what changed | Shared rendering, input, camera, picking, or the scenario harness itself — machinery no single scenario names and all of them exercise |
 
-Otherwise the label pays 30 minutes to replay flows the diff never touched. A control added to an existing panel, a setup form's field list, copy, a renderer detail no scenario reaches — the `visual` channel already covers those, run in this session against the one named scenario that exercises them, and that is the stronger evidence because it looks at the thing that changed.
+Otherwise the label pays real added CI time to replay flows the diff never touched. A control added to an existing panel, a setup form's field list, copy, a renderer detail no scenario reaches — the `visual` channel already covers those, run in this session against the one named scenario that exercises them, and that is the stronger evidence because it looks at the thing that changed.
 
 **When player-reachability is owed and no scenario drives the flow**, the label is not the answer — running scenarios that never reach the change reports nothing about it. Say so in the PR body, naming the flow and what does cover it. A goal-reaching flow worth pinning earns a new `role: 'player'` step in `scripts/scenario-defs/` (and then the label, so CI runs it in interaction mode); a control on an existing panel is covered by the `visual` channel and needs neither.
 

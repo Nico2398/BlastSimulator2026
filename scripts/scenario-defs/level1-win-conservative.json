@@ -3,25 +3,6 @@
   "description": "Level 1 (Dusty Hollow): 4 small blasts and 2 contract attempts with no vehicle ever bought -- named for a conservative win, but no hauling infrastructure means no delivery ever succeeds; see Findings #52-#53 for why the real trajectory (a net cash loss, well short of the $80k target) is asserted instead of the named outcome.",
   "steps": [
     {
-      "command": "new_game seed:99",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "new_game seed:99"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      }
-    },
-    {
       "command": "campaign start level:dusty_hollow",
       "interaction": [
         {
