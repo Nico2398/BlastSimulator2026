@@ -21,6 +21,7 @@ import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
 import { RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
+import { MIN_STEMMING_M } from '../../../src/core/config/balance.js';
 
 function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
@@ -918,6 +919,54 @@ describe('surveyCommand — ore_report subcommand', () => {
     const result = surveyCommand(ctx, ['ore_report'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
+  });
+});
+
+// ── chargeCommand — stemming floor (#527) ───────────────────────────────────
+// Mirrors the UI's existing 0.5m stemming floor (Charge.ts adjustStemming) so
+// a console `charge` command can never under-stem what a player could ever click.
+
+describe('chargeCommand — stemming floor', () => {
+  it('a single-hole charge below MIN_STEMMING_M returns success:false and names the refusal', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+
+    const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '0.2m' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('stemming');
+    expect(result.output.toLowerCase()).toContain('minimum');
+  });
+
+  it('does not write a charge to state for the refused hole', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '0.2m' });
+
+    expect(ctx.state!.chargesByHole['H1']).toBeUndefined();
+  });
+
+  it('a stemming value exactly at MIN_STEMMING_M is accepted (boundary)', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+
+    const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: `${MIN_STEMMING_M}m` });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.chargesByHole['H1']).toBeDefined();
+    expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBe(MIN_STEMMING_M);
+  });
+
+  it('a batch charge (hole:*) below MIN_STEMMING_M refuses and writes no charges', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+
+    const result = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '0.2m' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('stemming');
+    expect(Object.keys(ctx.state!.chargesByHole).length).toBe(0);
   });
 });
 

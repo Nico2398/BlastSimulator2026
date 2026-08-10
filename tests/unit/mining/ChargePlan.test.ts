@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createCharge, batchCharge } from '../../../src/core/mining/ChargePlan.js';
+import { MIN_STEMMING_M } from '../../../src/core/config/balance.js';
 
 describe('ChargePlan', () => {
   it('charging a hole stores explosive type and amount', () => {
@@ -35,5 +36,35 @@ describe('ChargePlan', () => {
   it('stemming exceeding hole depth returns error', () => {
     const result = createCharge('pop_rock', 2, 10, 8);
     expect('error' in result).toBe(true);
+  });
+
+  // ── stemming floor (#527) ──────────────────────────────────────────────────
+  // Mirrors the UI's existing 0.5m stemming floor (Charge.ts adjustStemming) so
+  // a console charge can never under-stem what a player could ever click.
+
+  it('stemming below MIN_STEMMING_M returns an error, not a charge', () => {
+    const result = createCharge('pop_rock', 2, 0.2, 8);
+    expect('error' in result).toBe(true);
+    expect('charge' in result).toBe(false);
+  });
+
+  it('stemming exactly at MIN_STEMMING_M succeeds (boundary, not off-by-one)', () => {
+    const result = createCharge('pop_rock', 2, MIN_STEMMING_M, 8);
+    expect('charge' in result).toBe(true);
+    if ('charge' in result) {
+      expect(result.charge.stemmingM).toBe(MIN_STEMMING_M);
+    }
+  });
+
+  it('batchCharge surfaces the stemming-floor error per affected hole, not a silent skip', () => {
+    const holeIds = ['H1', 'H2', 'H3'];
+    const depths: Record<string, number> = { H1: 8, H2: 8, H3: 8 };
+    const { charges, errors } = batchCharge(holeIds, depths, 'pop_rock', 2, 0.2);
+    expect(Object.keys(charges).length).toBe(0);
+    expect(errors.length).toBe(3);
+    expect(errors.map(e => e.holeId).sort()).toEqual(['H1', 'H2', 'H3']);
+    for (const e of errors) {
+      expect(e.message.toLowerCase()).toContain('stemming');
+    }
   });
 });

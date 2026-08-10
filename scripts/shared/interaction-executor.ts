@@ -243,11 +243,13 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   // (`computeDangerZone`), never a player-typed one, so a literal rectangle
   // override has no UI equivalent and no business having one.
   'zone clear',
-  // scores-display-visual.json: `stemming:0` is below the Charge panel's own
-  // floor — `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) — so
-  // no click sequence can ever reach it, while `createCharge` (ChargePlan.ts)
-  // has no lower bound and accepts 0 freely. A real, narrow UI/console gap.
-  'charge hole:* explosive:boomite amount:8 stemming:0',
+  // scores-display-visual.json: `stemming:0.5` is the Charge panel's own
+  // floor — `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) —
+  // the minimal value reachable by any click sequence. Kept as `bootstrap`
+  // for its `hole:*` batch shorthand rather than driving the individual
+  // amount/stemming steppers for real (see blast-execution-visual.json for
+  // the player-role version of this same charge).
+  'charge hole:* explosive:boomite amount:8 stemming:0.5',
   // blast-fire/preview/sequence-step-visual.json: the Charge step right
   // after each of these is the Blast panel's own designated first-open
   // (`#bs-toolbar [data-panel="blast"]` is a toggle) — giving the drill
