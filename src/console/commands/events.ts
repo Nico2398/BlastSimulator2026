@@ -485,7 +485,8 @@ export function corruptCommand(
     return { success: false, output: `Invalid target. Valid: ${validTargets.join(', ')}` };
   }
 
-  const cost = named['cost'] ? parseInt(named['cost'], 10) : undefined;
+  const rawCost = named['cost'] ? parseInt(named['cost'], 10) : undefined;
+  const cost = rawCost !== undefined && Number.isFinite(rawCost) && rawCost >= 0 ? rawCost : undefined;
   const resolvedCost = cost ?? TARGET_COSTS[target];
   if (state.cash < resolvedCost) {
     return {
