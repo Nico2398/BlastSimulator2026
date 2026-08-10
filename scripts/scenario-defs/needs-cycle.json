@@ -1,6 +1,6 @@
 {
   "name": "needs-cycle",
-  "description": "Chapter 7: Hire 3 workers, advance 20 ticks, and verify canteen auto-queue for hunger relief",
+  "description": "Chapter 7: Hire 3 workers, advance 20 ticks, and verify living_quarters (hunger) auto-queue",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -101,22 +101,42 @@
       }
     },
     {
-      "command": "build canteen at:5,5",
+      "command": "build living_quarters at:5,5",
       "interaction": [
         {
-          "type": "command",
-          "command": "build canteen at:5,5"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Left unmarked: \"canteen\" isn't a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes.",
+      "description": "Per #526: was `build canteen at:5,5`, a phantom BuildingType (commandOutput: \"Unknown subcommand or building type\") with no catalog row to click -- \"canteen\" maps to the real living_quarters building, which is what all three need gauges (hunger, fatigue, breakNeed) actually replenish against (NEED_REST_BUILDING_TYPES, balance.ts). Converted to a real player click on the Build panel, following building-menu-visual.json's pickTile pattern.",
       "expect": {
         "equals": {
-          "cash": 47800,
-          "buildingCount": 0
+          "cash": 37800,
+          "buildingCount": 1
         },
-        "note": "confirms the fake building type is a real no-op — this file's title promise (\"verify canteen auto-queue\") is unreachable since no canteen building type exists in this game; only the 2 real hires above and idle need-decay over the following ticks are actually testable"
+        "note": "cash 47800 - living_quarters tier-1 constructionCost 10000 (BuildingDefs.ts) = 37800"
       },
-      "role": "bootstrap"
+      "role": "player"
     },
     {
       "command": "tick 40",
