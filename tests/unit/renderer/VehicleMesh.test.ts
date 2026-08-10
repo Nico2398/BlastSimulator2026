@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Vehicle, VehicleTier, VehicleOperationalState } from '../../../src/core/entities/Vehicle.js';
 import { VehicleMesh, STATE_COLOR_MAP, applyStateIndicator } from '../../../src/renderer/VehicleMesh.js';
 import { WAITING_QUEUE_SLOT_OFFSETS } from '../../../src/core/config/balance.js';
+import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 
 function makeVehicle(id: number, type: Vehicle['type'], x = 0, z = 0, tier = 1 as VehicleTier): Vehicle {
   return { id, type, x, z, hp: 100, task: 'idle', state: 'idle', targetX: x, targetZ: z, tier } as Vehicle;
@@ -53,9 +54,10 @@ describe('VehicleMesh', () => {
     v.z = 100;
 
     // After a few updates, position should move toward target
-    vm.update([v]);
-    vm.update([v]);
-    vm.update([v]);
+    // (dt now required — VehicleMesh.update() must become duration-aware, #520)
+    vm.update([v], 0.1);
+    vm.update([v], 0.1);
+    vm.update([v], 0.1);
     const group = scene.children[0] as THREE.Group;
     expect(group.position.x).toBeGreaterThan(0);
     expect(group.position.z).toBeGreaterThan(0);
@@ -91,6 +93,102 @@ describe('VehicleMesh', () => {
     vm.addVehicle(makeVehicle(2, 'drill_rig'));
     vm.clearAll();
     expect(scene.children.length).toBe(0);
+    vm.dispose();
+  });
+});
+
+describe('VehicleMesh — movement interpolation (#520)', () => {
+  it('update() eases across multiple small-dt frames, passing through an intermediate point, and fully converges only once cumulative real time matches the tween duration', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 0, 0);
+    vm.addVehicle(v);
+    const group = scene.children[0] as THREE.Group;
+
+    v.x = 10;
+    v.z = 10;
+    v.targetX = 10;
+    v.targetZ = 10;
+
+    const dt = 0.05;
+    const steps = Math.ceil(MOVE_TWEEN_DURATION_S / dt) + 5;
+    let sawIntermediate = false;
+    for (let i = 0; i < steps; i++) {
+      vm.update([v], dt);
+      if (
+        group.position.x > 0 && group.position.x < 10 &&
+        group.position.z > 0 && group.position.z < 10
+      ) {
+        sawIntermediate = true;
+      }
+    }
+
+    expect(sawIntermediate).toBe(true);
+    expect(group.position.x).toBeCloseTo(10);
+    expect(group.position.z).toBeCloseTo(10);
+    vm.dispose();
+  });
+
+  it('retargeting mid-glide does not produce a large single-frame jump', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 0, 0);
+    vm.addVehicle(v);
+    const group = scene.children[0] as THREE.Group;
+
+    v.x = 10;
+    v.z = 10;
+    v.targetX = 10;
+    v.targetZ = 10;
+    vm.update([v], 0.05); // glide partway
+
+    const beforeX = group.position.x;
+    const beforeZ = group.position.z;
+
+    // Retarget completely before convergence.
+    v.x = -20;
+    v.z = 40;
+    v.targetX = -20;
+    v.targetZ = 40;
+    vm.update([v], 0.05);
+
+    const jump = Math.hypot(group.position.x - beforeX, group.position.z - beforeZ);
+    expect(jump).toBeLessThan(2);
+    vm.dispose();
+  });
+
+  it('a very large x/z change reaches the new position within one update() call (snap path)', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    const v = makeVehicle(1, 'debris_hauler', 0, 0);
+    vm.addVehicle(v);
+    const group = scene.children[0] as THREE.Group;
+
+    // Magnitude far exceeding any single-tick move (teleport across the map).
+    v.x = 500;
+    v.z = -500;
+    v.targetX = 500;
+    v.targetZ = -500;
+    vm.update([v], 0.016);
+
+    expect(group.position.x).toBeCloseTo(500);
+    expect(group.position.z).toBeCloseTo(-500);
+    vm.dispose();
+  });
+
+  it('setSurfaceY updates only the y component, leaving x/z untouched', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleMesh(scene);
+    vm.addVehicle(makeVehicle(1, 'debris_hauler', 4, 9));
+    const group = scene.children[0] as THREE.Group;
+    const xBefore = group.position.x;
+    const zBefore = group.position.z;
+
+    vm.setSurfaceY(1, 7);
+
+    expect(group.position.y).toBe(7);
+    expect(group.position.x).toBe(xBefore);
+    expect(group.position.z).toBe(zBefore);
     vm.dispose();
   });
 });

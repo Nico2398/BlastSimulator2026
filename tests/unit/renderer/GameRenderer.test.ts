@@ -194,6 +194,58 @@ describe('GameRenderer — ghost preview positioning (issue #406)', () => {
   });
 });
 
+describe('GameRenderer — movement interpolation, no hard-snap on sync (#520)', () => {
+  it('does not hard-snap employee x/z to the raw GameState value on sync, but instantly corrects y to the terrain surface', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    const { employee } = hireEmployee(ctx.state!.employees, 'driller', new Random(1), 5, 5);
+    renderer.syncFromContext(ctx);
+
+    // Solid column at the employee's new position so its terrain surface
+    // height differs from the flat y=0 the first sync placed it at.
+    for (let y = 0; y <= 2; y++) {
+      ctx.grid!.setVoxel(20, y, 20, { composition: { rocks: [] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+    }
+    employee.x = 20;
+    employee.z = 20;
+    renderer.syncFromContext(ctx);
+
+    const pos = renderer.entityWorldPosition('employee', employee.id);
+    expect(pos).not.toBeNull();
+    // x/z must NOT be hard-snapped to the raw new GameState value on sync —
+    // that would pre-empt the mesh's own eased glide (no update() call
+    // happened between the two syncFromContext() calls here).
+    expect(pos!.x).not.toBe(20);
+    expect(pos!.z).not.toBe(20);
+    // y must still be corrected immediately, independent of the x/z glide.
+    expect(pos!.y).toBeGreaterThan(2);
+  });
+
+  it('does not hard-snap vehicle x/z to the raw GameState value on sync, but instantly corrects y to the terrain surface', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    const { vehicle } = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 5, 5);
+    renderer.syncFromContext(ctx);
+
+    for (let y = 0; y <= 2; y++) {
+      ctx.grid!.setVoxel(20, y, 20, { composition: { rocks: [] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+    }
+    vehicle.x = 20;
+    vehicle.z = 20;
+    vehicle.targetX = 20;
+    vehicle.targetZ = 20;
+    renderer.syncFromContext(ctx);
+
+    const pos = renderer.entityWorldPosition('vehicle', vehicle.id);
+    expect(pos).not.toBeNull();
+    expect(pos!.x).not.toBe(20);
+    expect(pos!.z).not.toBe(20);
+    expect(pos!.y).toBeGreaterThan(2);
+  });
+});
+
 describe('GameRenderer — camera framing', () => {
   it('frames the site on the first load, using the grid size as the span', () => {
     const sm = makeMockSceneManager();

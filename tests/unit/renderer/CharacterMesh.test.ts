@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { MOVE_TWEEN_DURATION_S } from '../../../src/renderer/MovementInterpolation.js';
 
 function makeEmployee(id: number, overrides: Partial<Employee> = {}): Employee {
   return {
@@ -148,6 +149,98 @@ describe('CharacterMesh', () => {
     cm.clearAll();
     expect(scene.children.length).toBe(0);
     cm.dispose();
+  });
+
+  describe('movement interpolation (#520)', () => {
+    it('update() eases across multiple small-dt frames, passing through an intermediate point, and fully converges only once cumulative real time matches the tween duration', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      const group = scene.children[0] as THREE.Group;
+
+      emp.x = 10;
+      emp.z = 10;
+
+      const dt = 0.05;
+      const steps = Math.ceil(MOVE_TWEEN_DURATION_S / dt) + 5;
+      let sawIntermediate = false;
+      for (let i = 0; i < steps; i++) {
+        cm.update([emp], dt);
+        if (
+          group.position.x > 0 && group.position.x < 10 &&
+          group.position.z > 0 && group.position.z < 10
+        ) {
+          sawIntermediate = true;
+        }
+      }
+
+      expect(sawIntermediate).toBe(true);
+      // Not just "greater than 0" — cumulative real time (steps * dt) now
+      // exceeds MOVE_TWEEN_DURATION_S, so a duration-aware ease must have
+      // fully arrived. A fixed-fraction-per-call lerp (duration-blind)
+      // never reaches this close after only ~1s of real time.
+      expect(group.position.x).toBeCloseTo(10);
+      expect(group.position.z).toBeCloseTo(10);
+      cm.dispose();
+    });
+
+    it('retargeting mid-glide does not produce a large single-frame jump', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      const group = scene.children[0] as THREE.Group;
+
+      emp.x = 10;
+      emp.z = 10;
+      cm.update([emp], 0.05); // glide partway
+
+      const beforeX = group.position.x;
+      const beforeZ = group.position.z;
+
+      // Retarget completely before convergence.
+      emp.x = -20;
+      emp.z = 40;
+      cm.update([emp], 0.05);
+
+      const jump = Math.hypot(group.position.x - beforeX, group.position.z - beforeZ);
+      expect(jump).toBeLessThan(2);
+      cm.dispose();
+    });
+
+    it('a very large x/z change reaches the new position within one update() call (snap path)', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+      const group = scene.children[0] as THREE.Group;
+
+      // Magnitude far exceeding any single-tick move (teleport across the map).
+      emp.x = 500;
+      emp.z = -500;
+      cm.update([emp], 0.016);
+
+      expect(group.position.x).toBeCloseTo(500);
+      expect(group.position.z).toBeCloseTo(-500);
+      cm.dispose();
+    });
+
+    it('setSurfaceY updates only the y component, leaving x/z untouched', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      cm.addEmployee(makeEmployee(1, { x: 4, z: 9 }), 0);
+      const group = scene.children[0] as THREE.Group;
+      const xBefore = group.position.x;
+      const zBefore = group.position.z;
+
+      cm.setSurfaceY(1, 7);
+
+      expect(group.position.y).toBe(7);
+      expect(group.position.x).toBe(xBefore);
+      expect(group.position.z).toBe(zBefore);
+      cm.dispose();
+    });
   });
 
   describe('scene picking (P2)', () => {
