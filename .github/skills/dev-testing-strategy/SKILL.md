@@ -103,7 +103,7 @@ Same Vitest runner. May import from `src/console/` (command layer). Must exercis
 | `survey.integration.test.ts` | (1) Seismic within ±15%; (2) core sample within ±5%; (3) aerial surface-only; (4) stale at tick 101; (5) Lucky Strike > 120%; (6) Barren Blast < 60%; (7) insufficient funds error; (8) skill level reduces error; (9) seismic damages nearby building; (10) overlapping surveys accumulate |
 | `blast-enhanced.integration.test.ts` | (1) Multi-rock threshold weighted; (2) energy local for strong rock; (3) spreads for weak rock; (4) island flood-fill; (5) building destroyed at threshold; (6) death probability scales; (7) Voronoi count scales; (8) deep fragment v≈0; (9) surface overcharged v≈MAX; (10) Tier A cap enforced; (11) ore yield matches voxels; (12) navmesh dirty-region fires |
 | `navmesh.integration.test.ts` | (1) A* shortest path; (2) avoids blocked; (3) avoids buildings; (4) drill hole passable; (5) multi-level via ramp; (6) no ramp → found:false; (7) path re-requested on block; (8) stuck after 3 fails; (9) patch only affects blast region; (10) patch after building; (11) vehicle-occupied flag per tick |
-| `needs.integration.test.ts` | (1) Hunger drains during task; (2) fatigue faster during task; (3) rest auto-inserted at warning; (4) collapse interrupts + prepends; (5) rest resolves + resumes; (6) building-full queuing; (7) well-rested bonus at all >80; (8) shift cycle for Bunkhouse Tier 2+; (9) canteen cost deducted; (10) ground-rest 2× when no building |
+| `needs.integration.test.ts` | (1) Hunger drains during task; (2) fatigue faster during task; (3) rest auto-inserted at warning; (4) collapse interrupts + prepends; (5) rest resolves + resumes; (6) building-full queuing; (7) well-rested bonus at all >80; (8) shift cycle for Living Quarters Tier 2+; (9) living_quarters visit cost deducted; (10) ground-rest 2× when no building |
 | `economy.integration.test.ts` | (1) Ore sale deducts + credits; (2) missed deadline fine; (3) successful negotiation; (4) failed negotiation; (5) supply contract delivers on schedule; (6) rubble disposal cost; (7) bankruptcy tracker; (8) save/load finance state |
 | `events.integration.test.ts` | (1) Union timer interval; (2) probability scales with score; (3) decision affects follow-up; (4) mafia unlocked after corruption; (5) lawsuit after death; (6) weather modifies flood state; (7) TrafficJamEvent threshold; (8) UnqualifiedTaskError; (9) timer resets; (10) fine amounts scale with score |
 | `campaign.integration.test.ts` | (1) Level completes at profit threshold; (2) star rating computed; (3) next level unlocked; (4) progress persists on restart; (5) bankruptcy ends level; (6) arrest ends level; (7) ecological shutdown; (8) worker revolt; (9) replay completed level; (10) star rating updates on replay |
@@ -145,7 +145,7 @@ Steps also carry `role: 'player' | 'setup' | 'observe'` and `expect` (`ScenarioS
 | `skill-progression.json` | 3 | Hire driller → 700 ticks work → verify Level 5 |
 | `multi-deck-blast.json` | 5 | 3-deck charge → no surface projection, deep fracture |
 | `presplit-wall.json` | 5 | Presplit row + production holes → zero back-break |
-| `needs-cycle.json` | 7 | 3 workers → 20 ticks → canteen auto-queued |
+| `needs-cycle.json` | 7 | 3 workers → 20 ticks → living_quarters (hunger) auto-queued |
 | `ramp-navigation.json` | 6 | Build ramp → agent reaches lower bench |
 | `vibration-budget.json` | — | Exceed vibration budget 3× → $5,000 fine |
 | `building-lifecycle.json` | 1 | Place → research → demolish → rebuild Tier 2 |
