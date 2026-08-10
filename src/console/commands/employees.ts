@@ -100,7 +100,7 @@ export function employeeCommand(
     case 'raise': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       const amount = parseFloat(named['amount'] ?? '0');
-      if (isNaN(id) || amount <= 0) {
+      if (isNaN(id) || !Number.isFinite(amount) || amount <= 0) {
         return { success: false, output: 'Usage: employee raise <id> amount:500' };
       }
       if (!giveRaise(state.employees, id, amount)) {
