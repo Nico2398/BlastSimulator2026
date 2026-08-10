@@ -34,6 +34,23 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "mousedown",
+          "x": 640,
+          "y": 360,
+          "button": "right"
+        },
+        {
+          "type": "mousemove",
+          "x": 700,
+          "y": 320
+        },
+        {
+          "type": "mouseup",
+          "x": 700,
+          "y": 320,
+          "button": "right"
+        },
+        {
           "type": "dragTiles",
           "x1": 5,
           "z1": 15,

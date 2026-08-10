@@ -31,8 +31,13 @@ vi.mock('../../../src/ui/scene/ScenePicking.js', () => ({
 let canvas: HTMLCanvasElement;
 let controller: PlacementController;
 
-/** Minimal CameraController surface — arm/disarm only calls setArmedRemap. */
-const cameraController = { setArmedRemap: vi.fn() };
+/**
+ * Minimal CameraController surface — arm/disarm only calls setArmedRemap.
+ * `rightButtonDragged` backs the #544 right-drag-vs-right-click cancel guard;
+ * tests flip it directly rather than simulating real mouse gestures, mirroring
+ * how `setArmedRemap` is already a bare spy rather than a real remap.
+ */
+const cameraController = { setArmedRemap: vi.fn(), rightButtonDragged: false };
 
 function press(x: number, z: number): void {
   tileUnderCursor = { x, z };
@@ -52,6 +57,7 @@ function hover(x: number, z: number): void {
 beforeEach(() => {
   setPickerRegion(null);
   tileUnderCursor = null;
+  cameraController.rightButtonDragged = false;
   canvas = document.createElement('canvas');
   document.body.appendChild(canvas);
   controller = new PlacementController(
@@ -218,6 +224,77 @@ describe('the pre-filled selection a panel opens with', () => {
   it('is left alone when nothing is guiding the placement', () => {
     controller.arm({ shape: 'point', initialSelection: { x: 16, z: 16 } });
     expect(controller.selection).toEqual({ x1: 16, z1: 16, x2: 16, z2: 16 });
+  });
+});
+
+describe('cancel via right-click vs right-drag (#544)', () => {
+  function contextmenu(): MouseEvent {
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    canvas.dispatchEvent(event);
+    return event;
+  }
+
+  it('a right-drag that orbited the camera leaves an armed tool untouched', () => {
+    setPickerRegion(EXACT);
+    controller.arm({ shape: 'rect' });
+    press(25, 25);
+    const onCancel = vi.fn();
+    controller.setCancelHandler(onCancel);
+    const phaseBefore = controller.currentPhase;
+    const selectionBefore = controller.selection;
+
+    cameraController.rightButtonDragged = true;
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    const preventDefault = vi.spyOn(event, 'preventDefault');
+    canvas.dispatchEvent(event);
+
+    expect(controller.isArmed).toBe(true);
+    expect(controller.currentPhase).toBe(phaseBefore);
+    expect(controller.selection).toEqual(selectionBefore);
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalled();
+  });
+
+  it('a right-click with no camera movement still cancels the armed tool', () => {
+    setPickerRegion(EXACT);
+    controller.arm({ shape: 'rect' });
+    const onCancel = vi.fn();
+    controller.setCancelHandler(onCancel);
+
+    cameraController.rightButtonDragged = false;
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    const preventDefault = vi.spyOn(event, 'preventDefault');
+    canvas.dispatchEvent(event);
+
+    expect(controller.isArmed).toBe(false);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(preventDefault).toHaveBeenCalled();
+  });
+
+  it('Escape still cancels an armed tool regardless of rightButtonDragged', () => {
+    setPickerRegion(EXACT);
+    controller.arm({ shape: 'rect' });
+    const onCancel = vi.fn();
+    controller.setCancelHandler(onCancel);
+
+    // Set true to prove Escape's path never even consults it — a regression
+    // lock on the unchanged path, not a new behavior.
+    cameraController.rightButtonDragged = true;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(controller.isArmed).toBe(false);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('a contextmenu while idle is a no-op regardless of rightButtonDragged', () => {
+    const onCancel = vi.fn();
+    controller.setCancelHandler(onCancel);
+    cameraController.rightButtonDragged = true;
+
+    contextmenu();
+
+    expect(controller.currentPhase).toBe('idle');
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });
 

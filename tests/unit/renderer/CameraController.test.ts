@@ -263,6 +263,70 @@ describe('CameraController', () => {
     });
   });
 
+  describe('right-button drag/click signal (#544)', () => {
+    // Deltas below assume RIGHT_DRAG_THRESHOLD_PX = 5 (module-private in
+    // CameraController.ts, documented next to its declaration).
+    const mouseEvent = (button: number, x: number, y: number) =>
+      Object.assign(Object.create({ preventDefault: () => {} }), { button, clientX: x, clientY: y });
+    const down = (button: number, x: number, y: number) =>
+      canvas._listeners['mousedown']?.forEach((fn) => fn(mouseEvent(button, x, y) as unknown as Event));
+    const move = (x: number, y: number) =>
+      canvas._listeners['mousemove']?.forEach((fn) => fn(mouseEvent(0, x, y) as unknown as Event));
+    const up = (button: number, x: number, y: number) =>
+      canvas._listeners['mouseup']?.forEach((fn) => fn(mouseEvent(button, x, y) as unknown as Event));
+
+    it('reads false immediately after mousedown, before any movement', () => {
+      down(2, 100, 100);
+      expect(controller.rightButtonDragged).toBe(false);
+    });
+
+    it('reads true after a right-drag past the 5px threshold', () => {
+      down(2, 100, 100);
+      move(110, 100); // 10px delta, past threshold
+      up(2, 110, 100);
+      expect(controller.rightButtonDragged).toBe(true);
+    });
+
+    it('reads false after a right-click with no mousemove at all', () => {
+      down(2, 100, 100);
+      up(2, 100, 100);
+      expect(controller.rightButtonDragged).toBe(false);
+    });
+
+    it('reads false after movement below the threshold', () => {
+      down(2, 100, 100);
+      move(101, 100); // 1px delta, below threshold
+      up(2, 101, 100);
+      expect(controller.rightButtonDragged).toBe(false);
+    });
+
+    it('reads true for peak displacement even when the pointer returns to the press position', () => {
+      down(2, 100, 100);
+      move(110, 100); // 10px out, past threshold
+      move(100, 100); // back to the exact press position
+      up(2, 100, 100);
+      expect(controller.rightButtonDragged).toBe(true);
+    });
+
+    it('resets to false on a fresh right-button mousedown, before any subsequent move', () => {
+      down(2, 100, 100);
+      move(110, 100);
+      up(2, 110, 100);
+      expect(controller.rightButtonDragged).toBe(true);
+
+      down(2, 200, 200); // brand new gesture
+      expect(controller.rightButtonDragged).toBe(false);
+    });
+
+    it('never sets true for a left-button drag', () => {
+      down(0, 100, 100);
+      move(110, 100); // 10px, would be past threshold if this were tracked
+      expect(controller.rightButtonDragged).toBe(false);
+      up(0, 110, 100);
+      expect(controller.rightButtonDragged).toBe(false);
+    });
+  });
+
   describe('setPanLeash (#458 T6.1/D13)', () => {
     // A camera with zero X offset from its target (directly "north" of it,
     // not straight overhead — straight-down lookAt is a gimbal-lock edge
