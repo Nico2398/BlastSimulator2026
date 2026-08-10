@@ -67,7 +67,7 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 7. **Context explains the "why"** — what feature, what phase, what goal.
 8. **Single task per issue.** A task touching several concerns is several issues.
 9. **SMART compliance.** Specific (one clear goal), Measurable (verifiable outcome), Achievable (within an agent's capabilities), Relevant (part of the larger feature), Time-bound (a single atomic task).
-10. **Flag interaction-mode risk.** An issue whose change an interaction-mode scenario drives, or which touches machinery every scenario runs through, gets the `full-ci` label — it starts the interaction-mode browser job. Command-mode scenarios and the `visual` channel suffice for everything else, UI included. The label costs the merge path ~30 minutes, so leave it off when in doubt: `agentic-pipeline-pr-management` holds the test.
+10. **`full-ci` is off by default — an issue has to earn it.** The label starts the interaction-mode browser job, which costs the merge path real time, so it goes on an issue only where that job is the only thing that could catch the regression: an interaction-mode scenario clicks its way through the control, panel or flow the issue changes, or the issue touches shared input, picking, camera, rendering or harness machinery every scenario runs through. **Never on a backend-only issue.** A change confined to `src/core/`, `src/console/`, config or pure logic is proven by `static`, `logic` and command-mode `scenario`; replaying browser flows the diff never reaches reports nothing about it. **Never where there is no interaction regression to catch** — a renderer detail no scenario reaches, a control added to an existing panel, copy, a new command parameter. The `visual` channel covers those in-session against the thing that actually changed, which is stronger evidence than a suite that never touches it. When in doubt, leave it off. Full test and cost: `agentic-pipeline-pr-management`.
 11. **Label transfer.** A PR opened from a `full-ci` issue gets the same label: `gh pr edit <number> --add-label "full-ci"`.
 
 ## Checklist
@@ -80,6 +80,6 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 - [ ] Verification is a concrete observable outcome
 - [ ] SMART criteria respected
 - [ ] An issue that must stay out of the queue carries its own lifecycle label
-- [ ] Interaction-mode risk assessed → `full-ci` added only when an interaction-mode scenario drives the change, or every scenario runs through what it touches
+- [ ] `full-ci` left off unless the interaction-mode job is the only thing that could catch the regression — never on a backend-only issue, never where no interaction regression exists
 - [ ] If the issue has `full-ci`, the PR gets `full-ci` when opened
 - [ ] Labels set on creation: `ready,agent-task` unless the human specified otherwise or the issue must stay out of the queue
