@@ -56,6 +56,18 @@ describe('ChargePlan', () => {
     }
   });
 
+  it('non-finite stemming (NaN) returns an error, not a charge', () => {
+    const result = createCharge('pop_rock', 2, NaN, 8);
+    expect('error' in result).toBe(true);
+    expect('charge' in result).toBe(false);
+  });
+
+  it('non-finite amount (NaN) returns an error, not a charge', () => {
+    const result = createCharge('pop_rock', NaN, 1, 8);
+    expect('error' in result).toBe(true);
+    expect('charge' in result).toBe(false);
+  });
+
   it('batchCharge surfaces the stemming-floor error per affected hole, not a silent skip', () => {
     const holeIds = ['H1', 'H2', 'H3'];
     const depths: Record<string, number> = { H1: 8, H2: 8, H3: 8 };

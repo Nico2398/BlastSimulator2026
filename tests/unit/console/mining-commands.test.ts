@@ -968,6 +968,17 @@ describe('chargeCommand — stemming floor', () => {
     expect(result.output.toLowerCase()).toContain('stemming');
     expect(Object.keys(ctx.state!.chargesByHole).length).toBe(0);
   });
+
+  it('omitting the stemming: argument entirely defaults to MIN_STEMMING_M and succeeds', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+
+    const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.chargesByHole['H1']).toBeDefined();
+    expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBe(MIN_STEMMING_M);
+  });
 });
 
 describe('buildRampCommand', () => {

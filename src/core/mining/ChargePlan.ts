@@ -26,7 +26,7 @@ export function createCharge(
   if (!explosive) {
     return { error: `Unknown explosive: "${explosiveId}"` };
   }
-  if (amountKg < explosive.minChargeKg || amountKg > explosive.maxChargeKg) {
+  if (!Number.isFinite(amountKg) || amountKg < explosive.minChargeKg || amountKg > explosive.maxChargeKg) {
     return {
       error: `Amount ${amountKg}kg out of range [${explosive.minChargeKg}–${explosive.maxChargeKg}kg] for ${explosiveId}`,
     };
