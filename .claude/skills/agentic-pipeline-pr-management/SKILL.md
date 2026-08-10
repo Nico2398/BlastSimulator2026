@@ -55,7 +55,7 @@ So a channel this session cannot run but CI does — interaction-mode `visual`/`
 
 ## The `full-ci` label
 
-`full-ci` starts the `Scenarios (interaction mode)` browser job — sharded 4 ways in CI as of #530, each shard driving ~32 of the 127 scenarios; the terrain material still costs ~6.4 s/frame without a GPU (#475), so the job remains real added time to the merge path even sharded. #530 also cut the harness's own overhead by ~30% (measured 3367s -> ~2350s, single-threaded, in a sandbox) and, confirmed on #530's own PR checks, brings the sharded job to ~12 minutes wall clock. Treat it as costly, not as free just because it is parallelised; apply it where there is evidence to buy:
+`full-ci` starts the `Scenarios (interaction mode)` browser job — sharded via the repo variable `SCENARIO_INTERACTION_SHARDS` (a JSON array like `[1,2,3,4]`), defaulting to 4 shards as of #530, each shard driving roughly 127/N of the scenarios; the terrain material still costs ~6.4 s/frame without a GPU (#475), so the job remains real added time to the merge path even sharded. #530 also cut the harness's own overhead by ~30% (measured 3367s -> ~2350s, single-threaded, in a sandbox) and, confirmed on #530's own PR checks, brings the sharded job to ~12 minutes wall clock at 4 shards — of each shard's ~11-12 min, ~30s is fixed per-job setup (checkout, install, Chrome, build, dev-server boot) that does not shrink with more shards, the rest is the harness's own batch time, which scales down roughly with shard count. Treat it as costly, not as free just because it is parallelised; apply it where there is evidence to buy:
 
 | Apply because | Test |
 |---------------|------|

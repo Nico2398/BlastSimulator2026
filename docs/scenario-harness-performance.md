@@ -234,6 +234,38 @@ sharding on top, confirmed in real CI on PR #530, brought the
 `full-ci` job's `Scenarios (interaction mode)` step to **~12 minutes**
 wall clock.
 
+### Why 4 shards, not 2, 6, or 8 — and why it's now a variable, not a constant
+
+4 was a reasonable starting default, not the output of cost modelling — the
+real per-shard breakdown only exists now, pulled from PR #530's own job logs
+(`get_job_logs`, shard 1/4, plus the four shards' `started_at`/`completed_at`):
+
+| Cost | Size | Scales with shard count? |
+|---|---|---|
+| Fixed CI setup: checkout, Node + npm cache hit (~3.7 s), Puppeteer Chrome install (~4.6 s), `npm run build` (~4.1 s), dev server boot + `sleep 5` + curl (~10 s) | ~30 s | No — paid once per shard regardless of how many scenarios it runs |
+| Per-shard cold start: navigate + wait for `#game-canvas` | ~8.5 s | No — same reasoning, one page boot per shard |
+| Harness batch time: run this shard's slice of the 127 scenarios | ~646–694 s (shard 1 logged "BATCH COMPLETE — 646.1s" for its 32 scenarios) | Yes — roughly proportional to scenario count per shard |
+
+Total per-shard job wall time in that run: 680–726 s (~11–12 min) across
+the four shards, matching the ~12 minute figure above. The ~646 s batch
+portion is what shrinks as shard count grows; the ~38.5 s fixed portion is
+paid again by every additional shard. Doubling to 8 shards would roughly
+halve the variable portion to ~320 s while still paying ~38.5 s fixed,
+landing near ~360 s (~6 min) per shard — a real additional win, with
+diminishing returns as fixed cost becomes a larger fraction of a shorter
+job. Going the other way, 2 shards would land near ~1 331 s (~22 min) per
+shard — worse than today for no benefit.
+
+Rather than pick a new fixed number, the shard count is now the repo
+variable `SCENARIO_INTERACTION_SHARDS` (`.github/workflows/ci.yml`,
+`strategy.matrix.shard: ${{ fromJson(vars.SCENARIO_INTERACTION_SHARDS || '[1,2,3,4]') }}`).
+This adds no real complexity: `run-all-scenarios.ts`'s `--shard i/N` parsing
+already accepts any `N` (`parseShardArg`/`selectShard`), and the CI step
+already passes `${{ strategy.job-total }}` instead of a hardcoded `4`, so
+the harness's own shard-total argument stays correct for whatever the
+variable holds. Changing shard count is a Settings → Variables edit, not a
+workflow change.
+
 ### Measured and rejected
 
 - **Serve the built bundle instead of the dev server** — 0.4 s per scenario
