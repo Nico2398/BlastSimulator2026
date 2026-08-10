@@ -34,11 +34,14 @@ functions for unrelated reasons). The third run, on the merged result, is
 together with these optimisations and that the merge itself introduced
 nothing new.
 
-Sharding was spot-checked (round-robin partition math, one shard run in
-command mode) but not run in CI, since a CI-only wall-clock claim can't be
-reproduced in a sandbox — the number in row 4 of the ranked table stands as
-a projection, not a measurement, until a real four-way `full-ci` run
-confirms it.
+Sharding is now confirmed in real CI, not just projected: PR #530's own
+`full-ci` run completed all four `Scenarios (interaction mode)` shards in
+**~12 minutes wall clock** (11:12:00–11:24:12 UTC, all four started
+together and finished within 3 minutes of each other), against this same
+branch's ~39 minute unsharded, single-process time — close to the
+near-linear 4× this document projected, the gap being the fixed per-shard
+setup cost (checkout, `npm ci`, Puppeteer install, build, dev server start)
+that sharding doesn't divide.
 
 ### Tab reuse (optimisation 1) — implemented, reverted
 
@@ -221,14 +224,15 @@ scenarios purely because of it.
 | 1 | **Reuse one tab across scenarios**, reloading only where a scenario needs a fresh boot | ~950 s (28%) | — | **Reverted.** Implemented, found two bugs during verification (one fixed, one — sticky per-panel instance state — an open-ended audit, not a quick fix). See its own section above |
 | 2 | **Replace the 300 ms sleep with a two-frame rAF wait** | ~646 s (19%) | Included in the −1 005 s measured below | **Shipped.** Surfaced a real, separate race while landing it — `PlacementController.confirm()` holds `isArmed()` true for a fixed 220 ms flash via `setTimeout`, not a frame callback, so two rAF frames could lose that race where the old, generous 300 ms sleep happened to win it. Fixed by exposing `currentPhase()` and polling it, not by lengthening the wait |
 | 3 | **Let `campaign start` run without a prior `new_game`**, and drop the throwaway from the scenario definitions | 262 s interaction (8%), 12 s command (17% of command mode) | Included in the −1 005 s measured below | **Shipped**, scoped down from all 62 to 38 of the 62 campaign scenarios — the other 24 either deliberately exercise `campaign start` as a rejection path that continues on the discarded sandbox world instead of replacing it (locked tier-2/3 levels — removing their `new_game` would leave them no world at all), or assert `worldSizeX` actually grew from the sandbox default (a real regression check for "campaign start's regenerateGrid call ran," which a world that was never created can't prove) |
-| 4 | **Shard the suite across workers** (`--shard i/n` CI matrix) | Near-linear on whatever remains | Not measured — sandbox has no CI runner to time | **Shipped** as a 4-way GitHub Actions matrix + `--shard` flag, round-robin partitioned. Needs a real `full-ci` PR run to confirm the wall-clock claim |
+| 4 | **Shard the suite across workers** (`--shard i/n` CI matrix) | Near-linear on whatever remains | **Confirmed in real CI**: PR #530's `full-ci` run, all 4 shards, ~12 min wall clock | **Shipped** as a 4-way GitHub Actions matrix + `--shard` flag, round-robin partitioned |
 | 5 | **Collapse per-step state extraction into one evaluate**, and reuse that snapshot in `checkGoal` instead of re-fetching | ~130 s (4%) | Included in the −1 005 s measured below | **Shipped** |
 | 6 | **Drop the `waitForSelector` at the top of `clickSelector`** — the probe loop that follows already reports `absent` and honours the same deadline | ~15 s | Included in the −1 005 s measured below | **Shipped** |
 
-2, 3, 5, 6 together measure **3 367 s → 2 362 s (−1 005 s, −30%)** on a full
-127-scenario run, verified twice with an identical 121-passed/6-failed split
-both times. Four-way sharding on top of that would put a CI job near **10
-min** if the projection in row 4 holds — not yet confirmed by a real run.
+2, 3, 5, 6 together measure **3 367 s → 2 347–2 362 s (~−30%)** on a full
+127-scenario run, verified three times (see "Implemented" above). Four-way
+sharding on top, confirmed in real CI on PR #530, brought the
+`full-ci` job's `Scenarios (interaction mode)` step to **~12 minutes**
+wall clock.
 
 ### Measured and rejected
 
