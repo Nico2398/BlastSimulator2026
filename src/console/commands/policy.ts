@@ -31,6 +31,7 @@ export function setPolicyCommand(
 
   state.sitePolicy.shiftMode = mode;
 
+  // #539: guards below must reject non-finite parseInt results (NaN and Infinity)
   if (named['hunger'] !== undefined) {
     const v = parseInt(named['hunger'], 10);
     if (!isNaN(v)) state.sitePolicy.hungerRestThreshold = v;
