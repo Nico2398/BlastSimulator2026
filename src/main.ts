@@ -107,6 +107,15 @@ placementController.setArmedStateHandler((armed) => {
 placementController.setFeedbackHandler(() => {
   selectionOverlay.setBlockedTile(placementController.refusedTile);
 });
+// Read-only site-claim preview (#558): would this tile's claim be refused,
+// and why. `ctx` is assigned below (createRunner()) but this closure only
+// reads it once the player actually hovers/anchors a tile, well after that
+// assignment has run.
+placementController.setClaimCheck((x, z) => {
+  if (!ctx.playableArea) return null;
+  if (ctx.playableArea.contains(Math.floor(x), Math.floor(z))) return null;
+  return ctx.playableArea.previewClaim(Math.floor(x), Math.floor(z));
+});
 // ParamStrip only renders what it's told; pressing its own CONFIRM/ESC buttons
 // has to reach back into the controller that armed it.
 paramStrip.setConfirmHandler(() => placementController.confirm());

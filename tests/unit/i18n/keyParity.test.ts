@@ -80,10 +80,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // already translated in fr.json, not just carried over in English.
     // Before that, baseline was 3219 (down from 3231) after 12 dead/orphaned
     // keys were removed as part of the issue #492 glossary sweep — see
-    // ORPHAN_KEYS in src/core/i18n/glossary.ts. Update this baseline only
-    // alongside a deliberate key addition/removal, not silently.
+    // ORPHAN_KEYS in src/core/i18n/glossary.ts. Baseline is now 3244 (up from
+    // 3241): #558 added shell.placement.refused_protected_ground,
+    // refused_expansion_disabled and refused_too_far — the specific reasons a
+    // site-claim preview can refuse a placement tile, both locales translated.
+    // Update this baseline only alongside a deliberate key addition/removal,
+    // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3241);
+    expect(Object.keys(en).length).toBe(3244);
   });
 });
 

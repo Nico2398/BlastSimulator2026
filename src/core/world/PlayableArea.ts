@@ -18,6 +18,7 @@ import {
   type ProtectedStructures,
 } from './Structures.js';
 import type { Rect } from './WorldGen.js';
+import { MAX_CLAIM_BRIDGE_CHUNKS } from '../config/balance.js';
 
 /** Why a claim was refused. */
 export type ClaimRefusalReason =
@@ -211,11 +212,84 @@ export class PlayableArea {
    * not already edge-adjacent even when the gap is a handful of chunks the
    * action itself could reasonably bridge.
    *
-   * TODO: implement — this is a skeleton stub for the test-writer/implementer.
    */
   claimArea(cells: ReadonlyArray<{ x: number; z: number }>): ClaimAreaResult {
-    void cells;
-    throw new Error('not implemented');
+    const targets = new Map<string, { cx: number; cz: number }>();
+    for (const cell of cells) {
+      const chunk = PlayableArea.chunkAt(cell.x, cell.z);
+      targets.set(`${chunk.cx},${chunk.cz}`, chunk);
+    }
+    if (targets.size === 0) return { claimed: true, rect: null, chunks: [], expanded: false };
+
+    const notOwned = [...targets.values()].filter(t => !this.isFullyOwned(t.cx, t.cz));
+    if (notOwned.length === 0) return { claimed: true, rect: null, chunks: [], expanded: false };
+
+    if (!this.expansionEnabled) {
+      return { claimed: false, reason: 'expansion_disabled', chunk: notOwned[0]! };
+    }
+
+    // Every target chunk is part of the required set regardless of whether it
+    // needs bridging; bridge chunks are appended as bridging discovers them.
+    const required = new Map<string, { cx: number; cz: number }>(targets);
+    // Chunks proven connected to the site within this claim — targets and
+    // bridge chunks are added here in processing order, so later targets can
+    // bridge off earlier ones instead of only the site's own frontier.
+    const connected = new Map<string, { cx: number; cz: number }>();
+
+    const sorted = [...notOwned].sort((a, b) => {
+      const da = this.distanceToSite(a.cx, a.cz);
+      const db = this.distanceToSite(b.cx, b.cz);
+      if (da !== db) return da - db;
+      if (a.cx !== b.cx) return a.cx - b.cx;
+      return a.cz - b.cz;
+    });
+
+    for (const target of sorted) {
+      if (this.touchesConnected(target.cx, target.cz, connected)) {
+        connected.set(`${target.cx},${target.cz}`, target);
+        continue;
+      }
+      const anchor = this.nearestAnchor(target.cx, target.cz, connected);
+      if (!anchor) {
+        // Defensive fallback only — should not happen given a non-empty site.
+        return { claimed: false, reason: 'not_adjacent', chunk: target };
+      }
+      const bridge = PlayableArea.bridgeWalk(target, anchor);
+      if (bridge.length > MAX_CLAIM_BRIDGE_CHUNKS) {
+        return { claimed: false, reason: 'too_far', chunk: target };
+      }
+      for (const step of bridge) {
+        const key = `${step.cx},${step.cz}`;
+        connected.set(key, step);
+        required.set(key, step);
+      }
+      connected.set(`${target.cx},${target.cz}`, target);
+    }
+
+    // Validate every required chunk BEFORE mutating anything — all-or-nothing.
+    for (const chunk of required.values()) {
+      if (rectTouchesProtectedStructure(this.structures(), PlayableArea.chunkRect(chunk.cx, chunk.cz))) {
+        return { claimed: false, reason: 'protected_structure', chunk };
+      }
+    }
+
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    const claimedChunks: Array<{ cx: number; cz: number }> = [];
+    for (const chunk of required.values()) {
+      claimedChunks.push(chunk);
+      if (this.isFullyOwned(chunk.cx, chunk.cz)) continue;
+      const grown = this.grid.addChunk(chunk.cx, chunk.cz);
+      const rect = grown ?? PlayableArea.chunkRect(chunk.cx, chunk.cz);
+      this.generateInto(rect);
+      this.grid.markChunkPristine(chunk.cx, chunk.cz);
+      minX = Math.min(minX, rect.minX);
+      minZ = Math.min(minZ, rect.minZ);
+      maxX = Math.max(maxX, rect.maxX);
+      maxZ = Math.max(maxZ, rect.maxZ);
+    }
+
+    const rect = minX === Infinity ? null : { minX, minZ, maxX, maxZ };
+    return { claimed: true, rect, chunks: claimedChunks, expanded: true };
   }
 
   /**
@@ -223,12 +297,15 @@ export class PlayableArea {
    * mutating the site. Drives placement-tool feedback so a refusal shows
    * before the player commits to an action (#558).
    *
-   * TODO: implement — this is a skeleton stub for the test-writer/implementer.
+   * No bridging/too_far check here — a single hovered tile has no footprint
+   * to bridge yet, so those cannot apply.
    */
   previewClaim(x: number, z: number): ClaimRefusalReason | null {
-    void x;
-    void z;
-    throw new Error('not implemented');
+    if (this.contains(x, z)) return null;
+    if (!this.expansionEnabled) return 'expansion_disabled';
+    const { cx, cz } = PlayableArea.chunkAt(x, z);
+    if (rectTouchesProtectedStructure(this.structures(), PlayableArea.chunkRect(cx, cz))) return 'protected_structure';
+    return null;
   }
 
   /**
@@ -260,6 +337,83 @@ export class PlayableArea {
       || this.grid.hasChunk(cx + 1, cz)
       || this.grid.hasChunk(cx, cz - 1)
       || this.grid.hasChunk(cx, cz + 1);
+  }
+
+  /** True when chunk (cx, cz) is owned and holds its full CHUNK_SIZE² span (not a partial edge chunk). */
+  private isFullyOwned(cx: number, cz: number): boolean {
+    return this.grid.hasChunk(cx, cz) && !this.grid.isChunkPartial(cx, cz);
+  }
+
+  /** True when chunk (cx, cz) shares an edge with the site or with a chunk already proven connected this claim. */
+  private touchesConnected(cx: number, cz: number, connected: ReadonlyMap<string, { cx: number; cz: number }>): boolean {
+    if (this.touchesSite(cx, cz)) return true;
+    return connected.has(`${cx - 1},${cz}`)
+      || connected.has(`${cx + 1},${cz}`)
+      || connected.has(`${cx},${cz - 1}`)
+      || connected.has(`${cx},${cz + 1}`);
+  }
+
+  /** Chebyshev chunk-distance from (cx, cz) to the nearest chunk the site currently owns. */
+  private distanceToSite(cx: number, cz: number): number {
+    let best = Infinity;
+    for (const owned of this.grid.ownedChunks()) {
+      const d = Math.max(Math.abs(cx - owned.cx), Math.abs(cz - owned.cz));
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
+  /**
+   * The nearest chunk (by Chebyshev distance) that a bridge from (cx, cz)
+   * could connect to — either a chunk the site already owns, or one already
+   * proven connected earlier in this same claim. Ties broken by (cx, cz) so
+   * the result is deterministic.
+   */
+  private nearestAnchor(
+    cx: number,
+    cz: number,
+    connected: ReadonlyMap<string, { cx: number; cz: number }>,
+  ): { cx: number; cz: number } | null {
+    let best: { cx: number; cz: number } | null = null;
+    let bestDist = Infinity;
+    const consider = (candidate: { cx: number; cz: number }): void => {
+      const d = Math.max(Math.abs(cx - candidate.cx), Math.abs(cz - candidate.cz));
+      if (d < bestDist || (d === bestDist && best !== null && PlayableArea.chunkLess(candidate, best))) {
+        bestDist = d;
+        best = candidate;
+      }
+    };
+    for (const owned of this.grid.ownedChunks()) consider(owned);
+    for (const chunk of connected.values()) consider(chunk);
+    return best;
+  }
+
+  private static chunkLess(a: { cx: number; cz: number }, b: { cx: number; cz: number }): boolean {
+    return a.cx !== b.cx ? a.cx < b.cx : a.cz < b.cz;
+  }
+
+  /**
+   * Straight, chunk-stepped walk from `from` to `to`, moving one axis at a
+   * time (x fully, then z). Excludes both endpoints: `from` is already part
+   * of the claim's required set, `to` is already connected to the site.
+   */
+  private static bridgeWalk(
+    from: { cx: number; cz: number },
+    to: { cx: number; cz: number },
+  ): Array<{ cx: number; cz: number }> {
+    const path: Array<{ cx: number; cz: number }> = [];
+    let cx = from.cx, cz = from.cz;
+    while (cx !== to.cx) {
+      cx += Math.sign(to.cx - cx);
+      if (cx === to.cx && cz === to.cz) break;
+      path.push({ cx, cz });
+    }
+    while (cz !== to.cz) {
+      cz += Math.sign(to.cz - cz);
+      if (cx === to.cx && cz === to.cz) break;
+      path.push({ cx, cz });
+    }
+    return path;
   }
 
   private generateInto(rect: Rect): void {

@@ -491,7 +491,8 @@ export class GameRenderer {
   raycastSurfaceY(x: number, z: number): number | null {
     if (!this.terrain) return null;
     const raycaster = new THREE.Raycaster(new THREE.Vector3(x, 10_000, z), new THREE.Vector3(0, -1, 0));
-    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    let hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    if (!hit && this.landscape) hit = raycaster.intersectObjects(this.landscape.meshes, true)[0];
     return hit ? hit.point.y : null;
   }
 
@@ -513,7 +514,8 @@ export class GameRenderer {
     if (!this.terrain) return null;
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    let hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    if (!hit && this.landscape) hit = raycaster.intersectObjects(this.landscape.meshes, true)[0];
     return hit ? hit.point.clone() : null;
   }
 
@@ -912,12 +914,23 @@ export class GameRenderer {
     this.refreshPanLeash();
   }
 
-  /** Re-leash the camera to the site's current bounding box. Cheap; safe to call every remesh. */
+  /**
+   * Re-leash the camera to the landscape's fixed generation extent (#558) —
+   * NOT the site's live bounding box, which only grows as the player claims
+   * chunks and would otherwise leash the player to ground already claimed
+   * instead of the ground actually rendered. Centred on the level's ORIGINAL
+   * playable rect, exactly like `buildLandscapeMap` centres its tiles, so the
+   * leash stays fixed for the whole level. Cheap; safe to call every remesh.
+   */
   private refreshPanLeash(): void {
-    const grid = this.lastGrid;
-    if (!grid) return;
+    const handle = this.landscapeHandle;
+    if (!handle) return;
+    const rect = handle.playableRect;
+    const centerX = (rect.minX + rect.maxX) / 2;
+    const centerZ = (rect.minZ + rect.maxZ) / 2;
+    const half = handle.map.extentHalf;
     this.sm.cameraController.setPanLeash(
-      { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
+      { minX: centerX - half, minZ: centerZ - half, maxX: centerX + half, maxZ: centerZ + half },
       PAN_LEASH_MARGIN,
     );
   }

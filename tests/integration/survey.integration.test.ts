@@ -301,19 +301,23 @@ describe('Survey system', () => {
 
   // ── 7. Coordinates the site cannot reach are rejected (#473 D5) ──────────
 
-  it('survey rejects coordinates on ground touching no part of the site', () => {
-    // Site is 32x32, so (100, 100) is several chunks past anything claimable.
-    const result = surveyCommand(ctx as any, ['seismic'], { x: '100', z: '100' });
+  it('survey rejects coordinates too far for the site to bridge in one action', () => {
+    // Site is 32x32; (2000, 2000) is far past MAX_CLAIM_BRIDGE_CHUNKS (#558) —
+    // (100, 100) would now succeed instead, since the site bridges out to
+    // reach anything within that limit rather than refusing it outright.
+    const result = surveyCommand(ctx as any, ['seismic'], { x: '2000', z: '2000' });
     expect(result.success).toBe(false);
-    expect(result.output).toMatch(/out of bounds/i);
-    expect(ctx.grid!.containsColumn(100, 100)).toBe(false);
+    expect(result.output).toMatch(/too far/i);
+    expect(ctx.grid!.containsColumn(2000, 2000)).toBe(false);
   });
 
   it('survey just past the west edge claims that ground instead of refusing it', () => {
     const negResult = surveyCommand(ctx as any, ['aerial'], { x: '-5', z: '16' });
     expect(negResult.output).not.toMatch(/out of bounds/i);
     expect(ctx.grid!.containsColumn(-5, 16)).toBe(true);
-    expect(ctx.grid!.minX).toBe(-16);
+    // The claim now covers the survey's full aerial coverage disc (radius 30,
+    // #558), not just the center cell — it reaches chunk cx=-3 (minX=-48).
+    expect(ctx.grid!.minX).toBe(-48);
   });
 
   // ── 8. Insufficient funds ────────────────────────────────────────────────

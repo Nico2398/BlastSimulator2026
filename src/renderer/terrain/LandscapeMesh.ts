@@ -282,11 +282,9 @@ export class LandscapeMesh {
    * Every tile mesh, for raycasting past the site's claimed edge (#558) —
    * mirrors TerrainMesh.meshes so a caller can raycast both without knowing
    * which one it hit.
-   *
-   * TODO: implement — this is a skeleton stub for the test-writer/implementer.
    */
   get meshes(): THREE.Mesh[] {
-    return [];
+    return this.tileMeshes;
   }
 
   /**
