@@ -1,10 +1,15 @@
 name: "Assign next agent task"
 description: >
-  Picks the next unblocked ready issue, flips its labels, and posts the standard
+  Picks the next assignable ready issue, flips its labels, and posts the standard
   pipeline assignment comment addressed to the configured autonomous agent. The
   comment is the trigger: mentioning @claude or @opencode starts that runtime's
   runner workflow. Comment text is identical for both agents apart from the
   mention itself.
+
+  What counts as assignable is decided in `.github/scripts/assignability.cjs`,
+  which every entry point reaches through this action, so no two paths into the
+  queue can disagree about it. The repository must be checked out — the rules are
+  read from the workspace.
 
 inputs:
   token:
@@ -25,11 +30,21 @@ inputs:
     description: >
       Extra precondition to check before assigning.
       "closed_without_pr" — only chain when completed_issue closed without a linked PR.
+      "after_blocked_run" — only chain when completed_issue is a run that ended `blocked`,
+      and only while the cascade brake is open.
       "none" — no extra precondition. Single-flight is enforced either way.
     required: false
     default: "none"
   completed_issue:
-    description: "Issue just finished. Excluded from the stall check and read by the closed_without_pr guard."
+    description: "Issue just finished. Excluded from the stall check and read by the guards."
+    required: false
+    default: ""
+  blocked_chain_limit:
+    description: >
+      Consecutive runs that may end `blocked` since the last merged pipeline PR
+      before the `after_blocked_run` guard stops chaining. From
+      AGENTIC_BLOCKED_CHAIN_LIMIT; a non-positive or unparseable value falls back
+      to 3 rather than disabling the brake.
     required: false
     default: ""
 
@@ -40,6 +55,11 @@ outputs:
   mention:
     description: "Resolved agent mention (@claude or @opencode)."
     value: ${{ steps.assign.outputs.mention }}
+  halted:
+    description: >
+      "true" when the cascade brake stopped the chain — consecutive runs are
+      failing and the queue is deliberately parked until a human looks.
+    value: ${{ steps.assign.outputs.halted }}
 
 runs:
   using: composite
@@ -51,16 +71,27 @@ runs:
         ASSIGN_REASON: ${{ inputs.reason }}
         ASSIGN_GUARD: ${{ inputs.guard }}
         COMPLETED_ISSUE: ${{ inputs.completed_issue }}
+        BLOCKED_CHAIN_LIMIT: ${{ inputs.blocked_chain_limit }}
       with:
         github-token: ${{ inputs.token }}
         script: |
           const owner = context.repo.owner;
           const repo = context.repo.repo;
 
+          // Required from the workspace, not vendored into this YAML: the rules
+          // decide whether an unattended run starts on a task it cannot finish,
+          // and rules that only exist inside a workflow file cannot be tested.
+          const rules = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/assignability.cjs`);
+          const { createIssueApi } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/issue-api.cjs`);
+
+          const log = (message) => core.info(message);
+          const api = createIssueApi(github, { owner, repo, log });
+
+          core.setOutput('issue', '');
+          core.setOutput('halted', 'false');
+
           // --- Resolve which agent answers the assignment comment ---
-          const raw = (process.env.AGENTIC_AGENT || '').trim().replace(/^@/, '').toLowerCase();
-          const handles = { '': '@opencode', opencode: '@opencode', claude: '@claude' };
-          const mention = handles[raw];
+          const mention = rules.resolveMention(process.env.AGENTIC_AGENT);
           if (!mention) {
             core.setFailed(
               `AGENTIC_AGENT is "${process.env.AGENTIC_AGENT}" — expected "@claude" or "@opencode".`
@@ -68,7 +99,6 @@ runs:
             return;
           }
           core.setOutput('mention', mention);
-          core.setOutput('issue', '');
           core.info(`Configured autonomous agent: ${mention}`);
 
           const guard = process.env.ASSIGN_GUARD || 'none';
@@ -77,163 +107,165 @@ runs:
             ? parseInt(process.env.COMPLETED_ISSUE, 10)
             : null;
 
-          // Issue numbers an issue declares itself blocked by. Two spellings
-          // reach here and both are canonical somewhere: the `Blocked by`
-          // section `agentic-issue-creation` and the issue form produce, and
-          // the inline `Depends on: #N` older issues carry. Matching only the
-          // second one used to let a correctly written issue run ahead of the
-          // dependency it named, which fails the run rather than deferring it.
-          const dependenciesOf = (body) => {
-            const deps = new Set();
-            let inSection = false;
-            for (const line of (body || '').split('\n')) {
-              if (/^\s*(?:#{1,6}\s*|\*\*)?(?:blocked\s+by|depends?\s+on|dependencies)\b/i.test(line)) {
-                inSection = true;
-              } else if (inSection && /^\s*(?:#{1,6}\s+\S|\*\*\S)/.test(line)) {
-                inSection = false;   // the next section starts; the list is over
-                continue;
-              } else if (!inSection) {
-                continue;
-              }
-              for (const ref of line.matchAll(/#(\d+)/g)) {
-                deps.add(parseInt(ref[1], 10));
-              }
-            }
-            return [...deps];
-          };
-
-          const hasLinkedPr = async (number) => {
-            const { data: events } = await github.rest.issues.listEventsForTimeline({
-              owner, repo, issue_number: number, per_page: 100
-            });
-            return events.some((e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request);
-          };
-
           // --- Guard: only chain when the finished issue produced no PR ---
           if (guard === 'closed_without_pr') {
             if (!completed) {
               core.info('No completed issue supplied — nothing to chain from.');
               return;
             }
-            const { data: finished } = await github.rest.issues.get({
-              owner, repo, issue_number: completed
-            });
+            const finished = await api.getIssue(completed);
+            if (!finished) {
+              core.setFailed(`Issue #${completed} could not be read — not chaining on an unknown state.`);
+              return;
+            }
             if (finished.state !== 'closed') {
               core.info(`Issue #${completed} still open — a PR is expected to carry the chain.`);
               return;
             }
-            if (await hasLinkedPr(completed)) {
+            if ((await api.linkedPullRequests(completed)).length > 0) {
               core.info(`Issue #${completed} has a linked PR — the merge event carries the chain.`);
               return;
             }
             core.info(`Issue #${completed} closed without a PR — chaining directly.`);
           }
 
-          const { data: inProgress } = await github.rest.issues.listForRepo({
-            owner, repo, labels: 'in-progress', state: 'open', per_page: 20
-          });
-
-          // --- Single flight: never let two agent sessions run at once ---
-          // An issue keeps `in-progress` until its PR merges, so any other one
-          // still carrying that label means a run is live. Assigning now would
-          // put a second session on the same working tree of branches.
-          //
-          // Defer either way, and never diagnose. From the labels alone a run
-          // forty seconds old is indistinguishable from one that died hours
-          // ago; only `agentic-watchdog.yml` ages it against
-          // AGENTIC_STALL_MINUTES, so declaring a run lost is its job alone.
-          // This step used to comment "Pipeline halted — no linked PR was
-          // created" on sight, and posted it on #404 one minute into a
-          // two-hour session that was still running.
-          for (const busy of inProgress) {
-            if (busy.number === completed) continue;
-
-            if (await hasLinkedPr(busy.number)) {
-              core.info(
-                `Issue #${busy.number} is in progress with a linked PR — deferring. ` +
-                'Merging that PR re-enters this step.'
-              );
-            } else {
-              core.info(
-                `Issue #${busy.number} is in progress with no linked PR yet — deferring. ` +
-                'The watchdog labels it `blocked` if the run turns out to be lost.'
-              );
+          // --- Guard: chain past a run that ended `blocked` ---
+          // A blocked run is a terminal outcome like a merge is, and the queue
+          // has to keep moving through it: nothing else starts the next session,
+          // and a fully autonomous pipeline cannot wait for somebody to notice.
+          // What it must not do is keep chaining while every run fails.
+          if (guard === 'after_blocked_run') {
+            if (!completed) {
+              core.info('No blocked issue supplied — nothing to chain from.');
+              return;
             }
-            return;
+
+            const failed = await api.getIssue(completed);
+            if (!failed) {
+              core.setFailed(`Issue #${completed} could not be read — not chaining on an unknown state.`);
+              return;
+            }
+            if (!failed.labels.includes(rules.BLOCKED)) {
+              core.info(`Issue #${completed} no longer carries \`blocked\` — nothing to chain from.`);
+              return;
+            }
+
+            // A human labelling a backlog issue `blocked` is filing a note, not
+            // ending a run. Only an issue that was actually assigned — one that
+            // carried `in-progress` at some point — releases the next session.
+            if (!(await api.everCarriedInProgress(completed))) {
+              core.info(
+                `Issue #${completed} never carried \`in-progress\`, so no run ended here. Not chaining.`
+              );
+              return;
+            }
+
+            // `blocked` means the run is over, so the two labels cannot both be
+            // true. Left on, `in-progress` would defer this assignment against a
+            // session that no longer exists and hold the queue until the watchdog.
+            if (failed.labels.includes(rules.IN_PROGRESS)) {
+              await github.rest.issues
+                .removeLabel({ owner, repo, issue_number: completed, name: rules.IN_PROGRESS })
+                .catch(() => {});
+              core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it ended blocked.`);
+            }
+
+            const limit = rules.blockedChainLimit(process.env.BLOCKED_CHAIN_LIMIT);
+            const failures = await rules.consecutiveBlockedRuns(api);
+            if (failures >= limit) {
+              core.setOutput('halted', 'true');
+              core.warning(
+                `${failures} runs have ended \`blocked\` since the last pipeline merge (limit ${limit}). ` +
+                'Not chaining — this is a systemic failure, not a task-specific one.'
+              );
+              await announceHalt(failures, limit);
+              return;
+            }
+            core.info(
+              `${failures} blocked run(s) since the last pipeline merge, under the limit of ${limit}. Chaining.`
+            );
           }
 
           // --- Pick the next assignable issue ---
-          const { data: ready } = await github.rest.issues.listForRepo({
-            owner, repo, labels: 'ready', state: 'open', sort: 'created', direction: 'asc', per_page: 30
+          const { issue, reason: why } = await rules.selectNextAssignable(api, {
+            log,
+            completedIssue: completed,
           });
-          ready.sort((a, b) => a.number - b.number);
 
-          for (const issue of ready) {
-            if (issue.pull_request) continue;
-            if (issue.labels.some((l) => (typeof l === 'string' ? l : l.name) === 'blocked')) {
-              core.info(`#${issue.number}: labelled blocked, skipping.`);
-              continue;
-            }
-
-            let blocked = false;
-            for (const depNumber of dependenciesOf(issue.body)) {
-              if (depNumber === issue.number) continue;
-              const dep = await github.rest.issues.get({
-                owner, repo, issue_number: depNumber
-              }).catch(() => null);
-              if (!dep) {
-                core.warning(`#${issue.number}: dependency #${depNumber} does not exist, ignoring it.`);
-                continue;
-              }
-              if (dep.data.state !== 'closed') {
-                core.info(`#${issue.number}: dependency #${depNumber} not closed, skipping.`);
-                blocked = true;
-                break;
-              }
-            }
-            if (blocked) continue;
-
-            const n = issue.number;
-            await github.rest.issues.removeLabel({
-              owner, repo, issue_number: n, name: 'ready'
-            }).catch(() => {});
-            await github.rest.issues.addLabels({
-              owner, repo, issue_number: n, labels: ['in-progress']
-            });
-
-            // The comment IS the trigger. It must carry the whole assignment:
-            // which agent answers, what to build, and how the pipeline runs it.
-            // Identical for every agent apart from the mention on the first line.
-            const body = [
-              `${mention} — autonomous pipeline assignment for issue #${n} (${reason}).`,
-              '',
-              `**Task:** resolve issue #${n} end to end and open the pull request that closes it.`,
-              '',
-              '**▶ FIRST ACTION — hand this task to the `orchestrator` agent.**',
-              'Classification, planning, TDD, code review and PR creation are the orchestrator\'s job,',
-              'delegated to specialist sub-agents. Do not implement anything in this session directly,',
-              'and do not explore the codebase before the orchestrator has classified the task.',
-              '',
-              'The orchestrator then follows its own procedure:',
-              '',
-              `1. Classify the task and load the matching \`agentic-pipeline-*\` skill. The system itself is described in the \`agentic-autonomous-pipeline\` skill.`,
-              `2. Run the TDD cycle with branch isolation on \`pipeline/tests-${n}\` and \`pipeline/impl-${n}\` — the implementer never sees the tests.`,
-              `3. Cherry-pick the implementation onto \`pipeline/feature-${n}\`, then run code review, refactor and validation there.`,
-              '4. Run every verification channel the change touches. A renderer or UI change is not done until screenshots have been inspected; a player-facing flow is not done until an interaction-mode scenario proves a player can reach the goal by clicking.',
-              `5. Open the PR from \`pipeline/feature-${n}\` to \`main\`. Its body must contain \`Closes #${n}\`, plus \`READY TO MERGE\` on a line of its own. Open it as a draft without that line only when a channel stayed red, or when nothing will ever report on it — name the channel. A channel CI owns, like interaction-mode scenarios behind the \`full-ci\` label, is covered by the marker rather than blocked by it: the marked PR waits on those jobs and merges on their result. **Never leave the PR non-draft and unmarked** — nothing in the pipeline comes back to add the marker, and the issue holds \`in-progress\` until a human notices. How many review findings, visual iterations or retries the run took does not decide PR status.`,
-              '',
-              'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
-              '',
-              `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule and for the five blockers that genuinely stop a run. On one of those, label this issue \`blocked\`, comment what is missing, and stop.`,
-              '',
-              `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state: a merged-ready PR that closes it, \`blocked\` naming what is missing, or — when the deliverable is an answer or a command rather than a diff — issue #${n} closed and labelled \`done\`. An issue left holding \`in-progress\` defers every later assignment until the watchdog sweeps it.`
-            ].join('\n');
-
-            await github.rest.issues.createComment({ owner, repo, issue_number: n, body });
-
-            core.setOutput('issue', String(n));
-            core.info(`Assigned issue #${n} to ${mention}.`);
+          if (!issue) {
+            core.info(`Nothing assigned — ${why}.`);
             return;
           }
 
-          core.info('No assignable ready issues. Pipeline idle.');
+          const n = issue.number;
+          await github.rest.issues.removeLabel({
+            owner, repo, issue_number: n, name: rules.READY
+          }).catch(() => {});
+          await github.rest.issues.addLabels({
+            owner, repo, issue_number: n, labels: [rules.IN_PROGRESS]
+          });
+
+          // The comment IS the trigger. It must carry the whole assignment:
+          // which agent answers, what to build, and how the pipeline runs it.
+          // Identical for every agent apart from the mention on the first line.
+          const body = [
+            `${mention} — autonomous pipeline assignment for issue #${n} (${reason}).`,
+            '',
+            `**Task:** resolve issue #${n} end to end and open the pull request that closes it.`,
+            '',
+            '**▶ FIRST ACTION — hand this task to the `orchestrator` agent.**',
+            'Classification, planning, TDD, code review and PR creation are the orchestrator\'s job,',
+            'delegated to specialist sub-agents. Do not implement anything in this session directly,',
+            'and do not explore the codebase before the orchestrator has classified the task.',
+            '',
+            'The orchestrator then follows its own procedure:',
+            '',
+            `1. Classify the task and load the matching \`agentic-pipeline-*\` skill. The system itself is described in the \`agentic-autonomous-pipeline\` skill.`,
+            `2. Run the TDD cycle with branch isolation on \`pipeline/tests-${n}\` and \`pipeline/impl-${n}\` — the implementer never sees the tests.`,
+            `3. Cherry-pick the implementation onto \`pipeline/feature-${n}\`, then run code review, refactor and validation there.`,
+            '4. Run every verification channel the change touches. A renderer or UI change is not done until screenshots have been inspected; a player-facing flow is not done until an interaction-mode scenario proves a player can reach the goal by clicking.',
+            `5. Open the PR from \`pipeline/feature-${n}\` to \`main\`. Its body must contain \`Closes #${n}\`, plus \`READY TO MERGE\` on a line of its own. Open it as a draft without that line only when a channel stayed red, or when nothing will ever report on it — name the channel. A channel CI owns, like interaction-mode scenarios behind the \`full-ci\` label, is covered by the marker rather than blocked by it: the marked PR waits on those jobs and merges on their result. **Never leave the PR non-draft and unmarked** — nothing in the pipeline comes back to add the marker, and the issue holds \`in-progress\` until a human notices. How many review findings, visual iterations or retries the run took does not decide PR status.`,
+            '',
+            'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
+            '',
+            `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule and for the five blockers that genuinely stop a run. On one of those, label this issue \`blocked\`, comment what is missing, and stop.`,
+            '',
+            `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state: a merged-ready PR that closes it, \`blocked\` naming what is missing, or — when the deliverable is an answer or a command rather than a diff — issue #${n} closed and labelled \`done\`. An issue left holding \`in-progress\` defers every later assignment until the watchdog sweeps it.`
+          ].join('\n');
+
+          await github.rest.issues.createComment({ owner, repo, issue_number: n, body });
+
+          core.setOutput('issue', String(n));
+          core.info(`Assigned issue #${n} to ${mention}.`);
+
+          // --- Cascade brake report ---
+          // Posted on the issue the chain stopped at, because a warning in a job
+          // log is not somewhere anyone is watching, and this is the one state
+          // the autonomous loop cannot leave on its own. Once per halt: a second
+          // notice on every subsequent failure would bury the first.
+          async function announceHalt(failures, limit) {
+            const marker = '<!-- agentic-cascade-brake -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number: completed, per_page: 100
+            });
+            if (comments.some((comment) => (comment.body || '').includes(marker))) {
+              core.info('Cascade-brake notice already posted on this issue.');
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: completed,
+              body: [
+                marker,
+                '🛑 **Pipeline paused — the failures are not task-specific.**',
+                '',
+                `${failures} runs have ended \`blocked\` since the pipeline last merged one of its own pull requests, which is at or over the limit of ${limit} (\`AGENTIC_BLOCKED_CHAIN_LIMIT\`).`,
+                '',
+                'A blocked run normally chains straight to the next issue, so the queue keeps moving without anyone watching. Several in a row is a different signal: an expired token, a broken `main`, a runner image that no longer builds. Chaining on would march through the rest of the backlog labelling every issue `blocked` in minutes.',
+                '',
+                'The queue is parked until a human looks. Nothing is lost — every issue involved keeps its labels and its branches.',
+                '',
+                '**To resume:** fix what the recent runs have in common, then dispatch **Pipeline: run the configured agent on the next ready issue**. Merging any pipeline PR also resets the count on its own.'
+              ].join('\n')
+            });
+            core.info(`Posted the cascade-brake notice on #${completed}.`);
+          }

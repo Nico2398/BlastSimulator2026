@@ -1,11 +1,13 @@
 name: "Pipeline: intake a filed issue"
 
-# Filing an issue records work; it never starts a run. Exactly two mechanisms
-# start an autonomous session, and both are deliberate acts:
+# Filing an issue records work; it never starts a run. Exactly three mechanisms
+# start an autonomous session, and each reacts to a run ending or a human asking:
 #
 #   - `agentic-trigger.yml` — a human dispatching the workflow by hand.
 #   - `auto-assign-next.yml` — a merged pipeline pull request chaining to the
 #     next `ready` issue.
+#   - `handle-failure.yml` — a run that ended `blocked` chaining past itself,
+#     bounded by the cascade brake in `agentic-assign`.
 #
 # This workflow assigns nothing. It exists only to keep the lifecycle labels
 # usable by hand: it makes sure the label definitions exist so a human can pick
