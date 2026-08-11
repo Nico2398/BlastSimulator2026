@@ -39,6 +39,10 @@ interface FakeIssue {
   blockedAt?: number | null;
   /** Whether the whole timeline could be read. */
   timelineComplete?: boolean;
+  /** Issue numbers GitHub records as blocking this one (the Relationships panel). */
+  blockedBy?: number[];
+  /** The relationships call failed for a reason other than the feature being absent. */
+  relationshipsUnknown?: boolean;
 }
 
 /** The listing shape `linkedPullRequests` returns. */
@@ -57,6 +61,8 @@ const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   prs: [],
   blockedAt: null,
   timelineComplete: true,
+  blockedBy: [],
+  relationshipsUnknown: false,
   ...partial,
 });
 
@@ -78,6 +84,14 @@ function fakeApi(issues: FakeIssue[], options: { lastMergeAt?: number | null } =
     async linkedPullRequests(number: number) {
       const found = byNumber.get(number);
       return { pullRequests: found?.prs ?? [], complete: found?.timelineComplete ?? true };
+    },
+    async declaredBlockedBy(number: number) {
+      const found = byNumber.get(number);
+      return {
+        numbers: found?.blockedBy ?? [],
+        available: true,
+        unknown: found?.relationshipsUnknown ?? false,
+      };
     },
     async blockedLabelledAt(number: number) {
       return byNumber.get(number)?.blockedAt ?? null;
@@ -105,11 +119,25 @@ describe('reading declared dependencies out of an issue body', () => {
     expect(deps('Depends on: #12\n')).toEqual([12]);
   });
 
-  // GitHub's own issue UI writes dependencies as a task list. Before this, an
-  // issue written through the UI declared its dependency and was assigned anyway.
-  it('reads the checklist spelling GitHub writes', () => {
-    expect(deps('- [ ] Blocked by #77\n')).toEqual([77]);
-    expect(deps('* [x] depends on #78\n')).toEqual([78]);
+  // The reason the body is only the *secondary* source: a reference in prose is
+  // a mention, not a declaration. These are the shapes that must declare nothing,
+  // and a looser opener — any list item containing the words — read them all as
+  // dependencies, blocking on every issue a body happened to cite.
+  it.each([
+    ['a bullet inside another section', '## Context\n\n- depends on the rework in #123\n'],
+    ['a sentence', 'This depends on #123 landing first, roughly.\n'],
+    ['a quoted issue', '## Context\n\nSame bug as #55, see also #56.\n'],
+    ['a checklist item citing an issue', '## Task\n\n- [ ] mirror what #77 did\n'],
+  ])('declares nothing from %s', (_name, body) => {
+    expect(deps(body)).toEqual([]);
+  });
+
+  it.each([
+    ['a heading', '## Blocked by\n\n- #7\n'],
+    ['a bold line', '**Blocked by**\n\n- #7\n'],
+    ['a line-initial phrase', 'Blocked by: #7\n'],
+  ])('declares a dependency from %s', (_name, body) => {
+    expect(deps(body)).toEqual([7]);
   });
 
   it('collects every dependency in the section, not only the first', () => {
@@ -129,6 +157,88 @@ describe('reading declared dependencies out of an issue body', () => {
   it('survives an empty or missing body', () => {
     expect(deps('')).toEqual([]);
     expect((rules.parseDependencies as (b: unknown) => number[])(null)).toEqual([]);
+  });
+});
+
+// GitHub's own "Blocked by" relationships — the Relationships panel on an issue.
+// A relationship is a declaration; a body reference is a mention, and nothing
+// about quoting an issue in prose can produce one. So this is the authority, and
+// the body section is kept only because every issue written before relationships
+// existed carries its dependencies there and nowhere else.
+describe('combining GitHub relationships with the body section', () => {
+  const collect = (api: any, body = '', number = 20) =>
+    rules.blockedByFor(api, { number, body });
+
+  it('reads a relationship the body never mentions', async () => {
+    const api = fakeApi([{ number: 20, blockedBy: [547] }]);
+    expect((await collect(api, '')).numbers).toEqual([547]);
+  });
+
+  it('still reads a body section on an issue with no relationship set', async () => {
+    const api = fakeApi([{ number: 20 }]);
+    expect((await collect(api, '## Blocked by\n\n- #547\n')).numbers).toEqual([547]);
+  });
+
+  // A union, not a choice. Preferring one source would either ignore the
+  // authority or make every pre-relationship issue instantly assignable.
+  it('takes the union when the two sources disagree', async () => {
+    const api = fakeApi([{ number: 20, blockedBy: [547] }]);
+    const result = await collect(api, '## Blocked by\n\n- #548\n');
+    expect(result.numbers.sort()).toEqual([547, 548]);
+  });
+
+  it('deduplicates a dependency declared in both', async () => {
+    const api = fakeApi([{ number: 20, blockedBy: [547] }]);
+    expect((await collect(api, '## Blocked by\n\n- #547\n')).numbers).toEqual([547]);
+  });
+
+  it('ignores a self-reference from either source', async () => {
+    const api = fakeApi([{ number: 20, blockedBy: [20] }]);
+    expect((await collect(api, '## Blocked by\n\n- #20\n')).numbers).toEqual([]);
+  });
+
+  // The distinction that matters most: a repository without the feature is a
+  // fact about the repository, but a call that failed is a fact about nothing.
+  it('reports a failed relationship read as unknown', async () => {
+    const api = fakeApi([{ number: 20, relationshipsUnknown: true }]);
+    expect((await collect(api, '')).unknown).toBe(true);
+  });
+
+  it('blocks a candidate whose relationships could not be read', async () => {
+    const api = fakeApi([{ number: 20, labels: ['ready'], relationshipsUnknown: true }]);
+    const result = await select(api);
+    expect(result.issue).toBeNull();
+  });
+
+  it('blocks when a dependency of a dependency cannot report its relationships', async () => {
+    const api = fakeApi([
+      { number: 10, state: 'closed', stateReason: 'completed', relationshipsUnknown: true },
+      { number: 20, labels: ['ready'], blockedBy: [10] },
+    ]);
+    const verdict = await rules.graphVerdict(api, await api.getIssue(20));
+    expect(verdict.assignable).toBe(false);
+    expect(verdict.reason).toContain('#10');
+  });
+
+  // The pipeline predates the feature, so an API that does not offer it at all
+  // must degrade to the body section rather than stalling the queue forever.
+  it('falls back to the body when the API has no relationships at all', async () => {
+    const bare = fakeApi([{ number: 20, labels: ['ready'], body: '## Blocked by\n\n- #547\n' }]) as any;
+    delete bare.declaredBlockedBy;
+    bare.getIssue = async (n: number) => (n === 547 ? issue({ number: 547 }) : issue({ number: 20, labels: ['ready'], body: '## Blocked by\n\n- #547\n' }));
+    const result = await select(bare);
+    expect(result.issue).toBeNull();
+  });
+
+  // End to end, the way the queue sees it: #548 is blocked by #547 through the
+  // Relationships panel, with nothing in its body saying so.
+  it('refuses an issue blocked only by a relationship', async () => {
+    const api = fakeApi([
+      { number: 547, labels: ['blocked'], prs: [{ number: 566, state: 'open' }] },
+      { number: 548, labels: ['ready'], blockedBy: [547] },
+      { number: 550, labels: ['ready'] },
+    ]);
+    expect((await select(api)).issue?.number).toBe(550);
   });
 });
 
@@ -735,6 +845,18 @@ describe('running the assign action end to end', () => {
         pulls: {
           list: async () => ({ data: scenario.mergedPipelinePrs ?? [] }),
         },
+      },
+      // The dependencies endpoints have no octokit helper, so the action reaches
+      // them through `github.request` with an explicit route. Asserting the route
+      // here is what keeps a typo in it from silently degrading to "no
+      // relationships" on every issue.
+      request: async (route: string, params: { issue_number: number }) => {
+        expect(route).toBe(
+          'GET /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by'
+        );
+        const found = state.get(params.issue_number);
+        if (!found) throw Object.assign(new Error('Not Found'), { status: 404 });
+        return { data: (found.blockedBy ?? []).map((number) => ({ number })) };
       },
     };
 

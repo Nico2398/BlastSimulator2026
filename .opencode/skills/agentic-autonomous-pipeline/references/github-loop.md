@@ -128,6 +128,7 @@ An issue is skipped when:
 | It is a pull request | `listForRepo` returns PRs alongside issues; one carrying `ready` would be assigned as a task |
 | An **open** pull request already references it | Its `pipeline/feature-<N>` branch has commits on it. A second run would be told to build that branch from scratch and would collide with, or silently duplicate, the first. This is the state a rescued issue is left in |
 | A declared dependency is still open | The ordinary case, and the transitive one — the whole declared graph is walked, not just the first level, because a human can close an issue by hand while the issue *it* declared is still open |
+| Its `blocked_by` relationships **could not be read** | A failed call is not an empty list. Only the feature being absent (404/410) falls back to the body section |
 | A declared dependency was closed as **not planned** | Closed is not delivered. The work was abandoned; whatever declared it is still missing its ground |
 | A declared dependency is closed but an **open PR** still references it | The headline case. The issue is closed, the code has not merged, and `main` does not have it — issue #547 with PR #566 |
 | A declared dependency **is** a pull request that has not merged | A `Blocked by` line may name the PR rather than the issue it closes |
@@ -135,7 +136,15 @@ An issue is skipped when:
 | A cross-reference listing **could not be read in full** | "No open PR in the events I read" is not "no open PR". Timelines are paginated to the end (`issue-api.cjs`, 20 pages); past that the reader reports truncation and the rule blocks rather than concluding from a fraction of the evidence |
 | Its dependency graph exceeds 40 issues | A malformed body, and an unwalked graph is an unverified one |
 
-Dependencies are read from three spellings, each canonical somewhere: the `Blocked by` section the issue form and `agentic-issue-creation` produce, the inline `Depends on: #N` older issues carry, and the checklist form (`- [ ] Blocked by #N`) GitHub's own issue UI writes. Every `#N` on a line inside that section counts; references outside one do not, because `## Context` routinely cites issues as background.
+### Where a dependency comes from
+
+Two sources, unioned, and an issue stays blocked until every member of the union has landed.
+
+**GitHub's own `blocked_by` relationships are the authority** — the Relationships panel on an issue, read through `GET /repos/{owner}/{repo}/issues/{n}/dependencies/blocked_by`. A relationship is a *declaration*: nothing about quoting an issue in prose can produce one, which is exactly what a body reference cannot promise. `agentic-issue-creation` sets them; the endpoint takes `issue_id`, the database id rather than the issue number, which is the detail that fails silently when guessed.
+
+**The body section is the secondary source**, kept because every issue written before relationships existed carries its dependencies there and nowhere else. Dropping it the moment relationships arrived would make that entire backlog instantly assignable — a regression in the property the relationships are being adopted for. It is read strictly, because a mention is not a declaration: a section opens on a heading (`## Blocked by`), a bold line (`**Blocked by**`), or a line *starting* with the phrase (`Depends on: #12`), and ends at the next heading or bold line. A phrase inside a sentence opens nothing, so `## Context` citing #55 as background declares nothing — and neither does a bullet reading "depends on the rework in #123".
+
+A relationship call that fails for any reason other than the feature being absent is `unknown`, and `unknown` blocks. A 403 or a 500 must never read as "this issue has no dependencies"; a repository without the feature at all is a different fact, and there the body section is simply the only source there is.
 
 **Undeclared coupling is not detected, and deliberately so.** Comparing an issue's `## Files` list against the files an open pipeline PR touches was considered and rejected: on this repository nearly every gameplay issue touches `GameState.ts` or `GameLoop.ts`, so a single stale draft PR would make the whole backlog unassignable — the exact stall the blocked-chain exists to prevent. An issue that depends on another's work says so in its `Blocked by` section; that is what `agentic-issue-creation` is for.
 

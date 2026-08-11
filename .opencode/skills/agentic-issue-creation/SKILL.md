@@ -60,7 +60,7 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 
 1. **Every section the shape carries is required.** A run starting with zero context must be able to work from the issue alone.
 2. **File paths are exact** — relative to workspace root, forward slashes.
-3. **Dependencies go under `Blocked by`, as `#N` issue references.** The heading is what defers the issue until its dependencies close; a dependency mentioned anywhere else is not seen.
+3. **A dependency is set as a GitHub relationship, and written under `Blocked by` as well.** The relationship is what the queue trusts — a body reference is a mention, and quoting an issue must not be able to block on it — while the section is what a human reads. Setting one and not the other is the failure worth avoiding: a relationship with no section leaves the next reader guessing, and a section with no relationship is legacy, honoured only because issues written before relationships existed carry their dependencies there. Procedure below. A dependency mentioned outside a `Blocked by` heading, a `**Blocked by**` line, or a line starting `Blocked by:` / `Depends on:` is not read as one.
 4. **Verification is observable** — a state to reach, a value to return, a thing visible on screen. Naming a command is optional: the run picks its verification channels from the Verification Gate.
 5. **Test files map to the test pyramid** (unit/integration/visual/scenario) per `dev-testing-strategy`.
 6. **Leave out implementation hints, solution approaches, and code snippets** — the run derives those from the codebase.
@@ -70,13 +70,44 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 10. **`full-ci` is off by default — an issue has to earn it.** The label starts the interaction-mode browser job, which costs the merge path real time, so it goes on an issue only where that job is the only thing that could catch the regression: an interaction-mode scenario clicks its way through the control, panel or flow the issue changes, or the issue touches shared input, picking, camera, rendering or harness machinery every scenario runs through. **Never on a backend-only issue.** A change confined to `src/core/`, `src/console/`, config or pure logic is proven by `static`, `logic` and command-mode `scenario`; replaying browser flows the diff never reaches reports nothing about it. **Never where there is no interaction regression to catch** — a renderer detail no scenario reaches, a control added to an existing panel, copy, a new command parameter. The `visual` channel covers those in-session against the thing that actually changed, which is stronger evidence than a suite that never touches it. When in doubt, leave it off. Full test and cost: `agentic-pipeline-pr-management`.
 11. **Label transfer.** A PR opened from a `full-ci` issue gets the same label: `gh pr edit <number> --add-label "full-ci"`.
 
+## Setting a dependency
+
+`gh` has no command for relationships; they are REST-only. The endpoint takes
+`issue_id` — the issue's **database id**, not its number — which is the one
+detail that makes this fail silently if guessed.
+
+```bash
+REPO=Nico2398/BlastSimulator2026
+BLOCKER_ID=$(gh api "repos/$REPO/issues/<blocker-number>" --jq .id)
+gh api --method POST "repos/$REPO/issues/<blocked-number>/dependencies/blocked_by" \
+  -F "issue_id=$BLOCKER_ID"
+```
+
+Read them back, and remove one, with:
+
+```bash
+gh api "repos/$REPO/issues/<number>/dependencies/blocked_by" --jq '.[].number'
+gh api --method DELETE "repos/$REPO/issues/<blocked-number>/dependencies/blocked_by/$BLOCKER_ID"
+```
+
+**Verify the relationship after setting it.** A `POST` that 4xx'd leaves an issue
+that reads as blocked to a human and is assignable to the queue — the one
+direction that matters. The read-back above is the check.
+
+When several issues are filed as a batch, set every relationship before adding
+`ready` to any of them: `ready` is the only thing standing between an issue and
+an assignment, and an issue that gains it a moment before its dependency is
+recorded can be picked up in that window.
+
 ## Checklist
 
 - [ ] Title starts with feature context ("Add tutorial level - ...")
 - [ ] Context section explains the larger feature and this task's place in it
 - [ ] Task section states what changes
 - [ ] Complete shape only: Files and Test sections name every file and what it verifies
-- [ ] Dependencies live under a `Blocked by` heading as `#N` references
+- [ ] Dependencies set as GitHub `blocked_by` relationships, and read back to confirm
+- [ ] The same dependencies written under a `Blocked by` heading as `#N` references
+- [ ] For a batch, every relationship set before `ready` goes on any of them
 - [ ] Verification is a concrete observable outcome
 - [ ] SMART criteria respected
 - [ ] An issue that must stay out of the queue carries its own lifecycle label

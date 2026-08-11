@@ -42,18 +42,20 @@ const DEFAULT_BLOCKED_CHAIN_LIMIT = 3;
 const BLOCKED_CHAIN_FALLBACK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Issue numbers an issue declares itself blocked by.
+ * Issue numbers an issue's *body* declares it blocked by.
  *
- * Three spellings reach here and each is canonical somewhere: the `Blocked by`
- * section the issue form and `agentic-issue-creation` produce, the inline
- * `Depends on: #N` older issues carry, and the checklist form
- * (`- [ ] Blocked by #N`) GitHub's own UI writes. Matching only one of them let
- * a correctly written issue run ahead of the dependency it named, which fails
- * the run rather than deferring it.
+ * The secondary source. GitHub's own "Blocked by" relationships are the
+ * authority — a relationship is a declaration, where a body reference is only a
+ * mention — but every issue written before those existed carries its
+ * dependencies here and nowhere else, so the section still counts. See
+ * `blockedByFor` for how the two combine.
  *
- * Every `#N` on a line inside the section counts. A reference outside one does
- * not: `## Context` routinely cites issues as background, and reading those as
- * dependencies would block on the entire history an issue mentions.
+ * Being a mention is exactly the risk, so the section is delimited strictly.
+ * An opener is a heading (`## Blocked by`), a bold line (`**Blocked by**`), or a
+ * line that *starts* with the phrase (`Depends on: #12`) — never a phrase that
+ * merely appears in a sentence. The section ends at the next heading or bold
+ * line. A `## Context` paragraph citing #55 as background therefore declares
+ * nothing, which is the common case and the one that must not block.
  *
  * @param {string | null | undefined} body
  * @returns {number[]}
@@ -62,15 +64,13 @@ function parseDependencies(body) {
   const deps = new Set();
   let inSection = false;
 
-  for (const line of (body || '').split('\n')) {
-    const opensSection =
-      /^\s*(?:[-*]\s+(?:\[[ xX]\]\s+)?)?(?:#{1,6}\s*|\*\*)?(?:blocked\s+by|depends?\s+on|dependencies)\b/i.test(
-        line
-      );
+  const OPENS = /^\s*(?:#{1,6}\s*|\*\*)?(?:blocked\s+by|depends?\s+on|dependencies)\b/i;
+  const NEXT_SECTION = /^\s*(?:#{1,6}\s+\S|\*\*\S)/;
 
-    if (opensSection) {
+  for (const line of (body || '').split('\n')) {
+    if (OPENS.test(line)) {
       inSection = true;
-    } else if (inSection && /^\s*(?:#{1,6}\s+\S|\*\*\S)/.test(line)) {
+    } else if (inSection && NEXT_SECTION.test(line)) {
       inSection = false; // the next section starts; the list is over
       continue;
     } else if (!inSection) {
@@ -83,6 +83,33 @@ function parseDependencies(body) {
   }
 
   return [...deps];
+}
+
+/**
+ * Every issue a given issue is blocked by, from both sources at once.
+ *
+ * A union, not a choice. Dropping the body section the moment relationships
+ * exist would make every issue written before them instantly assignable — a
+ * regression in the exact property the relationships are being adopted for — and
+ * dropping the relationships would ignore the authoritative source. An issue is
+ * blocked by the union, and stays blocked until every member of it has landed.
+ *
+ * `unknown` means the relationship call failed for a reason other than the
+ * feature being absent. The caller blocks on it: a permission slip or a 500
+ * must never read as "this issue has no dependencies".
+ *
+ * @param {IssueApi} api
+ * @param {{number: number, body?: string|null}} issue
+ * @returns {Promise<{numbers: number[], unknown: boolean}>}
+ */
+async function blockedByFor(api, issue) {
+  const declared = api.declaredBlockedBy
+    ? await api.declaredBlockedBy(issue.number)
+    : { numbers: [], available: false, unknown: false };
+
+  const union = new Set([...declared.numbers, ...parseDependencies(issue.body)]);
+  union.delete(issue.number);
+  return { numbers: [...union], unknown: Boolean(declared.unknown) };
 }
 
 /** @returns {{assignable: false, reason: string}} */
@@ -186,7 +213,12 @@ function dependencyVerdict(dep, linked) {
  */
 async function graphVerdict(api, root) {
   const seen = new Set([root.number]);
-  const queue = parseDependencies(root.body).filter((n) => n !== root.number);
+  const rootDeps = await blockedByFor(api, root);
+  if (rootDeps.unknown) {
+    return no('its `Blocked by` relationships could not be read, so no dependency can be ruled out');
+  }
+
+  const queue = [...rootDeps.numbers];
   let examined = 0;
 
   while (queue.length > 0) {
@@ -217,7 +249,13 @@ async function graphVerdict(api, root) {
     if (!verdict.assignable) return verdict;
 
     if (!dep.isPullRequest) {
-      queue.push(...parseDependencies(dep.body).filter((n) => n !== number));
+      const deps = await blockedByFor(api, dep);
+      if (deps.unknown) {
+        return no(
+          `dependency #${number}'s own \`Blocked by\` relationships could not be read, so its graph cannot be cleared`
+        );
+      }
+      queue.push(...deps.numbers);
     }
   }
 
@@ -352,6 +390,7 @@ function resolveMention(raw) {
  * @property {(label: string) => Promise<object[]>} listIssuesByLabel
  * @property {(number: number) => Promise<object|null>} getIssue
  * @property {(number: number) => Promise<{pullRequests: {number: number, state: string}[], complete: boolean}>} linkedPullRequests
+ * @property {(number: number) => Promise<{numbers: number[], available: boolean, unknown: boolean}>} [declaredBlockedBy]
  * @property {(number: number) => Promise<number|null>} blockedLabelledAt
  * @property {() => Promise<number|null>} latestPipelineMergeAt
  */
@@ -365,6 +404,7 @@ module.exports = {
   DEFAULT_BLOCKED_CHAIN_LIMIT,
   MAX_DEPENDENCY_NODES,
   assessCandidate,
+  blockedByFor,
   blockedChainLimit,
   consecutiveBlockedRuns,
   dependencyVerdict,

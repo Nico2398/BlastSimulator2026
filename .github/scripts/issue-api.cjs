@@ -65,6 +65,7 @@ async function readAllPages(fetchPage) {
 function createIssueApi(github, { owner, repo, log = () => {} }) {
   const timelines = new Map();
   const issues = new Map();
+  const dependencies = new Map();
 
   /** One timeline read per issue per run — several rules ask about the same one. */
   const timeline = async (number) => {
@@ -168,6 +169,62 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
       return items.some(
         (event) => event.event === 'labeled' && event.label?.name === 'in-progress'
       );
+    },
+
+    /**
+     * The dependencies GitHub itself records — the "Blocked by" relationships in
+     * an issue's Relationships panel. Authoritative, because a relationship is a
+     * declaration rather than a mention: nothing about quoting an issue in prose
+     * can produce one.
+     *
+     * `GET /repos/{owner}/{repo}/issues/{n}/dependencies/blocked_by`, verified
+     * against this repository. Only the issue number is read off each entry; the
+     * dependency is re-fetched by number like any other, so the rules never
+     * depend on the rest of the payload's shape.
+     *
+     * Three outcomes, and the difference between the last two is the whole point:
+     *   available: true             — the list is what it says
+     *   available: false            — the endpoint is not on this repository, so
+     *                                 the body section is the only source there is
+     *   available: false, unknown   — the call failed for some other reason. The
+     *                                 rules block on this; a permission slip or a
+     *                                 500 must not read as "no dependencies"
+     *
+     * @returns {Promise<{numbers: number[], available: boolean, unknown: boolean}>}
+     */
+    async declaredBlockedBy(number) {
+      if (dependencies.has(number)) return dependencies.get(number);
+
+      let result;
+      try {
+        const { items } = await readAllPages((page) =>
+          github.request('GET /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by', {
+            owner,
+            repo,
+            issue_number: number,
+            per_page: PER_PAGE,
+            page,
+          })
+        );
+        result = {
+          numbers: items.map((item) => item.number).filter((n) => Number.isInteger(n)),
+          available: true,
+          unknown: false,
+        };
+      } catch (error) {
+        const status = error.status ?? 0;
+        // 404/410 is the feature not being present, which is a fact about the
+        // repository and not about this issue. Anything else is a failure to
+        // read, and a failure to read is not an empty list.
+        const absent = status === 404 || status === 410;
+        if (!absent) {
+          log(`#${number}: blocked-by relationships could not be read (${status || error.message}).`);
+        }
+        result = { numbers: [], available: false, unknown: !absent };
+      }
+
+      dependencies.set(number, result);
+      return result;
     },
 
     /**
