@@ -33,6 +33,18 @@ function makeReport(overrides: Partial<BlastReport> = {}): BlastReport {
   };
 }
 
+/**
+ * Arms the modal's current `state.lastBlastReport` and forces it open by
+ * running out the full delay (#545) — the arm-then-open sequence most tests
+ * need before asserting on already-open content, factored out of the ~9
+ * call sites that repeated it verbatim.
+ */
+function openReport(modal: BlastReportModal, state: GameState, setNow: (v: number) => void): void {
+  modal.update(state);
+  setNow(BLAST_REPORT_DELAY_MS);
+  modal.update(state);
+}
+
 beforeEach(() => resetHoleIds());
 
 describe('BlastReportModal', () => {
@@ -75,10 +87,8 @@ describe('BlastReportModal', () => {
     const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state);
 
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
 
     expect(modal.visible).toBe(true);
     expect(modal.pending).toBe(false);
@@ -121,9 +131,7 @@ describe('BlastReportModal', () => {
     const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
 
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
@@ -134,9 +142,7 @@ describe('BlastReportModal', () => {
     const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
     modal.update(state); // same report object, time unchanged
@@ -148,9 +154,7 @@ describe('BlastReportModal', () => {
     const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100 });
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
     setNow(BLAST_REPORT_DELAY_MS + 1);
@@ -176,9 +180,7 @@ describe('BlastReportModal', () => {
     const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 47 });
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
     expect(modal.visible).toBe(false);
 
@@ -205,9 +207,7 @@ describe('BlastReportModal', () => {
       hasTreranium: false, absurdiumFraction: 0,
     };
 
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
 
     expect(modal.root.textContent).toContain('86%');
     expect(modal.root.textContent).toContain('5220 kg');
@@ -223,9 +223,7 @@ describe('BlastReportModal', () => {
       hasTreranium: false, absurdiumFraction: 0,
     };
 
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
 
     expect(modal.root.textContent).not.toContain('Ore Report');
   });
@@ -237,9 +235,7 @@ describe('BlastReportModal', () => {
       destroyedBuildings: [{ buildingId: 3, type: 'freight_warehouse', x: 5, z: 5 }],
     });
 
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
 
     expect(modal.root.textContent).toContain('Freight Warehouse #3');
     expect(modal.root.textContent).toContain('was destroyed');
@@ -249,17 +245,13 @@ describe('BlastReportModal', () => {
     const { modal: modalA, setNow: setNowA } = makeModal();
     const stateA = makeState();
     stateA.lastBlastReport = makeReport({ oversizedFragments: 0 });
-    modalA.update(stateA);
-    setNowA(BLAST_REPORT_DELAY_MS);
-    modalA.update(stateA);
+    openReport(modalA, stateA, setNowA);
     expect(modalA.root.textContent).not.toContain('too large for standard haulers');
 
     const { modal: modalB, setNow: setNowB } = makeModal();
     const stateB = makeState();
     stateB.lastBlastReport = makeReport({ oversizedFragments: 6 });
-    modalB.update(stateB);
-    setNowB(BLAST_REPORT_DELAY_MS);
-    modalB.update(stateB);
+    openReport(modalB, stateB, setNowB);
     expect(modalB.root.textContent).toContain('6 fragments are too large for standard haulers');
     expect(modalB.root.textContent).toContain('Rock Fragmenter');
   });
@@ -291,9 +283,7 @@ describe('BlastReportModal', () => {
     const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
-    modal.update(state);
-    setNow(BLAST_REPORT_DELAY_MS);
-    modal.update(state);
+    openReport(modal, state, setNow);
     expect(modal.visible).toBe(true);
 
     modal.reset();

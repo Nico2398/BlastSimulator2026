@@ -1,10 +1,12 @@
 // BlastSimulator2026 — Blast Report Modal (redesign P4/§5.C)
-// Shows state.lastBlastReport (built in blastCommand, task P4/#17) right
-// after a blast resolves. Visibility is derived from state, not manually
-// toggled — the same pattern EventModal already uses for its own pendingEvent:
-// a report whose tick differs from the last one shown means a new blast just
-// happened, so the modal opens itself on the very next update() tick, right
-// after PreflightModal's DETONATE dispatches `blast` and closes itself.
+// Shows state.lastBlastReport (built in blastCommand, task P4/#17) once a
+// blast resolves. Visibility is derived from state, not manually toggled —
+// the same pattern EventModal already uses for its own pendingEvent: a
+// report whose identity differs from the last one shown means a new blast
+// just happened, right after PreflightModal's DETONATE dispatches `blast`
+// and closes itself. Rather than opening on that very next update() tick,
+// the modal arms and waits out BLAST_REPORT_DELAY_MS before actually
+// showing itself (#545), so the fragment-collapse animation plays first.
 //
 // Deviation from the design mock: its second footer button, "SEND HAULERS",
 // has no real backing command — only per-vehicle `vehicle haul <id>` exists,
