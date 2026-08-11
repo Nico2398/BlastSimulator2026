@@ -314,6 +314,9 @@ export class UIManager {
    * transition, sandbox start) — a fresh GameState's lastBlastReport is
    * always null, so BlastReportModal.update() never re-closes itself on its
    * own (it only ever opens on a new report; see BlastReportModal#update).
+   * reset() drops both a visible report and a pending/armed-but-not-yet-open
+   * one (#545) — a report queued right before a transition must not survive
+   * into the next level's state.
    * PreflightModal/ConfirmModal are excluded on purpose: both are
    * request/response dialogs the player just triggered, never state-derived,
    * so a level transition mid-dialog is not this bug's shape. LevelEndScreen
@@ -321,7 +324,7 @@ export class UIManager {
    * state.levelEndReason reads null, which a fresh level's state always is.
    */
   closeStaleLevelOverlays(): void {
-    if (this.blastReportModal.visible) this.blastReportModal.hide();
+    this.blastReportModal.reset();
   }
 
   /** Read-only accessor for tests (#504) — whether the BlastReportModal is currently open. */
@@ -415,7 +418,7 @@ export class UIManager {
     // so it would render on top and hide the report's own Close button
     // behind it. Re-checked every tick, so the event opens itself the moment
     // the report is closed.
-    if (this.eventModal.visible || !this.blastReportModal.visible) {
+    if (this.eventModal.visible || (!this.blastReportModal.visible && !this.blastReportModal.pending)) {
       this.eventModal.update(state);
     }
   }

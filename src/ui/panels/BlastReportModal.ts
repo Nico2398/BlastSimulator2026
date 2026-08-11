@@ -28,8 +28,9 @@ const RATING_COLOR: Record<BlastRating, string> = {
   catastrophic: 'var(--bsx-critical-text)',
 };
 
-// TODO: implement — real-time delay between a blast report becoming
-// available and the modal actually opening (#545).
+// Real-time delay between a blast report becoming available and the modal
+// actually opening (#545), so the fragment-collapse animation plays in the
+// clear instead of being instantly covered.
 export const BLAST_REPORT_DELAY_MS = 3000;
 
 export class BlastReportModal {
@@ -42,15 +43,13 @@ export class BlastReportModal {
   private lastShownReport: BlastReport | null = null;
   private readonly locale = new LocaleTextRegistry();
 
-  // TODO: implement — deferred-open state (#545). pendingReport holds a
-  // report that has arrived but not yet been shown; pendingDeadlineMs is
-  // the `now()` timestamp (per the injected clock) at which it should open.
+  // Deferred-open state (#545). pendingReport holds a report that has
+  // arrived but not yet been shown; pendingDeadlineMs is the `now()`
+  // timestamp (per the injected clock) at which it should open.
   private pendingReport: BlastReport | null = null;
   private pendingDeadlineMs: number | null = null;
 
   constructor(container: HTMLElement, private readonly now: () => number = () => performance.now()) {
-    // Used by the deferred-open delay logic landing with the implementer (#545).
-    void this.now;
     this.overlay = el('div', { className: 'bs-confirm-overlay' });
     this.overlay.style.display = 'none';
 
@@ -103,12 +102,10 @@ export class BlastReportModal {
   get pending(): boolean { return this.pendingReport !== null; }
 
   /** Discard any in-flight deferred report and close the modal (#545). */
-  // TODO: implement — real logic lands with the implementer.
   reset(): void {
-    this.hide();
     this.pendingReport = null;
     this.pendingDeadlineMs = null;
-    void this.pendingDeadlineMs;
+    this.hide();
   }
 
   update(state: GameState): void {
@@ -120,11 +117,25 @@ export class BlastReportModal {
     // tick-equality check silently drops the second report forever (found
     // converting vibration-budget.json to real clicks, issue #479 — a
     // player who fires twice in a row would never see the second one).
-    if (!report || report === this.lastShownReport) return;
-    this.lastShownReport = report;
-    this.render(report, state);
-    this.open = true;
-    this.overlay.style.display = '';
+    //
+    // Arming replaces any not-yet-opened pending report outright (#545): a
+    // second blast inside the delay window discards the first pending
+    // report and starts its own full-length real-time window from its own
+    // arrival time. The first report is never shown.
+    if (report && report !== this.lastShownReport && report !== this.pendingReport) {
+      this.pendingReport = report;
+      this.pendingDeadlineMs = this.now() + BLAST_REPORT_DELAY_MS;
+    }
+
+    if (this.pendingReport !== null && this.pendingDeadlineMs !== null && this.now() >= this.pendingDeadlineMs) {
+      const toShow = this.pendingReport;
+      this.lastShownReport = toShow;
+      this.pendingReport = null;
+      this.pendingDeadlineMs = null;
+      this.render(toShow, state);
+      this.open = true;
+      this.overlay.style.display = '';
+    }
   }
 
   refreshLocale(): void { this.locale.refresh(); }
