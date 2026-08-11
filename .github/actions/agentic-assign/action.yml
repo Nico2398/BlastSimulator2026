@@ -102,11 +102,43 @@ runs:
             return [...deps];
           };
 
-          const hasLinkedPr = async (number) => {
-            const { data: events } = await github.rest.issues.listEventsForTimeline({
-              owner, repo, issue_number: number, per_page: 100
+          // A PR counts only when its head is the pipeline's own branch for
+          // the issue, or GitHub records it as closing the issue. A timeline
+          // cross-reference counts for nothing: any PR that merely writes "#N"
+          // anywhere in its body raises one, which here would kill the chain
+          // (closed_without_pr guard) or defer every future assignment behind
+          // a mention (single flight). Same predicate inlined in
+          // agentic-run-state and agentic-watchdog.yml — no shared file,
+          // because the watchdog runs without a checkout to read one from.
+          const deliverablePr = async (number) => {
+            const { data: headPrs } = await github.rest.pulls.list({
+              owner, repo, state: 'all',
+              head: `${owner}:pipeline/feature-${number}`, per_page: 20
             });
-            return events.some((e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request);
+            const fromPipeline = headPrs.find((pr) => pr.state === 'open' || pr.merged_at);
+            if (fromPipeline) {
+              return {
+                number: fromPipeline.number,
+                how: `from pipeline/feature-${number}, ${fromPipeline.merged_at ? 'merged' : 'open'}`
+              };
+            }
+            const linked = await github.graphql(
+              `query($owner: String!, $repo: String!, $number: Int!) {
+                 repository(owner: $owner, name: $repo) {
+                   issue(number: $number) {
+                     closedByPullRequestsReferences(first: 10, includeClosedPrs: false) {
+                       nodes { number merged }
+                     }
+                   }
+                 }
+               }`,
+              { owner, repo, number }
+            );
+            const closer = linked?.repository?.issue?.closedByPullRequestsReferences?.nodes?.[0];
+            if (closer) {
+              return { number: closer.number, how: `closing reference, ${closer.merged ? 'merged' : 'open'}` };
+            }
+            return null;
           };
 
           // --- Guard: only chain when the finished issue produced no PR ---
@@ -122,8 +154,12 @@ runs:
               core.info(`Issue #${completed} still open — a PR is expected to carry the chain.`);
               return;
             }
-            if (await hasLinkedPr(completed)) {
-              core.info(`Issue #${completed} has a linked PR — the merge event carries the chain.`);
+            const completedPr = await deliverablePr(completed);
+            if (completedPr) {
+              core.info(
+                `Issue #${completed} has pull request #${completedPr.number} (${completedPr.how}) — ` +
+                'the merge event carries the chain.'
+              );
               return;
             }
             core.info(`Issue #${completed} closed without a PR — chaining directly.`);
@@ -148,9 +184,10 @@ runs:
           for (const busy of inProgress) {
             if (busy.number === completed) continue;
 
-            if (await hasLinkedPr(busy.number)) {
+            const busyPr = await deliverablePr(busy.number);
+            if (busyPr) {
               core.info(
-                `Issue #${busy.number} is in progress with a linked PR — deferring. ` +
+                `Issue #${busy.number} is in progress with pull request #${busyPr.number} (${busyPr.how}) — deferring. ` +
                 'Merging that PR re-enters this step.'
               );
             } else {
