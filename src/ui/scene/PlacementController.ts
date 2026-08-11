@@ -273,6 +273,18 @@ export class PlacementController {
   }
 
   private onMouseUp(e: MouseEvent): void {
+    if (e.button === 2) {
+      // The cancel-vs-not decision lives here rather than in onContextMenu:
+      // on this environment's Chromium, contextmenu fires right after
+      // mousedown, before any mousemove — so rightButtonDragged always reads
+      // false there regardless of the eventual drag. mouseup is the one event
+      // guaranteed, on every platform, to fire only after the full gesture's
+      // movement is known (#544).
+      if (this.phase === 'idle' || this.phase === 'confirmed') return;
+      if (this.cameraController.rightButtonDragged) return;
+      this.cancel();
+      return;
+    }
     if (e.button !== 0) return;
     if (this.phase !== 'dragging') return;
     const tile = this.tileUnderCursor(e);
@@ -284,7 +296,6 @@ export class PlacementController {
   private onContextMenu(e: MouseEvent): void {
     if (this.phase === 'idle' || this.phase === 'confirmed') return;
     e.preventDefault();
-    this.cancel();
   }
 
   private onKeyDown(e: KeyboardEvent): void {
