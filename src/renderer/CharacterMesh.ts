@@ -184,6 +184,12 @@ export class CharacterMesh {
     return this.characters.get(id)?.group.position.clone() ?? null;
   }
 
+  /** An employee's root Group, or null if it isn't rendered — anchor for billboarded overlays (#546). */
+  getGroup(_id: number): THREE.Group | null {
+    // TODO: implement
+    return null;
+  }
+
   dispose(): void {
     this.clearAll();
   }

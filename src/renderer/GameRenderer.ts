@@ -32,6 +32,7 @@ import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
+import { TaskProgressBar } from './TaskProgressBar.js';
 import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
@@ -91,6 +92,7 @@ export class GameRenderer {
   private lastCutBounds = '';
   private blastOverlay: BlastPlanOverlay | null = null;
   private ghosts: GhostMesh | null = null;
+  private taskProgress: TaskProgressBar | null = null;
   private lastGrid: VoxelGrid | null = null;
 
   /** Seed of the currently loaded game — used to detect new_game calls. */
@@ -119,6 +121,11 @@ export class GameRenderer {
   /** ID of the currently-bound VoxelGrid, for diagnostics. Null if no grid is loaded. */
   get lastGridId(): number | null {
     return this.lastGrid?.id ?? null;
+  }
+
+  /** Number of task-progress-bar meshes currently rendered — for diagnostics. */
+  get taskProgressBarCount(): number {
+    return this.taskProgress?.count ?? 0;
   }
 
   /** Number of ghost-preview meshes currently rendered — for diagnostics. */
