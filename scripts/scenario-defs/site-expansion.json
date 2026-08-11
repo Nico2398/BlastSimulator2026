@@ -177,7 +177,7 @@
     {
       "command": "blast",
       "description": "A blast spanning both the original site and ground claimed during play.",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",

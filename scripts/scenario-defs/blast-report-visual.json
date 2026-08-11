@@ -98,7 +98,7 @@
     },
     {
       "command": "blast",
-      "timeout": 15,
+      "timeout": 30,
       "frames": 6,
       "interval": 50,
       "interaction": [
@@ -115,8 +115,18 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
+          "type": "wait",
+          "durationMs": 1000
+        },
+        {
+          "type": "screenshot"
+        },
+        {
           "type": "waitForSelector",
           "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "screenshot"
         },
         {
           "type": "clickSelector",

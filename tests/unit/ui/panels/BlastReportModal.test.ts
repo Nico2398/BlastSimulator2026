@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BlastReportModal } from '../../../../src/ui/panels/BlastReportModal.js';
+import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../../src/ui/panels/BlastReportModal.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
@@ -10,11 +10,17 @@ function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
 }
 
-function makeModal(): { modal: BlastReportModal; container: HTMLElement } {
+/**
+ * Injects a fake, manually-advanced clock (#545) — `setNow()` drives the same
+ * `now` closure variable the modal's constructor was handed, so tests control
+ * real-time delay without a real timer.
+ */
+function makeModal(): { modal: BlastReportModal; container: HTMLElement; setNow: (v: number) => void } {
   const container = document.createElement('div');
   document.body.appendChild(container);
-  const modal = new BlastReportModal(container);
-  return { modal, container };
+  let now = 0;
+  const modal = new BlastReportModal(container, () => now);
+  return { modal, container, setNow: (v: number) => { now = v; } };
 }
 
 function makeReport(overrides: Partial<BlastReport> = {}): BlastReport {
@@ -41,14 +47,41 @@ describe('BlastReportModal', () => {
     expect(modal.visible).toBe(false);
   });
 
-  it('auto-shows and renders real stats the first time a report appears', () => {
+  it('does not open on the same update() call that first observes a report (#545)', () => {
     const { modal } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
 
     modal.update(state);
 
+    expect(modal.visible).toBe(false);
+    expect(modal.pending).toBe(true);
+  });
+
+  it('stays closed just before the open delay has elapsed (#545)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport();
+    modal.update(state);
+
+    setNow(BLAST_REPORT_DELAY_MS - 1);
+    modal.update(state);
+
+    expect(modal.visible).toBe(false);
+    expect(modal.pending).toBe(true);
+  });
+
+  it('opens once the delay has elapsed, rendering the held report\'s real stats (#545)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport();
+    modal.update(state);
+
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(state);
+
     expect(modal.visible).toBe(true);
+    expect(modal.pending).toBe(false);
     expect(modal.root.textContent).toContain('1842');
     expect(modal.root.textContent).toContain('610');
     expect(modal.root.textContent).toContain('47');
@@ -57,10 +90,39 @@ describe('BlastReportModal', () => {
     expect(modal.root.textContent).toContain('Good');
   });
 
+  it('a second report inside the delay window replaces the first — only the latest is ever rendered (#545)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    const reportA = makeReport({ fragmentCount: 47, totalOreValue: 16020 });
+    state.lastBlastReport = reportA;
+    modal.update(state); // arms A at now=0
+    expect(modal.visible).toBe(false);
+    expect(modal.root.textContent).not.toContain('16,020');
+
+    setNow(1000);
+    const reportB = makeReport({ fragmentCount: 12, totalOreValue: 12345 });
+    state.lastBlastReport = reportB;
+    modal.update(state); // B replaces A well before A's own deadline (3000)
+
+    expect(modal.visible).toBe(false); // A never opened
+    expect(modal.root.textContent).not.toContain('16,020'); // A's stat never rendered
+
+    // B's own fresh full window, counted from when B was armed (now=1000).
+    setNow(1000 + BLAST_REPORT_DELAY_MS);
+    modal.update(state);
+
+    expect(modal.visible).toBe(true);
+    expect(modal.pending).toBe(false);
+    expect(modal.root.textContent).toContain('12,345');
+    expect(modal.root.textContent).not.toContain('16,020');
+  });
+
   it('Close hides the modal', () => {
-    const { modal } = makeModal();
+    const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
+    modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
     modal.update(state);
 
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
@@ -69,25 +131,35 @@ describe('BlastReportModal', () => {
   });
 
   it('does not reopen on the next tick for the same report once closed', () => {
-    const { modal } = makeModal();
+    const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
     modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(state);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
-    modal.update(state); // same tick, same report object
+    modal.update(state); // same report object, time unchanged
 
     expect(modal.visible).toBe(false);
   });
 
   it('opens again for a genuinely new report (different tick)', () => {
-    const { modal } = makeModal();
+    const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100 });
     modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(state);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
 
+    setNow(BLAST_REPORT_DELAY_MS + 1);
     state.lastBlastReport = makeReport({ tick: 200 });
+    modal.update(state); // arms the new report
+
+    expect(modal.visible).toBe(false);
+
+    setNow(BLAST_REPORT_DELAY_MS + 1 + BLAST_REPORT_DELAY_MS);
     modal.update(state);
 
     expect(modal.visible).toBe(true);
@@ -101,14 +173,22 @@ describe('BlastReportModal', () => {
     // fix compares report identity instead (buildBlastReport in mining.ts
     // always returns a fresh object, so two distinct blasts are always two
     // distinct references even when their tick matches). Issue #479.
-    const { modal } = makeModal();
+    const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 47 });
+    modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
     modal.update(state);
     (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
     expect(modal.visible).toBe(false);
 
+    setNow(BLAST_REPORT_DELAY_MS + 1);
     state.lastBlastReport = makeReport({ tick: 100, fragmentCount: 12 });
+    modal.update(state); // arms the second blast's report
+
+    expect(modal.visible).toBe(false); // still waiting out its own delay
+
+    setNow(BLAST_REPORT_DELAY_MS + 1 + BLAST_REPORT_DELAY_MS);
     modal.update(state);
 
     expect(modal.visible).toBe(true);
@@ -116,7 +196,7 @@ describe('BlastReportModal', () => {
   });
 
   it('shows the ore report card with real percentage and breakdown when a survey estimate exists', () => {
-    const { modal } = makeModal();
+    const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
     state.lastOreReport = {
@@ -126,6 +206,8 @@ describe('BlastReportModal', () => {
     };
 
     modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(state);
 
     expect(modal.root.textContent).toContain('86%');
     expect(modal.root.textContent).toContain('5220 kg');
@@ -133,7 +215,7 @@ describe('BlastReportModal', () => {
   });
 
   it('omits the ore report card when there was no survey estimate to compare against', () => {
-    const { modal } = makeModal();
+    const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport();
     state.lastOreReport = {
@@ -142,17 +224,21 @@ describe('BlastReportModal', () => {
     };
 
     modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(state);
 
     expect(modal.root.textContent).not.toContain('Ore Report');
   });
 
   it('shows one card per destroyed building', () => {
-    const { modal } = makeModal();
+    const { modal, setNow } = makeModal();
     const state = makeState();
     state.lastBlastReport = makeReport({
       destroyedBuildings: [{ buildingId: 3, type: 'freight_warehouse', x: 5, z: 5 }],
     });
 
+    modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
     modal.update(state);
 
     expect(modal.root.textContent).toContain('Freight Warehouse #3');
@@ -160,18 +246,59 @@ describe('BlastReportModal', () => {
   });
 
   it('shows the oversized-fragments hint, naming the real rock_fragmenter vehicle, only when there are any', () => {
-    const { modal: modalA } = makeModal();
+    const { modal: modalA, setNow: setNowA } = makeModal();
     const stateA = makeState();
     stateA.lastBlastReport = makeReport({ oversizedFragments: 0 });
     modalA.update(stateA);
+    setNowA(BLAST_REPORT_DELAY_MS);
+    modalA.update(stateA);
     expect(modalA.root.textContent).not.toContain('too large for standard haulers');
 
-    const { modal: modalB } = makeModal();
+    const { modal: modalB, setNow: setNowB } = makeModal();
     const stateB = makeState();
     stateB.lastBlastReport = makeReport({ oversizedFragments: 6 });
     modalB.update(stateB);
+    setNowB(BLAST_REPORT_DELAY_MS);
+    modalB.update(stateB);
     expect(modalB.root.textContent).toContain('6 fragments are too large for standard haulers');
     expect(modalB.root.textContent).toContain('Rock Fragmenter');
+  });
+
+  it('reset() clears a pending report so it never opens (#545)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport();
+    modal.update(state); // arms the report at now=0
+    expect(modal.pending).toBe(true);
+
+    modal.reset();
+
+    expect(modal.pending).toBe(false);
+    expect(modal.visible).toBe(false);
+
+    // Level-transition sequence: a fresh GameState (new_game/campaign/sandbox
+    // entry), whose lastBlastReport always starts null — mirrors the real
+    // enteredNewLevel guard, not a reuse of the same stale state object.
+    const freshState = makeState();
+    setNow(BLAST_REPORT_DELAY_MS * 10);
+    modal.update(freshState);
+
+    expect(modal.visible).toBe(false);
+    expect(modal.pending).toBe(false);
+  });
+
+  it('reset() also hides an already-open modal (#545)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport();
+    modal.update(state);
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(state);
+    expect(modal.visible).toBe(true);
+
+    modal.reset();
+
+    expect(modal.visible).toBe(false);
   });
 
   it('refreshLocale() does not throw', () => {

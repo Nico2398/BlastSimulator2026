@@ -354,7 +354,7 @@
     },
     {
       "command": "blast",
-      "timeout": 20,
+      "timeout": 30,
       "frames": 6,
       "interval": 50,
       "interaction": [
