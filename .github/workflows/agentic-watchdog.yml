@@ -58,20 +58,61 @@ jobs:
               return;
             }
 
+            // A PR counts only when its head is the pipeline's own branch for
+            // the issue, or GitHub records it as closing the issue. A timeline
+            // cross-reference counts for nothing: any PR that merely writes
+            // "#N" anywhere in its body raises one, and this sweep is the
+            // last-resort net — a stray mention must not make a dead run's
+            // issue immortally `in-progress`. Same predicate inlined in
+            // agentic-run-state and agentic-assign (no shared file — this
+            // workflow runs without a checkout to read one from).
+            const deliverablePr = async (issueNumber) => {
+              const { data: headPrs } = await github.rest.pulls.list({
+                owner, repo, state: 'all',
+                head: `${owner}:pipeline/feature-${issueNumber}`, per_page: 20
+              });
+              const fromPipeline = headPrs.find((pr) => pr.state === 'open' || pr.merged_at);
+              if (fromPipeline) {
+                return {
+                  number: fromPipeline.number,
+                  how: `from pipeline/feature-${issueNumber}, ${fromPipeline.merged_at ? 'merged' : 'open'}`
+                };
+              }
+              const linked = await github.graphql(
+                `query($owner: String!, $repo: String!, $number: Int!) {
+                   repository(owner: $owner, name: $repo) {
+                     issue(number: $number) {
+                       closedByPullRequestsReferences(first: 10, includeClosedPrs: false) {
+                         nodes { number merged }
+                       }
+                     }
+                   }
+                 }`,
+                { owner, repo, number: issueNumber }
+              );
+              const closer = linked?.repository?.issue?.closedByPullRequestsReferences?.nodes?.[0];
+              if (closer) {
+                return { number: closer.number, how: `closing reference, ${closer.merged ? 'merged' : 'open'}` };
+              }
+              return null;
+            };
+
             let swept = 0;
             for (const issue of inProgress) {
               const n = issue.number;
 
+              // A deliverable PR means the run produced something; it is the
+              // PR's CI and review that carry it from here, however long that
+              // takes.
+              const pr = await deliverablePr(n);
+              if (pr) {
+                core.info(`#${n}: pull request #${pr.number} (${pr.how}) carries it, leaving alone.`);
+                continue;
+              }
+
               const { data: events } = await github.rest.issues.listEventsForTimeline({
                 owner, repo, issue_number: n, per_page: 100
               });
-
-              // A linked PR means the run produced something; it is the PR's
-              // CI and review that carry it from here, however long that takes.
-              if (events.some((e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request)) {
-                core.info(`#${n}: has a linked PR, leaving alone.`);
-                continue;
-              }
 
               const labelledAt = events
                 .filter((e) => e.event === 'labeled' && e.label?.name === 'in-progress')
