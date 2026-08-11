@@ -44,9 +44,9 @@ const PAN_SPEED_FACTOR = 0.001;
  * Pixel movement below this between right-button mousedown and release still
  * reads as a click, not a drag — mirrors ScenePicking's
  * CLICK_MOVE_THRESHOLD_PX for the analogous left-button distinction. Below
- * this, PlacementController's contextmenu handler still cancels the armed
- * tool; at or above it, a right-drag used purely to orbit the camera leaves
- * the tool untouched (#544).
+ * this, PlacementController.onMouseUp's button === 2 branch still cancels the
+ * armed tool; at or above it, a right-drag used purely to orbit the camera
+ * leaves the tool untouched (#544).
  */
 const RIGHT_DRAG_THRESHOLD_PX = 5;
 
