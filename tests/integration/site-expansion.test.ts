@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { newGameCommand, terrainConfigOf, type GameContext } from '../../src/console/commands/world.js';
 import { drillPlanCommand, buildRampCommand, surveyCommand, type MiningContext } from '../../src/console/commands/mining.js';
-import { buildCommand } from '../../src/console/commands/entities.js';
+import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { PlayableArea } from '../../src/core/world/PlayableArea.js';
 import type { ProtectedStructures } from '../../src/core/world/Structures.js';
@@ -17,6 +17,14 @@ function makeCtx(): MiningContext {
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '500000' });
   return ctx;
+}
+
+/** Hire a surveyor with geology skill so runSurvey()'s qualification guard passes. */
+function hireSurveyor(ctx: MiningContext): void {
+  const hire = employeeCommand(ctx, ['hire'], { role: 'surveyor' });
+  if (!hire.success) throw new Error(`hire failed: ${hire.output}`);
+  const empId = ctx.state!.employees.employees.slice(-1)[0]!.id;
+  employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
 }
 
 describe('site expansion — drill plans', () => {
@@ -171,6 +179,7 @@ describe('site expansion — bridging a target that is not edge-adjacent', () =>
 
   it('bridges a distant survey, building, and ramp target the same way', () => {
     const surveyCtx = makeCtx();
+    hireSurveyor(surveyCtx);
     const survey = surveyCommand(surveyCtx, ['seismic'], { x: '70', z: '10' });
     expect(survey.success).toBe(true);
     expect(surveyCtx.grid!.containsColumn(70, 10)).toBe(true);
