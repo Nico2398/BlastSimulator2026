@@ -37,7 +37,15 @@ interface FakeIssue {
   prs?: { number: number; state: string }[];
   /** When `blocked` was last applied, epoch ms. */
   blockedAt?: number | null;
+  /** Whether the whole timeline could be read. */
+  timelineComplete?: boolean;
 }
+
+/** The listing shape `linkedPullRequests` returns. */
+const listing = (pullRequests: { number: number; state: string }[], complete = true) => ({
+  pullRequests,
+  complete,
+});
 
 const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   state: 'open',
@@ -48,6 +56,7 @@ const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   prMergedAt: null,
   prs: [],
   blockedAt: null,
+  timelineComplete: true,
   ...partial,
 });
 
@@ -67,7 +76,8 @@ function fakeApi(issues: FakeIssue[], options: { lastMergeAt?: number | null } =
       return byNumber.get(number) ?? null;
     },
     async linkedPullRequests(number: number) {
-      return byNumber.get(number)?.prs ?? [];
+      const found = byNumber.get(number);
+      return { pullRequests: found?.prs ?? [], complete: found?.timelineComplete ?? true };
     },
     async blockedLabelledAt(number: number) {
       return byNumber.get(number)?.blockedAt ?? null;
@@ -151,18 +161,18 @@ describe('conditions readable off the candidate itself', () => {
 describe('whether one dependency has actually landed', () => {
   it('accepts a dependency closed as completed with no open PR', () => {
     const dep = issue({ number: 5, state: 'closed', stateReason: 'completed' });
-    expect(rules.dependencyVerdict(dep, []).assignable).toBe(true);
+    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(true);
   });
 
   it('refuses a dependency that is still open', () => {
-    const verdict = rules.dependencyVerdict(issue({ number: 5 }), []);
+    const verdict = rules.dependencyVerdict(issue({ number: 5 }), listing([]));
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain('#5');
   });
 
   // The state #547 is in. Its own label already says the work stopped.
   it('names `blocked` when the open dependency is itself blocked', () => {
-    const verdict = rules.dependencyVerdict(issue({ number: 547, labels: ['blocked'] }), []);
+    const verdict = rules.dependencyVerdict(issue({ number: 547, labels: ['blocked'] }), listing([]));
     expect(verdict.reason).toContain('blocked');
   });
 
@@ -170,7 +180,7 @@ describe('whether one dependency has actually landed', () => {
   // work, and everything declaring it a dependency is still missing its ground.
   it('refuses a dependency closed as not planned', () => {
     const dep = issue({ number: 5, state: 'closed', stateReason: 'not_planned' });
-    const verdict = rules.dependencyVerdict(dep, []);
+    const verdict = rules.dependencyVerdict(dep, listing([]));
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain('not planned');
   });
@@ -179,20 +189,20 @@ describe('whether one dependency has actually landed', () => {
   // its code has not merged, so `main` does not have it.
   it('refuses a dependency whose pull request is still open', () => {
     const dep = issue({ number: 547, state: 'closed', stateReason: 'completed' });
-    const verdict = rules.dependencyVerdict(dep, [{ number: 566, state: 'open' }]);
+    const verdict = rules.dependencyVerdict(dep, listing([{ number: 566, state: 'open' }]));
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain('#566');
   });
 
   it('accepts a dependency whose pull requests are all finished', () => {
     const dep = issue({ number: 5, state: 'closed', stateReason: 'completed' });
-    expect(rules.dependencyVerdict(dep, [{ number: 6, state: 'closed' }]).assignable).toBe(true);
+    expect(rules.dependencyVerdict(dep, listing([{ number: 6, state: 'closed' }])).assignable).toBe(true);
   });
 
   // A `Blocked by` line may name the PR rather than the issue it closes.
   it('refuses a dependency that is an unmerged pull request', () => {
     const dep = issue({ number: 566, isPullRequest: true, state: 'open' });
-    expect(rules.dependencyVerdict(dep, []).assignable).toBe(false);
+    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(false);
   });
 
   it('accepts a dependency that is a merged pull request', () => {
@@ -202,13 +212,13 @@ describe('whether one dependency has actually landed', () => {
       state: 'closed',
       prMergedAt: '2026-08-11T12:00:00Z',
     });
-    expect(rules.dependencyVerdict(dep, []).assignable).toBe(true);
+    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(true);
   });
 
   // A closed PR that never merged is a rejected deliverable, not a landed one.
   it('refuses a dependency that is a closed but unmerged pull request', () => {
     const dep = issue({ number: 566, isPullRequest: true, state: 'closed', prMergedAt: null });
-    expect(rules.dependencyVerdict(dep, []).assignable).toBe(false);
+    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(false);
   });
 });
 
@@ -499,7 +509,10 @@ describe('the GitHub half', () => {
         ],
       }),
     });
-    expect(await client.linkedPullRequests(1)).toEqual([{ number: 566, state: 'open' }]);
+    expect(await client.linkedPullRequests(1)).toEqual({
+      pullRequests: [{ number: 566, state: 'open' }],
+      complete: true,
+    });
     expect(await client.blockedLabelledAt(1)).toBe(Date.parse('2026-08-11T12:00:00Z'));
     expect(await client.everCarriedInProgress(1)).toBe(false);
   });
@@ -528,6 +541,92 @@ describe('the GitHub half', () => {
 
   it('reports no pipeline merge rather than guessing one', async () => {
     expect(await api().latestPipelineMergeAt()).toBeNull();
+  });
+
+  // A cross-reference can sit anywhere in a timeline, and the timeline of a
+  // long-lived pipeline issue runs to hundreds of label events. Reading only the
+  // first page would answer "no open pull request" from having looked at a
+  // fraction of the evidence — the one wrong answer that fails open.
+  describe('a timeline longer than one page', () => {
+    /** `pages` pages of filler, with the cross-reference on the last one. */
+    const paged = (pages: number) => {
+      let served = 0;
+      return {
+        listEventsForTimeline: async ({ page }: { page: number }) => {
+          served = Math.max(served, page);
+          const last = page >= pages;
+          const filler = Array.from({ length: last ? 3 : 100 }, () => ({
+            event: 'labeled',
+            label: { name: 'noise' },
+            created_at: '2026-08-01T00:00:00Z',
+          }));
+          if (last) {
+            filler.push({
+              event: 'cross-referenced',
+              source: { issue: { number: 566, state: 'open', pull_request: {} } },
+            } as never);
+          }
+          return { data: filler };
+        },
+        pagesServed: () => served,
+      };
+    };
+
+    it('reads every page before concluding anything', async () => {
+      const pager = paged(3);
+      const client = api({ listEventsForTimeline: pager.listEventsForTimeline });
+      const linked = await client.linkedPullRequests(1);
+      expect(linked.complete).toBe(true);
+      expect(linked.pullRequests).toEqual([{ number: 566, state: 'open' }]);
+      expect(pager.pagesServed()).toBe(3);
+    });
+
+    it('reads the timeline once however many rules ask about it', async () => {
+      const pager = paged(2);
+      const client = api({ listEventsForTimeline: pager.listEventsForTimeline });
+      await client.linkedPullRequests(1);
+      await client.blockedLabelledAt(1);
+      await client.everCarriedInProgress(1);
+      expect(pager.pagesServed()).toBe(2);
+    });
+
+    // Past the page cap the reader cannot vouch for the answer, and says so
+    // instead of returning the part it managed to read.
+    it('reports a timeline past the cap as incomplete', async () => {
+      const client = api({
+        listEventsForTimeline: async () => ({
+          data: Array.from({ length: 100 }, () => ({ event: 'labeled', label: { name: 'noise' } })),
+        }),
+      });
+      expect((await client.linkedPullRequests(1)).complete).toBe(false);
+    });
+
+    // The rules' side of the same fact: an unreadable cross-reference list is a
+    // possible open pull request, so it blocks.
+    it('blocks a dependency whose cross-references could not be read in full', () => {
+      const dep = issue({ number: 547, state: 'closed', stateReason: 'completed' });
+      const verdict = rules.dependencyVerdict(dep, listing([], false));
+      expect(verdict.assignable).toBe(false);
+      expect(verdict.reason).toContain('in full');
+    });
+
+    it('blocks a candidate whose own cross-references could not be read in full', async () => {
+      const api = fakeApi([{ number: 20, labels: ['ready'], timelineComplete: false }]);
+      const result = await select(api);
+      expect(result.issue).toBeNull();
+    });
+
+    // An undated failure has to count as a recent one, or a truncated history
+    // would quietly reopen a chain the brake had closed.
+    it('dates an unreadable `blocked` label as now rather than never', async () => {
+      const now = Date.parse('2026-08-11T12:00:00Z');
+      const client = api({
+        listEventsForTimeline: async () => ({
+          data: Array.from({ length: 100 }, () => ({ event: 'labeled', label: { name: 'noise' } })),
+        }),
+      });
+      expect(await client.blockedLabelledAt(1, now)).toBe(now);
+    });
   });
 });
 

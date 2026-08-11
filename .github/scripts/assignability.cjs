@@ -131,9 +131,9 @@ function labelVerdict(issue) {
  * issue in its batch builds on.
  *
  * @param {{number: number, state: string, stateReason?: string|null, isPullRequest?: boolean, prMergedAt?: string|null, labels?: string[]}} dep
- * @param {{number: number, state: string}[]} linkedPrs
+ * @param {{pullRequests: {number: number, state: string}[], complete: boolean}} linked
  */
-function dependencyVerdict(dep, linkedPrs) {
+function dependencyVerdict(dep, linked) {
   if (dep.isPullRequest) {
     return dep.prMergedAt
       ? yes()
@@ -154,7 +154,15 @@ function dependencyVerdict(dep, linkedPrs) {
     return no(`dependency #${dep.number} was closed as not planned, so its work never landed`);
   }
 
-  const unmerged = (linkedPrs || []).find((pr) => pr.state === 'open');
+  // "No open PR found in the events I read" is not "no open PR". A truncated
+  // timeline can only be reported, never completed by inference.
+  if (linked && linked.complete === false) {
+    return no(
+      `dependency #${dep.number}'s cross-references could not be read in full, so an unmerged pull request cannot be ruled out`
+    );
+  }
+
+  const unmerged = (linked?.pullRequests || []).find((pr) => pr.state === 'open');
   if (unmerged) {
     return no(
       `dependency #${dep.number} is closed but its pull request #${unmerged.number} is still open`
@@ -202,7 +210,9 @@ async function graphVerdict(api, root) {
       );
     }
 
-    const linked = dep.isPullRequest ? [] : await api.linkedPullRequests(number);
+    const linked = dep.isPullRequest
+      ? { pullRequests: [], complete: true }
+      : await api.linkedPullRequests(number);
     const verdict = dependencyVerdict(dep, linked);
     if (!verdict.assignable) return verdict;
 
@@ -231,7 +241,10 @@ async function assessCandidate(api, issue) {
   // This is the state #547 was left in, and the state a human re-adding `ready`
   // to a rescued issue would recreate.
   const linked = await api.linkedPullRequests(issue.number);
-  const open = linked.find((pr) => pr.state === 'open');
+  if (linked.complete === false) {
+    return no('its cross-references could not be read in full, so an open pull request cannot be ruled out');
+  }
+  const open = linked.pullRequests.find((pr) => pr.state === 'open');
   if (open) {
     return no(`pull request #${open.number} is already open against it`);
   }
@@ -338,7 +351,7 @@ function resolveMention(raw) {
  * @typedef {object} IssueApi
  * @property {(label: string) => Promise<object[]>} listIssuesByLabel
  * @property {(number: number) => Promise<object|null>} getIssue
- * @property {(number: number) => Promise<{number: number, state: string}[]>} linkedPullRequests
+ * @property {(number: number) => Promise<{pullRequests: {number: number, state: string}[], complete: boolean}>} linkedPullRequests
  * @property {(number: number) => Promise<number|null>} blockedLabelledAt
  * @property {() => Promise<number|null>} latestPipelineMergeAt
  */

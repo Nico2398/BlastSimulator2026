@@ -122,7 +122,7 @@ runs:
               core.info(`Issue #${completed} still open — a PR is expected to carry the chain.`);
               return;
             }
-            if ((await api.linkedPullRequests(completed)).length > 0) {
+            if ((await api.linkedPullRequests(completed)).pullRequests.length > 0) {
               core.info(`Issue #${completed} has a linked PR — the merge event carries the chain.`);
               return;
             }

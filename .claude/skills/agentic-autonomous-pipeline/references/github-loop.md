@@ -132,6 +132,7 @@ An issue is skipped when:
 | A declared dependency is closed but an **open PR** still references it | The headline case. The issue is closed, the code has not merged, and `main` does not have it — issue #547 with PR #566 |
 | A declared dependency **is** a pull request that has not merged | A `Blocked by` line may name the PR rather than the issue it closes |
 | A declared dependency **cannot be read** | A typo in a `Blocked by` line used to read as "no dependency" and start the run anyway. Unverifiable counts as unmet |
+| A cross-reference listing **could not be read in full** | "No open PR in the events I read" is not "no open PR". Timelines are paginated to the end (`issue-api.cjs`, 20 pages); past that the reader reports truncation and the rule blocks rather than concluding from a fraction of the evidence |
 | Its dependency graph exceeds 40 issues | A malformed body, and an unwalked graph is an unverified one |
 
 Dependencies are read from three spellings, each canonical somewhere: the `Blocked by` section the issue form and `agentic-issue-creation` produce, the inline `Depends on: #N` older issues carry, and the checklist form (`- [ ] Blocked by #N`) GitHub's own issue UI writes. Every `#N` on a line inside that section counts; references outside one do not, because `## Context` routinely cites issues as background.
