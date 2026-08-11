@@ -153,7 +153,7 @@ export class OperationsPanel {
       oreReport: state.lastOreReport,
       accidents: state.damage.accidents.length,
       injured: state.employees.employees.filter(e => e.injured && e.alive).map(e => e.id),
-      unclaimed: state.pendingActions.filter(a => a.targetEmployeeId === null).length,
+      unclaimed: state.pendingActions.filter(a => a.targetEmployeeId === null && a.status === 'queued').length,
       policy: state.sitePolicy.revision,
     });
     if (signature === this.lastSignature) return;
@@ -201,7 +201,7 @@ export class OperationsPanel {
     // pool action repeating on every eligible idle employee's own row — the
     // new CrewPanel shows only an employee's own claimed activity, so this is
     // now the only place an unclaimed action is visible at all (#39).
-    const unclaimed = state.pendingActions.filter(a => a.targetEmployeeId === null).length;
+    const unclaimed = state.pendingActions.filter(a => a.targetEmployeeId === null && a.status === 'queued').length;
 
     const wrap = el('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px';

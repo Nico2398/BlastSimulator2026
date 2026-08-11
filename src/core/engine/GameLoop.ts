@@ -17,6 +17,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
 import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
+import { claimPendingAction } from './TaskDispatch.js';
 
 // ── Config ──
 
@@ -149,9 +150,13 @@ export interface TickEmployeesResult {
  */
 export function tickEmployees(state: GameState): TickEmployeesResult {
   const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
-  const remaining: PendingAction[] = [];
 
-  for (const action of state.pendingActions) {
+  // Iterate a snapshot — claimPendingAction mutates matched actions in place
+  // (they stay in state.pendingActions, #547), so the live array must not be
+  // mutated mid-iteration.
+  const queuedActions = state.pendingActions.filter(a => a.status === 'queued');
+
+  for (const action of queuedActions) {
     // Base eligibility: alive, not injured, not in training.
     const eligible = state.employees.employees.filter(
       emp => emp.alive && !emp.injured && emp.trainingState === null,
@@ -164,7 +169,6 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
     if (allWithSkill.length === 0) {
       result.unqualified.push(action.id);
-      remaining.push(action);
       continue;
     }
 
@@ -175,13 +179,11 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
     if (!idleMatch) {
       result.waiting.push(action.id);
-      remaining.push(action);
       continue;
     }
 
     idleMatch.activeActionId = action.id;
     result.claimed.push(action.id);
-    // action is consumed — not pushed to remaining
 
     // Send the employee walking toward the action's location — targetX/targetZ
     // is documented on PendingAction as existing for exactly this purpose
@@ -189,12 +191,10 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     idleMatch.destinationX = action.targetX;
     idleMatch.destinationZ = action.targetZ;
 
-    // This is the actual claim path the tick loop uses (claimPendingAction in
-    // TaskDispatch.ts is a separate helper nothing here calls), so it owns
-    // clearing the ghost preview too — otherwise the blue marker never
-    // disappears once a real employee picks up the work (#406).
-    const ghostIdx = state.ghostPreviews.findIndex(g => g.id === action.id);
-    if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
+    // The action (and its ghost) stays in state.pendingActions/ghostPreviews —
+    // only status/assignedEmployeeId (and the ghost's claimed flag) flip, so
+    // it remains visible while the employee walks there (#547).
+    claimPendingAction(state, action.id, idleMatch.id);
 
     // tickCollapse/tickNeedRestoration self-claim (see above) and, like this
     // branch, only ever *queue* the rest via pendingRestDuration/
@@ -246,7 +246,6 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     }
   }
 
-  state.pendingActions = remaining;
   return result;
 }
 
@@ -308,6 +307,7 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
+    claimPendingAction(state, restAction.id, emp.id);
     // Immediately claimed (unlike autoInsertNeedTasks) — but the rest timer
     // itself does not start until ArrivalGate.tickArrivalGate confirms the
     // employee has walked to the building (#437).
@@ -396,6 +396,7 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
+    claimPendingAction(state, restAction.id, emp.id);
     // Immediately claimed — but the rest timer itself does not start until
     // ArrivalGate.tickArrivalGate confirms arrival (mirrors tickNeedRestoration, #437).
     // When resting in place (targetX/Z === emp.x/z, the two no-building branches
@@ -789,6 +790,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
   let completed = false;
   let completedActionType: ActionType | undefined;
   let completedActionPayload: Record<string, unknown> | undefined;
+  let completedActionId: number | undefined;
   if (emp.taskTicksRemaining <= 0) {
     completed = true;
     // pendingActionType/pendingActionPayload were left set by tickEmployees at
@@ -796,6 +798,9 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
     // a completed survey — still knows what work this was.
     completedActionType = emp.pendingActionType ?? undefined;
     completedActionPayload = emp.pendingActionPayload ?? undefined;
+    // Captured before activeActionId is nulled below, so callers know which
+    // pending-action record to remove (#547).
+    completedActionId = emp.activeActionId ?? undefined;
     emp.activeActionId = null;
     emp.taskTicksRemaining = null;
     delete emp.activeTaskTotalTicks;
@@ -811,6 +816,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
     ...(levelUpLevels ? { oldLevel: levelUpLevels.oldLevel, newLevel: levelUpLevels.newLevel } : {}),
     ...(completedActionType !== undefined ? { actionType: completedActionType } : {}),
     ...(completedActionPayload !== undefined ? { actionPayload: completedActionPayload } : {}),
+    ...(completedActionId !== undefined ? { actionId: completedActionId } : {}),
   };
 }
 
@@ -832,7 +838,13 @@ function completeRestTick(
   emp.restTicksRemaining -= 1;
 
   if (emp.restTicksRemaining <= 0) {
+    const completedActionId = emp.activeActionId;
     completeRestForEmployee(state, emp, 'fatigue');
+    // Shift-cycle-forced rest self-claims in forceShiftRestIfNeeded and, like
+    // tickGeneralRestCompletion's own rest sources, is never otherwise removed
+    // from pendingActions once it completes (#547 — this path had no cleanup
+    // at all before).
+    state.pendingActions = state.pendingActions.filter(a => a.id !== completedActionId);
     emp.ticksWorked = 0;
     restCompleted.push(emp.id);
   }
@@ -908,6 +920,7 @@ function forceShiftRestIfNeeded(
 
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;
+  claimPendingAction(state, restAction.id, emp.id);
   emp.destinationX = targetX;
   emp.destinationZ = targetZ;
   shiftRested.push(emp.id);

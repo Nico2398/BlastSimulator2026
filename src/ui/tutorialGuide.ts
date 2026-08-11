@@ -173,9 +173,13 @@ function hasOutstandingWork(e: Employee): boolean {
  * `isWorkInProgress` inspects, generic across every `waitsOnWork` step.
  */
 function workSignature(state: GameState): string {
+  // Includes status so a same-tick queued → assigned transition (e.g. an
+  // employee already standing on the target) registers as a signature change
+  // even when position/duration counters haven't moved yet (#547) — the
+  // record now survives claim instead of disappearing from pendingActions.
   const pendingIds = (state.pendingActions ?? [])
-    .map((a) => a.id)
-    .sort((a, b) => a - b)
+    .map((a) => `${a.id}:${a.status}`)
+    .sort()
     .join(',');
 
   const working = state.employees.employees

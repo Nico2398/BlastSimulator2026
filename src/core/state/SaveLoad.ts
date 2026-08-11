@@ -152,6 +152,49 @@ export function deserialize(json: string): GameState {
     if (typeof tubingRaw['inventory'] !== 'number') tubingRaw['inventory'] = 0;
   }
 
+  // v7 → v8: PendingAction gained status/assignedEmployeeId, GhostPreview
+  // gained claimed (#547 — the record now survives claim instead of being
+  // deleted, so it needs a lifecycle field to track that).
+  const pendingActionsRaw = obj['pendingActions'] as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(pendingActionsRaw)) {
+    for (const action of pendingActionsRaw) {
+      if (action['status'] === undefined) {
+        action['status'] = 'queued';
+      }
+      if (action['assignedEmployeeId'] === undefined) {
+        action['assignedEmployeeId'] = null;
+      }
+    }
+  }
+  const ghostPreviewsRaw = obj['ghostPreviews'] as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(ghostPreviewsRaw)) {
+    for (const ghost of ghostPreviewsRaw) {
+      if (ghost['claimed'] === undefined) {
+        ghost['claimed'] = false;
+      }
+    }
+  }
+  // Under the old model, a non-rest claim deleted the PendingAction record at
+  // claim time — only a self-claimed rest action (tickCollapse/
+  // tickNeedRestoration/autoInsertNeedTasks/forceShiftRestIfNeeded) could
+  // still be sitting in pendingActions while an employee's activeActionId
+  // pointed at it. Re-link those so status/assignedEmployeeId reflect the
+  // claim under the new model; anything else legitimately has no match.
+  if (Array.isArray(pendingActionsRaw)) {
+    const employeesForRelink = obj['employees'] as Record<string, unknown> | undefined;
+    const employeeListForRelink = employeesForRelink?.['employees'] as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(employeeListForRelink)) {
+      for (const emp of employeeListForRelink) {
+        const activeActionId = emp['activeActionId'];
+        if (typeof activeActionId !== 'number') continue;
+        const matched = pendingActionsRaw.find(a => a['id'] === activeActionId);
+        if (matched === undefined) continue;
+        matched['status'] = 'assigned';
+        matched['assignedEmployeeId'] = emp['id'];
+      }
+    }
+  }
+
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The
   // loader is responsible for rebuilding a real one.

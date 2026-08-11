@@ -11,6 +11,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { assignDriver } from '../entities/Vehicle.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
+import { startPendingAction } from './TaskDispatch.js';
 
 /** Summary of what the arrival gate started/cancelled on this tick. */
 export interface ArrivalGateResult {
@@ -58,6 +59,9 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       emp.restNeedKey = emp.pendingRestNeedKey;
       emp.pendingRestDuration = null;
       emp.pendingRestNeedKey = null;
+      if (emp.activeActionId !== null) {
+        startPendingAction(state, emp.activeActionId);
+      }
       result.restStarted.push(emp.id);
     }
 
@@ -70,6 +74,9 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       // to know what work just finished (e.g. resolving a survey) and clears
       // them itself. Clearing them here would make every task's completion
       // handler blind to what it just did (see survey.integration.test.ts).
+      if (emp.activeActionId !== null) {
+        startPendingAction(state, emp.activeActionId);
+      }
       result.taskStarted.push(emp.id);
     }
 

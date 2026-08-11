@@ -67,40 +67,43 @@ export function dispatchPendingAction(
  * its ghost) stays in `state.pendingActions`/`state.ghostPreviews` — only its
  * status/assignedEmployeeId (and the ghost's `claimed` flag) change, so it
  * remains visible to the player while the employee walks to it (#547).
- * Returns the claimed action, or null if not found.
- *
- * TODO: implement — currently a stub, see #547.
+ * Returns the claimed action, or null if not found or already claimed.
  */
 export function claimPendingAction(
   state: GameState,
   actionId: number,
   employeeId: number,
 ): PendingAction | null {
-  void state;
-  void actionId;
-  void employeeId;
-  return null;
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (action === undefined || action.status !== 'queued') {
+    return null;
+  }
+  action.status = 'assigned';
+  action.assignedEmployeeId = employeeId;
+  const ghost = state.ghostPreviews.find(g => g.id === actionId);
+  if (ghost !== undefined) {
+    ghost.claimed = true;
+  }
+  return action;
 }
 
 /**
  * Transition a claimed action from 'assigned' to 'in_progress' once the
  * assigned employee has arrived at the target (called from ArrivalGate).
- *
- * TODO: implement — currently a stub, see #547.
  */
 export function startPendingAction(state: GameState, actionId: number): void {
-  void state;
-  void actionId;
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (action !== undefined && action.status === 'assigned') {
+    action.status = 'in_progress';
+  }
 }
 
 /**
  * Remove a completed action and its ghost preview from state entirely
  * (called from events.ts and GameLoop rest-completion paths).
- *
- * TODO: implement — currently a stub, see #547.
  */
 export function completePendingAction(state: GameState, actionId: number): void {
-  void state;
-  void actionId;
+  state.pendingActions = state.pendingActions.filter(a => a.id !== actionId);
+  state.ghostPreviews = state.ghostPreviews.filter(g => g.id !== actionId);
 }
 
