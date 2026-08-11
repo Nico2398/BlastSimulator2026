@@ -163,6 +163,9 @@
         {
           "type": "command",
           "command": "tick 23"
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup"
@@ -243,6 +246,9 @@
         {
           "type": "command",
           "command": "survey show"
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "observe",

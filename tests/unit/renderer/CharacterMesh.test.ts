@@ -273,4 +273,54 @@ describe('CharacterMesh', () => {
       cm.dispose();
     });
   });
+
+  describe('getGroup() — billboard anchor for overlays (#546)', () => {
+    it('returns the same Group added to the scene for a rendered employee', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      cm.addEmployee(makeEmployee(1));
+
+      const group = cm.getGroup(1);
+      expect(group).toBe(scene.children[0]);
+      cm.dispose();
+    });
+
+    it('returns null for an id that was never added', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      cm.addEmployee(makeEmployee(1));
+
+      expect(cm.getGroup(999)).toBeNull();
+      cm.dispose();
+    });
+
+    it('an object parented under getGroup(id) tracks the interpolated tween position automatically', () => {
+      const scene = new THREE.Scene();
+      const cm = new CharacterMesh(scene);
+      const emp = makeEmployee(1, { x: 0, z: 0 });
+      cm.addEmployee(emp, 0);
+
+      const group = cm.getGroup(1);
+      expect(group).not.toBeNull();
+      const indicator = new THREE.Object3D();
+      group!.add(indicator);
+
+      emp.x = 10;
+      emp.z = 10;
+      // Partial tween step (dt well under MOVE_TWEEN_DURATION_S), matching
+      // the existing "update() eases across multiple small-dt frames" test.
+      cm.update([emp], 0.05);
+
+      const groupPos = group!.position.clone();
+      const indicatorWorldPos = new THREE.Vector3();
+      indicator.getWorldPosition(indicatorWorldPos);
+
+      // The tween must have actually moved the group off the origin for this
+      // to be a meaningful check (otherwise both sides trivially agree at 0).
+      expect(groupPos.x).toBeGreaterThan(0);
+      expect(indicatorWorldPos.x).toBeCloseTo(groupPos.x);
+      expect(indicatorWorldPos.z).toBeCloseTo(groupPos.z);
+      cm.dispose();
+    });
+  });
 });
