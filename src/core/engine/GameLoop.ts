@@ -528,6 +528,12 @@ function createRestPendingAction(
     targetY: 0,
     payload: overrides.payload,
     targetEmployeeId: overrides.targetEmployeeId,
+    // Rest actions self-claim immediately at every call site above (#437) —
+    // 'queued'/null here is overwritten by the caller in practice; kept as
+    // the type-correct default until the #547 lifecycle work assigns these
+    // explicitly at creation.
+    status: 'queued',
+    assignedEmployeeId: null,
   };
 }
 
@@ -744,6 +750,8 @@ export interface TaskProgressResult {
   actionType?: ActionType;
   /** Payload of the task that just completed — only present when `completed` is true. */
   actionPayload?: Record<string, unknown>;
+  /** ID of the PendingAction that just completed — only present when `completed` is true (#547). */
+  actionId?: number;
 }
 
 /**

@@ -297,6 +297,10 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     targetY: 0,
     payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method] },
     targetEmployeeId: null,
+    // Minimal type-compliance defaults for the #547 lifecycle fields — real
+    // status transitions land with the lifecycle implementation, not here.
+    status: 'queued',
+    assignedEmployeeId: null,
   });
 
   state.ghostPreviews.push({
@@ -305,6 +309,7 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     targetX: centerX,
     targetZ: centerZ,
     targetY: 0,
+    claimed: false,
   });
 
   return { success: true, actionId };
