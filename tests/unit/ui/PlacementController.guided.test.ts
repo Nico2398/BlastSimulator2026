@@ -244,6 +244,10 @@ describe('cancel via right-click vs right-drag (#544)', () => {
     const selectionBefore = controller.selection;
 
     cameraController.rightButtonDragged = true;
+    // Real gesture order: mousedown(2) -> mouseup(2) -> contextmenu. With
+    // rightButtonDragged true, onMouseUp's button-2 branch must skip cancel (#544).
+    canvas.dispatchEvent(new MouseEvent('mousedown', { button: 2, clientX: 1, clientY: 1, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { button: 2, clientX: 1, clientY: 1, bubbles: true }));
     const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     const preventDefault = vi.spyOn(event, 'preventDefault');
     canvas.dispatchEvent(event);
@@ -262,13 +266,23 @@ describe('cancel via right-click vs right-drag (#544)', () => {
     controller.setCancelHandler(onCancel);
 
     cameraController.rightButtonDragged = false;
+    // Real gesture order: mousedown(2) -> mouseup(2) -> contextmenu. The
+    // cancel decision now lives in onMouseUp for button 2 (#544), so the
+    // mouseup must be dispatched for the cancellation to fire.
+    canvas.dispatchEvent(new MouseEvent('mousedown', { button: 2, clientX: 1, clientY: 1, bubbles: true }));
+    canvas.dispatchEvent(new MouseEvent('mouseup', { button: 2, clientX: 1, clientY: 1, bubbles: true }));
     const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     const preventDefault = vi.spyOn(event, 'preventDefault');
     canvas.dispatchEvent(event);
 
     expect(controller.isArmed).toBe(false);
     expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(preventDefault).toHaveBeenCalled();
+    // The mouseup already cancelled and disarmed the tool, so by the time
+    // contextmenu arrives the controller is idle — same as the "idle" no-op
+    // case below, onContextMenu's early-return means it never reaches
+    // preventDefault here. Suppressing the native menu is no longer this
+    // handler's job for a gesture that already resolved at mouseup.
+    expect(preventDefault).not.toHaveBeenCalled();
   });
 
   it('Escape still cancels an armed tool regardless of rightButtonDragged', () => {
