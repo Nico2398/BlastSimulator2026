@@ -10,7 +10,7 @@ import type { Employee, EmployeeRole, SkillCategory } from '../core/entities/Emp
 import { BASE_SALARIES } from '../core/entities/Employee.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { ActionType } from '../core/state/GameState.js';
-import { computeEmployeeActivity, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
+import { computeEmployeeActivity, taskProgressFraction, type EmployeeActivity } from '../core/entities/EmployeeActivity.js';
 import { availableTrainingOffers, planTraining, MAX_PROFICIENCY } from '../core/entities/EmployeeTraining.js';
 import { NEED_THRESHOLDS, MORALE_THRESHOLDS, XP_THRESHOLDS, PROFICIENCY_MULTIPLIERS, QUALIFICATION_SALARY_BONUS } from '../core/config/balance.js';
 import { ROLE_COLORS } from '../renderer/CharacterMesh.js';
@@ -142,8 +142,9 @@ export function makeCurrentTaskSection(e: Employee, state: GameState): HTMLEleme
   }
 
   const children: HTMLElement[] = [headRow];
-  if (activity.ticksRemaining !== null && activity.totalTicks !== null && activity.totalTicks > 0) {
-    const pct = Math.round((1 - activity.ticksRemaining / activity.totalTicks) * 100);
+  const fraction = taskProgressFraction(activity);
+  if (fraction !== null) {
+    const pct = Math.round(fraction * 100);
     const track = el('div', { attrs: { style: 'height:4px;border-radius:2px;overflow:hidden;background:#242c36' } });
     track.appendChild(el('div', { attrs: { style: `height:100%;background:var(--bsx-amber);width:${Math.max(0, Math.min(100, pct))}%` } }));
     children.push(track);

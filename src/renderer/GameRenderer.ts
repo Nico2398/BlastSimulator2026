@@ -32,6 +32,7 @@ import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
 import { WorldBorderWall } from './WorldBorderWall.js';
 import { BlastPlanOverlay } from './BlastPlanOverlay.js';
 import { GhostMesh } from './GhostMesh.js';
+import { TaskProgressBar } from './TaskProgressBar.js';
 import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
 import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../core/mining/SurveyCalc.js';
@@ -91,6 +92,7 @@ export class GameRenderer {
   private lastCutBounds = '';
   private blastOverlay: BlastPlanOverlay | null = null;
   private ghosts: GhostMesh | null = null;
+  private taskProgress: TaskProgressBar | null = null;
   private lastGrid: VoxelGrid | null = null;
 
   /** Seed of the currently loaded game — used to detect new_game calls. */
@@ -119,6 +121,11 @@ export class GameRenderer {
   /** ID of the currently-bound VoxelGrid, for diagnostics. Null if no grid is loaded. */
   get lastGridId(): number | null {
     return this.lastGrid?.id ?? null;
+  }
+
+  /** Number of task-progress bars currently rendered — for diagnostics. */
+  get taskProgressBarCount(): number {
+    return this.taskProgress?.count ?? 0;
   }
 
   /** Number of ghost-preview meshes currently rendered — for diagnostics. */
@@ -200,6 +207,15 @@ export class GameRenderer {
         ? ctx.state.ghostPreviews.map(p => ({ ...p, targetY: this.getTerrainSurfaceY(p.targetX, p.targetZ) }))
         : ctx.state.ghostPreviews;
       this.ghosts.sync(previews);
+    }
+
+    // Task progress bars — reflect the current working/idle state each sync (#546)
+    if (this.taskProgress && this.characters) {
+      this.taskProgress.sync(
+        ctx.state.employees.employees,
+        ctx.state.vehicles.vehicles,
+        id => this.characters!.getGroup(id),
+      );
     }
 
     // Blink employees still inside an active safety zone during clearing
@@ -310,6 +326,8 @@ export class GameRenderer {
     if (this.characters && this.lastState) {
       this.characters.update(this.lastState.employees.employees, dt);
     }
+
+    this.taskProgress?.update(dt);
 
     if (this.vehicles && this.lastState) {
       this.vehicles.update(this.lastState.vehicles.vehicles, dt);
@@ -769,6 +787,9 @@ export class GameRenderer {
       this.characters.addEmployee(e, surfaceY);
     }
 
+    // Task progress bars — billboarded above working employees (#546)
+    this.taskProgress = new TaskProgressBar(scene, this.sm.camera);
+
     // Weather sky
     this.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
 
@@ -920,6 +941,7 @@ export class GameRenderer {
     this.landscape?.dispose();
     this.blastOverlay?.dispose();
     this.ghosts?.dispose();
+    this.taskProgress?.dispose();
 
     this.terrain = null;
     this.landscapeHandle = null;
@@ -942,6 +964,7 @@ export class GameRenderer {
     this.landscape = null;
     this.blastOverlay = null;
     this.ghosts = null;
+    this.taskProgress = null;
     this.lastGrid = null;
 
     this.renderedBuildingIds.clear();

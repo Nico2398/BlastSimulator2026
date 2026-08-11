@@ -3,8 +3,9 @@ name: gameplay-employee-skills
 description: >
   Employee skills and task queue system for BlastSimulator2026: skill categories,
   proficiency levels (1-5), XP gain, task duration formula, pending-action pool,
-  and ghost preview rendering. Use when implementing or modifying
-  employee qualifications, task dispatch, action queuing, or proficiency mechanics.
+  ghost preview rendering, and in-scene task progress bars. Use when implementing
+  or modifying employee qualifications, task dispatch, action queuing, or
+  proficiency mechanics.
 ---
 
 ## Design Philosophy
@@ -13,6 +14,7 @@ Employees not interchangeable tokens. Each has skill qualifications with profici
 
 - **Every physical action is queued, not instant.** Commands → global pending-action pool → free qualified employee auto-claims.
 - **Pending actions show 3D ghost.** Semi-transparent blue fresnel-effect mesh at target position — distinguishes pending from completed.
+- **Working actions show a progress bar.** Billboarded fill above the employee, tracking `taskProgressFraction` (`src/core/entities/EmployeeActivity.ts`) from empty to full over the task's duration — distinguishes "busy" from "idle" once the ghost's action is claimed.
 - **No qualified employee = immediate error** (not silent queue). Fired when zero employees have required skill.
 - **Some tasks require vehicle.** Hauling + drilling require employee to board vehicle of appropriate role.
 
@@ -90,6 +92,8 @@ export type ActionType =
 4. If qualified employees exist but all temporarily busy → wait silently (no error)
 
 **Ghost rendering:** For every `PendingAction`, renderer creates blue fresnel-effect translucent mesh with pulsing animation. Ghost removed on claim.
+
+**Task progress rendering:** For every employee whose `computeEmployeeActivity` reads `kind: 'working'`, `TaskProgressBar` (`src/renderer/TaskProgressBar.ts`) billboards a fill bar above the character, parented under its `CharacterMesh.getGroup(id)` transform so it tracks position without per-frame copying. Fill fraction comes from `taskProgressFraction`, shared with the Crew panel's own progress line so the two never disagree. Removed when the task ends.
 
 ## Salary Calculation
 
