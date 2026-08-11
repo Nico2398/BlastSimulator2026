@@ -67,6 +67,7 @@ Physics/rendering can use try/catch for unexpected errors. Never let game crash 
 - Marching cubes recalculation localized — only recompute chunks near blast
 - Fragment count capped per blast (max 2000) to avoid physics overload
 - Event system timers use delta-time accumulation, not setTimeout
+- A UI element that must delay by real wall-clock time (not simulation ticks — e.g. letting an animation play before a modal opens) takes its clock as an injectable constructor param defaulting to `performance.now`: `constructor(..., private readonly now: () => number = () => performance.now())`. Tests inject a fake clock instead of waiting out the real delay; production gets the real one for free. See `BlastReportModal` (#545).
 - Voxel grid operations use spatial indexing where beneficial
 
 ## Centralized Configuration

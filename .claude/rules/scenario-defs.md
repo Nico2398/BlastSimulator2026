@@ -63,4 +63,6 @@ A step's `command` or clicks prove only that nothing threw, not that the game ac
 
 `set`/`clickLabel`/`awaitUsable`/`zoomOut`/`focusTile`/`clickEntity`/`clickIfPresent`/`resolveEventIfPending` were ported from the playability harness (issue #479) to close gaps in the click vocabulary — before them, some player steps had no click-equivalent at all and stayed console commands.
 
+`waitForSelector` resolves on DOM presence, not CSS visibility (Puppeteer's default `visible: false`) — an element that stays mounted with only its `display` toggled resolves the wait immediately, before the toggle happens (#545). To capture a screenshot after a *visibility* change (a modal that arms before it opens, a panel that shows/hides an already-mounted node), use an explicit real-time `wait` timed to the known delay, or `awaitUsable` if the element's usability is what's being probed.
+
 Adding a scenario for a feature is how that feature gets end-to-end coverage without a unit test per interaction. Runner flags, batch mode, and output layout: `dev-visual-testing` skill. Scenario inventory: `dev-testing-strategy` skill.
