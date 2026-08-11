@@ -1,10 +1,12 @@
 // BlastSimulator2026 — Blast Report Modal (redesign P4/§5.C)
-// Shows state.lastBlastReport (built in blastCommand, task P4/#17) right
-// after a blast resolves. Visibility is derived from state, not manually
-// toggled — the same pattern EventModal already uses for its own pendingEvent:
-// a report whose tick differs from the last one shown means a new blast just
-// happened, so the modal opens itself on the very next update() tick, right
-// after PreflightModal's DETONATE dispatches `blast` and closes itself.
+// Shows state.lastBlastReport (built in blastCommand, task P4/#17) once a
+// blast resolves. Visibility is derived from state, not manually toggled —
+// the same pattern EventModal already uses for its own pendingEvent: a
+// report whose identity differs from the last one shown means a new blast
+// just happened, right after PreflightModal's DETONATE dispatches `blast`
+// and closes itself. Rather than opening on that very next update() tick,
+// the modal arms and waits out BLAST_REPORT_DELAY_MS before actually
+// showing itself (#545), so the fragment-collapse animation plays first.
 //
 // Deviation from the design mock: its second footer button, "SEND HAULERS",
 // has no real backing command — only per-vehicle `vehicle haul <id>` exists,
@@ -28,6 +30,11 @@ const RATING_COLOR: Record<BlastRating, string> = {
   catastrophic: 'var(--bsx-critical-text)',
 };
 
+// Real-time delay between a blast report becoming available and the modal
+// actually opening (#545), so the fragment-collapse animation plays in the
+// clear instead of being instantly covered.
+export const BLAST_REPORT_DELAY_MS = 3000;
+
 export class BlastReportModal {
   private readonly overlay: HTMLElement;
   private readonly ratingEl: HTMLElement;
@@ -38,7 +45,13 @@ export class BlastReportModal {
   private lastShownReport: BlastReport | null = null;
   private readonly locale = new LocaleTextRegistry();
 
-  constructor(container: HTMLElement) {
+  // Deferred-open state (#545). pendingReport holds a report that has
+  // arrived but not yet been shown; pendingDeadlineMs is the `now()`
+  // timestamp (per the injected clock) at which it should open.
+  private pendingReport: BlastReport | null = null;
+  private pendingDeadlineMs: number | null = null;
+
+  constructor(container: HTMLElement, private readonly now: () => number = () => performance.now()) {
     this.overlay = el('div', { className: 'bs-confirm-overlay' });
     this.overlay.style.display = 'none';
 
@@ -87,6 +100,16 @@ export class BlastReportModal {
   hide(): void { this.open = false; this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.open; }
 
+  /** Whether a report has arrived but is still waiting out its open delay (#545). */
+  get pending(): boolean { return this.pendingReport !== null; }
+
+  /** Discard any in-flight deferred report and close the modal (#545). */
+  reset(): void {
+    this.pendingReport = null;
+    this.pendingDeadlineMs = null;
+    this.hide();
+  }
+
   update(state: GameState): void {
     const report = state.lastBlastReport;
     // Identity, not report.tick: buildBlastReport (mining.ts) is a fresh
@@ -96,11 +119,25 @@ export class BlastReportModal {
     // tick-equality check silently drops the second report forever (found
     // converting vibration-budget.json to real clicks, issue #479 — a
     // player who fires twice in a row would never see the second one).
-    if (!report || report === this.lastShownReport) return;
-    this.lastShownReport = report;
-    this.render(report, state);
-    this.open = true;
-    this.overlay.style.display = '';
+    //
+    // Arming replaces any not-yet-opened pending report outright (#545): a
+    // second blast inside the delay window discards the first pending
+    // report and starts its own full-length real-time window from its own
+    // arrival time. The first report is never shown.
+    if (report && report !== this.lastShownReport && report !== this.pendingReport) {
+      this.pendingReport = report;
+      this.pendingDeadlineMs = this.now() + BLAST_REPORT_DELAY_MS;
+    }
+
+    if (this.pendingReport !== null && this.pendingDeadlineMs !== null && this.now() >= this.pendingDeadlineMs) {
+      const toShow = this.pendingReport;
+      this.lastShownReport = toShow;
+      this.pendingReport = null;
+      this.pendingDeadlineMs = null;
+      this.render(toShow, state);
+      this.open = true;
+      this.overlay.style.display = '';
+    }
   }
 
   refreshLocale(): void { this.locale.refresh(); }

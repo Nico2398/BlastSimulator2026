@@ -231,7 +231,7 @@
     {
       "command": "blast",
       "description": "Blast a crater into the live scene after slot 1's save, so the load step below must actually regenerate terrain (not just leave the cratered grid on screen) to prove itself.",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",

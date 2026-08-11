@@ -17,6 +17,10 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
+import { BLAST_REPORT_DELAY_MS } from '../../../src/ui/panels/BlastReportModal.js';
+import { setupEvents } from '../../../src/core/events/index.js';
+
+setupEvents();
 
 function makeState() {
   const state = createGame({ seed: 1, mineType: 'desert' });
@@ -386,10 +390,19 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     // the NavGrid overlay tests above do, since UIManager.update() also
     // drives the minimap.
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    // Blast reports arm on first sight and only open once real time (via
+    // performance.now()) advances past BLAST_REPORT_DELAY_MS (#545) — mock
+    // the clock so this test can reach a genuinely visible modal before
+    // testing that closeStaleLevelOverlays() closes it.
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
-    // Simulate the first site's blast report opening the modal, the way a
-    // real `blast` command's uiManager.update(state) call does.
-    uiManager.update(makeStateWithReport(10));
+    // Simulate the first site's blast report arriving, the way a real
+    // `blast` command's uiManager.update(state) call does.
+    const state = makeStateWithReport(10);
+    uiManager.update(state); // arms the report (pending)
+
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
+    uiManager.update(state); // delay elapsed — report opens
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     uiManager.closeStaleLevelOverlays();
@@ -404,6 +417,99 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     expect(() => uiManager.closeStaleLevelOverlays()).not.toThrow();
 
     expect(uiManager.blastReportModalVisible).toBe(false);
+  });
+
+  it('clears a pending (not yet opened) report too, and a fresh level state stays closed/non-pending as time advances (#545)', () => {
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+    // Report has arrived but is still waiting out its real-time open delay —
+    // never actually opened the modal.
+    uiManager.update(makeStateWithReport(10));
+    expect(uiManager.blastReportModalPending).toBe(true);
+    expect(uiManager.blastReportModalVisible).toBe(false);
+
+    uiManager.closeStaleLevelOverlays();
+
+    expect(uiManager.blastReportModalPending).toBe(false);
+
+    // Level-transition semantics: a genuinely fresh GameState, whose
+    // lastBlastReport starts null (mirrors the real enteredNewLevel guard) —
+    // not a reuse of the same stale state object.
+    const freshState = createGame({ seed: 1, mineType: 'desert' });
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
+    uiManager.update(freshState);
+
+    expect(uiManager.blastReportModalPending).toBe(false);
+    expect(uiManager.blastReportModalVisible).toBe(false);
+  });
+});
+
+// ── Blast report deferral holds off the event modal (#545) ─────────────────
+//
+// Both BlastReportModal and EventModal are auto-triggered off GameState, and
+// eventModal is deferred while blastReportModal.visible is true so a
+// same-tick scripted follow-up event can't render on top of the report and
+// hide its Close button. The deferral has to key off "still on screen or
+// about to be" (pending OR visible), not just visible — otherwise a report
+// that has arrived but not yet opened (still waiting out its real-time
+// delay) lets the event modal open underneath it.
+
+function makeStateWithReportAndEvent(tick: number): GameState {
+  const state = createGame({ seed: 1, mineType: 'desert' });
+  state.lastBlastReport = makeBlastReport(tick);
+  state.events.pendingEvent = { eventId: 'tutorial_synergy_consultant', firedAtTick: tick };
+  return state;
+}
+
+describe('UIManager — blast report deferral holds the event modal (#545)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('event modal stays closed while the report is pending (arrived but not yet opened)', () => {
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    uiManager = new UIManager(container);
+    const state = makeStateWithReportAndEvent(10);
+
+    uiManager.update(state);
+
+    expect(uiManager.blastReportModalPending).toBe(true);
+    expect(uiManager.blastReportModalVisible).toBe(false);
+    const eventDialog = container.querySelector('#bs-event-dialog') as HTMLElement;
+    expect(eventDialog.style.display).toBe('none');
+  });
+
+  it('event modal opens once the report is closed', () => {
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    uiManager = new UIManager(container);
+    const state = makeStateWithReportAndEvent(10);
+    uiManager.update(state); // arms the report
+
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
+    uiManager.update(state); // report opens
+
+    expect(uiManager.blastReportModalVisible).toBe(true);
+    let eventDialog = container.querySelector('#bs-event-dialog') as HTMLElement;
+    expect(eventDialog.style.display).toBe('none');
+
+    (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
+    uiManager.update(state);
+
+    expect(uiManager.blastReportModalVisible).toBe(false);
+    eventDialog = container.querySelector('#bs-event-dialog') as HTMLElement;
+    expect(eventDialog.style.display).not.toBe('none');
   });
 });
 

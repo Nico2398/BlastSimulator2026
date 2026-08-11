@@ -94,7 +94,7 @@
     },
     {
       "command": "blast",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
