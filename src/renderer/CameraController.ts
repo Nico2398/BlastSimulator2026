@@ -297,7 +297,10 @@ export class CameraController {
     }
     if (e.button === 2) {
       // New right-button gesture starts clean — PlacementController's
-      // contextmenu handler reads rightGestureMoved after release (#544).
+      // onMouseUp handler reads rightButtonDragged (backed by
+      // rightGestureMoved) via the button-2 branch, since mouseup is
+      // guaranteed to fire after any movement regardless of where
+      // contextmenu lands (#544).
       this.rightButtonDown = true;
       this.rightDownX = e.clientX;
       this.rightDownY = e.clientY;
