@@ -20,27 +20,6 @@ const BAR_HEIGHT = 0.08;
 const BAR_Y_OFFSET = 1.35;
 const FILL_Z_OFFSET = 0.001; // keep fill in front of track, avoid z-fighting
 
-// ---------- Shared resources (built once, reused across every bar) ----------
-
-const trackGeometry = new THREE.PlaneGeometry(BAR_WIDTH, BAR_HEIGHT);
-const fillGeometry = new THREE.PlaneGeometry(BAR_WIDTH, BAR_HEIGHT);
-// Pivot at the fill's own left edge so scaling scale.x grows it rightward
-// from a fixed left edge instead of from center.
-fillGeometry.translate(BAR_WIDTH / 2, 0, 0);
-
-const trackMaterial = new THREE.MeshBasicMaterial({
-  color: TRACK_COLOR,
-  transparent: true,
-  opacity: 0.85,
-  depthWrite: false,
-});
-const fillMaterial = new THREE.MeshBasicMaterial({
-  color: FILL_COLOR,
-  transparent: true,
-  opacity: 0.95,
-  depthWrite: false,
-});
-
 interface Bar {
   group: THREE.Group;
   fillMesh: THREE.Mesh;
@@ -53,9 +32,34 @@ export class TaskProgressBar {
   private readonly camera: THREE.Camera;
   private readonly bars = new Map<number, Bar>();
 
+  // ---------- Shared resources (built once per instance, reused across every bar) ----------
+  private readonly trackGeometry: THREE.PlaneGeometry;
+  private readonly fillGeometry: THREE.PlaneGeometry;
+  private readonly trackMaterial: THREE.MeshBasicMaterial;
+  private readonly fillMaterial: THREE.MeshBasicMaterial;
+
   constructor(scene: THREE.Scene, camera: THREE.Camera) {
     this.scene = scene;
     this.camera = camera;
+
+    this.trackGeometry = new THREE.PlaneGeometry(BAR_WIDTH, BAR_HEIGHT);
+    this.fillGeometry = new THREE.PlaneGeometry(BAR_WIDTH, BAR_HEIGHT);
+    // Pivot at the fill's own left edge so scaling scale.x grows it rightward
+    // from a fixed left edge instead of from center.
+    this.fillGeometry.translate(BAR_WIDTH / 2, 0, 0);
+
+    this.trackMaterial = new THREE.MeshBasicMaterial({
+      color: TRACK_COLOR,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    });
+    this.fillMaterial = new THREE.MeshBasicMaterial({
+      color: FILL_COLOR,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+    });
   }
 
   /** Number of progress bars currently rendered. */
@@ -128,10 +132,10 @@ export class TaskProgressBar {
 
   dispose(): void {
     this.clearAll();
-    trackGeometry.dispose();
-    fillGeometry.dispose();
-    trackMaterial.dispose();
-    fillMaterial.dispose();
+    this.trackGeometry.dispose();
+    this.fillGeometry.dispose();
+    this.trackMaterial.dispose();
+    this.fillMaterial.dispose();
   }
 
   // ---------- Helpers ----------
@@ -144,10 +148,10 @@ export class TaskProgressBar {
     // whatever parent it already has), so this is only ever a transient home.
     this.scene.add(group);
 
-    const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+    const trackMesh = new THREE.Mesh(this.trackGeometry, this.trackMaterial);
     group.add(trackMesh);
 
-    const fillMesh = new THREE.Mesh(fillGeometry, fillMaterial);
+    const fillMesh = new THREE.Mesh(this.fillGeometry, this.fillMaterial);
     fillMesh.position.set(-BAR_WIDTH / 2, 0, FILL_Z_OFFSET);
     fillMesh.scale.x = 0;
     group.add(fillMesh);
