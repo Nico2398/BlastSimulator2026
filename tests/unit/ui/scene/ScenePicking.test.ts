@@ -27,14 +27,28 @@ function makeTopDownCamera(x: number, z: number, y = 30): THREE.PerspectiveCamer
 function makeFakeRenderer(opts: {
   pickables?: THREE.Object3D[];
   terrainMeshes?: THREE.Mesh[];
+  landscapeMeshes?: THREE.Mesh[];
   fragments?: FragmentMesh;
 }): GameRenderer {
   return {
     pickables: () => opts.pickables ?? [],
     terrain: opts.terrainMeshes ? { meshes: opts.terrainMeshes } : null,
+    // Mirrors GameRenderer's public `landscape` field (#558) — pickScene must
+    // fall back to it so ground past the site's claimed edge can be aimed at.
+    landscape: opts.landscapeMeshes ? { meshes: opts.landscapeMeshes } : null,
     resolveFragmentId: (bucketIndex: number, instanceId: number) =>
       opts.fragments?.fragmentIdAt(bucketIndex, instanceId) ?? null,
   } as unknown as GameRenderer;
+}
+
+/** A flat, featureless landscape quad at world height `y`, standing in for LandscapeMesh's real tile geometry. */
+function makeFlatLandscapeMesh(y = 0, size = 40): THREE.Mesh {
+  const geometry = new THREE.PlaneGeometry(size, size);
+  geometry.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+  mesh.position.set(0, y, 0);
+  mesh.updateMatrixWorld();
+  return mesh;
 }
 
 function makeSolidTerrain(sizeX = 8, sizeY = 4, sizeZ = 8): TerrainMesh {
@@ -157,6 +171,45 @@ describe('pickScene', () => {
     expect(result.terrain).toEqual(expect.objectContaining({ tileX: 5, tileZ: 5 }));
     bm.dispose();
     tm.dispose();
+  });
+
+  // ── #558: landscape past the site's claimed edge joins the raycast ──────
+
+  it('resolves a terrain pick against a landscape mesh when no terrain mesh is present', () => {
+    const landscape = makeFlatLandscapeMesh();
+    const camera = makeTopDownCamera(3.7, 2.2);
+    const renderer = makeFakeRenderer({ landscapeMeshes: [landscape] });
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 3, tileZ: 2 }));
+  });
+
+  it('falls back to the landscape mesh when a terrain mesh is present but the ray misses it', () => {
+    const tm = makeSolidTerrain(8, 4, 8); // solid terrain only spans x,z in [0,8)
+    const landscape = makeFlatLandscapeMesh(0, 200); // far past the terrain's own footprint
+    // Aim well outside the terrain mesh's footprint, onto the landscape only.
+    const camera = makeTopDownCamera(50.5, 40.5);
+    const renderer = makeFakeRenderer({ terrainMeshes: tm.meshes, landscapeMeshes: [landscape] });
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toBeNull();
+    expect(result.terrain).toEqual(expect.objectContaining({ tileX: 50, tileZ: 40 }));
+    tm.dispose();
+  });
+
+  it('depth decides between an entity and the landscape the same way it does for terrain — not mesh kind', () => {
+    const landscape = makeFlatLandscapeMesh(0, 200);
+    const scene = new THREE.Scene();
+    const bm = new BuildingMesh(scene);
+    bm.addBuilding({ id: 1, type: 'management_office', tier: 1, x: 50, z: 50, hp: 100, active: true }, 4); // sits above the landscape
+    scene.updateMatrixWorld(true);
+    const camera = makeTopDownCamera(51.3, 51.3, 60);
+    const renderer = makeFakeRenderer({ pickables: bm.pickables(), landscapeMeshes: [landscape] });
+
+    const result = pickScene(0, 0, camera, renderer);
+    expect(result.entity).toEqual(expect.objectContaining({ kind: 'building', id: 1 }));
+    bm.dispose();
   });
 });
 

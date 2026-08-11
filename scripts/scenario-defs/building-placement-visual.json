@@ -3,18 +3,19 @@
   "description": "Visual check of building placement at different grid positions with list inspection after each",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:150000",
+      "description": "#558: cash bumped from the default 50000 so the file's new final step (a building on ground well outside the site) is affordable on top of the four already here -- every other cash check below is shifted by the same +100000.",
       "timeout": 10,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:150000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 150000,
           "buildingCount": 0
         }
       }
@@ -50,7 +51,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 40000,
+          "cash": 140000,
           "buildingCount": 1
         }
       }
@@ -92,7 +93,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 25000,
+          "cash": 125000,
           "buildingCount": 2
         }
       }
@@ -134,7 +135,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 13000,
+          "cash": 113000,
           "buildingCount": 3
         }
       }
@@ -176,9 +177,53 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 5000,
+          "cash": 105000,
           "buildingCount": 4
         }
+      }
+    },
+    {
+      "command": "build list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "build list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "build management_office at:90,20",
+      "description": "#558: targets ground well outside the default 64x64 site (chunk (5,20/16=1)... chunk index for x=90 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 90,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 97000,
+          "buildingCount": 5
+        },
+        "increased": ["worldSizeX"]
       }
     },
     {

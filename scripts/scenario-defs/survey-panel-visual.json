@@ -42,6 +42,45 @@
           "cash": 48800
         }
       }
+    },
+    {
+      "command": "survey seismic x:40 z:10",
+      "description": "#558: targets ground outside the 24x24 site this scenario started with (chunk (2,0) at x:32-47 does not touch the site's own chunks (0,0)/(1,0)) -- a real click through PICK TARGET IN SCENE, proving both that the picker can raycast past the claimed edge (fence 1) and that the site actually grows to cover it.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 40,
+          "z": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": ["worldSizeX"],
+        "decreased": ["cash"]
+      }
     }
   ]
 }

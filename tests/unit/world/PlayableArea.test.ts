@@ -1,9 +1,11 @@
-// PlayableArea — the site's claimed-chunk set and the claim/refuse contract (#473 D3/D5/D6)
+// PlayableArea — the site's claimed-chunk set and the claim/refuse contract (#473 D3/D5/D6, #558)
 
 import { describe, it, expect } from 'vitest';
 import { PlayableArea } from '../../../src/core/world/PlayableArea.js';
 import { generateTerrain, type TerrainConfig } from '../../../src/core/world/TerrainGen.js';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, CHUNK_SIZE } from '../../../src/core/world/VoxelGrid.js';
+import { MAX_CLAIM_BRIDGE_CHUNKS } from '../../../src/core/config/balance.js';
+import type { ProtectedStructures } from '../../../src/core/world/Structures.js';
 
 const CONFIG: TerrainConfig = {
   sizeX: 32, sizeY: 24, sizeZ: 32,
@@ -168,5 +170,162 @@ describe('PlayableArea — protected structures (#473 D6)', () => {
     for (const entry of area.protectedFrontier()) {
       expect(entry).not.toEqual(expect.objectContaining({ cx: 2, cz: 0 }));
     }
+  });
+});
+
+// ── #558: claimArea (whole-footprint + bridging) and previewClaim ────────────
+
+const EMPTY_STRUCTURES: ProtectedStructures = { rivers: [], villages: [], landmarks: [] };
+
+/** A protected-structure set with one village pad centred on chunk (cx, cz), small enough not to reach any neighbouring chunk. */
+function structuresProtectingChunk(cx: number, cz: number): ProtectedStructures {
+  const rect = PlayableArea.chunkRect(cx, cz);
+  return {
+    ...EMPTY_STRUCTURES,
+    villages: [{
+      x: (rect.minX + rect.maxX) / 2,
+      z: (rect.minZ + rect.maxZ) / 2,
+      radius: 5,
+      houses: [],
+    }],
+  };
+}
+
+describe('PlayableArea.claimArea', () => {
+  it('claims every chunk a multi-cell footprint spans, not just the first cell\'s', () => {
+    const { grid, area } = makeArea();
+    // (34, 10) -> chunk (2, 0), directly east of the site; (10, 34) -> chunk
+    // (0, 2), directly south of it. Both are single-hop adjacent, so this
+    // isolates "one call claims every target chunk" from bridging.
+    const result = area.claimArea([{ x: 34, z: 10 }, { x: 10, z: 34 }]);
+
+    expect(result.claimed).toBe(true);
+    expect(result.claimed && result.expanded).toBe(true);
+    expect(grid.hasChunk(2, 0)).toBe(true);
+    expect(grid.hasChunk(0, 2)).toBe(true);
+    expect(result.claimed && result.chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ cx: 2, cz: 0 }),
+      expect.objectContaining({ cx: 0, cz: 2 }),
+    ]));
+  });
+
+  it('reports no expansion and mutates nothing when every target chunk is already owned', () => {
+    const { grid, area } = makeArea();
+    const before = grid.chunkCount;
+
+    const result = area.claimArea([{ x: 5, z: 5 }, { x: 20, z: 20 }]);
+
+    expect(result.claimed).toBe(true);
+    expect(result.claimed && result.expanded).toBe(false);
+    expect(result.claimed && result.rect).toBeNull();
+    expect(grid.chunkCount).toBe(before);
+  });
+
+  it('bridges a target chunk that does not touch the site, claiming the intermediate chunk too', () => {
+    const { grid, area } = makeArea();
+    // (50, 10) -> chunk (3, 0). The site only owns chunks (0,0)/(1,0) in this
+    // row, and chunk (2, 0) sits between them — a single-cell footprint here
+    // cannot exist without that chunk also becoming part of the site.
+    const result = area.claimArea([{ x: 50, z: 10 }]);
+
+    expect(result.claimed).toBe(true);
+    expect(grid.hasChunk(2, 0)).toBe(true); // the bridge
+    expect(grid.hasChunk(3, 0)).toBe(true); // the target
+    expect(result.claimed && result.chunks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ cx: 2, cz: 0 }),
+      expect.objectContaining({ cx: 3, cz: 0 }),
+    ]));
+  });
+
+  it('bridges up to MAX_CLAIM_BRIDGE_CHUNKS intermediate chunks, and refuses one chunk further as too_far', () => {
+    // Nearest owned chunk in this row is cx=1 (site is 2x2 chunks, cx 0..1).
+    // A target MAX_CLAIM_BRIDGE_CHUNKS+1 chunks east of it needs exactly
+    // MAX_CLAIM_BRIDGE_CHUNKS intermediate chunks bridged (cx=2..cx=MAX+1),
+    // and the target chunk itself (cx=MAX+2) is the destination, not a bridge
+    // chunk — this is the boundary the constant's own doc comment describes.
+    {
+      const { grid, area } = makeArea();
+      const targetCx = 1 + MAX_CLAIM_BRIDGE_CHUNKS + 1;
+      const result = area.claimArea([{ x: targetCx * CHUNK_SIZE, z: 10 }]);
+      expect(result.claimed).toBe(true);
+      expect(grid.hasChunk(targetCx, 0)).toBe(true);
+    }
+    {
+      const { grid, area } = makeArea();
+      const before = grid.chunkCount;
+      const targetCx = 1 + MAX_CLAIM_BRIDGE_CHUNKS + 2;
+      const result = area.claimArea([{ x: targetCx * CHUNK_SIZE, z: 10 }]);
+      expect(result.claimed).toBe(false);
+      expect(!result.claimed && result.reason).toBe('too_far');
+      expect(grid.chunkCount).toBe(before);
+      expect(grid.hasChunk(targetCx, 0)).toBe(false);
+    }
+  });
+
+  it('refuses the whole action when any required chunk touches a protected structure, mutating nothing', () => {
+    const { grid, area } = makeArea();
+    // Chunk (2, 0) — the first cell below — is directly claimable on its own.
+    // Chunk (3, 0) needs (2, 0) as a bridge and is itself protected. Iteration
+    // order processes the claimable cell first; the whole action must still
+    // be refused, and chunk (2, 0) must NOT be left claimed as a side effect.
+    area.adoptStructures(structuresProtectingChunk(3, 0));
+    const before = grid.chunkCount;
+
+    const result = area.claimArea([{ x: 34, z: 10 }, { x: 50, z: 10 }]);
+
+    expect(result.claimed).toBe(false);
+    expect(!result.claimed && result.reason).toBe('protected_structure');
+    expect(grid.chunkCount).toBe(before);
+    expect(grid.hasChunk(2, 0)).toBe(false);
+    expect(grid.hasChunk(3, 0)).toBe(false);
+  });
+
+  it('refuses every footprint with expansion_disabled when expansion is off, mutating nothing', () => {
+    const config = { ...CONFIG };
+    const grid = generateTerrain(config);
+    const area = new PlayableArea(grid, config, { expansionEnabled: false });
+    const before = grid.chunkCount;
+
+    const result = area.claimArea([{ x: 34, z: 10 }]);
+
+    expect(result.claimed).toBe(false);
+    expect(!result.claimed && result.reason).toBe('expansion_disabled');
+    expect(grid.chunkCount).toBe(before);
+  });
+});
+
+describe('PlayableArea.previewClaim', () => {
+  it('returns null for a coordinate already inside the site', () => {
+    const { area } = makeArea();
+    expect(area.previewClaim(10, 10)).toBeNull();
+  });
+
+  it('returns null for ordinary claimable ground, without claiming it', () => {
+    const { grid, area } = makeArea();
+    const before = grid.chunkCount;
+    expect(area.previewClaim(34, 10)).toBeNull();
+    expect(grid.chunkCount).toBe(before);
+    expect(grid.containsColumn(34, 10)).toBe(false);
+  });
+
+  it('returns protected_structure for ground a protected structure touches, without mutating the site', () => {
+    const { grid, area } = makeArea();
+    area.adoptStructures(structuresProtectingChunk(2, 0));
+    const before = grid.chunkCount;
+
+    expect(area.previewClaim(34, 10)).toBe('protected_structure');
+
+    expect(grid.chunkCount).toBe(before);
+    expect(grid.hasChunk(2, 0)).toBe(false);
+  });
+
+  it('returns expansion_disabled when expansion is off, without mutating the site', () => {
+    const config = { ...CONFIG };
+    const grid = generateTerrain(config);
+    const area = new PlayableArea(grid, config, { expansionEnabled: false });
+    const before = grid.chunkCount;
+
+    expect(area.previewClaim(34, 10)).toBe('expansion_disabled');
+    expect(grid.chunkCount).toBe(before);
   });
 });

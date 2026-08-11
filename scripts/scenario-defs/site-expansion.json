@@ -43,11 +43,31 @@
     },
     {
       "command": "drill_plan add x:34 z:10 depth:6",
-      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
+      "description": "Was left as a bare command (role bootstrap) because whether the 3D tile picker could raycast ground still outside the site was unverified. #558 fixes exactly that -- landscape meshes now join pickScene's raycast past the claimed edge -- so this is a real click through the Drill step's point-placement tool, exercising the fix directly.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan add x:34 z:10 depth:6"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 34,
+          "z": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "expect": {
@@ -57,15 +77,31 @@
           "holeCount": 1
         }
       },
-      "role": "bootstrap"
+      "role": "player"
     },
     {
       "command": "drill_plan add x:-4 z:10 depth:6",
-      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
+      "description": "Was left as a bare command (role bootstrap) for the same reason as the step above -- converted now that #558 lets the picker raycast past the (still-expanding) site edge.",
       "interaction": [
         {
-          "type": "command",
-          "command": "drill_plan add x:-4 z:10 depth:6"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": -4,
+          "z": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "expect": {
@@ -75,7 +111,7 @@
           "holeCount": 2
         }
       },
-      "role": "bootstrap"
+      "role": "player"
     },
     {
       "command": "terrain_info",
@@ -107,12 +143,34 @@
     },
     {
       "command": "build_ramp origin:30,20 direction:east length:8 depth:6",
-      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
+      "description": "Was left as a bare command (role bootstrap) for the same raycast-past-the-edge reason as the drill steps above; converted now that #558 lets the picker raycast the landscape past the site.",
       "timeout": 15,
       "interaction": [
         {
-          "type": "command",
-          "command": "build_ramp origin:30,20 direction:east length:8 depth:6"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel .bs-build-ramp-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 30,
+          "z1": 20,
+          "x2": 38,
+          "z2": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "expect": {
@@ -121,15 +179,31 @@
           "buildingCount": 0
         }
       },
-      "role": "bootstrap"
+      "role": "player"
     },
     {
       "command": "build management_office at:34,4",
-      "description": "Left unmarked: this coordinate sits outside the site's original bounds, and the scenario's whole point is that placing here triggers auto-expansion (terrain_info's Site line grows 32x32x32 -> 64x32x32). Whether the 3D tile picker can raycast a still-unexpanded region reliably enough for pickTile to land is unverified and risky to guess at -- left as a command rather than gambling a batch run on an edge case none of the other 67 converted files needed.",
+      "description": "Was left as a bare command (role bootstrap) for the same raycast-past-the-edge reason as the steps above; converted now that #558 lets the picker raycast the landscape past the site.",
       "interaction": [
         {
-          "type": "command",
-          "command": "build management_office at:34,4"
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 34,
+          "z": 4
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
       "expect": {
@@ -138,7 +212,7 @@
           "buildingCount": 1
         }
       },
-      "role": "bootstrap"
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -271,6 +345,40 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "drill_plan add x:140 z:10 depth:6",
+      "description": "#558 fence 3: a single-cell footprint with no connecting path of its own, well past the site's current frontier (chunk (2,0) is the nearest owned ground; chunk (8,0) is the target -- five intermediate chunks apart). Where the earlier drill/ramp/building steps in this file each landed on ground directly adjacent to the site (fence 1's raycast fix was the only thing standing between them and a real click), this one requires claimArea to bridge the gap itself (fence 3), well under MAX_CLAIM_BRIDGE_CHUNKS.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 140,
+          "z": 10
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": ["holeCount", "worldSizeX"]
+      }
     }
   ],
   "shots": [
