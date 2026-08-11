@@ -280,6 +280,78 @@ describe('tickArrivalGate — dead employees are skipped entirely', () => {
   });
 });
 
+describe('tickArrivalGate — PendingAction status promotion on arrival (#547)', () => {
+  it('promotes the matching pendingActions entry to "in_progress" on rest arrival', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 8, targetZ: 8, targetY: 0, payload: { needKey: 'fatigue' },
+      targetEmployeeId: employee.id, status: 'assigned', assignedEmployeeId: employee.id,
+    });
+
+    employee.x = 8;
+    employee.z = 8;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingRestDuration = 6;
+    employee.pendingRestNeedKey = 'fatigue';
+
+    tickArrivalGate(state);
+
+    const action = state.pendingActions.find(a => a.id === actionId)!;
+    expect(action.status).toBe('in_progress');
+  });
+
+  it('promotes the matching pendingActions entry to "in_progress" on task arrival', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng);
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    state.pendingActions.push({
+      id: actionId, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null,
+      targetX: 16, targetZ: 16, targetY: 0, payload: { method: 'core_sample' },
+      targetEmployeeId: employee.id, status: 'assigned', assignedEmployeeId: employee.id,
+    });
+
+    employee.x = 16;
+    employee.z = 16;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingTaskDuration = 4;
+    employee.pendingActionType = 'survey';
+    employee.pendingActionPayload = { method: 'core_sample', centerX: 16, centerZ: 16 };
+
+    tickArrivalGate(state);
+
+    const action = state.pendingActions.find(a => a.id === actionId)!;
+    expect(action.status).toBe('in_progress');
+  });
+
+  it('is a no-op — no throw, no mutation — when activeActionId matches no live pendingActions entry', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    // activeActionId refers to nothing currently in state.pendingActions —
+    // e.g. an action already completed and removed on a prior tick.
+    employee.activeActionId = 999;
+    employee.x = 8;
+    employee.z = 8;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingRestDuration = 6;
+    employee.pendingRestNeedKey = 'fatigue';
+
+    expect(() => tickArrivalGate(state)).not.toThrow();
+    expect(state.pendingActions).toHaveLength(0);
+    expect(employee.restTicksRemaining).toBe(6);
+  });
+});
+
 describe('tickArrivalGate — combined multi-employee tick', () => {
   it('processes rest, task, and boarding promotions for different employees in the same tick', () => {
     const state = createGame({ seed: SEED });

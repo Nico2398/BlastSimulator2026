@@ -63,6 +63,115 @@ describe('deserialize — v4→v5 migration for collectedOre (task 5.18)', () =>
   });
 });
 
+// ── v7 → v8 migration for PendingAction lifecycle fields (#547) ────────────
+describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)', () => {
+  /** A minimal, valid v7 save — every field GameState requires as of v7, with no `status`/`assignedEmployeeId`/`claimed`. */
+  function v7Save(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      version: 7,
+      seed: 42,
+      time: 0,
+      tickCount: 0,
+      timeScale: 1,
+      isPaused: false,
+      mineType: 'desert',
+      world: null,
+      surveyedPositions: [],
+      surveyResults: [],
+      nextSurveyId: 1,
+      cash: 10000,
+      drillHoles: [],
+      chargesByHole: {},
+      sequenceDelays: {},
+      savedPlans: {},
+      finances: { cash: 10000, revenue: 0, expenses: 0, transactions: [], isBankrupt: false, bankruptcyGraceTicks: 0 },
+      contracts: { available: [], active: [], completedHistory: [], nextId: 1, lastRefreshTick: 0 },
+      logistics: { fragments: [], storageCapacityKg: 5000, storedMassKg: 0 },
+      collectedOre: {},
+      buildings: { buildings: [] },
+      vehicles: { vehicles: [] },
+      employees: { employees: [] },
+      scores: { ecology: 50, safety: 50, nuisance: 0, wellBeing: 50, blastCount: 0 },
+      damage: { deathCount: 0, injuryCount: 0, blastCount: 0, damageEvents: [], deathEvents: [] },
+      zone: { zones: [] },
+      events: { firedEventIds: [], timers: {}, pendingQueue: [], followUpQueue: [] },
+      corruption: { exposure: 0, bribes: [], mafiaUnlocked: false, exposureHistory: [] },
+      mafia: { exposure: 0, smugglingActive: false, frames: [] },
+      campaign: { unlockedLevels: ['level1'], levelResults: {}, selectedLevel: 'level1' },
+      bankruptcy: { missedPayments: 0, graceTicksRemaining: 0, warningGiven: false },
+      arrest: { investigationPoints: 0, exposureLevel: 0, warningGiven: false },
+      ecological: { damageEvents: [], shutdownTicksRemaining: 0, warningGiven: false },
+      revolt: { unrestLevel: 0, revoltTicksRemaining: 0, warningGiven: false },
+      levelStats: { totalWealth: 0, maxDepthReached: 0, uniqueOresExtracted: [], totalVolumeBlasted: 0, blastsPerformed: 0, casualties: 0, bestEcology: 50, bestSafety: 50 },
+      sitePolicy: { shiftDuration: 'shift_8h', restThreshold: 40, hungerRest: 40, fatigueRest: 25, socialBreak: 20 },
+      levelEnded: false,
+      levelEndReason: null,
+      pendingActions: [],
+      nextPendingActionId: 1,
+      ghostPreviews: [],
+      softwareTier: 0,
+      tubingState: { inventory: 0, installedHoles: [] },
+      ...overrides,
+    });
+  }
+
+  it('a pending action with no `status` field defaults to status: "queued", assignedEmployeeId: null', () => {
+    const save = v7Save({
+      pendingActions: [
+        { id: 1, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 5, targetZ: 5, targetY: 0, payload: {}, targetEmployeeId: null },
+      ],
+    });
+    const restored = deserialize(save);
+    expect(restored.pendingActions).toHaveLength(1);
+    expect(restored.pendingActions[0]!.status).toBe('queued');
+    expect(restored.pendingActions[0]!.assignedEmployeeId).toBeNull();
+  });
+
+  it('a ghost preview with no `claimed` field defaults to false', () => {
+    const save = v7Save({
+      ghostPreviews: [{ id: 1, type: 'survey', targetX: 5, targetZ: 5, targetY: 0 }],
+    });
+    const restored = deserialize(save);
+    expect(restored.ghostPreviews).toHaveLength(1);
+    expect(restored.ghostPreviews[0]!.claimed).toBe(false);
+  });
+
+  it('re-links a migrated action to "assigned" when an employee\'s activeActionId matches it', () => {
+    const save = v7Save({
+      pendingActions: [
+        { id: 5, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 5, targetZ: 5, targetY: 0, payload: {}, targetEmployeeId: null },
+      ],
+      employees: {
+        employees: [
+          { id: 3, name: 'Rex Digby', role: 'surveyor', salary: 400, morale: 60, unionized: false, injured: false, alive: true, x: 5, z: 5, qualifications: [], trainingState: null, activeActionId: 5, hunger: 100, fatigue: 100, breakNeed: 100, collapsing: false, interruptedActionPayload: null },
+        ],
+      },
+    });
+    const restored = deserialize(save);
+    const action = restored.pendingActions.find(a => a.id === 5)!;
+    expect(action.status).toBe('assigned');
+    expect(action.assignedEmployeeId).toBe(3);
+  });
+
+  it('leaves a migrated action "queued" when no employee\'s activeActionId matches it, and the state still loads without throwing', () => {
+    const save = v7Save({
+      pendingActions: [
+        { id: 9, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 5, targetZ: 5, targetY: 0, payload: {}, targetEmployeeId: null },
+      ],
+      employees: {
+        employees: [
+          { id: 3, name: 'Rex Digby', role: 'surveyor', salary: 400, morale: 60, unionized: false, injured: false, alive: true, x: 5, z: 5, qualifications: [], trainingState: null, activeActionId: null, hunger: 100, fatigue: 100, breakNeed: 100, collapsing: false, interruptedActionPayload: null },
+        ],
+      },
+    });
+    expect(() => deserialize(save)).not.toThrow();
+    const restored = deserialize(save);
+    const action = restored.pendingActions.find(a => a.id === 9)!;
+    expect(action.status).toBe('queued');
+    expect(action.assignedEmployeeId).toBeNull();
+  });
+});
+
 describe('serialize / deserialize', () => {
   it('round-trip produces an equivalent state', () => {
     const state = createGame({ seed: 42 });

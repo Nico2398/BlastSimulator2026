@@ -772,6 +772,28 @@ describe('SurveyCalc — runSurvey (4.6)', () => {
     expect(preview.type).toBe('survey');
     expect(preview.id).toBe(state.pendingActions[0]!.id);
   });
+
+  // ── #547: lifecycle default fields ──────────────────────────────────────────
+
+  it('pushed PendingAction has status "queued" and assignedEmployeeId null (#547)', () => {
+    const state = makeState(SURVEY_COSTS.seismic + 5000);
+    addGeologySurveyor(state);
+
+    runSurvey(state, BASE_PARAMS);
+
+    const action = state.pendingActions[0]!;
+    expect(action.status).toBe('queued');
+    expect(action.assignedEmployeeId).toBeNull();
+  });
+
+  it('pushed GhostPreview has claimed: false (#547)', () => {
+    const state = makeState(SURVEY_COSTS.seismic + 5000);
+    addGeologySurveyor(state);
+
+    runSurvey(state, BASE_PARAMS);
+
+    expect(state.ghostPreviews[0]!.claimed).toBe(false);
+  });
 });
 
 // ── 4.7: computeBlastOreReport ───────────────────────────────────────────────

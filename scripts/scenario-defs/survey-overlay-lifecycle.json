@@ -262,14 +262,52 @@
       "role": "observe"
     },
     {
-      "command": "tick 40",
+      "command": "tick 1",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 40"
+          "command": "tick 1"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "description": "#547 regression: both round-1 survey actions are claimed on this very first tick (2 idle geology-qualified surveyors, both open targetEmployeeId:null), long before either survey's walk+duration can complete. Proves a claimed action stays in pendingActions instead of being spliced out the instant an idle employee picks it up.",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 2
+        },
+        "note": "both round-1 actions claimed this tick but still present -- FAILS pre-#547, where tickEmployees spliced a claimed action out of pendingActions immediately, dropping this to 0 the instant an idle employee picked it up."
+      }
+    },
+    {
+      "command": "tick 36",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 36"
+        }
+      ],
+      "role": "setup",
+      "description": "#547 regression: the core_sample survey (shorter walk + 4-tick duration) completes within this window; its PendingAction and ghost must be removed on completion, dropping pendingActionCount by one.",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        },
+        "decreased": [
+          "pendingActionCount"
+        ],
+        "note": "core_sample survey (round 1) lands here -- pendingActionCount must decrease as its record is completed and removed, not stay flat because it was already gone at claim time (pre-#547)."
+      }
+    },
+    {
+      "command": "tick 3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 3"
+        }
+      ],
+      "role": "setup",
+      "description": "Realigns the cumulative tick count with the original schedule (1+36+3 = 40) before the existing event/tick padding below."
     },
     {
       "command": "event choose 0",

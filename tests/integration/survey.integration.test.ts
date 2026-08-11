@@ -285,6 +285,48 @@ describe('Survey system', () => {
     expect(ctx.state!.surveyResults[0]!.method).toBe('seismic');
   });
 
+  // ── 6d. #547: the survey record and its ghost survive the whole walk ─────
+
+  it('#547: survey record + ghost survive the walk — status progresses assigned→in_progress, ghost stays claimed, until actual completion', () => {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    const [empSpawnX, empSpawnZ] = [emp.x, emp.z];
+
+    surveyCommand(ctx as any, ['seismic'], { x: '2', z: '2' });
+    const actionId = ctx.state!.pendingActions.find(a => a.type === 'survey')!.id;
+
+    // Immediately after dispatch — still queued and unclaimed.
+    expect(ctx.state!.pendingActions.find(a => a.id === actionId)!.status).toBe('queued');
+    expect(ctx.state!.ghostPreviews.find(g => g.id === actionId)!.claimed).toBe(false);
+
+    // Claimed on the very first tick — only one qualified idle employee exists.
+    tickCommand(ctx, ['1'], {});
+    const claimedAction = ctx.state!.pendingActions.find(a => a.id === actionId);
+    expect(claimedAction).toBeDefined();
+    expect(claimedAction!.status).toBe('assigned');
+    expect(claimedAction!.assignedEmployeeId).toBe(empId);
+    const claimedGhost = ctx.state!.ghostPreviews.find(g => g.id === actionId);
+    expect(claimedGhost).toBeDefined();
+    expect(claimedGhost!.claimed).toBe(true);
+
+    // Mid-flight: still walking (not yet arrived) — record must still exist.
+    const travelTicks = Math.ceil(Math.hypot(empSpawnX - 2, empSpawnZ - 2) / AGENT_WALK_SPEED);
+    for (let i = 0; i < Math.max(1, travelTicks - 2); i++) tickCommand(ctx, ['1'], {});
+    const midFlight = ctx.state!.pendingActions.find(a => a.id === actionId);
+    expect(midFlight).toBeDefined();
+    expect(['assigned', 'in_progress']).toContain(midFlight!.status);
+    expect(ctx.state!.ghostPreviews.find(g => g.id === actionId)!.claimed).toBe(true);
+
+    // Finish the walk and the full survey duration, with slack.
+    for (let i = 0; i < 5 + SURVEY_DURATION_TICKS.seismic + 10; i++) tickCommand(ctx, ['1'], {});
+
+    // Resolved: both the PendingAction and its ghost are gone.
+    expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+    expect(ctx.state!.ghostPreviews.find(g => g.id === actionId)).toBeUndefined();
+    expect(ctx.state!.surveyResults).toHaveLength(1);
+  });
+
   it('surveyCommand rejects and queues nothing when no qualified surveyor is available', () => {
     // No employee hired — runSurvey requires a qualified surveyor at queue time.
     const result = surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });

@@ -434,4 +434,49 @@ describe('decideClock', () => {
     });
     expect(arrived.hold).toBe(true);
   });
+
+  // -- #547: a PendingAction now lives through claim/walk/work instead of
+  // being deleted the instant it's claimed. isWorkInProgress/workSignature
+  // only check `state.pendingActions.length` and per-employee fields — never
+  // a PendingAction's `status` — so this clock-hold behavior must stay
+  // unchanged despite the record living longer: still holds while the survey
+  // is 'queued'/'assigned'/'in_progress', and releases only once the record
+  // is actually removed (on completion), not merely claimed.
+  describe('a single outstanding survey through its full #547 lifecycle', () => {
+    function surveyAction(status: 'queued' | 'assigned' | 'in_progress'): GameState['pendingActions'][number] {
+      return {
+        id: 1, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null,
+        targetX: 5, targetZ: 5, targetY: 0, payload: {}, targetEmployeeId: null,
+        status, assignedEmployeeId: status === 'queued' ? null : 7,
+      } as GameState['pendingActions'][number];
+    }
+
+    it('holds past budget while the survey is still "queued" (unclaimed)', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.pendingActions = [surveyAction('queued')];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+    });
+
+    it('holds past budget while the survey is "assigned" (claimed, still walking)', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.pendingActions = [surveyAction('assigned')];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+    });
+
+    it('holds past budget while the survey is "in_progress" (arrived, working)', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.pendingActions = [surveyAction('in_progress')];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+    });
+
+    it('releases only once the record is actually removed (completion), not merely claimed', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.pendingActions = []; // completePendingAction already removed it
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
+    });
+  });
 });

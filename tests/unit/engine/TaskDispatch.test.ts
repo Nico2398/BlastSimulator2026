@@ -376,3 +376,207 @@ describe('dispatchPendingAction — all SkillCategory values are routable', () =
     });
   }
 });
+
+// ── Section 5: PendingAction lifecycle (#547) ────────────────────────────────
+//   A claimed action is no longer deleted the instant it's claimed. Instead it
+//   carries a PendingActionStatus ('queued' | 'assigned' | 'in_progress') and
+//   an assignedEmployeeId, transitioned by claimPendingAction/
+//   startPendingAction, and only removed by completePendingAction.
+
+import {
+  claimPendingAction,
+  startPendingAction,
+  completePendingAction,
+} from '../../../src/core/engine/TaskDispatch.js';
+import type { GhostPreview } from '../../../src/core/state/GameState.js';
+
+/** Build a fully-shaped PendingAction, bypassing dispatchPendingAction so tests control every lifecycle field precisely. */
+function makeFullPendingAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+  return {
+    type: 'survey',
+    requiredSkill: 'geology',
+    requiredVehicleRole: null,
+    targetX: 10,
+    targetZ: 20,
+    targetY: 0,
+    payload: {},
+    targetEmployeeId: null,
+    status: 'queued',
+    assignedEmployeeId: null,
+    ...overrides,
+  };
+}
+
+function makeGhost(overrides: Partial<GhostPreview> & { id: number }): GhostPreview {
+  return {
+    type: 'survey',
+    targetX: 10,
+    targetZ: 20,
+    targetY: 0,
+    claimed: false,
+    ...overrides,
+  };
+}
+
+describe('dispatchPendingAction — pushes lifecycle defaults (#547)', () => {
+  it('pushed action has status "queued" and assignedEmployeeId null', () => {
+    const state = makeGame();
+    addQualifiedEmployee(state, 'geology', SEED);
+
+    const action = makePendingAction({ id: 1, requiredSkill: 'geology' });
+    dispatchPendingAction(state, action);
+
+    const stored = state.pendingActions[0]!;
+    expect(stored.status).toBe('queued');
+    expect(stored.assignedEmployeeId).toBeNull();
+  });
+
+  it('pushed ghost preview has claimed: false', () => {
+    const state = makeGame();
+    addQualifiedEmployee(state, 'geology', SEED);
+
+    const action = makePendingAction({ id: 1, requiredSkill: 'geology' });
+    dispatchPendingAction(state, action);
+
+    expect(state.ghostPreviews[0]!.claimed).toBe(false);
+  });
+});
+
+describe('claimPendingAction (#547)', () => {
+  it('transitions a queued action to "assigned" and sets assignedEmployeeId, without removing it', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1 }));
+
+    const claimed = claimPendingAction(state, 1, 42);
+
+    expect(claimed).not.toBeNull();
+    expect(claimed!.status).toBe('assigned');
+    expect(claimed!.assignedEmployeeId).toBe(42);
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(state.pendingActions[0]!.assignedEmployeeId).toBe(42);
+  });
+
+  it('marks the matching ghost preview claimed: true', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1 }));
+    state.ghostPreviews.push(makeGhost({ id: 1 }));
+
+    claimPendingAction(state, 1, 42);
+
+    expect(state.ghostPreviews).toHaveLength(1);
+    expect(state.ghostPreviews[0]!.claimed).toBe(true);
+  });
+
+  it('does not throw when no matching ghost preview exists — the action is still claimed', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1 }));
+    // No ghost pushed.
+
+    expect(() => claimPendingAction(state, 1, 42)).not.toThrow();
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+  });
+
+  it('returns null and mutates nothing for an unknown actionId', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1 }));
+
+    const result = claimPendingAction(state, 999, 42);
+
+    expect(result).toBeNull();
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.pendingActions[0]!.status).toBe('queued');
+  });
+
+  it('a claimed action is not claimable by a second employee', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1 }));
+
+    const first = claimPendingAction(state, 1, 42);
+    expect(first!.assignedEmployeeId).toBe(42);
+
+    const second = claimPendingAction(state, 1, 43);
+
+    // The action is no longer 'queued', so a second claim on the same id is a
+    // no-op: it must not hand the action to a different employee.
+    expect(second).toBeNull();
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.pendingActions[0]!.assignedEmployeeId).toBe(42);
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+  });
+});
+
+describe('startPendingAction (#547)', () => {
+  it('transitions an assigned action to "in_progress"', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1, status: 'assigned', assignedEmployeeId: 7 }));
+
+    startPendingAction(state, 1);
+
+    expect(state.pendingActions[0]!.status).toBe('in_progress');
+    // The holder is unchanged by the transition.
+    expect(state.pendingActions[0]!.assignedEmployeeId).toBe(7);
+  });
+
+  it('is a no-op for an unknown actionId', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1, status: 'assigned', assignedEmployeeId: 7 }));
+
+    expect(() => startPendingAction(state, 999)).not.toThrow();
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+  });
+
+  it('does not promote a still-queued action (never claimed) to "in_progress"', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1, status: 'queued', assignedEmployeeId: null }));
+
+    startPendingAction(state, 1);
+
+    expect(state.pendingActions[0]!.status).toBe('queued');
+  });
+});
+
+describe('completePendingAction (#547)', () => {
+  it('removes the action from state.pendingActions', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1, status: 'in_progress', assignedEmployeeId: 7 }));
+
+    completePendingAction(state, 1);
+
+    expect(state.pendingActions.find(a => a.id === 1)).toBeUndefined();
+  });
+
+  it('removes the matching ghost preview from state.ghostPreviews', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1, status: 'in_progress', assignedEmployeeId: 7 }));
+    state.ghostPreviews.push(makeGhost({ id: 1, claimed: true }));
+
+    completePendingAction(state, 1);
+
+    expect(state.ghostPreviews.find(g => g.id === 1)).toBeUndefined();
+  });
+
+  it('leaves unrelated actions and ghosts untouched', () => {
+    const state = makeGame();
+    state.pendingActions.push(
+      makeFullPendingAction({ id: 1, status: 'in_progress', assignedEmployeeId: 7 }),
+      makeFullPendingAction({ id: 2, status: 'queued' }),
+    );
+    state.ghostPreviews.push(makeGhost({ id: 1, claimed: true }), makeGhost({ id: 2 }));
+
+    completePendingAction(state, 1);
+
+    expect(state.pendingActions.find(a => a.id === 2)).toBeDefined();
+    expect(state.ghostPreviews.find(g => g.id === 2)).toBeDefined();
+  });
+
+  it('is a no-op (does not throw, does not mutate other entries) for an unknown actionId', () => {
+    const state = makeGame();
+    state.pendingActions.push(makeFullPendingAction({ id: 1, status: 'in_progress', assignedEmployeeId: 7 }));
+    state.ghostPreviews.push(makeGhost({ id: 1, claimed: true }));
+
+    expect(() => completePendingAction(state, 999)).not.toThrow();
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.ghostPreviews).toHaveLength(1);
+  });
+});

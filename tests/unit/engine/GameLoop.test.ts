@@ -209,11 +209,13 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: null,
+      status: 'queued',
+      assignedEmployeeId: null,
       ...overrides,
     };
   }
 
-  it('assigns idle qualified employee to matching pending action', () => {
+  it('assigns idle qualified employee to matching pending action, leaving it in pendingActions as "assigned" (#547, supersedes the old delete-on-claim behavior)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
@@ -225,17 +227,23 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     tickEmployees(state);
 
-    // Action should have been claimed — removed from pendingActions
-    expect(state.pendingActions).toHaveLength(0);
+    // #547: a claimed action stays in pendingActions — only its status and
+    // assignedEmployeeId change — so it remains visible to the player while
+    // the employee walks to it.
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.pendingActions[0]!.id).toBe(1);
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(state.pendingActions[0]!.assignedEmployeeId).toBe(employee.id);
     // Employee should hold the action's id
     expect((employee as any).activeActionId).toBe(action.id);
   });
 
-  it('removes the matching GhostPreview when the action is claimed (issue #406)', () => {
-    // tickEmployees is the tick loop's real claim path — claimPendingAction in
-    // TaskDispatch.ts is a separate helper nothing in the loop calls — so it
-    // must own clearing ghostPreviews itself, or the blue marker never
-    // disappears once an employee actually picks up the work.
+  it('marks the matching GhostPreview claimed: true instead of removing it (issue #547, supersedes #406\'s removal)', () => {
+    // Pre-#547, tickEmployees spliced the ghost out of ghostPreviews the
+    // instant it was claimed — the blue marker vanished the moment an
+    // employee started walking, before they had actually done anything. #547
+    // keeps the ghost on screen (dimmer/slower-pulsing, see GhostMesh.ts)
+    // until the underlying action is actually completed.
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
@@ -244,11 +252,13 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     const action = makePendingAction({ id: 3, requiredSkill: 'blasting', targetX: 5, targetZ: 6 });
     state.pendingActions.push(action);
-    state.ghostPreviews.push({ id: 3, type: action.type, targetX: 5, targetZ: 6, targetY: 0 });
+    state.ghostPreviews.push({ id: 3, type: action.type, targetX: 5, targetZ: 6, targetY: 0, claimed: false });
 
     tickEmployees(state);
 
-    expect(state.ghostPreviews.find(g => g.id === 3)).toBeUndefined();
+    const ghost = state.ghostPreviews.find(g => g.id === 3);
+    expect(ghost).toBeDefined();
+    expect(ghost!.claimed).toBe(true);
   });
 
   it('leaves an unclaimed action\'s GhostPreview untouched (issue #406)', () => {
@@ -257,11 +267,13 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     const action = makePendingAction({ id: 4, requiredSkill: 'geology', targetX: 1, targetZ: 2 });
     state.pendingActions.push(action);
-    state.ghostPreviews.push({ id: 4, type: action.type, targetX: 1, targetZ: 2, targetY: 0 });
+    state.ghostPreviews.push({ id: 4, type: action.type, targetX: 1, targetZ: 2, targetY: 0, claimed: false });
 
     tickEmployees(state);
 
-    expect(state.ghostPreviews.find(g => g.id === 4)).toBeDefined();
+    const ghost = state.ghostPreviews.find(g => g.id === 4);
+    expect(ghost).toBeDefined();
+    expect(ghost!.claimed).toBe(false);
   });
 
   it('returns claimed action ID in result.claimed', () => {
@@ -382,8 +394,9 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     tickEmployees(state);
 
-    // Both actions must have been claimed
-    expect(state.pendingActions).toHaveLength(0);
+    // #547: both actions stay in pendingActions — claimed, not removed.
+    expect(state.pendingActions).toHaveLength(2);
+    expect(state.pendingActions.every(a => a.status === 'assigned')).toBe(true);
     // Each employee holds one of the action IDs
     const assignedIds = [
       (emp1 as any).activeActionId,
@@ -393,6 +406,12 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
     expect(assignedIds).toContain(11);
     // Each employee has a distinct assignment
     expect(assignedIds[0]).not.toBe(assignedIds[1]);
+    // assignedEmployeeId on each action matches whichever employee claimed it.
+    const action10 = state.pendingActions.find(a => a.id === 10)!;
+    const action11 = state.pendingActions.find(a => a.id === 11)!;
+    expect([action10.assignedEmployeeId, action11.assignedEmployeeId].sort()).toEqual(
+      [emp1.id, emp2.id].sort(),
+    );
   });
 
   it('each employee can only claim one action per tick', () => {
@@ -408,8 +427,14 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     tickEmployees(state);
 
-    // Only one action can be assigned to the single employee per tick
-    expect(state.pendingActions).toHaveLength(1);
+    // #547: the claimed action (20) stays in pendingActions as "assigned";
+    // the other (21) stays "queued" — only one employee, so only one claim.
+    expect(state.pendingActions).toHaveLength(2);
+    const claimed = state.pendingActions.find(a => a.status === 'assigned')!;
+    const stillQueued = state.pendingActions.find(a => a.status === 'queued')!;
+    expect(claimed.id).toBe(20);
+    expect(stillQueued.id).toBe(21);
+    expect(claimed.assignedEmployeeId).toBe(employee.id);
     expect((employee as any).activeActionId).not.toBeNull();
   });
 });
@@ -835,6 +860,24 @@ describe('tickNeedRestoration (Task 3.11)', () => {
     expect(restAction!.targetZ).toBe(nearResult.building!.z);
     expect(restAction!.targetX).not.toBe(farResult.building!.x);
   });
+
+  // ── #547: self-claim leaves the rest action "assigned", not "queued" ──────
+  it('self-claimed rest action is immediately "assigned" to the routed employee (#547)', () => {
+    const state = createGame({ seed: SEED });
+    const rng   = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 20; // below hunger threshold of 35
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    tickNeedRestoration(state);
+
+    const restAction = state.pendingActions.find((a: PendingAction) => a.type === 'rest');
+    expect(restAction).toBeDefined();
+    expect(restAction!.status).toBe('assigned');
+    expect(restAction!.assignedEmployeeId).toBe(employee.id);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1207,6 +1250,29 @@ describe('tickCollapse (7.6)', () => {
     expect(employee.pendingRestNeedKey).toBe('fatigue');
   });
 
+  // ── #547: self-claim leaves the rest action "assigned", not "queued" ──────
+  it('self-claimed collapse rest action is immediately "assigned" to the collapsed employee (#547)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 5;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+    employee.x = 0;
+    employee.z = 0;
+
+    placeBuilding(state.buildings, 'living_quarters', 10, 10, 100, 100);
+
+    tickCollapse(state);
+
+    const restAction = state.pendingActions.find(
+      (a: PendingAction) => a.type === 'rest' && a.targetEmployeeId === employee.id,
+    );
+    expect(restAction).toBeDefined();
+    expect(restAction!.status).toBe('assigned');
+    expect(restAction!.assignedEmployeeId).toBe(employee.id);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2091,6 +2157,27 @@ describe('processShiftCycle (7.9)', () => {
     expect(employee.activeActionId).not.toBeNull();
   });
 
+  // ── #547: self-claim leaves the shift-cycle rest action "assigned" ────────
+  it('self-claimed shift-cycle rest action is immediately "assigned" to the employee (#547)', () => {
+    const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 100;
+    employee.ticksWorked = WORK_DURATION_TICKS - 1;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    processShiftCycle(state, firedEvents);
+
+    const restAction = state.pendingActions.find(a => a.id === employee.activeActionId);
+    expect(restAction).toBeDefined();
+    expect(restAction!.status).toBe('assigned');
+    expect(restAction!.assignedEmployeeId).toBe(employee.id);
+  });
+
   // ── Test 8 ──────────────────────────────────────────────────────────────────
   it('restTicksRemaining decrements each tick while resting', () => {
     const state = createGame({ seed: SEED });
@@ -2132,6 +2219,51 @@ describe('processShiftCycle (7.9)', () => {
     expect(employee.ticksWorked).toBe(0);       // reset for next shift
     // Fatigue should be restored (increased) upon rest completion
     expect(employee.fatigue).toBeGreaterThan(20);
+  });
+
+  // ── #547 regression: completeRestTick (shift-cycle rest completion) never
+  // removed its own PendingAction from state.pendingActions — a pre-existing
+  // leak on `main`, independent of the rest of #547's lifecycle work. Every
+  // OTHER rest-completion path (tickGeneralRestCompletion, see its own
+  // describe block below) already does this via a `.filter()`; completeRestTick
+  // is the one path that never did. This test is written to fail against
+  // unmodified `main`, not just the #547 skeleton.
+  it('removes the completed shift-cycle rest action from state.pendingActions (pre-existing leak, #547 regression)', () => {
+    const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    employee.restTicksRemaining = 1; // one more tick → completes this call
+    employee.restNeedKey = null;     // shift-cycle rest, not general rest
+    employee.ticksWorked = 5;
+
+    // Mirrors what forceShiftRestIfNeeded pushes when it self-claims a
+    // shift-cycle rest action (targetEmployeeId set, payload carries no
+    // needKey — resolveRestNeedKey returns null for it, same as production).
+    state.pendingActions.push({
+      id: actionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0,
+      targetZ: 0,
+      targetY: 0,
+      payload: { needType: 'fatigue', triggeredBy: 'shift_cycle' },
+      targetEmployeeId: employee.id,
+      status: 'assigned',
+      assignedEmployeeId: employee.id,
+    });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.restCompleted).toContain(employee.id);
+    expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
   });
 
   // ── Test 10 ─────────────────────────────────────────────────────────────────

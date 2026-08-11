@@ -227,6 +227,49 @@ describe('SurveyPanel', () => {
   });
 });
 
+// ── #547 regression: survey-in-progress status persists through claim ───────
+// Before #547, a claimed action was deleted from state.pendingActions the
+// instant an employee picked it up — so the panel's `pending` count (which
+// just filters state.pendingActions by type) dropped to 0 the moment the
+// surveyor started walking, and the "in progress" message vanished long
+// before the surveyor had actually done anything. #547 keeps the record (and
+// therefore the message) alive through claim → walk → work.
+describe('SurveyPanel — survey-in-progress status persists through claim (#547)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  it('still shows "in progress" once the action is claimed (status: "assigned")', () => {
+    const { panel } = makePanel();
+    const state = makeState({
+      employees: { employees: [makeSurveyor()], nextId: 2 } as GameState['employees'],
+      pendingActions: [{
+        id: 1, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null,
+        targetX: 5, targetZ: 5, targetY: 0, payload: { method: 'seismic', centerX: 5, centerZ: 5 },
+        targetEmployeeId: null, status: 'assigned', assignedEmployeeId: 1,
+      }],
+    });
+    panel.update(state);
+    expect(panel.root.querySelector('.bs-survey-status')!.textContent).toContain('in progress');
+  });
+
+  it('still shows "in progress" once the surveyor has arrived and is working (status: "in_progress")', () => {
+    const { panel } = makePanel();
+    const state = makeState({
+      employees: { employees: [makeSurveyor()], nextId: 2 } as GameState['employees'],
+      pendingActions: [{
+        id: 1, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null,
+        targetX: 5, targetZ: 5, targetY: 0, payload: { method: 'seismic', centerX: 5, centerZ: 5 },
+        targetEmployeeId: null, status: 'in_progress', assignedEmployeeId: 1,
+      }],
+    });
+    panel.update(state);
+    expect(panel.root.querySelector('.bs-survey-status')!.textContent).toContain('in progress');
+  });
+});
+
 // ── Survey confidence overlay toggle (#496) ─────────────────────────────────
 //
 // The header's overlay-visibility toggle button drives GameRenderer's

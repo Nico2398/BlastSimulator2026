@@ -55,14 +55,35 @@ describe('OperationsPanel', () => {
     const { panel } = makePanel();
     const state = makeState();
     state.pendingActions = [
-      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null },
-      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null },
-      { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7 },
+      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', assignedEmployeeId: null },
+      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', assignedEmployeeId: null },
+      { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7, status: 'queued', assignedEmployeeId: null },
     ];
     panel.update(state);
     const text = panel.root.textContent ?? '';
     expect(text).toContain('Unclaimed Work');
     expect(text).toContain('2 tasks');
+  });
+
+  // ── #547: an action with targetEmployeeId:null but status:'assigned' (an
+  // employee has already claimed it and is walking there) has a holder — it
+  // must not count as "unclaimed" any more, even though the field the old
+  // (pre-#547) filter alone checked (targetEmployeeId === null) is unchanged.
+  it('excludes an "assigned" action with targetEmployeeId:null from the unclaimed count (#547)', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    state.pendingActions = [
+      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', assignedEmployeeId: null },
+      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'assigned', assignedEmployeeId: 4 },
+    ];
+    panel.update(state);
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('Unclaimed Work');
+    // Only action 1 (still 'queued') counts — action 2 was already claimed.
+    // (No pluralization in ui.operations.unclaimed_work_count — "1 tasks" is
+    // the real rendered string, matching the "2 tasks" case above.)
+    expect(text).toContain('1 tasks');
+    expect(text).not.toContain('2 tasks');
   });
 
   it('renders ore on hand with a computed value from OreCatalog', () => {
