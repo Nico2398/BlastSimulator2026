@@ -57,3 +57,15 @@ export function computeEmployeeActivity(employee: Employee, vehicles: readonly V
 
   return IDLE;
 }
+
+/**
+ * Fraction of the current task's total duration completed, clamped to
+ * [0, 1]. Null when `activity` isn't an active timed task — the same
+ * 'working' + totalTicks > 0 guard the Crew panel's progress line and the
+ * floating task-progress bar both need before they have anything to show.
+ */
+export function taskProgressFraction(activity: EmployeeActivity): number | null {
+  if (activity.kind !== 'working' || activity.totalTicks === null || activity.totalTicks <= 0) return null;
+  const ticksRemaining = activity.ticksRemaining ?? 0;
+  return Math.min(1, Math.max(0, (activity.totalTicks - ticksRemaining) / activity.totalTicks));
+}

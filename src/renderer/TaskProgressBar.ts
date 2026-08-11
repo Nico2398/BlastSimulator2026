@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import type { Employee } from '../core/entities/Employee.js';
 import type { Vehicle } from '../core/entities/Vehicle.js';
-import { computeEmployeeActivity } from '../core/entities/EmployeeActivity.js';
+import { computeEmployeeActivity, taskProgressFraction } from '../core/entities/EmployeeActivity.js';
 
 // ---------- Config ----------
 
@@ -74,7 +74,7 @@ export class TaskProgressBar {
    * Group to billboard above.
    */
   sync(
-    employees: Employee[],
+    employees: readonly Employee[],
     vehicles: readonly Vehicle[],
     getAnchor: (id: number) => THREE.Group | null,
   ): void {
@@ -85,12 +85,9 @@ export class TaskProgressBar {
 
       const activity = computeEmployeeActivity(employee, vehicles);
       const anchor = getAnchor(employee.id);
-      const hasProgress = activity.kind === 'working'
-        && typeof activity.totalTicks === 'number'
-        && activity.totalTicks > 0
-        && anchor !== null;
+      const fraction = activity.kind === 'working' ? taskProgressFraction(activity) : null;
 
-      if (!hasProgress) {
+      if (fraction === null || anchor === null) {
         this.removeBar(employee.id);
         continue;
       }
@@ -101,13 +98,10 @@ export class TaskProgressBar {
         this.bars.set(employee.id, bar);
       }
       if (bar.group.parent !== anchor) {
-        anchor!.add(bar.group);
+        anchor.add(bar.group);
       }
 
-      const totalTicks = activity.totalTicks as number;
-      const ticksRemaining = activity.ticksRemaining ?? 0;
-      const fraction = (totalTicks - ticksRemaining) / totalTicks;
-      bar.fillMesh.scale.x = Math.min(1, Math.max(0, fraction));
+      bar.fillMesh.scale.x = fraction;
     }
 
     // Sweep any bar whose employee is no longer in the roster at all (death/removal).

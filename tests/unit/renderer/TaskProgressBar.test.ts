@@ -58,9 +58,18 @@ function collectMeshes(object: THREE.Object3D): THREE.Mesh[] {
   return out;
 }
 
-/** True if some mesh under `anchor` has scale.x within `tolerance` of `expected`. */
-function anyMeshScaleXCloseTo(anchor: THREE.Object3D, expected: number, tolerance = 0.1): boolean {
-  return collectMeshes(anchor).some(m => Math.abs(m.scale.x - expected) <= tolerance);
+/**
+ * The bar's fill mesh under `anchor` — distinguished from the track mesh by
+ * FILL_Z_OFFSET (the only mesh TaskProgressBar ever offsets on Z, to sit in
+ * front of the track and avoid z-fighting). The track mesh's scale.x is
+ * never touched — it stays at THREE's default of 1 — so keying off Z instead
+ * of "any mesh" ensures this actually checks the fill level, not a
+ * coincidental default.
+ */
+function findFillMesh(anchor: THREE.Object3D): THREE.Mesh {
+  const fill = collectMeshes(anchor).find(m => m.position.z !== 0);
+  if (!fill) throw new Error('no fill mesh found under anchor');
+  return fill;
 }
 
 describe('TaskProgressBar', () => {
@@ -87,7 +96,7 @@ describe('TaskProgressBar', () => {
 
       bar.sync([emp], NO_VEHICLES, id => (id === 1 ? anchor : null));
 
-      expect(anyMeshScaleXCloseTo(anchor, 0)).toBe(true);
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0, 5);
       bar.dispose();
     });
 
@@ -100,11 +109,11 @@ describe('TaskProgressBar', () => {
 
       bar.sync([emp], NO_VEHICLES, id => (id === 1 ? anchor : null));
 
-      expect(anyMeshScaleXCloseTo(anchor, 0.5)).toBe(true);
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0.5, 5);
       bar.dispose();
     });
 
-    it('reads ~1 just before the task completes', () => {
+    it('reads ~0.95 just before the task completes', () => {
       const scene = new THREE.Scene();
       const bar = new TaskProgressBar(scene, makeCamera());
       const anchor = new THREE.Group();
@@ -113,7 +122,7 @@ describe('TaskProgressBar', () => {
 
       bar.sync([emp], NO_VEHICLES, id => (id === 1 ? anchor : null));
 
-      expect(anyMeshScaleXCloseTo(anchor, 0.95, 0.15)).toBe(true);
+      expect(findFillMesh(anchor).scale.x).toBeCloseTo(0.95, 5);
       bar.dispose();
     });
   });
@@ -210,6 +219,28 @@ describe('TaskProgressBar', () => {
 
     expect(bar.count).toBe(0);
     expect(anchor.children.length).toBe(0);
+  });
+
+  it('update() billboards the bar group to face the camera', () => {
+    const scene = new THREE.Scene();
+    const camera = makeCamera();
+    camera.quaternion.setFromEuler(new THREE.Euler(0.4, 1.1, 0.2));
+    const bar = new TaskProgressBar(scene, camera);
+    const anchor = new THREE.Group();
+    scene.add(anchor);
+    const emp = makeEmployee({ id: 1, taskTicksRemaining: 10, activeTaskTotalTicks: 20 });
+
+    bar.sync([emp], NO_VEHICLES, id => (id === 1 ? anchor : null));
+    const [group] = anchor.children;
+    // Sanity: freshly-created bar starts at THREE's default identity rotation,
+    // distinct from the camera's — otherwise the assertion below would pass
+    // even if update() never ran.
+    expect(group.quaternion.equals(camera.quaternion)).toBe(false);
+
+    bar.update(0.016);
+
+    expect(group.quaternion.equals(camera.quaternion)).toBe(true);
+    bar.dispose();
   });
 
   it('clearAll() removes every bar without disposing the whole instance', () => {

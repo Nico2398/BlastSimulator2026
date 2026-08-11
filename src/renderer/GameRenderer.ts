@@ -123,7 +123,7 @@ export class GameRenderer {
     return this.lastGrid?.id ?? null;
   }
 
-  /** Number of task-progress-bar meshes currently rendered — for diagnostics. */
+  /** Number of task-progress bars currently rendered — for diagnostics. */
   get taskProgressBarCount(): number {
     return this.taskProgress?.count ?? 0;
   }
