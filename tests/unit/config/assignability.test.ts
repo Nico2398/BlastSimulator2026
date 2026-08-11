@@ -33,23 +33,30 @@ interface FakeIssue {
   body?: string;
   isPullRequest?: boolean;
   prMergedAt?: string | null;
-  /** Pull requests cross-referencing this issue. */
-  prs?: { number: number; state: string }[];
+  /** The PR from this issue's own `pipeline/feature-<N>` branch, if one exists. */
+  pipelinePr?: { number: number; merged: boolean } | null;
+  /** PRs GitHub records as closing this issue (open and merged only). */
+  closers?: { number: number; merged: boolean }[];
+  /** The deliverable-PR read failed — callers must fail closed. */
+  deliverableUnknown?: boolean;
   /** When `blocked` was last applied, epoch ms. */
   blockedAt?: number | null;
-  /** Whether the whole timeline could be read. */
-  timelineComplete?: boolean;
+  /** Whether a run ever owned this issue (it carried `in-progress` at some point). */
+  everInProgress?: boolean;
   /** Issue numbers GitHub records as blocking this one (the Relationships panel). */
   blockedBy?: number[];
   /** The relationships call failed for a reason other than the feature being absent. */
   relationshipsUnknown?: boolean;
 }
 
-/** The listing shape `linkedPullRequests` returns. */
-const listing = (pullRequests: { number: number; state: string }[], complete = true) => ({
-  pullRequests,
-  complete,
-});
+/** The shape `deliverableFor` returns. */
+const deliverable = (
+  overrides: Partial<{
+    pipeline: { number: number; merged: boolean } | null;
+    closers: { number: number; merged: boolean }[];
+    unknown: boolean;
+  }> = {}
+) => ({ pipeline: null, closers: [], unknown: false, ...overrides });
 
 const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   state: 'open',
@@ -58,9 +65,11 @@ const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   body: '',
   isPullRequest: false,
   prMergedAt: null,
-  prs: [],
+  pipelinePr: null,
+  closers: [],
+  deliverableUnknown: false,
   blockedAt: null,
-  timelineComplete: true,
+  everInProgress: true,
   blockedBy: [],
   relationshipsUnknown: false,
   ...partial,
@@ -81,9 +90,13 @@ function fakeApi(issues: FakeIssue[], options: { lastMergeAt?: number | null } =
     async getIssue(number: number) {
       return byNumber.get(number) ?? null;
     },
-    async linkedPullRequests(number: number) {
+    async deliverableFor(number: number) {
       const found = byNumber.get(number);
-      return { pullRequests: found?.prs ?? [], complete: found?.timelineComplete ?? true };
+      return {
+        pipeline: found?.pipelinePr ?? null,
+        closers: found?.closers ?? [],
+        unknown: found?.deliverableUnknown ?? false,
+      };
     },
     async declaredBlockedBy(number: number) {
       const found = byNumber.get(number);
@@ -96,8 +109,8 @@ function fakeApi(issues: FakeIssue[], options: { lastMergeAt?: number | null } =
     async blockedLabelledAt(number: number) {
       return byNumber.get(number)?.blockedAt ?? null;
     },
-    async everCarriedInProgress() {
-      return true;
+    async everCarriedInProgress(number: number) {
+      return byNumber.get(number)?.everInProgress ?? true;
     },
     async latestPipelineMergeAt() {
       return options.lastMergeAt ?? null;
@@ -234,7 +247,7 @@ describe('combining GitHub relationships with the body section', () => {
   // Relationships panel, with nothing in its body saying so.
   it('refuses an issue blocked only by a relationship', async () => {
     const api = fakeApi([
-      { number: 547, labels: ['blocked'], prs: [{ number: 566, state: 'open' }] },
+      { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
       { number: 548, labels: ['ready'], blockedBy: [547] },
       { number: 550, labels: ['ready'] },
     ]);
@@ -271,18 +284,18 @@ describe('conditions readable off the candidate itself', () => {
 describe('whether one dependency has actually landed', () => {
   it('accepts a dependency closed as completed with no open PR', () => {
     const dep = issue({ number: 5, state: 'closed', stateReason: 'completed' });
-    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(true);
+    expect(rules.dependencyVerdict(dep, deliverable()).assignable).toBe(true);
   });
 
   it('refuses a dependency that is still open', () => {
-    const verdict = rules.dependencyVerdict(issue({ number: 5 }), listing([]));
+    const verdict = rules.dependencyVerdict(issue({ number: 5 }), null);
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain('#5');
   });
 
   // The state #547 is in. Its own label already says the work stopped.
   it('names `blocked` when the open dependency is itself blocked', () => {
-    const verdict = rules.dependencyVerdict(issue({ number: 547, labels: ['blocked'] }), listing([]));
+    const verdict = rules.dependencyVerdict(issue({ number: 547, labels: ['blocked'] }), null);
     expect(verdict.reason).toContain('blocked');
   });
 
@@ -290,29 +303,56 @@ describe('whether one dependency has actually landed', () => {
   // work, and everything declaring it a dependency is still missing its ground.
   it('refuses a dependency closed as not planned', () => {
     const dep = issue({ number: 5, state: 'closed', stateReason: 'not_planned' });
-    const verdict = rules.dependencyVerdict(dep, listing([]));
+    const verdict = rules.dependencyVerdict(dep, deliverable());
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain('not planned');
   });
 
   // The headline case: the dependency is closed, but the pull request carrying
-  // its code has not merged, so `main` does not have it.
-  it('refuses a dependency whose pull request is still open', () => {
+  // its code has not merged, so `main` does not have it. Both arms of the
+  // deliverable predicate must catch it — the pipeline's own branch, and a PR
+  // GitHub records as closing the issue.
+  it('refuses a dependency whose pipeline pull request is still open', () => {
     const dep = issue({ number: 547, state: 'closed', stateReason: 'completed' });
-    const verdict = rules.dependencyVerdict(dep, listing([{ number: 566, state: 'open' }]));
+    const verdict = rules.dependencyVerdict(
+      dep,
+      deliverable({ pipeline: { number: 566, merged: false } })
+    );
     expect(verdict.assignable).toBe(false);
     expect(verdict.reason).toContain('#566');
   });
 
-  it('accepts a dependency whose pull requests are all finished', () => {
+  it('refuses a dependency whose closing pull request is still open', () => {
+    const dep = issue({ number: 547, state: 'closed', stateReason: 'completed' });
+    const verdict = rules.dependencyVerdict(
+      dep,
+      deliverable({ closers: [{ number: 566, merged: false }] })
+    );
+    expect(verdict.assignable).toBe(false);
+    expect(verdict.reason).toContain('#566');
+  });
+
+  it('accepts a dependency whose pull requests all merged', () => {
     const dep = issue({ number: 5, state: 'closed', stateReason: 'completed' });
-    expect(rules.dependencyVerdict(dep, listing([{ number: 6, state: 'closed' }])).assignable).toBe(true);
+    const done = deliverable({
+      pipeline: { number: 6, merged: true },
+      closers: [{ number: 6, merged: true }],
+    });
+    expect(rules.dependencyVerdict(dep, done).assignable).toBe(true);
+  });
+
+  // A read that failed is not an empty list — fail closed, never open.
+  it('refuses a dependency whose pull requests could not be read', () => {
+    const dep = issue({ number: 5, state: 'closed', stateReason: 'completed' });
+    const verdict = rules.dependencyVerdict(dep, deliverable({ unknown: true }));
+    expect(verdict.assignable).toBe(false);
+    expect(verdict.reason).toContain('could not be read');
   });
 
   // A `Blocked by` line may name the PR rather than the issue it closes.
   it('refuses a dependency that is an unmerged pull request', () => {
     const dep = issue({ number: 566, isPullRequest: true, state: 'open' });
-    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(false);
+    expect(rules.dependencyVerdict(dep, null).assignable).toBe(false);
   });
 
   it('accepts a dependency that is a merged pull request', () => {
@@ -322,13 +362,13 @@ describe('whether one dependency has actually landed', () => {
       state: 'closed',
       prMergedAt: '2026-08-11T12:00:00Z',
     });
-    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(true);
+    expect(rules.dependencyVerdict(dep, null).assignable).toBe(true);
   });
 
   // A closed PR that never merged is a rejected deliverable, not a landed one.
   it('refuses a dependency that is a closed but unmerged pull request', () => {
     const dep = issue({ number: 566, isPullRequest: true, state: 'closed', prMergedAt: null });
-    expect(rules.dependencyVerdict(dep, listing([])).assignable).toBe(false);
+    expect(rules.dependencyVerdict(dep, null).assignable).toBe(false);
   });
 });
 
@@ -412,25 +452,52 @@ describe('picking the next issue', () => {
 
   // The rescued-branch shape. #547 keeps PR #566 open; re-adding `ready` to it
   // by hand would otherwise start a second run against a branch that already has
-  // commits on it.
-  it('skips an issue that already has an open pull request', async () => {
+  // commits on it. Both deliverable arms must catch it.
+  it('skips an issue whose pipeline pull request is open', async () => {
     const api = fakeApi([
-      { number: 547, labels: ['ready'], prs: [{ number: 566, state: 'open' }] },
+      { number: 547, labels: ['ready'], pipelinePr: { number: 566, merged: false } },
       { number: 548, labels: ['ready'] },
     ]);
     expect((await select(api)).issue?.number).toBe(548);
   });
 
+  it('skips an issue an open pull request closes', async () => {
+    const api = fakeApi([
+      { number: 547, labels: ['ready'], closers: [{ number: 566, merged: false }] },
+      { number: 548, labels: ['ready'] },
+    ]);
+    expect((await select(api)).issue?.number).toBe(548);
+  });
+
+  // The predicate is deliverable PRs, never mentions: an open PR that cites the
+  // issue in prose raises a timeline cross-reference and nothing else, so it
+  // appears in neither arm and must not block. PR #567's own body cites half
+  // the backlog — under the mention predicate that PR froze it.
+  it('assigns an issue an open pull request merely mentions', async () => {
+    const api = fakeApi([{ number: 548, labels: ['ready'] }]);
+    expect((await select(api)).issue?.number).toBe(548);
+  });
+
   it('assigns an issue whose pull request was closed without merging', async () => {
-    const api = fakeApi([{ number: 547, labels: ['ready'], prs: [{ number: 566, state: 'closed' }] }]);
+    // A closed-unmerged PR is a rejected deliverable: deliverableFor reports
+    // neither arm, so the issue is assignable again.
+    const api = fakeApi([{ number: 547, labels: ['ready'] }]);
     expect((await select(api)).issue?.number).toBe(547);
+  });
+
+  it('skips an issue whose pull requests could not be read', async () => {
+    const api = fakeApi([
+      { number: 547, labels: ['ready'], deliverableUnknown: true },
+      { number: 548, labels: ['ready'] },
+    ]);
+    expect((await select(api)).issue?.number).toBe(548);
   });
 
   // The requirement in one test: #547 is blocked with PR #566 unmerged, and its
   // whole follow-up batch declares `Blocked by #547`. None of them may run.
   it('assigns nothing when every candidate waits on the unmerged run', async () => {
     const api = fakeApi([
-      { number: 547, labels: ['blocked'], prs: [{ number: 566, state: 'open' }] },
+      { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
       { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
       { number: 549, labels: ['ready'], body: '## Blocked by\n\n- #548\n' },
     ]);
@@ -441,7 +508,7 @@ describe('picking the next issue', () => {
 
   it('assigns the unblocked issue in that batch', async () => {
     const api = fakeApi([
-      { number: 547, labels: ['blocked'], prs: [{ number: 566, state: 'open' }] },
+      { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
       { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
       { number: 550, labels: ['ready'], body: '## Blocked by\n\nNone\n' },
     ]);
@@ -521,6 +588,19 @@ describe('the cascade brake', () => {
     expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(1);
   });
 
+  // #474 is a human note labelled `blocked` by hand — no run ever owned it.
+  // Notes record problems; only failed runs measure whether the pipeline works.
+  it('does not count a blocked issue no run ever held', async () => {
+    const api = fakeApi(
+      [
+        { ...blockedAt(1, lastMergeAt + HOUR), everInProgress: false },
+        blockedAt(2, lastMergeAt + 2 * HOUR),
+      ],
+      { lastMergeAt }
+    );
+    expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(1);
+  });
+
   it('ignores a blocked issue with no labelling event to age', async () => {
     const api = fakeApi([{ number: 1, labels: ['blocked'], blockedAt: null }], { lastMergeAt });
     expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(0);
@@ -567,6 +647,9 @@ describe('the GitHub half', () => {
       },
       pulls: { list: async () => ({ data: [] }) },
     },
+    graphql: async () => ({
+      repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } },
+    }),
   });
 
   const api = (overrides?: Record<string, unknown>) =>
@@ -609,22 +692,100 @@ describe('the GitHub half', () => {
     expect(await client.getIssue(999)).toBeNull();
   });
 
-  it('reads linked pull requests off the timeline', async () => {
+  it('reads label events off the timeline', async () => {
     const client = api({
       listEventsForTimeline: async () => ({
         data: [
           { event: 'cross-referenced', source: { issue: { number: 566, state: 'open', pull_request: {} } } },
-          { event: 'cross-referenced', source: { issue: { number: 70, state: 'open' } } },
           { event: 'labeled', label: { name: 'blocked' }, created_at: '2026-08-11T12:00:00Z' },
         ],
       }),
     });
-    expect(await client.linkedPullRequests(1)).toEqual({
-      pullRequests: [{ number: 566, state: 'open' }],
-      complete: true,
-    });
     expect(await client.blockedLabelledAt(1)).toBe(Date.parse('2026-08-11T12:00:00Z'));
     expect(await client.everCarriedInProgress(1)).toBe(false);
+  });
+
+  // The deliverable predicate, per #568: a PR from the issue's own pipeline
+  // branch, or one GitHub records as closing it. Never a timeline mention.
+  describe('deliverableFor', () => {
+    it('asks for the pipeline branch by exact head and reads closers via GraphQL', async () => {
+      let askedHead = '';
+      let graphqlVariables: Record<string, unknown> | null = null;
+      const client = createIssueApi(
+        {
+          rest: {
+            issues: octokit().rest.issues,
+            pulls: {
+              list: async (params: { head: string }) => {
+                askedHead = params.head;
+                return { data: [{ number: 566, state: 'open', merged_at: null }] };
+              },
+            },
+          },
+          graphql: async (query: string, variables: Record<string, unknown>) => {
+            graphqlVariables = variables;
+            expect(query).toContain('closedByPullRequestsReferences');
+            expect(query).toContain('includeClosedPrs: false');
+            return {
+              repository: {
+                issue: { closedByPullRequestsReferences: { nodes: [{ number: 570, merged: true }] } },
+              },
+            };
+          },
+        },
+        { owner: 'o', repo: 'r' }
+      );
+      const result = await client.deliverableFor(547);
+      expect(askedHead).toBe('o:pipeline/feature-547');
+      expect(graphqlVariables).toMatchObject({ owner: 'o', repo: 'r', number: 547 });
+      expect(result).toEqual({
+        pipeline: { number: 566, merged: false },
+        closers: [{ number: 570, merged: true }],
+        unknown: false,
+      });
+    });
+
+    // A closed-unmerged head-branch PR is a rejected deliverable — reported as
+    // no pipeline PR, so the issue becomes assignable again.
+    it('ignores a closed-unmerged pipeline pull request', async () => {
+      const client = createIssueApi(
+        {
+          rest: {
+            issues: octokit().rest.issues,
+            pulls: { list: async () => ({ data: [{ number: 566, state: 'closed', merged_at: null }] }) },
+          },
+          graphql: async () => ({
+            repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } },
+          }),
+        },
+        { owner: 'o', repo: 'r' }
+      );
+      expect(await client.deliverableFor(547)).toEqual({ pipeline: null, closers: [], unknown: false });
+    });
+
+    // Fail closed on any read error: a 500 is not an empty list.
+    it('reports unknown when either read fails', async () => {
+      const restFails = createIssueApi(
+        {
+          rest: {
+            issues: octokit().rest.issues,
+            pulls: { list: async () => { throw Object.assign(new Error('boom'), { status: 500 }); } },
+          },
+          graphql: async () => ({ repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } } }),
+        },
+        { owner: 'o', repo: 'r' }
+      );
+      expect((await restFails.deliverableFor(1)).unknown).toBe(true);
+
+      const graphqlFails = createIssueApi(
+        {
+          rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
+          graphql: async () => { throw new Error('GraphQL down'); },
+        },
+        { owner: 'o', repo: 'r' }
+      );
+      expect((await graphqlFails.deliverableFor(1)).unknown).toBe(true);
+    });
   });
 
   it('reads the latest merge of a pipeline branch', async () => {
@@ -653,12 +814,11 @@ describe('the GitHub half', () => {
     expect(await api().latestPipelineMergeAt()).toBeNull();
   });
 
-  // A cross-reference can sit anywhere in a timeline, and the timeline of a
-  // long-lived pipeline issue runs to hundreds of label events. Reading only the
-  // first page would answer "no open pull request" from having looked at a
-  // fraction of the evidence — the one wrong answer that fails open.
+  // The timeline of a long-lived pipeline issue runs to hundreds of label
+  // events, and the labels the rules read — `in-progress` for the chain guard,
+  // `blocked` for the cascade brake — can sit on any page.
   describe('a timeline longer than one page', () => {
-    /** `pages` pages of filler, with the cross-reference on the last one. */
+    /** `pages` pages of filler, with the telling event on the last one. */
     const paged = (pages: number) => {
       let served = 0;
       return {
@@ -672,8 +832,9 @@ describe('the GitHub half', () => {
           }));
           if (last) {
             filler.push({
-              event: 'cross-referenced',
-              source: { issue: { number: 566, state: 'open', pull_request: {} } },
+              event: 'labeled',
+              label: { name: 'in-progress' },
+              created_at: '2026-08-01T00:00:00Z',
             } as never);
           }
           return { data: filler };
@@ -682,48 +843,20 @@ describe('the GitHub half', () => {
       };
     };
 
-    it('reads every page before concluding anything', async () => {
+    it('reads every page of label events before concluding anything', async () => {
       const pager = paged(3);
       const client = api({ listEventsForTimeline: pager.listEventsForTimeline });
-      const linked = await client.linkedPullRequests(1);
-      expect(linked.complete).toBe(true);
-      expect(linked.pullRequests).toEqual([{ number: 566, state: 'open' }]);
+      // The in-progress event sits on the last page; a one-page read misses it.
+      expect(await client.everCarriedInProgress(1)).toBe(true);
       expect(pager.pagesServed()).toBe(3);
     });
 
     it('reads the timeline once however many rules ask about it', async () => {
       const pager = paged(2);
       const client = api({ listEventsForTimeline: pager.listEventsForTimeline });
-      await client.linkedPullRequests(1);
       await client.blockedLabelledAt(1);
       await client.everCarriedInProgress(1);
       expect(pager.pagesServed()).toBe(2);
-    });
-
-    // Past the page cap the reader cannot vouch for the answer, and says so
-    // instead of returning the part it managed to read.
-    it('reports a timeline past the cap as incomplete', async () => {
-      const client = api({
-        listEventsForTimeline: async () => ({
-          data: Array.from({ length: 100 }, () => ({ event: 'labeled', label: { name: 'noise' } })),
-        }),
-      });
-      expect((await client.linkedPullRequests(1)).complete).toBe(false);
-    });
-
-    // The rules' side of the same fact: an unreadable cross-reference list is a
-    // possible open pull request, so it blocks.
-    it('blocks a dependency whose cross-references could not be read in full', () => {
-      const dep = issue({ number: 547, state: 'closed', stateReason: 'completed' });
-      const verdict = rules.dependencyVerdict(dep, listing([], false));
-      expect(verdict.assignable).toBe(false);
-      expect(verdict.reason).toContain('in full');
-    });
-
-    it('blocks a candidate whose own cross-references could not be read in full', async () => {
-      const api = fakeApi([{ number: 20, labels: ['ready'], timelineComplete: false }]);
-      const result = await select(api);
-      expect(result.issue).toBeNull();
     });
 
     // An undated failure has to count as a recent one, or a truncated history
@@ -786,16 +919,18 @@ describe('running the assign action end to end', () => {
       log: [],
     };
 
+    // Label events, plus a prose mention on every issue: any real timeline has
+    // cross-references, and the scripts must never read one as a deliverable.
     const timelineOf = (number: number) => [
       ...(scenario.events?.[number] ?? []).map((event) => ({
         event: 'labeled',
         label: { name: event.label },
         created_at: new Date(event.at).toISOString(),
       })),
-      ...(state.get(number)?.prs ?? []).map((pr) => ({
+      {
         event: 'cross-referenced',
-        source: { issue: { number: pr.number, state: pr.state, pull_request: {} } },
-      })),
+        source: { issue: { number: 9999, state: 'open', pull_request: {} } },
+      },
     ];
 
     const github = {
@@ -843,8 +978,32 @@ describe('running the assign action end to end', () => {
           },
         },
         pulls: {
-          list: async () => ({ data: scenario.mergedPipelinePrs ?? [] }),
+          list: async (params: { head?: string }) => {
+            if (params.head) {
+              const match = /pipeline\/feature-(\d+)$/.exec(params.head);
+              const found = match ? state.get(parseInt(match[1], 10)) : undefined;
+              const pr = found?.pipelinePr;
+              return {
+                data: pr
+                  ? [{ number: pr.number, state: pr.merged ? 'closed' : 'open', merged_at: pr.merged ? '2026-08-11T00:00:00Z' : null }]
+                  : [],
+              };
+            }
+            return { data: scenario.mergedPipelinePrs ?? [] };
+          },
         },
+      },
+      graphql: async (_query: string, params: { number: number }) => {
+        const found = state.get(params.number);
+        return {
+          repository: {
+            issue: {
+              closedByPullRequestsReferences: {
+                nodes: (found?.closers ?? []).map((pr) => ({ number: pr.number, merged: pr.merged })),
+              },
+            },
+          },
+        };
       },
       // The dependencies endpoints have no octokit helper, so the action reaches
       // them through `github.request` with an explicit route. Asserting the route
@@ -922,7 +1081,7 @@ describe('running the assign action end to end', () => {
   it('chains to the next issue when a run ends blocked', async () => {
     const result = await run({
       issues: [
-        { number: 547, labels: ['blocked', 'in-progress'], prs: [{ number: 566, state: 'open' }] },
+        { number: 547, labels: ['blocked', 'in-progress'], pipelinePr: { number: 566, merged: false } },
         { number: 550, labels: ['ready'] },
       ],
       events: blockedRun(547, NOW - 60_000),
@@ -940,7 +1099,7 @@ describe('running the assign action end to end', () => {
   it('assigns nothing when the rest of the queue waits on the blocked issue', async () => {
     const result = await run({
       issues: [
-        { number: 547, labels: ['blocked'], prs: [{ number: 566, state: 'open' }] },
+        { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
         { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
         { number: 549, labels: ['ready'], body: '## Blocked by\n\n- #548\n' },
       ],

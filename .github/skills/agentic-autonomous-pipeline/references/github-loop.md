@@ -126,14 +126,14 @@ An issue is skipped when:
 |-----------|-----|
 | It carries `blocked`, `in-progress`, or `done` | Respectively: halted, already owned, already finished. `done` on an open `ready` issue is contradictory, not a permission |
 | It is a pull request | `listForRepo` returns PRs alongside issues; one carrying `ready` would be assigned as a task |
-| An **open** pull request already references it | Its `pipeline/feature-<N>` branch has commits on it. A second run would be told to build that branch from scratch and would collide with, or silently duplicate, the first. This is the state a rescued issue is left in |
+| An **open** pull request carries it | A deliverable PR — one from its own `pipeline/feature-<N>` branch, or one GitHub records as closing it — is open, so the branch has commits a second run would collide with or silently duplicate. This is the state a rescued issue is left in. A PR that merely *mentions* the issue is not this: #567's own body cites half the backlog, and under a mention predicate that one PR froze it |
 | A declared dependency is still open | The ordinary case, and the transitive one — the whole declared graph is walked, not just the first level, because a human can close an issue by hand while the issue *it* declared is still open |
 | Its `blocked_by` relationships **could not be read** | A failed call is not an empty list. Only the feature being absent (404/410) falls back to the body section |
 | A declared dependency was closed as **not planned** | Closed is not delivered. The work was abandoned; whatever declared it is still missing its ground |
-| A declared dependency is closed but an **open PR** still references it | The headline case. The issue is closed, the code has not merged, and `main` does not have it — issue #547 with PR #566 |
+| A declared dependency is closed but an **open PR** still carries it | The headline case. The issue is closed, the code has not merged, and `main` does not have it — issue #547 with PR #566. Both deliverable arms are checked: the dep's own pipeline branch, and its closing references |
 | A declared dependency **is** a pull request that has not merged | A `Blocked by` line may name the PR rather than the issue it closes |
 | A declared dependency **cannot be read** | A typo in a `Blocked by` line used to read as "no dependency" and start the run anyway. Unverifiable counts as unmet |
-| A cross-reference listing **could not be read in full** | "No open PR in the events I read" is not "no open PR". Timelines are paginated to the end (`issue-api.cjs`, 20 pages); past that the reader reports truncation and the rule blocks rather than concluding from a fraction of the evidence |
+| Its pull requests **could not be read** | A failed deliverable read is `unknown`, and unknown blocks — a 500 must never read as "no pull request" |
 | Its dependency graph exceeds 40 issues | A malformed body, and an unwalked graph is an unverified one |
 
 ### Where a dependency comes from
@@ -145,6 +145,10 @@ Two sources, unioned, and an issue stays blocked until every member of the union
 **The body section is the secondary source**, kept because every issue written before relationships existed carries its dependencies there and nowhere else. Dropping it the moment relationships arrived would make that entire backlog instantly assignable — a regression in the property the relationships are being adopted for. It is read strictly, because a mention is not a declaration: a section opens on a heading (`## Blocked by`), a bold line (`**Blocked by**`), or a line *starting* with the phrase (`Depends on: #12`), and ends at the next heading or bold line. A phrase inside a sentence opens nothing, so `## Context` citing #55 as background declares nothing — and neither does a bullet reading "depends on the rework in #123".
 
 A relationship call that fails for any reason other than the feature being absent is `unknown`, and `unknown` blocks. A 403 or a 500 must never read as "this issue has no dependencies"; a repository without the feature at all is a different fact, and there the body section is simply the only source there is.
+
+### What counts as an issue's pull request
+
+Everywhere the loop asks "does this issue have its PR" — the single-flight defer, the watchdog's leave-alone, the run-state settle check, and the two assignability rules above — the answer is the **deliverable predicate**: a PR whose head is the issue's own `pipeline/feature-<N>` branch (open or merged; closed-unmerged is a rejected deliverable), or a PR GitHub records as closing the issue (`closedByPullRequestsReferences`, open and merged only). A timeline cross-reference counts for nothing: any PR that merely writes `#N` in prose raises one, which is how docs PR #561's passing mention of #547 read as run #133's deliverable and disarmed its retry with five hours of budget left. The predicate is inlined in `agentic-watchdog.yml` and `agentic-run-state` because both run without a checkout, and shared from `issue-api.cjs` for everything `agentic-assign` decides; all copies are pinned identical in shape by `autonomy-loop.test.ts`.
 
 **Undeclared coupling is not detected, and deliberately so.** Comparing an issue's `## Files` list against the files an open pipeline PR touches was considered and rejected: on this repository nearly every gameplay issue touches `GameState.ts` or `GameLoop.ts`, so a single stale draft PR would make the whole backlog unassignable — the exact stall the blocked-chain exists to prevent. An issue that depends on another's work says so in its `Blocked by` section; that is what `agentic-issue-creation` is for.
 

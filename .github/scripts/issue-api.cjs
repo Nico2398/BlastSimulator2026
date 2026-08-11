@@ -17,8 +17,8 @@ const PER_PAGE = 100;
  * Pages read before a listing is called incomplete. Reached in practice by
  * nothing — 2000 timeline events on one issue — and the point is what happens
  * if it ever is: the reader reports the truncation rather than returning a
- * partial answer that looks complete. A cross-reference beyond the last page
- * read is a pull request the rules would not see.
+ * partial answer that looks complete. A label event beyond the last page read
+ * is a run the rules would not see.
  */
 const MAX_PAGES = 20;
 
@@ -66,6 +66,7 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
   const timelines = new Map();
   const issues = new Map();
   const dependencies = new Map();
+  const deliverables = new Map();
 
   /** One timeline read per issue per run — several rules ask about the same one. */
   const timeline = async (number) => {
@@ -123,23 +124,72 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
     },
 
     /**
-     * Pull requests cross-referencing this issue, which is how GitHub records
-     * `Closes #N`. State only — merged is reported as `closed`, and no rule here
-     * needs to tell a merged PR from an abandoned one: both are finished.
+     * The pull requests that actually carry this issue's work — never a mention.
      *
-     * `complete` reports whether the whole timeline was read. A rule that cannot
-     * see every cross-reference cannot conclude there is no open pull request.
+     * A timeline cross-reference is raised by any PR that merely writes "#N"
+     * anywhere in its body, and reading one as "this issue has a PR" is how docs
+     * PR #561's passing mention of #547 disarmed run #133's retry (fixed on the
+     * other three sites by #568; this is the same predicate for the rules the
+     * shared scripts own). Two links prose cannot raise:
+     *
+     *   pipeline — a PR whose head is `pipeline/feature-<N>`, the branch the
+     *              assignment told the run to build. Open or merged; a
+     *              closed-unmerged one is a rejected deliverable and ignored.
+     *   closers  — PRs GitHub records as closing the issue (`Closes #N` in the
+     *              PR body, or linked by hand). Open and merged only,
+     *              `includeClosedPrs: false`.
+     *
+     * `unknown: true` means a read failed. Callers fail closed on it — a 500
+     * must never read as "this issue has no pull request".
+     *
+     * @returns {Promise<{pipeline: {number: number, merged: boolean}|null,
+     *                    closers: {number: number, merged: boolean}[],
+     *                    unknown: boolean}>}
      */
-    async linkedPullRequests(number) {
-      const { items, complete } = await timeline(number);
-      const seen = new Map();
-      for (const event of items) {
-        const source = event.event === 'cross-referenced' ? event.source?.issue : null;
-        if (source?.pull_request) {
-          seen.set(source.number, { number: source.number, state: source.state });
-        }
+    async deliverableFor(number) {
+      if (deliverables.has(number)) return deliverables.get(number);
+
+      let result;
+      try {
+        const { data: headPrs } = await github.rest.pulls.list({
+          owner,
+          repo,
+          state: 'all',
+          head: `${owner}:pipeline/feature-${number}`,
+          per_page: 20,
+        });
+        const fromPipeline = headPrs.find((pr) => pr.state === 'open' || pr.merged_at);
+
+        const linked = await github.graphql(
+          `query($owner: String!, $repo: String!, $number: Int!) {
+             repository(owner: $owner, name: $repo) {
+               issue(number: $number) {
+                 closedByPullRequestsReferences(first: 50, includeClosedPrs: false) {
+                   nodes { number merged }
+                 }
+               }
+             }
+           }`,
+          { owner, repo, number }
+        );
+        const closers = (linked?.repository?.issue?.closedByPullRequestsReferences?.nodes ?? [])
+          .filter((node) => node && Number.isInteger(node.number))
+          .map((node) => ({ number: node.number, merged: Boolean(node.merged) }));
+
+        result = {
+          pipeline: fromPipeline
+            ? { number: fromPipeline.number, merged: Boolean(fromPipeline.merged_at) }
+            : null,
+          closers,
+          unknown: false,
+        };
+      } catch (error) {
+        log(`#${number}: deliverable PRs could not be read (${error.status ?? error.message}).`);
+        result = { pipeline: null, closers: [], unknown: true };
       }
-      return { pullRequests: [...seen.values()], complete };
+
+      deliverables.set(number, result);
+      return result;
     },
 
     /**

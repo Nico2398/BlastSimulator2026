@@ -122,8 +122,16 @@ runs:
               core.info(`Issue #${completed} still open — a PR is expected to carry the chain.`);
               return;
             }
-            if ((await api.linkedPullRequests(completed)).pullRequests.length > 0) {
-              core.info(`Issue #${completed} has a linked PR — the merge event carries the chain.`);
+            // Deliverable PRs only — a prose mention must not read as the
+            // deliverable and kill the chain (#568). Unknown fails closed.
+            const finishedPrs = await api.deliverableFor(completed);
+            if (finishedPrs.unknown) {
+              core.setFailed(`Issue #${completed}'s pull requests could not be read — not chaining on an unknown state.`);
+              return;
+            }
+            const carrier = finishedPrs.pipeline ?? finishedPrs.closers[0];
+            if (carrier) {
+              core.info(`Issue #${completed} has pull request #${carrier.number} — the merge event carries the chain.`);
               return;
             }
             core.info(`Issue #${completed} closed without a PR — chaining directly.`);

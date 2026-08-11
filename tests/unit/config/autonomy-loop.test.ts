@@ -176,6 +176,48 @@ describe('chaining past a run that ended blocked', () => {
   });
 });
 
+// A timeline cross-reference is raised by any PR that merely writes "#N" in
+// prose, and reading one as "this issue has its PR" is how docs PR #561's
+// passing mention of #547 disarmed run #133's retry (#568). The deliverable
+// predicate — a PR from `pipeline/feature-<N>`, or one GitHub records as
+// closing the issue — is deliberately inlined in the two sites that run
+// without a checkout and shared from `issue-api.cjs` everywhere else. Four
+// copies that must agree is exactly the shape that drifts silently, so each
+// copy's two arms are pinned here, and the mention predicate is pinned out.
+describe('a mention is never a deliverable', () => {
+  const SITES = [
+    ['.github/workflows/agentic-watchdog.yml', 'inline'],
+    ['.github/actions/agentic-run-state/action.yml', 'inline'],
+    ['.github/scripts/issue-api.cjs', 'shared'],
+  ] as const;
+
+  it.each(SITES)('%s carries both arms of the deliverable predicate', (file) => {
+    const text = readFileSync(join(ROOT, file), 'utf8');
+    expect(text).toContain('closedByPullRequestsReferences');
+    expect(text).toContain('includeClosedPrs: false');
+    expect(text).toMatch(/pipeline\/feature-\$\{/);
+  });
+
+  // The predicate the copies replaced. Code reading `cross-referenced` events
+  // as pull requests is the regression; comments may still tell the story.
+  it.each([
+    '.github/workflows/agentic-watchdog.yml',
+    '.github/actions/agentic-run-state/action.yml',
+    '.github/actions/agentic-assign/action.yml',
+    '.github/scripts/issue-api.cjs',
+    '.github/scripts/assignability.cjs',
+  ])('%s never reads a cross-reference as a pull request', (file) => {
+    const code = readFileSync(join(ROOT, file), 'utf8')
+      .split('\n')
+      .filter((line) => {
+        const trimmed = line.trim();
+        return !trimmed.startsWith('#') && !trimmed.startsWith('//') && !trimmed.startsWith('*');
+      })
+      .join('\n');
+    expect(code).not.toContain("'cross-referenced'");
+  });
+});
+
 // Three entry points cannot be argued safe by construction the way two could:
 // a merge and a blocked label can land in the same second. The repo-wide group
 // is what keeps two of them from reading `in-progress` before either writes it.

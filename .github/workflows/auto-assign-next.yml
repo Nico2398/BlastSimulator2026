@@ -71,7 +71,14 @@ jobs:
             const repo = context.repo.repo;
             const prBody = context.payload.pull_request.body || '';
 
-            const closesMatch = prBody.match(/(?:Closes?|Resolves|Fixes)\s+#(\d+)/i);
+            // Anchored to a line of its own: `Closes #N` on its own line is the
+            // pipeline's PR-body convention (agentic-assign writes it into every
+            // assignment, agentic-rescue writes it into every rescue body). An
+            // unanchored match let any prose mention — "also fixes #X
+            // partially", a quoted issue body — close the wrong issue, label it
+            // `done`, and feed the wrong number to agentic-assign, while the
+            // right issue kept holding the queue.
+            const closesMatch = prBody.match(/^\s*(?:Closes?|Resolves|Fixes)\s+#(\d+)\s*$/im);
             if (!closesMatch) {
               core.info('No explicit close directive found in PR body. Skipping issue close.');
               core.setOutput('issue', '');

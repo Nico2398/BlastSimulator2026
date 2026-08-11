@@ -205,9 +205,10 @@ runs:
         fi
 
         # Draft, and deliberately without `READY TO MERGE`: this PR is
-        # unreviewed and unvalidated by definition. `Closes #N` is what
-        # cross-references the issue, which is how the watchdog and the
-        # single-flight check see that the work exists.
+        # unreviewed and unvalidated by definition. `Closes #N` records the PR
+        # as closing the issue — and the head branch is `pipeline/feature-<N>`
+        # — so the watchdog and the single-flight check, which accept exactly
+        # those two links and ignore mere mentions, see that the work exists.
         cat > /tmp/agentic-rescue-body.md <<EOF
         Closes #${ISSUE}
 

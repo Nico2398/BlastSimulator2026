@@ -158,9 +158,12 @@ function labelVerdict(issue) {
  * issue in its batch builds on.
  *
  * @param {{number: number, state: string, stateReason?: string|null, isPullRequest?: boolean, prMergedAt?: string|null, labels?: string[]}} dep
- * @param {{pullRequests: {number: number, state: string}[], complete: boolean}} linked
+ * @param {{pipeline: {number: number, merged: boolean}|null, closers: {number: number, merged: boolean}[], unknown: boolean}|null} deliverable
+ *   The dep's deliverable pull requests, from `deliverableFor`. Only consulted
+ *   when the dep is closed — an open dep blocks on its state alone — so callers
+ *   may pass null for open deps and skip the read.
  */
-function dependencyVerdict(dep, linked) {
+function dependencyVerdict(dep, deliverable) {
   if (dep.isPullRequest) {
     return dep.prMergedAt
       ? yes()
@@ -181,18 +184,26 @@ function dependencyVerdict(dep, linked) {
     return no(`dependency #${dep.number} was closed as not planned, so its work never landed`);
   }
 
-  // "No open PR found in the events I read" is not "no open PR". A truncated
-  // timeline can only be reported, never completed by inference.
-  if (linked && linked.complete === false) {
+  // The dep is closed; what is left to check is whether its code landed. Only
+  // deliverable pull requests count — a PR whose head is the dep's own
+  // `pipeline/feature-<N>` branch, or one GitHub records as closing it. A
+  // timeline mention counts for nothing: any PR that writes "#N" in prose
+  // raises one, and a docs PR citing a closed dep must not block everything
+  // built on it (#568's predicate, applied to the shared rules).
+  if (!deliverable || deliverable.unknown) {
     return no(
-      `dependency #${dep.number}'s cross-references could not be read in full, so an unmerged pull request cannot be ruled out`
+      `dependency #${dep.number}'s pull requests could not be read, so an unmerged one cannot be ruled out`
     );
   }
-
-  const unmerged = (linked?.pullRequests || []).find((pr) => pr.state === 'open');
-  if (unmerged) {
+  if (deliverable.pipeline && !deliverable.pipeline.merged) {
     return no(
-      `dependency #${dep.number} is closed but its pull request #${unmerged.number} is still open`
+      `dependency #${dep.number} is closed but its pull request #${deliverable.pipeline.number} is still open`
+    );
+  }
+  const openCloser = deliverable.closers.find((pr) => !pr.merged);
+  if (openCloser) {
+    return no(
+      `dependency #${dep.number} is closed but its pull request #${openCloser.number} is still open`
     );
   }
 
@@ -242,10 +253,9 @@ async function graphVerdict(api, root) {
       );
     }
 
-    const linked = dep.isPullRequest
-      ? { pullRequests: [], complete: true }
-      : await api.linkedPullRequests(number);
-    const verdict = dependencyVerdict(dep, linked);
+    const deliverable =
+      !dep.isPullRequest && dep.state === 'closed' ? await api.deliverableFor(number) : null;
+    const verdict = dependencyVerdict(dep, deliverable);
     if (!verdict.assignable) return verdict;
 
     if (!dep.isPullRequest) {
@@ -273,18 +283,23 @@ async function assessCandidate(api, issue) {
   const labels = labelVerdict(issue);
   if (!labels.assignable) return labels;
 
-  // An issue that already has an open PR against it has a branch with commits
+  // An issue that already has an open PR carrying it has a branch with commits
   // on it. A second run would be told to build `pipeline/feature-<N>` from
   // scratch and would either collide with that branch or silently duplicate it.
   // This is the state #547 was left in, and the state a human re-adding `ready`
-  // to a rescued issue would recreate.
-  const linked = await api.linkedPullRequests(issue.number);
-  if (linked.complete === false) {
-    return no('its cross-references could not be read in full, so an open pull request cannot be ruled out');
+  // to a rescued issue would recreate. Deliverable PRs only — an open PR that
+  // merely *mentions* the issue must not make it unassignable (#567's own body
+  // cites half the backlog).
+  const deliverable = await api.deliverableFor(issue.number);
+  if (deliverable.unknown) {
+    return no('its pull requests could not be read, so an open one cannot be ruled out');
   }
-  const open = linked.pullRequests.find((pr) => pr.state === 'open');
-  if (open) {
-    return no(`pull request #${open.number} is already open against it`);
+  if (deliverable.pipeline && !deliverable.pipeline.merged) {
+    return no(`pull request #${deliverable.pipeline.number} is already open against it`);
+  }
+  const openCloser = deliverable.closers.find((pr) => !pr.merged);
+  if (openCloser) {
+    return no(`pull request #${openCloser.number} is already open against it`);
   }
 
   return graphVerdict(api, issue);
@@ -354,7 +369,14 @@ async function consecutiveBlockedRuns(api, options = {}) {
   let count = 0;
   for (const issue of blocked) {
     const at = await api.blockedLabelledAt(issue.number);
-    if (at !== null && at > floor) count += 1;
+    if (at === null || at <= floor) continue;
+    // A human labelling a backlog note `blocked` is filing a reminder, not
+    // ending a run, and three notes in a week must not park the queue. Only an
+    // issue a run once owned counts toward the brake — the same test the chain
+    // guard applies to the issue it fires from. Reads the timeline the
+    // timestamp above already fetched, so this costs nothing extra.
+    if (!(await api.everCarriedInProgress(issue.number))) continue;
+    count += 1;
   }
   return count;
 }
@@ -389,7 +411,7 @@ function resolveMention(raw) {
  * @typedef {object} IssueApi
  * @property {(label: string) => Promise<object[]>} listIssuesByLabel
  * @property {(number: number) => Promise<object|null>} getIssue
- * @property {(number: number) => Promise<{pullRequests: {number: number, state: string}[], complete: boolean}>} linkedPullRequests
+ * @property {(number: number) => Promise<{pipeline: {number: number, merged: boolean}|null, closers: {number: number, merged: boolean}[], unknown: boolean}>} deliverableFor
  * @property {(number: number) => Promise<{numbers: number[], available: boolean, unknown: boolean}>} [declaredBlockedBy]
  * @property {(number: number) => Promise<number|null>} blockedLabelledAt
  * @property {() => Promise<number|null>} latestPipelineMergeAt

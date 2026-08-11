@@ -129,15 +129,54 @@ runs:
           }
 
           // A linked PR is the deliverable. Its own CI and review carry it from
-          // here, however long that takes, so the run is done either way.
-          const { data: events } = await github.rest.issues.listEventsForTimeline({
-            owner, repo, issue_number: number, per_page: 100
-          });
-          const linked = events.find(
-            (e) => e.event === 'cross-referenced' && e.source?.issue?.pull_request
-          );
-          if (linked) {
-            settle(true, false, `Issue #${number} has a linked pull request — the run produced its deliverable.`);
+          // here, however long that takes, so the run is done either way. But
+          // "linked" must mean a PR from this run's own branch, or one GitHub
+          // records as closing the issue — never a timeline cross-reference.
+          // Any PR that merely writes "#N" anywhere in its body raises one of
+          // those: docs PR #561's passing mention of #547 read as run #133's
+          // deliverable and disarmed its retry with five hours of budget left.
+          // The same predicate is inlined in agentic-watchdog.yml and
+          // agentic-assign — no shared file, because the watchdog runs without
+          // a checkout to read one from. The verdict names the PR it matched,
+          // so a false positive is visible in the job log instead of silent.
+          const deliverablePr = async (issueNumber) => {
+            const { data: headPrs } = await github.rest.pulls.list({
+              owner, repo, state: 'all',
+              head: `${owner}:pipeline/feature-${issueNumber}`, per_page: 20
+            });
+            const fromPipeline = headPrs.find((pr) => pr.state === 'open' || pr.merged_at);
+            if (fromPipeline) {
+              return {
+                number: fromPipeline.number,
+                how: `from pipeline/feature-${issueNumber}, ${fromPipeline.merged_at ? 'merged' : 'open'}`
+              };
+            }
+            // Closing references cover the manual-completion path: a human PR
+            // from any branch whose body says `Closes #N`. `includeClosedPrs:
+            // false` keeps open and merged PRs and drops closed-unmerged ones,
+            // matching agentic-rescue's `state != "CLOSED"` reading.
+            const linked = await github.graphql(
+              `query($owner: String!, $repo: String!, $number: Int!) {
+                 repository(owner: $owner, name: $repo) {
+                   issue(number: $number) {
+                     closedByPullRequestsReferences(first: 10, includeClosedPrs: false) {
+                       nodes { number merged }
+                     }
+                   }
+                 }
+               }`,
+              { owner, repo, number: issueNumber }
+            );
+            const closer = linked?.repository?.issue?.closedByPullRequestsReferences?.nodes?.[0];
+            if (closer) {
+              return { number: closer.number, how: `closing reference, ${closer.merged ? 'merged' : 'open'}` };
+            }
+            return null;
+          };
+
+          const pr = await deliverablePr(number);
+          if (pr) {
+            settle(true, false, `Issue #${number} has pull request #${pr.number} (${pr.how}) — the run produced its deliverable.`);
             return;
           }
 
