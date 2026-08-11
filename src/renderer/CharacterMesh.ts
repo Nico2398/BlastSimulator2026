@@ -185,9 +185,8 @@ export class CharacterMesh {
   }
 
   /** An employee's root Group, or null if it isn't rendered — anchor for billboarded overlays (#546). */
-  getGroup(_id: number): THREE.Group | null {
-    // TODO: implement
-    return null;
+  getGroup(id: number): THREE.Group | null {
+    return this.characters.get(id)?.group ?? null;
   }
 
   dispose(): void {

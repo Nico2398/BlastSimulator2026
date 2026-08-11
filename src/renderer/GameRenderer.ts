@@ -209,6 +209,15 @@ export class GameRenderer {
       this.ghosts.sync(previews);
     }
 
+    // Task progress bars — reflect the current working/idle state each sync (#546)
+    if (this.taskProgress && this.characters) {
+      this.taskProgress.sync(
+        ctx.state.employees.employees,
+        ctx.state.vehicles.vehicles,
+        id => this.characters!.getGroup(id),
+      );
+    }
+
     // Blink employees still inside an active safety zone during clearing
     if (this.characters) {
       const zone = ctx.state.zone.activeZone;
@@ -317,6 +326,8 @@ export class GameRenderer {
     if (this.characters && this.lastState) {
       this.characters.update(this.lastState.employees.employees, dt);
     }
+
+    this.taskProgress?.update(dt);
 
     if (this.vehicles && this.lastState) {
       this.vehicles.update(this.lastState.vehicles.vehicles, dt);
@@ -776,6 +787,9 @@ export class GameRenderer {
       this.characters.addEmployee(e, surfaceY);
     }
 
+    // Task progress bars — billboarded above working employees (#546)
+    this.taskProgress = new TaskProgressBar(scene, this.sm.camera);
+
     // Weather sky
     this.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
 
@@ -927,6 +941,7 @@ export class GameRenderer {
     this.landscape?.dispose();
     this.blastOverlay?.dispose();
     this.ghosts?.dispose();
+    this.taskProgress?.dispose();
 
     this.terrain = null;
     this.landscapeHandle = null;
@@ -949,6 +964,7 @@ export class GameRenderer {
     this.landscape = null;
     this.blastOverlay = null;
     this.ghosts = null;
+    this.taskProgress = null;
     this.lastGrid = null;
 
     this.renderedBuildingIds.clear();
