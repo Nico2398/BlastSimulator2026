@@ -390,10 +390,19 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     // the NavGrid overlay tests above do, since UIManager.update() also
     // drives the minimap.
     vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    // Blast reports arm on first sight and only open once real time (via
+    // performance.now()) advances past BLAST_REPORT_DELAY_MS (#545) — mock
+    // the clock so this test can reach a genuinely visible modal before
+    // testing that closeStaleLevelOverlays() closes it.
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     uiManager = new UIManager(container);
-    // Simulate the first site's blast report opening the modal, the way a
-    // real `blast` command's uiManager.update(state) call does.
-    uiManager.update(makeStateWithReport(10));
+    // Simulate the first site's blast report arriving, the way a real
+    // `blast` command's uiManager.update(state) call does.
+    const state = makeStateWithReport(10);
+    uiManager.update(state); // arms the report (pending)
+
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
+    uiManager.update(state); // delay elapsed — report opens
     expect(uiManager.blastReportModalVisible).toBe(true);
 
     uiManager.closeStaleLevelOverlays();
