@@ -34,6 +34,11 @@ export type ClaimRefusalReason =
    * grow without limit, one chunk at a time.
    */
   | 'not_adjacent'
+  /**
+   * The chunk lies further from the site than MAX_CLAIM_BRIDGE_CHUNKS allows
+   * to bridge in one claim (#558) — a reach limit rather than a hard wall.
+   */
+  | 'too_far'
   /** Expansion is disabled for this site (campaign levels with a fixed boundary). */
   | 'expansion_disabled';
 
@@ -53,6 +58,31 @@ export interface ClaimRefusal {
 }
 
 export type ClaimResult = ClaimSuccess | ClaimRefusal;
+
+/**
+ * Result of claiming a whole action footprint plus whatever intermediate
+ * chunks bridge it to the site as one connected worksite (#558). Distinct
+ * from `ClaimResult`, which answers for a single chunk on the existing
+ * edge-adjacency-only `claim` path.
+ */
+export interface ClaimAreaSuccess {
+  claimed: true;
+  /** The world rect the whole claim spans, max exclusive, or null when nothing new was claimed. */
+  rect: Rect | null;
+  /** Every chunk that is now part of the site as a result of this call, including bridge chunks. */
+  chunks: Array<{ cx: number; cz: number }>;
+  /** True when the site actually grew. */
+  expanded: boolean;
+}
+
+export interface ClaimAreaRefusal {
+  claimed: false;
+  reason: ClaimRefusalReason;
+  /** The chunk that triggered the refusal. */
+  chunk: { cx: number; cz: number };
+}
+
+export type ClaimAreaResult = ClaimAreaSuccess | ClaimAreaRefusal;
 
 export interface PlayableAreaOptions {
   /**
@@ -172,6 +202,33 @@ export class PlayableArea {
     this.grid.markChunkPristine(cx, cz);
 
     return { claimed: true, chunk: { cx, cz }, rect, alreadyOwned: false };
+  }
+
+  /**
+   * Claim a whole action footprint plus whatever intermediate chunks bridge
+   * it to the site as one connected worksite (#558) — the replacement for
+   * routing each cell through `claim` individually, which refuses anything
+   * not already edge-adjacent even when the gap is a handful of chunks the
+   * action itself could reasonably bridge.
+   *
+   * TODO: implement — this is a skeleton stub for the test-writer/implementer.
+   */
+  claimArea(cells: ReadonlyArray<{ x: number; z: number }>): ClaimAreaResult {
+    void cells;
+    throw new Error('not implemented');
+  }
+
+  /**
+   * Whether a claim covering (x, z) would be refused, and why — without
+   * mutating the site. Drives placement-tool feedback so a refusal shows
+   * before the player commits to an action (#558).
+   *
+   * TODO: implement — this is a skeleton stub for the test-writer/implementer.
+   */
+  previewClaim(x: number, z: number): ClaimRefusalReason | null {
+    void x;
+    void z;
+    throw new Error('not implemented');
   }
 
   /**

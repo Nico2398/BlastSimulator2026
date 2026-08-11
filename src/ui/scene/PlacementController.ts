@@ -14,6 +14,7 @@ import { pickScene } from './ScenePicking.js';
 import {
   getPickerRegion, regionAccepts, regionContains, liveArea, type TileRegion,
 } from '../tutorialPickerRegion.js';
+import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 
 export type PlacementShape = 'rect' | 'line' | 'point';
 export type PlacementPhase = 'idle' | 'armed' | 'hovering' | 'dragging' | 'selected' | 'confirmed';
@@ -90,6 +91,16 @@ export class PlacementController {
   setArmedStateHandler(cb: (armed: boolean) => void): void { this.onArmedStateHandler = cb; }
   /** Fires alongside every change, for the scene-level feedback main.ts owns (region outline, refused tile). */
   setFeedbackHandler(cb: PlacementChangeHandler): void { this.onFeedbackHandler = cb; }
+  /**
+   * Register the predicate the controller asks whether the live selection
+   * would be refused a site claim (#558) — separate from the tutorial's
+   * region check, which pins to a guided step rather than the site's shape.
+   *
+   * TODO: implement — this is a skeleton stub for the test-writer/implementer.
+   */
+  setClaimCheck(fn: (x: number, z: number) => ClaimRefusalReason | null): void {
+    void fn;
+  }
 
   get currentPhase(): PlacementPhase { return this.phase; }
   get currentShape(): PlacementShape { return this.shape; }
@@ -100,6 +111,14 @@ export class PlacementController {
   get activeRegion(): TileRegion | null { return this.region; }
   /** Tile the pointer is over that the region refuses, or null. The overlay marks it red and the strip explains it. */
   get refusedTile(): { x: number; z: number } | null { return this.blockedTile; }
+  /**
+   * Why a claim covering the live selection would be refused, or null when it
+   * would not be (#558) — read by placementRefusalReason to explain a dead
+   * Confirm past the site's edge.
+   *
+   * TODO: implement — this is a skeleton stub for the test-writer/implementer.
+   */
+  get refusalReason(): ClaimRefusalReason | null { return null; }
 
   /** The live selection, or null before an anchor exists. */
   get selection(): PlacementSelection | null {

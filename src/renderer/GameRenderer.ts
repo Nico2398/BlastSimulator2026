@@ -84,7 +84,8 @@ export class GameRenderer {
   private fragments: FragmentMesh | null = null;
   private fragmentAnimator: FragmentAnimator | null = null;
   private blastEffects: BlastEffects | null = null;
-  private landscape: LandscapeMesh | null = null;
+  /** Public (like `terrain`) so aiming/raycasting can fall back to landscape meshes past the site's claimed edge (#558). */
+  public landscape: LandscapeMesh | null = null;
   /** Kept so a claim can re-cut the landscape without rebuilding the (expensive) landscape map. */
   private landscapeHandle: LandscapeHandle | null = null;
   private borderWall: WorldBorderWall | null = null;

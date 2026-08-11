@@ -3239,5 +3239,8 @@
   "ui.blast_workshop.report.building_destroyed": "{type} #{id} was destroyed.",
   "ui.blast_workshop.report.oversized_hint": "{count} fragments are too large for standard haulers. A {vehicle} would turn them into money instead of scenery.",
   "shell.placement.outside_region": "Outside the highlighted area — click inside the blue outline.",
-  "shell.placement.pick_first": "Click the highlighted area in the scene first."
+  "shell.placement.pick_first": "Click the highlighted area in the scene first.",
+  "shell.placement.refused_protected_ground": "Protected ground — a village, river or landmark stands there.",
+  "shell.placement.refused_expansion_disabled": "Outside the site, and this site cannot be expanded.",
+  "shell.placement.refused_too_far": "Too far from the site to claim in one action."
 }

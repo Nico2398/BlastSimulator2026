@@ -87,6 +87,14 @@ export const DEFAULT_GRID_SIZE = 64;
 /** Fixed sandbox site depth (voxels), Y. Sandbox no longer exposes depth as a player control (#504). */
 export const SANDBOX_GRID_DEPTH = 32;
 
+/**
+ * Largest number of intermediate chunks `PlayableArea.claimArea` will bridge
+ * in one claim to connect an action's footprint to the site (#558). Refused
+ * with 'too_far' beyond this — a reach limit, not a hard wall, so a distant
+ * action is still possible, just not in a single unbounded leap.
+ */
+export const MAX_CLAIM_BRIDGE_CHUNKS = 24;
+
 // ─── Campaign / Win-Lose Thresholds ────────────────────────────────────────────
 
 /** Cash below which bankruptcy warning fires ($). */

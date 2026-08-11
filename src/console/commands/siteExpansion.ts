@@ -22,6 +22,7 @@ export interface ClaimOutcome {
 const REFUSAL_TEXT: Record<ClaimRefusalReason, string> = {
   protected_structure: 'protected ground — a village, river or landmark stands there and the site can never take it',
   not_adjacent: 'out of bounds — the site can only grow into ground that touches it',
+  too_far: 'too far — the site cannot bridge that much ground in a single action',
   expansion_disabled: 'outside the site, and this site cannot be expanded',
 };
 
@@ -90,4 +91,17 @@ export function cellsInRect(minX: number, minZ: number, maxX: number, maxZ: numb
     for (let x = Math.floor(minX); x <= Math.floor(maxX); x++) cells.push({ x, z });
   }
   return cells;
+}
+
+/**
+ * Every integer column within `radius` of (centerX, centerZ) — the cell list
+ * a disc-shaped action (e.g. a blast danger zone) claims (#558).
+ *
+ * TODO: implement — this is a skeleton stub for the test-writer/implementer.
+ */
+export function cellsInDisc(centerX: number, centerZ: number, radius: number): Array<{ x: number; z: number }> {
+  void centerX;
+  void centerZ;
+  void radius;
+  throw new Error('not implemented');
 }
