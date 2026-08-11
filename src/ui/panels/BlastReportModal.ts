@@ -28,6 +28,10 @@ const RATING_COLOR: Record<BlastRating, string> = {
   catastrophic: 'var(--bsx-critical-text)',
 };
 
+// TODO: implement — real-time delay between a blast report becoming
+// available and the modal actually opening (#545).
+export const BLAST_REPORT_DELAY_MS = 3000;
+
 export class BlastReportModal {
   private readonly overlay: HTMLElement;
   private readonly ratingEl: HTMLElement;
@@ -38,7 +42,15 @@ export class BlastReportModal {
   private lastShownReport: BlastReport | null = null;
   private readonly locale = new LocaleTextRegistry();
 
-  constructor(container: HTMLElement) {
+  // TODO: implement — deferred-open state (#545). pendingReport holds a
+  // report that has arrived but not yet been shown; pendingDeadlineMs is
+  // the `now()` timestamp (per the injected clock) at which it should open.
+  private pendingReport: BlastReport | null = null;
+  private pendingDeadlineMs: number | null = null;
+
+  constructor(container: HTMLElement, private readonly now: () => number = () => performance.now()) {
+    // Used by the deferred-open delay logic landing with the implementer (#545).
+    void this.now;
     this.overlay = el('div', { className: 'bs-confirm-overlay' });
     this.overlay.style.display = 'none';
 
@@ -86,6 +98,18 @@ export class BlastReportModal {
 
   hide(): void { this.open = false; this.overlay.style.display = 'none'; }
   get visible(): boolean { return this.open; }
+
+  /** Whether a report has arrived but is still waiting out its open delay (#545). */
+  get pending(): boolean { return this.pendingReport !== null; }
+
+  /** Discard any in-flight deferred report and close the modal (#545). */
+  // TODO: implement — real logic lands with the implementer.
+  reset(): void {
+    this.hide();
+    this.pendingReport = null;
+    this.pendingDeadlineMs = null;
+    void this.pendingDeadlineMs;
+  }
 
   update(state: GameState): void {
     const report = state.lastBlastReport;

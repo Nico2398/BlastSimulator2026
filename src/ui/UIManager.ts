@@ -327,6 +327,9 @@ export class UIManager {
   /** Read-only accessor for tests (#504) — whether the BlastReportModal is currently open. */
   get blastReportModalVisible(): boolean { return this.blastReportModal.visible; }
 
+  /** Read-only accessor for tests (#545) — whether a report is waiting out its open delay. */
+  get blastReportModalPending(): boolean { return this.blastReportModal.pending; }
+
   /** Re-render all owned panels' locale-dependent text after a language change. */
   refreshLocale(): void {
     this.topBar.refreshLocale();
