@@ -408,6 +408,24 @@ describe('tutorialSteps', () => {
     it('has a Vehicles-toolbar highlightTarget', () => {
       expect(step!.highlightTarget).toBe('#bs-toolbar [data-panel="vehicles"]');
     });
+
+    // #552: hauling self-dispatches — the Fleet panel's Haul button is
+    // retired, and there is no player action left to hint a console command
+    // for. A step that still told the player to type `vehicle haul` would be
+    // pointing at a control that no longer exists.
+    it('carries no manual "vehicle haul" command hint — hauling is fully automatic (#552)', () => {
+      const commands = step!.commands ?? [];
+      for (const cmd of commands) {
+        expect(cmd, `step still hints a manual haul command: "${cmd}"`).not.toMatch(/vehicle haul/);
+      }
+    });
+
+    it('does not reference a specific fragment id — auto-dispatch picks the target, not the player (#552)', () => {
+      const commands = step!.commands ?? [];
+      for (const cmd of commands) {
+        expect(cmd, `step still names a player-chosen fragment id: "${cmd}"`).not.toMatch(/fragment:/);
+      }
+    });
   });
 
   // ── Steps whose completion the simulation owns ───────────────────────────

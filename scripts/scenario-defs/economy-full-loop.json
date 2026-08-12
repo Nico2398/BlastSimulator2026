@@ -515,23 +515,19 @@
       }
     },
     {
-      "command": "vehicle haul 1 fragment:138",
-      "description": "The Haul button always picks the vehicle's nearest reachable, non-oversized, storage-fitting fragment (findReachableGroundFragment, HaulingTask.ts) -- not a fixed index. #138 is what that function itself returns for this exact seed/command sequence. Re-derived from a previously-hardcoded #0 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting this file's drill_plan depth from 8 to 6 (the grid tool's real default, since this step never clicks the depth stepper) changes the whole blast/fragment population, and fragment #0 was no longer haul-eligible in the corrected population -- storedMassKg silently stayed 0 through the following tick and the contract delivery step never paid out. Confirmed by calling findReachableGroundFragment directly against the corrected blast.",
+      "command": "tick 1",
+      "description": "#552: replaces the old manual 'vehicle haul 1 fragment:138' step and its .bs-vehicle-haul-btn click -- once the debris_hauler and its licensed driver exist, the on-ground fragment's own haul_debris PendingAction is claimed and driven to automatically, with no player command or button naming which fragment. Ordering a haul costs nothing, but this extra tick still drains its own tick's worth of salary/maintenance upkeep, so cash only decreases here rather than holding at the retired command's old exact equals:29770 (which itself never cost anything, only the tick around it did). The following tick-10 step lets the drive-load-deliver cycle actually finish.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+          "type": "command",
+          "command": "tick 1"
         }
       ],
-      "role": "player",
+      "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 29770
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {

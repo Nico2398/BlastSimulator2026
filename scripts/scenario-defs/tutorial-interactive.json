@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the retired playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut.",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at \u2014 speed button, toolbar, hire buttons, blast panel, event choices \u2014 and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the retired playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut.",
   "shots": [
     {
       "name": "overview",
@@ -17,7 +17,7 @@
     {
       "command": "campaign start level:tutorial_pit",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera",
+      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera",
       "role": "setup",
       "interaction": [
         {
@@ -76,7 +76,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Player follows the glowing Crew button — the tutorial card must not swallow the click",
+      "description": "Player follows the glowing Crew button \u2014 the tutorial card must not swallow the click",
       "role": "player",
       "interaction": [
         {
@@ -106,7 +106,9 @@
       ],
       "expect": {
         "tutorialStep": "survey",
-        "increased": ["employeeCount"],
+        "increased": [
+          "employeeCount"
+        ],
         "blocked": ".bs-return-map",
         "note": "The tutorial is on rails: leaving for the world map mid-step is how a player loses it, so that button must be inert while the tutorial is up (mirrors tutorial.json's hire-surveyor beat)."
       }
@@ -114,7 +116,7 @@
     {
       "command": "employee assign_skill 1 skill:geology level:3",
       "timeout": 30,
-      "description": "Test-only bootstrap, not a tutorial stage: hiring already grants Rookie geology (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for tighter survey estimates. No role tag — there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building, which this scenario does not need. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "description": "Test-only bootstrap, not a tutorial stage: hiring already grants Rookie geology (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for tighter survey estimates. No role tag \u2014 there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building, which this scenario does not need. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
       "interaction": [
         {
           "type": "command",
@@ -126,7 +128,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "the hired surveyor can actually be sent to survey: opening the Survey panel alone must already show a usable Run button — a surveyor who cannot survey is not a surveyor. If Run is disabled here, hiring grants no geology qualification and no button in the game grants one (mirrors tutorial.json's own standalone beat).",
+      "description": "the hired surveyor can actually be sent to survey: opening the Survey panel alone must already show a usable Run button \u2014 a surveyor who cannot survey is not a surveyor. If Run is disabled here, hiring grants no geology qualification and no button in the game grants one (mirrors tutorial.json's own standalone beat).",
       "role": "player",
       "interaction": [
         {
@@ -141,7 +143,7 @@
     {
       "command": "survey seismic x:23 z:23",
       "timeout": 90,
-      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
+      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk \u2014 no scripted `tick` needed once a click starts it.",
       "role": "player",
       "interaction": [
         {
@@ -204,7 +206,7 @@
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
       "timeout": 90,
-      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). waitForTutorialStep drives the real clock — no scripted `tick` needed.",
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). waitForTutorialStep drives the real clock \u2014 no scripted `tick` needed.",
       "role": "player",
       "interaction": [
         {
@@ -252,7 +254,7 @@
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
       "timeout": 30,
-      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
+      "description": "Test-only bootstrap, not a tutorial stage \u2014 see the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
       "interaction": [
         {
           "type": "command",
@@ -300,13 +302,15 @@
       ],
       "expect": {
         "tutorialStep": "charge",
-        "increased": ["holeCount"]
+        "increased": [
+          "holeCount"
+        ]
       }
     },
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
       "timeout": 30,
-      "description": "charge complete: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn green",
+      "description": "charge complete: Charge All Holes clicked \u2014 the panel applies its own form defaults and hole rows turn green",
       "role": "player",
       "interaction": [
         {
@@ -320,7 +324,9 @@
       ],
       "expect": {
         "tutorialStep": "sequence",
-        "increased": ["chargedCount"]
+        "increased": [
+          "chargedCount"
+        ]
       }
     },
     {
@@ -340,7 +346,9 @@
       ],
       "expect": {
         "tutorialStep": "blast",
-        "increased": ["sequencedCount"]
+        "increased": [
+          "sequencedCount"
+        ]
       }
     },
     {
@@ -501,7 +509,7 @@
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
       "timeout": 30,
-      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically.",
+      "description": "Test-only bootstrap, not a tutorial stage \u2014 see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically.",
       "interaction": [
         {
           "type": "command",
@@ -530,13 +538,15 @@
         }
       ],
       "expect": {
-        "increased": ["vehicleCount"]
+        "increased": [
+          "vehicleCount"
+        ]
       }
     },
     {
       "command": "vehicle driver 1 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real",
       "role": "player",
       "interaction": [
         {
@@ -590,27 +600,20 @@
       ],
       "expect": {
         "tutorialStep": "haul-debris",
-        "increased": ["buildingCount"]
+        "increased": [
+          "buildingCount"
+        ]
       }
     },
     {
-      "command": "vehicle haul 1 fragment:1",
+      "command": "tick 1",
       "timeout": 90,
-      "description": "haul-debris complete: the Vehicles panel's Haul button sends the hauler to a reachable fragment, and stored mass grows once it unloads at the warehouse. waitForTutorialStep drives the real clock for the haul — no scripted `tick` needed.",
+      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it.",
       "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn",
-          "timeout": 30000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
         },
         {
           "type": "waitForTutorialStep",
@@ -620,13 +623,13 @@
       ],
       "expect": {
         "tutorialStep": "contract-deliver",
-        "note": "The reported bug this beat guards: no UI control anywhere could trigger `vehicle haul`, so this is where a real player got stuck forever (mirrors tutorial.json's own note). No increased check on storedMassKg here — like hauling-gate.json (Finding #33), the exact delivered tonnage is position/timing-dependent, not the thing this beat proves."
+        "note": "The old reported bug this beat guarded against (no UI control anywhere could trigger `vehicle haul`) no longer applies -- #552 retires the button and the whole manual flow, so there is nothing left to get stuck on. No increased check on storedMassKg here -- like hauling-gate.json (Finding #33), the exact delivered tonnage is position/timing-dependent, not the thing this beat proves."
       }
     },
     {
       "command": "contract deliver 1 amount:5000",
       "timeout": 90,
-      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Left unmarked: command mode's own `contract deliver` fails synchronously here (\"Not enough stored material\" — command mode's `vehicle haul` dispatches but never waits for real arrival/unload, so nothing is ever in storage), while interaction mode's identical click genuinely succeeds because the tutorial's own waitForTutorialStep gate only advances once delivery truly completes — activeContractCount would drop to 0 there but stay 1 in command mode, so it is not safely checkable across both modes (same class as Findings #21/#22/#31).",
+      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Left unmarked: command mode's own `contract deliver` fails synchronously here (\"Not enough stored material\" -- command mode's automatic dispatch (#552) needs real ticks to actually drive/load/deliver, and the haul-debris step above only advances a single tick, so nothing is ever in storage there), while interaction mode's identical click genuinely succeeds because the tutorial's own waitForTutorialStep gate only advances once delivery truly completes -- activeContractCount would drop to 0 there but stay 1 in command mode, so it is not safely checkable across both modes (same class as Findings #21/#22/#31).",
       "role": "player",
       "interaction": [
         {
@@ -659,7 +662,7 @@
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 60,
-      "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) — the form mirrors the policy in force, and applying it unchanged still counts",
+      "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) \u2014 the form mirrors the policy in force, and applying it unchanged still counts",
       "role": "player",
       "interaction": [
         {
@@ -689,13 +692,13 @@
       ],
       "expect": {
         "tutorialStep": "tick-advance",
-        "note": "Applies without touching a control first — the form mirrors the policy already in force, and it used to leave the step stuck while the panel said the policy had been updated (mirrors tutorial.json's own note)."
+        "note": "Applies without touching a control first \u2014 the form mirrors the policy already in force, and it used to leave the step stuck while the panel said the policy had been updated (mirrors tutorial.json's own note)."
       }
     },
     {
       "command": "tick 6",
       "timeout": 60,
-      "description": "tick-advance complete: the tutorial's own clock runs — the whole point of this step — until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the retired playtest's own beat, which was `letTimePass` only.",
+      "description": "tick-advance complete: the tutorial's own clock runs \u2014 the whole point of this step \u2014 until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the retired playtest's own beat, which was `letTimePass` only.",
       "role": "player",
       "interaction": [
         {
@@ -708,14 +711,16 @@
         }
       ],
       "expect": {
-        "increased": ["tickCount"],
+        "increased": [
+          "tickCount"
+        ],
         "note": "Either closing card is a correct outcome: victory hands off to the completion card as soon as the level's profit target is met, which is campaign economy rather than playability (mirrors tutorial.json's own note)."
       }
     },
     {
       "command": "campaign complete",
       "timeout": 30,
-      "description": "victory complete: level ends, card shows Tutorial Complete. Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action — `campaign` is on the reused setup allowlist.",
+      "description": "victory complete: level ends, card shows Tutorial Complete. Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action \u2014 `campaign` is on the reused setup allowlist.",
       "role": "setup",
       "interaction": [
         {

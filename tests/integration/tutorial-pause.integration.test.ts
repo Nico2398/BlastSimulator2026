@@ -14,6 +14,9 @@ import { type GameContext, newGameCommand } from '../../src/console/commands/wor
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { TutorialOverlay } from '../../src/ui/TutorialOverlay.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { createRunner } from '../../src/console/createRunner.js';
+import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
+import { TutorialRails } from '../../src/ui/tutorialRails.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -112,5 +115,52 @@ describe('Tutorial pause behaviour (#371)', () => {
 
     // The game should NOT be paused because undefined was passed
     expect(ctx.state!.isPaused).toBe(false);
+  });
+
+  // ── 5. haul-debris step (#552): clock never gets stuck held ─────────────
+  //
+  // The real "stuck on 17/24" playthrough bug: before #552,
+  // hasOutstandingWork/isWorkInProgress/workSignature (tutorialGuide.ts) only
+  // ever looked at employees and PendingActions, never at a vehicle's own
+  // haulingPhase/breakPhase. A driver who had already boarded a hauler and
+  // was mid-drive read as "fully idle" (no activeActionId, no destination),
+  // so TutorialRails.updateClock held the clock — permanently, since a held
+  // clock stops the very ticks the drive needed to finish. This test drives
+  // the real engine (createRunner, real ticks) through an automatic haul and
+  // asserts the clock is never held while the haul is genuinely progressing.
+  it('haul-debris (#552): TutorialRails never holds the clock while automatic hauling is genuinely in progress', () => {
+    const { runner, ctx } = createRunner();
+
+    expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(runner.run('build freight_warehouse at:6,6').success).toBe(true);
+    expect(runner.run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
+    expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(runner.run('sequence auto delay_step:25').success).toBe(true);
+    expect(runner.run('blast').success).toBe(true);
+
+    const state = ctx.state!;
+    expect(state.logistics.fragments.some(f => f.state === 'on_ground')).toBe(true);
+
+    const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris')!;
+    expect(step.waitsOnWork).toBe(true);
+
+    const rails = new TutorialRails();
+    rails.beginStep(
+      { id: step.id, highlightTarget: step.highlightTarget, tickBudget: step.tickBudget, waitsOnWork: step.waitsOnWork },
+      state,
+    );
+
+    const snapshot = step.captureSnapshot!(state);
+    let everHeld = false;
+
+    for (let i = 0; i < 400 && !step.isComplete(state, snapshot); i++) {
+      runner.run('tick 1');
+      const held = rails.updateClock(state);
+      if (held) everHeld = true;
+    }
+
+    expect(step.isComplete(state, snapshot)).toBe(true);
+    expect(everHeld).toBe(false);
+    expect(state.isPaused).toBe(false);
   });
 });

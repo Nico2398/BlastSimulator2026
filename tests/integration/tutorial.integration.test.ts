@@ -7,6 +7,8 @@ import { type GameContext, newGameCommand } from '../../src/console/commands/wor
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
+import { createRunner } from '../../src/console/createRunner.js';
+import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -109,5 +111,67 @@ describe('Tutorial flow', () => {
 
     // Starting cash matches tutorial_pit config
     expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
+  });
+});
+
+// ── haul-debris step (#552): self-dispatching, no manual "vehicle haul" ────
+//
+// #552 retires the Fleet panel's manual Haul button in favor of automatic
+// dispatch: on-ground fragments spawn haul_debris/fragment_debris
+// PendingActions that a qualified employee claims, fetches a free hauler
+// for, and drives on their own (#549/#550's machinery). This is the real
+// "stuck on 17/24" playthrough bug's functional half — the step must
+// actually complete via automatic dispatch alone, with no `vehicle haul`
+// command anywhere in the sequence. The clock-holding half is covered
+// separately in tutorial-pause.integration.test.ts.
+
+describe('haul-debris step (#552): self-dispatching, no manual command', () => {
+  it('is the 17th of 24 tutorial steps (0-based index 16), between build-storage and contract-deliver', () => {
+    const ids = TUTORIAL_STEPS.map(s => s.id);
+    const idx = ids.indexOf('haul-debris');
+    expect(idx).toBe(16);
+    expect(ids[idx - 1]).toBe('build-storage');
+    expect(ids[idx + 1]).toBe('contract-deliver');
+  });
+
+  it('completes via automatic hauling alone: fragments move on_ground -> stored with no "vehicle haul" command issued', () => {
+    const { runner, ctx } = createRunner();
+    const commandsRun: string[] = [];
+    const run = (cmd: string) => {
+      commandsRun.push(cmd);
+      return runner.run(cmd);
+    };
+
+    // Staffed opening (#551) skips manual hire/purchase setup: driller,
+    // blaster, a truck-licensed driver and two excavator-licensed drivers,
+    // plus an unmanned drill_rig/debris_hauler/rock_digger/rock_fragmenter
+    // fleet — exactly the roster/fleet automatic haul dispatch needs, with
+    // no vehicle pre-assigned to anyone.
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('build freight_warehouse at:6,6').success).toBe(true);
+    expect(run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(run('sequence auto delay_step:25').success).toBe(true);
+    const blastResult = run('blast');
+    expect(blastResult.success).toBe(true);
+
+    const state = ctx.state!;
+    expect(state.logistics.fragments.some(f => f.state === 'on_ground')).toBe(true);
+    expect(state.logistics.storedMassKg).toBe(0);
+
+    const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris')!;
+    const snapshot = step.captureSnapshot!(state);
+
+    // Automatic dispatch alone: nothing here ever issues `vehicle haul` or
+    // assigns a driver by hand — the roster/fleet from staffed:true has to
+    // self-organize.
+    for (let i = 0; i < 400 && !step.isComplete(state, snapshot); i++) {
+      run('tick 1');
+    }
+
+    expect(step.isComplete(state, snapshot)).toBe(true);
+    expect(state.logistics.storedMassKg).toBeGreaterThan(0);
+    expect(state.logistics.fragments.some(f => f.state === 'stored')).toBe(true);
+    expect(commandsRun.some(cmd => cmd.startsWith('vehicle haul'))).toBe(false);
   });
 });

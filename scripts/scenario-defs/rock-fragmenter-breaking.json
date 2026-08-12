@@ -1,6 +1,6 @@
 {
   "name": "rock-fragmenter-breaking",
-  "description": "Chapter 5/2 (#484): an undercharged blast leaves an oversized boulder a debris_hauler must refuse; a crewed rock_fragmenter drives to it, breaks it via 'vehicle break', and a resulting sub-fragment is then hauled and stored \u2014 both through console commands and real Vehicles-panel clicks (buy, driver assign, .bs-vehicle-haul-btn, .bs-vehicle-break-btn).",
+  "description": "Chapter 5/2 (#484), superseded by #552's self-dispatching hauling/fragmenting: an undercharged blast leaves an oversized boulder that auto-dispatch routes to a crewed rock_fragmenter (fragment_debris PendingAction) rather than a debris_hauler (haul_debris) -- no player command or button picks which vehicle goes where any more, and there is no rejection to test either, since an oversized fragment simply never spawns a haul_debris action in the first place. A resulting sub-fragment is then hauled and stored automatically once a freight_warehouse exists. Buy/driver-assign purchases still go through real Vehicles-panel clicks; the break/haul actions themselves are proven by ticking forward and reading the automatic outcome.",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
@@ -254,21 +254,21 @@
       "role": "setup"
     },
     {
-      "command": "vehicle haul 1 fragment:0",
-      "description": "Must be refused: fragment #0 is oversized. No .bs-vehicle-haul-btn exists to click for it in interaction mode \u2014 the eligibility cache (findReachableGroundFragment) excludes oversized fragments outright, so the button never renders for this boulder; the command-mode attempt is what proves the rejection. Re-derived from a previously-hardcoded fragment #1 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting this file's drill_plan depth from 8 to 6 changed the whole fragment population, and fragment #1 (volume exactly 0.5, the OVERSIZED_FRAGMENT_THRESHOLD itself, not > 0.5) is no longer oversized in the corrected blast -- requestHaulFragment (HaulingTask.ts) checks isOversized before the freight-warehouse-exists check, so the refusal reason silently changed to 'No active freight warehouse available' with the old id, testing a different (and, at this point in the file, coincidental) rejection path instead of the one this step is actually about. Fragment #0 (volume 0.75) is genuinely oversized in the corrected population -- confirmed the refusal reason is 'Fragment is oversized and needs a Rock Fragmenter first' again.",
+      "command": "tick 1",
+      "description": "#552: replaces the old manual 'vehicle haul 1 fragment:0' rejection step -- there is no haul attempt to refuse any more, since an oversized fragment never spawns a haul_debris PendingAction in the first place (syncHaulDispatch routes it to fragment_debris instead). No freight_warehouse exists yet at this point in the file either way, so nothing can be delivered regardless.",
       "interaction": [
         {
           "type": "command",
-          "command": "vehicle haul 1 fragment:0"
+          "command": "tick 1"
         }
       ],
       "expect": {
         "equals": {
           "storedMassKg": 0
         },
-        "note": "the refused haul must not move anything into storage \u2014 the real proof is the command's own 'Fragment is oversized' rejection text, checked nowhere else this mechanism reaches; storedMassKg staying 0 is the closest state-level corroboration"
+        "note": "no active freight_warehouse exists yet, so storedMassKg staying 0 holds regardless of what auto-dispatch attempts"
       },
-      "role": "bootstrap"
+      "role": "setup"
     },
     {
       "command": "fragments",
@@ -373,20 +373,15 @@
       "role": "setup"
     },
     {
-      "command": "vehicle break 2 fragment:60",
-      "description": "Sets break intent only \u2014 the fragmenter must still drive to the boulder before breaking it. Command mode dispatches directly. In interaction mode, a reachable oversized fragment makes .bs-vehicle-break-btn render for vehicle #2, and the request is dispatched by a real click on that button \u2014 the button's own handler picks the fragment id (the eligibility cache's best reachable oversized fragment) and calls the exact same console command the click handler in breakEligibility.ts fires. Re-derived from a previously-hardcoded fragment #1 during the depth-mismatch audit (Ground rule #15/Finding #42): correcting the drill_plan depth from 8 to 6 produces a different fragment population with many oversized pieces (not just one), and fragment #1 specifically landed exactly at the oversized threshold (0.5 m3, not > 0.5) rather than above it -- confirmed by calling findReachableOversizedFragment directly against the corrected blast, which returns #60 (volume 0.75).",
+      "command": "tick 1",
+      "description": "#552: replaces the old manual 'vehicle break 2 fragment:60' step and its .bs-vehicle-break-btn click -- once the rock_fragmenter and its licensed driver exist, the oversized boulder's own fragment_debris PendingAction is claimed and driven to automatically, with no player command or button naming which boulder. The following tick-30 padding step lets the drive-and-break cycle actually finish.",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-break-btn",
-          "timeout": 5000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-break-btn"
+          "type": "command",
+          "command": "tick 1"
         }
       ],
-      "role": "player"
+      "role": "setup"
     },
     {
       "command": "tick 30",
@@ -456,24 +451,15 @@
       }
     },
     {
-      "command": "vehicle haul 1 fragment:56",
-      "description": "Hauls a resulting sub-fragment with the (still-idle) debris_hauler. Command mode dispatches the hardcoded fragment:56 directly \u2014 one of the sub-fragments produced by breaking fragment #60 (seed 42, this exact command sequence), not a stale oversized fragment left over from the original blast; the scenario step vocabulary has no way to capture an id from a prior step's output, so this is hardcoded, and needs re-deriving (via findReachableGroundFragment, or a 'fragments' step) if any upstream change to blast/break fragment-id assignment shifts it \u2014 as it did during the depth-mismatch audit (Ground rule #15/Finding #42), where correcting the drill_plan depth from 8 to 6 changed the whole fragment population and the previously-hardcoded #64 was no longer haul-eligible (confirmed: storedMassKg silently stayed 0). In interaction mode, this fragment is on_ground and reachable, so .bs-vehicle-haul-btn renders for vehicle #1, and the request is dispatched by a real click on that button \u2014 the button's own handler picks the fragment id (the eligibility cache's nearest reachable on-ground fragment) and calls the exact same console command the click handler in haulEligibility.ts fires.",
+      "command": "tick 1",
+      "description": "#552: replaces the old manual 'vehicle haul 1 fragment:56' step and its .bs-vehicle-haul-btn click -- one of the sub-fragments the automatic break above produced is on_ground and non-oversized, so it already has its own haul_debris PendingAction; the idle debris_hauler's driver claims and delivers it with no player command or button naming which fragment. The following tick-30 padding step lets the drive-load-deliver cycle actually finish.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn",
-          "timeout": 5000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-haul-btn"
+          "type": "command",
+          "command": "tick 1"
         }
       ],
-      "role": "player"
+      "role": "setup"
     },
     {
       "command": "tick 30",

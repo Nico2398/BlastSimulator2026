@@ -317,8 +317,12 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": ["tickCount"],
-        "decreased": ["safety"],
+        "increased": [
+          "tickCount"
+        ],
+        "decreased": [
+          "safety"
+        ],
         "note": "confirmed via direct trace: safety crashes 50 -> ~20 over these 3 ticks (recentAccidents * 5 per tick against the two deaths from the blast above) -- decreased rather than an exact value since the precise magnitude depends on the accident-recency window's exact tick alignment, which real wall-clock ticking in interaction mode is not guaranteed to reproduce bit-for-bit."
       }
     },
@@ -367,7 +371,9 @@
         "equals": {
           "cash": 71800
         },
-        "increased": ["wellBeing"],
+        "increased": [
+          "wellBeing"
+        ],
         "note": "tutorial_synergy_consultant's option 0 is a fixed, RNG-free delta (cashDelta:-3000, scoreDelta.wellBeing:15 -- TutorialEvents.ts) -- deterministic in both modes since the event itself was forced above, not randomly selected."
       }
     },
@@ -442,7 +448,7 @@
           "command": "contract deliver 1 amount:5000"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 430 kg contract -- this file never hauls anything into storage (no `vehicle haul` call anywhere). The console command is no better: it returns success:false (\"Not enough stored material: 0.0 kg available\") and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:5000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 430 kg contract. Still true post-#552 (self-dispatching hauling): no debris_hauler exists yet at this point in the file (bought only much later, step 23) -- there is nothing for auto-dispatch to claim with yet, manual or otherwise. The console command is no better: it returns success:false (\"Not enough stored material: 0.0 kg available\") and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:5000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
       "expect": {
         "equals": {
           "activeContractCount": 1
@@ -615,7 +621,7 @@
           "command": "contract deliver 2 amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble #1, sparkium #2), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. The console command returns success:false (\"Not enough sparkium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble #1, sparkium #2), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. Still true post-#552: the debris_hauler, its licensed driver, and the freight_warehouse are all in place by now (steps 21-25), so a haul_debris PendingAction could in principle be claimed automatically -- but no `tick` step runs anywhere between the warehouse going up and this step, so the simulation has had zero ticks in which to actually drive/load/deliver anything. Storage is still genuinely empty, not merely un-ordered. The console command returns success:false (\"Not enough sparkium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
         "equals": {
           "activeContractCount": 2
@@ -736,7 +742,7 @@
           "command": "contract deliver 3 amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough rustite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 25) and here either. The console command returns success:false (\"Not enough rustite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard.",
       "expect": {
         "equals": {
           "activeContractCount": 3
@@ -942,8 +948,12 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": ["tickCount"],
-        "decreased": ["cash"],
+        "increased": [
+          "tickCount"
+        ],
+        "decreased": [
+          "cash"
+        ],
         "note": "confirmed via direct trace: cash drops from ongoing payroll/maintenance even with no active tasks (28000 -> 26130, shifted from the pre-#526 43000 -> 41130 by the freight_warehouse construction cost above), matching every other file's ordinary tick-drain pattern."
       }
     },
