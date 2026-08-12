@@ -2,7 +2,14 @@
 // Owns the exclusive claim a PendingAction holds on a Vehicle from the
 // moment an employee claims a vehicle-gated action until the action
 // completes, is cancelled, or the vehicle is destroyed underneath it.
-// Core-pure: imports only from entities/ and state/.
+// Core-pure: imports only from entities/, state/, and EntityMovementTick.js
+// (one-way, EntityMovementTick.ts never imports back). Deliberately does NOT
+// import TaskDispatch.ts — TaskDispatch.ts imports releaseVehicleReservation
+// from here, so calling into it back would be a cycle. Where reconciliation
+// needs to interrupt an active action (case (c) below), it reports the need
+// to its caller instead of performing the interruption itself — see
+// reconcileVehicleReservations's return type and ArrivalGate.ts, the sole
+// caller, which already imports both modules safely.
 
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
@@ -10,7 +17,6 @@ import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import { unassignDriver } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { setVehicleIdle } from './EntityMovementTick.js';
-import { interruptActiveAction } from './TaskDispatch.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -85,14 +91,22 @@ export function releaseVehicleOnCompletion(state: GameState, employee: Employee,
   releaseVehicleReservation(state, completedActionId);
 }
 
+/** One active action reconcileVehicleReservations found needing interruption — its reserved vehicle vanished before the holder started their work timer. The caller (ArrivalGate.ts) performs the actual interruptActiveAction call, since that lives in TaskDispatch.ts and this module cannot import it without a cycle. */
+export interface VehicleGoneInterruption {
+  employee: Employee;
+  actionId: number;
+}
+
 /**
  * Per-tick reconciliation: releases any reservation whose PendingAction
- * no longer exists or whose holder is dead, and interrupts any employee
- * whose vehicle-gated active action's reserved vehicle no longer exists
- * in state.vehicles.vehicles (destroyed underneath them) — before they've
- * started the work timer. Never touches an employee already mid-work-timer.
+ * no longer exists or whose holder is dead, and reports any employee whose
+ * vehicle-gated active action's reserved vehicle no longer exists in
+ * state.vehicles.vehicles (destroyed underneath them) — before they've
+ * started the work timer — so the caller can interrupt it. Never touches an
+ * employee already mid-work-timer. Returns an empty array when nothing needs
+ * interrupting.
  */
-export function reconcileVehicleReservations(state: GameState): void {
+export function reconcileVehicleReservations(state: GameState): VehicleGoneInterruption[] {
   // (a) / (b): every still-reserved vehicle whose PendingAction vanished or
   // whose reserving employee died — release the reservation outright.
   for (const vehicle of state.vehicles.vehicles) {
@@ -115,6 +129,7 @@ export function reconcileVehicleReservations(state: GameState): void {
   // (c): a vehicle-gated action still claimed, still pre-work-timer, whose
   // reserved vehicle no longer exists at all — can't be caught by iterating
   // vehicles (there's nothing left to iterate), so walk actions instead.
+  const interruptions: VehicleGoneInterruption[] = [];
   for (const action of state.pendingActions) {
     if (action.requiredVehicleRole === null) continue;
     if (action.holderId === null) continue;
@@ -125,6 +140,8 @@ export function reconcileVehicleReservations(state: GameState): void {
     const vehicleStillExists = state.vehicles.vehicles.some(v => v.reservedForActionId === action.id);
     if (vehicleStillExists) continue;
 
-    interruptActiveAction(state, holder, action.id);
+    interruptions.push({ employee: holder, actionId: action.id });
   }
+
+  return interruptions;
 }

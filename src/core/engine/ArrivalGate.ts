@@ -13,6 +13,7 @@ import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
 import { tickVehicle, tickVehicleTaskState } from './EntityMovementTick.js';
 import { releaseVehicleReservation, reconcileVehicleReservations } from './VehicleReservation.js';
+import { interruptActiveAction } from './TaskDispatch.js';
 import { seedTaskTimerFields } from './ActionSelection.js';
 import { VEHICLE_ROLE_ARRIVAL_TASK } from '../config/balance.js';
 
@@ -193,7 +194,14 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     tickVehicleTaskState(vehicle);
   }
 
-  reconcileVehicleReservations(state);
+  // reconcileVehicleReservations only reports which active actions need
+  // interrupting (their reserved vehicle vanished underneath them) rather
+  // than interrupting them itself — that call lives in TaskDispatch.ts,
+  // which VehicleReservation.ts cannot import without a cycle (TaskDispatch.ts
+  // imports releaseVehicleReservation from VehicleReservation.ts).
+  for (const { employee, actionId } of reconcileVehicleReservations(state)) {
+    interruptActiveAction(state, employee, actionId);
+  }
 
   return result;
 }
