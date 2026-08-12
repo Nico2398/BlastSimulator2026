@@ -23,7 +23,7 @@ import { tickResearch, getTotalOperatingCost } from '../../core/entities/Buildin
 import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate, tryContinueVehicleGatedAction } from '../../core/engine/GameLoop.js';
 import { completePendingAction } from '../../core/engine/TaskDispatch.js';
 import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
@@ -203,21 +203,26 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] Research cancelled: ${cancelledResearch.targetType} tier ${cancelledResearch.targetTier} — Research Center destroyed, $${cancelledResearch.refund} refunded.`);
     }
 
-    // 8e (before 8d). Task duration progress + XP/level-up reporting.
-    // taskTicksRemaining only counts down once ArrivalGate (8h below) has
-    // promoted it from pendingTaskDuration on a prior tick — see tickEmployees
-    // (#437). Runs before 8d's claim pass — this reordering affects every
-    // employee who finishes a task this tick, on-foot or vehicle-gated alike:
-    // whoever it is becomes immediately eligible for redispatch the same
-    // tick instead of sitting idle until next tick. The motivating case is
-    // narrower — a vehicle-gated action's driver, freed by a completed
-    // action, is available to be reclaimed by a same-role follow-up in the
-    // SAME tick, since the continuity tie-break in
-    // VehicleReservation.findFreeVehicleForRole only re-mounts a driver who
-    // is still (or, after dismounting here, freshly) at the vehicle's own
-    // position, so claiming one tick late would otherwise walk them away and
-    // back for no reason (#550) — but the reordering itself is not scoped to
-    // that case.
+    // 8d. Dispatch remaining pending actions to idle qualified employees. An
+    // action requiring a skill nobody on the roster holds is not left to
+    // queue silently forever — it raises the same unqualified_task_error
+    // event used elsewhere (auto-pause, resolved via "event choose").
+    //
+    // Runs BEFORE 8e's completion pass below, matching main's original
+    // order — an earlier fix (#550) swapped these two globally so a
+    // vehicle-gated driver freed by 8e could be redispatched the same tick,
+    // but that reordering shifted every employee's task-completion timing by
+    // up to one tick, on-foot or vehicle-gated alike, and broke survey/task
+    // timing across several scenarios that have nothing to do with vehicles.
+    // The vehicle-continuity case that motivated it is instead handled
+    // inline, scoped to vehicle-gated actions only — see
+    // tryContinueVehicleGatedAction below.
+    const dispatchResult = tickEmployees(state);
+    fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
+
+    // 8e. Task duration progress + XP/level-up reporting. taskTicksRemaining
+    // only counts down once ArrivalGate (8h below) has promoted it from
+    // pendingTaskDuration on a prior tick — see tickEmployees (#437).
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
       const progress = tickTaskProgress(state, emp, emitter);
@@ -231,12 +236,18 @@ export function tickCommand(
         // removes the completing action's record and ghost, once the work has
         // actually finished, not at claim time (#547).
         if (progress.actionId !== undefined) {
-          // #550: look the action up (and release its vehicle, dismount-or-
-          // stay per releaseVehicleOnCompletion) before completePendingAction
-          // removes the record — nothing to look requiredVehicleRole up on afterward.
+          // #550: look the action up before completePendingAction removes
+          // the record — nothing to look requiredVehicleRole up on
+          // afterward. For a vehicle-gated action, try the scoped same-tick
+          // continuity promotion first (tryContinueVehicleGatedAction) —
+          // reassigns the just-finished vehicle straight to a same-role
+          // follow-up already available to this employee, keeping them
+          // mounted. Only when no follow-up qualifies does the vehicle get
+          // unconditionally released/dismounted via releaseVehicleOnCompletion.
           const completingAction = state.pendingActions.find(a => a.id === progress.actionId);
           if (completingAction && completingAction.requiredVehicleRole !== null) {
-            releaseVehicleOnCompletion(state, emp, progress.actionId);
+            const continued = tryContinueVehicleGatedAction(state, emp, completingAction);
+            if (!continued) releaseVehicleOnCompletion(state, emp, progress.actionId);
           }
           completePendingAction(state, progress.actionId);
         }
@@ -270,18 +281,6 @@ export function tickCommand(
         lines.push(`[tick ${state.tickCount}] LEVELUP: ${emp.name} reached level ${progress.newLevel} in ${progress.skill}.`);
       }
     }
-
-    // 8d (after 8e). Dispatch remaining pending actions to idle qualified
-    // employees — moved after the completion pass above so ANY employee
-    // freed this same tick by finishing a task (on-foot or, per #550,
-    // vehicle-gated — including a driver dismounted by
-    // releaseVehicleOnCompletion) can be reclaimed the same tick rather than
-    // idling for one extra tick. An action requiring a skill nobody on
-    // the roster holds is not left to queue silently forever — it raises the
-    // same unqualified_task_error event used elsewhere (auto-pause, resolved
-    // via "event choose").
-    const dispatchResult = tickEmployees(state);
-    fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
     // 8f. Vehicle movement — advance every vehicle currently task='moving' one
     // step toward its target (moveVehicle/vehicle-move-command only set the

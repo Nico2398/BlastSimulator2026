@@ -415,6 +415,79 @@ function promoteActionToActive(state: GameState, employee: Employee, action: Pen
   seedTaskTimerFields(state, employee, action);
 }
 
+/**
+ * Vehicle-continuity inline promotion (#550). Called by events.ts's
+ * completion pass the instant a vehicle-gated action finishes, before it
+ * would otherwise call VehicleReservation.releaseVehicleOnCompletion and
+ * dismount the driver. Looks for a same-`requiredVehicleRole` follow-up
+ * already available to `employee` — first their own `taskQueue` (claimed on
+ * a prior tick), then the still-`queued` pool (open, or targeted at this
+ * employee) — and, if one exists, transfers the just-finished action's
+ * vehicle reservation straight to it and promotes it to active immediately,
+ * so the employee stays mounted and drives to the next target the same tick
+ * instead of dismounting and re-walking.
+ *
+ * Deliberately scoped to this one employee/vehicle pair: does not touch when
+ * `tickEmployees` runs, or any other employee's completion-to-redispatch
+ * timing. An earlier fix solved the same continuity gap by globally
+ * reordering the tick's dispatch pass to run after completion instead of
+ * before — that shifted survey/task completion timing by up to one tick for
+ * every employee in the game, not just vehicle-gated ones (regression fixed
+ * by restoring the original 8d-before-8e order and adding this function).
+ *
+ * Ties broken by lowest action id, matching claimActionsTargetedAtEmployee's
+ * own determinism rule — cost-based ranking (selectBestActionForEmployee) is
+ * unnecessary here since every candidate already shares the same vehicle.
+ *
+ * Returns true when a follow-up was promoted this way (caller must skip
+ * releaseVehicleOnCompletion — the vehicle is now reserved for the new
+ * action, not free). Returns false when nothing qualified — caller falls
+ * back to the normal unconditional release/dismount.
+ */
+export function tryContinueVehicleGatedAction(
+  state: GameState,
+  employee: Employee,
+  completedAction: PendingAction,
+): boolean {
+  const role = completedAction.requiredVehicleRole;
+  if (role === null) return false;
+
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === completedAction.id);
+  if (!vehicle || vehicle.driverId !== employee.id) return false;
+
+  const queuedFollowUps = employee.taskQueue
+    .map(id => state.pendingActions.find(a => a.id === id))
+    .filter((a): a is PendingAction =>
+      a !== undefined && a.status === 'assigned' && a.holderId === employee.id && a.requiredVehicleRole === role)
+    .sort((a, b) => a.id - b.id);
+
+  if (queuedFollowUps.length > 0) {
+    const followUp = queuedFollowUps[0]!;
+    employee.taskQueue = employee.taskQueue.filter(id => id !== followUp.id);
+    vehicle.reservedForActionId = followUp.id;
+    promoteActionToActive(state, employee, followUp);
+    return true;
+  }
+
+  const poolFollowUps = state.pendingActions
+    .filter(a =>
+      a.status === 'queued' &&
+      (a.targetEmployeeId === null || a.targetEmployeeId === employee.id) &&
+      a.requiredVehicleRole === role &&
+      (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)))
+    .sort((a, b) => a.id - b.id);
+
+  if (poolFollowUps.length === 0) return false;
+
+  const followUp = poolFollowUps[0]!;
+  const claimed = claimPendingAction(state, followUp.id, employee.id);
+  if (!claimed) return false;
+
+  vehicle.reservedForActionId = claimed.id;
+  promoteActionToActive(state, employee, claimed);
+  return true;
+}
+
 // ── Need restoration routing ──
 
 export interface NeedRestorationResult {
