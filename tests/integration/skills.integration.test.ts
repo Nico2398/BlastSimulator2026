@@ -465,7 +465,7 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
     expect(masterSeeded).toBeLessThan(rookieSeeded);
   });
 
-  it('dispatch without a skill: param still queues general_work with requiredSkill: null and gets claimed (regression)', () => {
+  it('dispatch without a skill: param still queues general_work with requiredSkill: null, gets claimed and seeded, and reaches completion (regression, #547 review — the widened tickEmployees condition, action.type !== \'rest\' rather than requiredSkill !== null, is what makes this possible)', () => {
     const ctx = makeCtx();
     const empId = hireOne(ctx, 'driller');
 
@@ -476,22 +476,6 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
     expect(action).toBeDefined();
     expect(action!.requiredSkill).toBeNull();
     expect(action!.type).toBe('general_work');
-
-    tickCommand(ctx, ['1'], {});
-    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
-    expect(emp.activeActionId).not.toBeNull();
-  });
-
-  it('a null-skill general_work action still gets pendingTaskDuration/taskTicksRemaining seeded and reaches completion (regression, #547 review — the widened tickEmployees condition, action.type !== \'rest\' rather than requiredSkill !== null, is what makes this possible)', () => {
-    const ctx = makeCtx();
-    const empId = hireOne(ctx, 'driller');
-
-    const result = employeeCommand(ctx, ['dispatch', String(empId)], { x: '3', z: '3' });
-    expect(result.success, result.output).toBe(true);
-
-    const action = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId);
-    expect(action).toBeDefined();
-    expect(action!.requiredSkill).toBeNull();
     const dispatchedActionId = action!.id;
 
     // Claim happens the very next tick — pendingTaskDuration is seeded on the
