@@ -83,7 +83,7 @@ export function makeHiredLocationStrip(e: Employee, state: GameState): HTMLEleme
 
   const activity = computeEmployeeActivity(e, state.vehicles.vehicles);
   let location: string;
-  if (activity.kind === 'driving') {
+  if (activity.kind === 'driving' || activity.kind === 'driving_to_task') {
     location = t('ui.crew.location_aboard', { vehicle: `#${activity.vehicleId}` });
   } else if (e.destinationX !== null || e.destinationZ !== null) {
     location = t('ui.crew.location_walking', { x: e.destinationX ?? e.x, z: e.destinationZ ?? e.z });

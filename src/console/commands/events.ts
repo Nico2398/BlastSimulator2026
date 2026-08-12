@@ -25,6 +25,7 @@ import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeN
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate } from '../../core/engine/GameLoop.js';
 import { completePendingAction } from '../../core/engine/TaskDispatch.js';
+import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
@@ -225,6 +226,13 @@ export function tickCommand(
         // removes the completing action's record and ghost, once the work has
         // actually finished, not at claim time (#547).
         if (progress.actionId !== undefined) {
+          // #550: look the action up (and release its vehicle, dismount-or-
+          // stay per releaseVehicleOnCompletion) before completePendingAction
+          // removes the record — nothing to look requiredVehicleRole up on afterward.
+          const completingAction = state.pendingActions.find(a => a.id === progress.actionId);
+          if (completingAction && completingAction.requiredVehicleRole !== null) {
+            releaseVehicleOnCompletion(state, emp, progress.actionId);
+          }
           completePendingAction(state, progress.actionId);
         }
 
@@ -264,7 +272,11 @@ export function tickCommand(
     // are driven entirely by tickArrivalGate/tickHaulingProgress instead (8h)
     // — ticking them here too would move them twice in the same tick (#437).
     for (const vehicle of state.vehicles.vehicles) {
-      if (vehicle.haulingPhase !== null) continue;
+      // Vehicle-gated actions (#550) are driven exclusively by
+      // ArrivalGate.tickArrivalGate's own vehicle-drive loop (8h below) —
+      // ticking them here too would move them twice in the same tick, same
+      // rationale as the haulingPhase skip.
+      if (vehicle.haulingPhase !== null || vehicle.reservedForActionId !== null) continue;
       tickVehicle(state, vehicle, emitter);
       tickVehicleTaskState(vehicle);
     }

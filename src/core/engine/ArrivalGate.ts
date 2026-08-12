@@ -11,6 +11,10 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { assignDriver } from '../entities/Vehicle.js';
 import { tickHaulingProgress } from '../economy/HaulingTask.js';
 import { tickBreakProgress } from '../economy/BoulderBreaking.js';
+import { tickVehicle, tickVehicleTaskState } from './EntityMovementTick.js';
+import { releaseVehicleReservation, reconcileVehicleReservations } from './VehicleReservation.js';
+import { seedTaskTimerFields } from './ActionSelection.js';
+import { VEHICLE_ROLE_ARRIVAL_TASK } from '../config/balance.js';
 
 /** Summary of what the arrival gate started/cancelled on this tick. */
 export interface ArrivalGateResult {
@@ -127,6 +131,38 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     }
   }
 
+  // Vehicle-gated actions (#550): drive every boarded, reserved vehicle
+  // toward the target GameLoop.promoteActionToActive/promoteVehicleGatedAction
+  // set on claim (moveVehicle, or on the tick a boarding above just
+  // completed) — the sole place a reserved vehicle's x/z is ever advanced,
+  // per this file's header comment. Once it arrives, seed the holder's
+  // work-timer fields (deferred at claim time specifically for this) and
+  // swap the vehicle from "moving" into its role's arrival task instead of
+  // the idle state tickVehicle's own arrival handling would otherwise leave
+  // it in.
+  for (const vehicle of state.vehicles.vehicles) {
+    if (vehicle.reservedForActionId === null || vehicle.driverId === null) continue;
+
+    const alreadyAtTarget = vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ;
+    if (!alreadyAtTarget) {
+      tickVehicle(state, vehicle, emitter);
+    }
+    if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) continue;
+
+    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+    if (!action || action.status !== 'assigned') continue; // work already started (or reservation stale) — nothing left to seed
+
+    const holder = action.holderId !== null ? state.employees.employees.find(e => e.id === action.holderId) : undefined;
+    if (holder) {
+      seedTaskTimerFields(state, holder, action);
+    }
+
+    vehicle.task = VEHICLE_ROLE_ARRIVAL_TASK[vehicle.type];
+    tickVehicleTaskState(vehicle);
+  }
+
+  reconcileVehicleReservations(state);
+
   return result;
 }
 
@@ -147,12 +183,14 @@ function resolveBoarding(
   if (!vehicle) {
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_gone' });
+    releaseReservationIfVehicleGated(state, emp);
     return;
   }
 
   if (vehicle.driverId !== null && vehicle.driverId !== emp.id) {
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_taken' });
+    releaseReservationIfVehicleGated(state, emp);
     return;
   }
 
@@ -161,6 +199,7 @@ function resolveBoarding(
     // moved elsewhere — cancel rather than chase it silently.
     emp.pendingDriverVehicleId = null;
     result.boardingCancelled.push({ employeeId: emp.id, reason: 'vehicle_moved' });
+    releaseReservationIfVehicleGated(state, emp);
     return;
   }
 
@@ -169,7 +208,30 @@ function resolveBoarding(
   if (boarded.success) {
     result.driversBoarded.push(emp.id);
     emitter?.emit('vehicle:driver_boarded', { employeeId: emp.id, vehicleId: vehicle.id });
+    // #550: a vehicle-gated action already staged targetX/targetZ on this
+    // vehicle at claim time (GameLoop.promoteVehicleGatedAction) but left
+    // task alone so an unmanned vehicle never drove itself — now that a
+    // driver is aboard, hand it to tickVehicle (ArrivalGate's own vehicle-
+    // drive loop, below) the same way moveVehicle would.
+    if (vehicle.reservedForActionId !== null) {
+      vehicle.task = 'moving';
+      vehicle.waitingTicks = 0;
+    }
   } else {
     result.boardingCancelled.push({ employeeId: emp.id, reason: boarded.error ?? 'unknown' });
+  }
+}
+
+/**
+ * A cancelled boarding must not leave a dangling vehicle reservation behind
+ * (#550) — `emp.activeActionId` still names the vehicle-gated action being
+ * walked to at this point (GameLoop sets it before requesting the board), so
+ * it's the lookup key back to which reservation, if any, to release.
+ */
+function releaseReservationIfVehicleGated(state: GameState, emp: Employee): void {
+  if (emp.activeActionId === null) return;
+  const action = state.pendingActions.find(a => a.id === emp.activeActionId);
+  if (action && action.requiredVehicleRole !== null) {
+    releaseVehicleReservation(state, action.id);
   }
 }

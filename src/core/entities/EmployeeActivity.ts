@@ -48,8 +48,17 @@ export function computeEmployeeActivity(employee: Employee, vehicles: readonly V
     };
   }
 
-  const driving = vehicles.find(v => v.driverId === employee.id);
-  if (driving) return { ...IDLE, kind: 'driving', vehicleId: driving.id };
+  const drivenVehicle = vehicles.find(v => v.driverId === employee.id);
+  // `?? null`: a fixture/old-save Vehicle predating reservedForActionId
+  // (#550) carries it as undefined, not null — treated the same as
+  // "unreserved" rather than misreported as vehicle-gated.
+  if (drivenVehicle && (drivenVehicle.reservedForActionId ?? null) !== null) {
+    // taskTicksRemaining !== null is caught by the 'working' branch above,
+    // which takes priority — this only ever fires while still en route
+    // (walking/boarding done, vehicle driving, work not yet started).
+    return { ...IDLE, kind: 'driving_to_task', vehicleId: drivenVehicle.id };
+  }
+  if (drivenVehicle) return { ...IDLE, kind: 'driving', vehicleId: drivenVehicle.id };
 
   if (employee.destinationX !== null || employee.destinationZ !== null) {
     return { ...IDLE, kind: 'walking', actionType: employee.pendingActionType };

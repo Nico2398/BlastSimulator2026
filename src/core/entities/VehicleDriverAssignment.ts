@@ -44,6 +44,15 @@ export function canAssignDriver(
   const hasLicence = employee.qualifications.some(q => q.category === requiredLicence);
   if (!hasLicence) return { success: false, error: 'Employee lacks licence for this role' };
 
+  // A vehicle reserved for a vehicle-gated PendingAction (#550) may only be
+  // boarded by the employee that reservation belongs to — anyone else (a
+  // different employee, or a manual `vehicle driver` re-target) is blocked.
+  // The reserving employee's own boarding succeeds because GameLoop sets
+  // employee.activeActionId to the reserving action before requesting it.
+  if (vehicle.reservedForActionId !== null && vehicle.reservedForActionId !== employee.activeActionId) {
+    return { success: false, error: 'Vehicle is reserved for another task' };
+  }
+
   const alreadyDriving = vehicleState.vehicles.some(v => v.driverId === employeeId);
   if (alreadyDriving) return { success: false, error: 'Employee already driving another vehicle' };
 

@@ -6,6 +6,7 @@ import { SURVEY_COSTS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
+import { releaseVehicleReservation } from './VehicleReservation.js';
 
 export type { PendingAction };
 
@@ -42,6 +43,7 @@ function clearHolderWalkFields(emp: Employee): void {
   emp.moveConsecutiveFailures = 0;
   emp.isMoveStuck = false;
   emp.pendingTaskDuration = null;
+  emp.pendingDriverVehicleId = null;
 }
 
 /**
@@ -188,6 +190,10 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
     if (holder) clearHolderWalkFields(holder);
   }
 
+  if (action.requiredVehicleRole !== null) {
+    releaseVehicleReservation(state, action.id);
+  }
+
   const refunded = actionOrderCost(action);
   if (refunded > 0) {
     state.cash += refunded;
@@ -264,6 +270,10 @@ export function interruptActiveAction(state: GameState, employee: Employee, acti
 
       const ghost = state.ghostPreviews.find(g => g.id === actionId);
       if (ghost) ghost.claimed = false;
+
+      if (action.requiredVehicleRole !== null) {
+        releaseVehicleReservation(state, action.id);
+      }
     }
   }
 

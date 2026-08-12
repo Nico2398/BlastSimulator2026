@@ -166,7 +166,7 @@ function canTickVehicle(vehicle: Vehicle): boolean {
     (vehicle.state === 'idle' || vehicle.state === 'moving' || vehicle.state === 'waiting' || vehicle.state === 'working');
 }
 
-function setVehicleIdle(vehicle: Vehicle): void {
+export function setVehicleIdle(vehicle: Vehicle): void {
   vehicle.task = 'idle';
   vehicle.state = 'idle';
   vehicle.waitingTicks = 0;

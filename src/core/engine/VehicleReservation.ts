@@ -7,12 +7,15 @@
 import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
+import { unassignDriver } from '../entities/Vehicle.js';
+import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
+import { setVehicleIdle } from './EntityMovementTick.js';
+import { interruptActiveAction } from './TaskDispatch.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
-  void employee; void role;
-  // TODO: implement
-  throw new Error('not implemented');
+  const requiredLicence = ROLE_LICENCE_REQUIRED[role];
+  return employee.qualifications.some(q => q.category === requiredLicence);
 }
 
 /**
@@ -25,16 +28,25 @@ export function isLicensedForRole(employee: Employee, role: VehicleRole): boolea
  * Returns null when none qualify.
  */
 export function findFreeVehicleForRole(state: GameState, role: VehicleRole, employee: Employee): Vehicle | null {
-  void state; void role; void employee;
-  // TODO: implement
-  throw new Error('not implemented');
+  if (!isLicensedForRole(employee, role)) return null;
+
+  const qualifying = state.vehicles.vehicles.filter(v =>
+    v.type === role &&
+    v.state !== 'broken' &&
+    v.reservedForActionId === null &&
+    (v.driverId === null || v.driverId === employee.id),
+  );
+  if (qualifying.length === 0) return null;
+
+  const continuity = qualifying.find(v => v.driverId === employee.id);
+  if (continuity) return continuity;
+
+  return qualifying.reduce((lowest, v) => (v.id < lowest.id ? v : lowest));
 }
 
 /** Marks `vehicle` reserved for `actionId`. Caller must have already confirmed the vehicle came from findFreeVehicleForRole this same tick. */
 export function reserveVehicle(vehicle: Vehicle, actionId: number): void {
-  void vehicle; void actionId;
-  // TODO: implement
-  throw new Error('not implemented');
+  vehicle.reservedForActionId = actionId;
 }
 
 /**
@@ -44,9 +56,14 @@ export function reserveVehicle(vehicle: Vehicle, actionId: number): void {
  * reconciliation sweep. No-op if no vehicle is reserved for `actionId`.
  */
 export function releaseVehicleReservation(state: GameState, actionId: number): void {
-  void state; void actionId;
-  // TODO: implement
-  throw new Error('not implemented');
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  if (!vehicle) return;
+
+  vehicle.reservedForActionId = null;
+  if (vehicle.driverId !== null) {
+    unassignDriver(state.vehicles, vehicle.id);
+    setVehicleIdle(vehicle);
+  }
 }
 
 /**
@@ -58,9 +75,14 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
  * the employee stays mounted.
  */
 export function releaseVehicleOnCompletion(state: GameState, employee: Employee, completedActionId: number): void {
-  void state; void employee; void completedActionId;
-  // TODO: implement
-  throw new Error('not implemented');
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === completedActionId);
+  if (!vehicle) return;
+  // Defensive: only the driver whose action just completed may trigger the
+  // release — a mismatch here means the reservation/driver bookkeeping has
+  // already drifted, and reconcileVehicleReservations is the one to fix it.
+  if (vehicle.driverId !== null && vehicle.driverId !== employee.id) return;
+
+  releaseVehicleReservation(state, completedActionId);
 }
 
 /**
@@ -71,7 +93,38 @@ export function releaseVehicleOnCompletion(state: GameState, employee: Employee,
  * started the work timer. Never touches an employee already mid-work-timer.
  */
 export function reconcileVehicleReservations(state: GameState): void {
-  void state;
-  // TODO: implement
-  throw new Error('not implemented');
+  // (a) / (b): every still-reserved vehicle whose PendingAction vanished or
+  // whose reserving employee died — release the reservation outright.
+  for (const vehicle of state.vehicles.vehicles) {
+    if (vehicle.reservedForActionId === null) continue;
+    const actionId = vehicle.reservedForActionId;
+    const action = state.pendingActions.find(a => a.id === actionId);
+
+    if (!action) {
+      releaseVehicleReservation(state, actionId);
+      continue;
+    }
+
+    const holderId = action.holderId ?? vehicle.driverId;
+    const holder = holderId !== null ? state.employees.employees.find(e => e.id === holderId) : undefined;
+    if (!holder || !holder.alive) {
+      releaseVehicleReservation(state, actionId);
+    }
+  }
+
+  // (c): a vehicle-gated action still claimed, still pre-work-timer, whose
+  // reserved vehicle no longer exists at all — can't be caught by iterating
+  // vehicles (there's nothing left to iterate), so walk actions instead.
+  for (const action of state.pendingActions) {
+    if (action.requiredVehicleRole === null) continue;
+    if (action.holderId === null) continue;
+
+    const holder = state.employees.employees.find(e => e.id === action.holderId);
+    if (!holder || holder.taskTicksRemaining !== null) continue;
+
+    const vehicleStillExists = state.vehicles.vehicles.some(v => v.reservedForActionId === action.id);
+    if (vehicleStillExists) continue;
+
+    interruptActiveAction(state, holder, action.id);
+  }
 }

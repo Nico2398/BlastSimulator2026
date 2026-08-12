@@ -58,6 +58,23 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
 }
 
 /**
+ * Seeds the work-timer-on-arrival fields (pendingTaskDuration, activeTaskSkill,
+ * pendingActionType, pendingActionPayload) that ArrivalGate.tickArrivalGate
+ * promotes into taskTicksRemaining once the entity physically reaches the
+ * action's target — the employee themself for an on-foot action, or (#550)
+ * their reserved vehicle for a vehicle-gated one. Shared by GameLoop.ts's
+ * promoteActionToActive (on-foot claim, unchanged behavior) and
+ * ArrivalGate.ts's vehicle-arrival transition, so both start work identically
+ * instead of duplicating the same four-field assignment in two places.
+ */
+export function seedTaskTimerFields(state: GameState, employee: Employee, action: PendingAction): void {
+  employee.pendingTaskDuration = computeActionWorkTicks(state, employee, action);
+  employee.activeTaskSkill = action.requiredSkill;
+  employee.pendingActionType = action.type;
+  employee.pendingActionPayload = action.payload;
+}
+
+/**
  * Straight-line (octile-heuristic) travel ticks for `employee` to reach
  * `action`'s target — see `octileHeuristic` in `Pathfinding.ts`. Shared by
  * `estimateActionCost` (always uses this direct-line estimate) and
