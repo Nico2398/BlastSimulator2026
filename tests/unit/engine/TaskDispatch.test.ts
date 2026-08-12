@@ -88,6 +88,32 @@ function addQualifiedEmployee(
   }
 }
 
+/**
+ * Simulates tickEmployees' claim-time field writes (GameLoop.ts) on top of
+ * claimPendingAction — the latter only flips status/holderId, not the
+ * employee's own walking/pending-task bookkeeping, which a real claim always
+ * sets alongside it. Shared by the cancelAction (#548) and
+ * interruptActiveAction (#549) suites below — both need the same claimed-and-
+ * walking shape as their starting point.
+ */
+function simulateClaimWalking(
+  state: GameState,
+  actionId: number,
+  employeeId: number,
+  action: { targetX: number; targetZ: number; requiredSkill: string | null; type: string; payload: Record<string, unknown> },
+  durationTicks = 10,
+): void {
+  claimPendingAction(state, actionId, employeeId);
+  const emp = state.employees.employees.find(e => e.id === employeeId)!;
+  emp.activeActionId = actionId;
+  emp.destinationX = action.targetX;
+  emp.destinationZ = action.targetZ;
+  emp.pendingTaskDuration = durationTicks;
+  emp.pendingActionType = action.type as any;
+  emp.pendingActionPayload = action.payload;
+  emp.activeTaskSkill = action.requiredSkill as any;
+}
+
 // ── Section 1: GameState.pendingActions field ────────────────────────────────
 
 describe('GameState.pendingActions (CH1.4)', () => {
@@ -565,30 +591,6 @@ describe('cancelAction (#548)', () => {
   });
 
   /**
-   * Simulates tickEmployees' claim-time field writes (GameLoop.ts) on top of
-   * claimPendingAction — the latter only flips status/holderId, not the
-   * employee's own walking/pending-task bookkeeping, which a real claim
-   * always sets alongside it.
-   */
-  function simulateClaimWalking(
-    state: GameState,
-    actionId: number,
-    employeeId: number,
-    action: { targetX: number; targetZ: number; requiredSkill: string | null; type: string; payload: Record<string, unknown> },
-    durationTicks = 10,
-  ): void {
-    claimPendingAction(state, actionId, employeeId);
-    const emp = state.employees.employees.find(e => e.id === employeeId)!;
-    emp.activeActionId = actionId;
-    emp.destinationX = action.targetX;
-    emp.destinationZ = action.targetZ;
-    emp.pendingTaskDuration = durationTicks;
-    emp.pendingActionType = action.type as any;
-    emp.pendingActionPayload = action.payload;
-    emp.activeTaskSkill = action.requiredSkill as any;
-  }
-
-  /**
    * Simulates ArrivalGate's promotion from "walking" to "in_progress"
    * (ArrivalGate.ts): destinationX/Z already nulled by movement, taskTicksRemaining
    * and activeTaskTotalTicks set from pendingTaskDuration, pendingTaskDuration
@@ -832,30 +834,6 @@ describe('clearActiveTaskFields (#548 — shared by cancelAction and tickTaskPro
 
 describe('interruptActiveAction (#549)', () => {
   let state: GameState;
-
-  /**
-   * Mirrors cancelAction's own simulateClaimWalking test helper above: claims
-   * the action and stamps the walk/task-claim fields a real claim (via
-   * tickEmployees/promoteActionToActive in GameLoop.ts) always sets alongside
-   * claimPendingAction.
-   */
-  function simulateClaimWalking(
-    state: GameState,
-    actionId: number,
-    employeeId: number,
-    action: { targetX: number; targetZ: number; requiredSkill: string | null; type: string; payload: Record<string, unknown> },
-    durationTicks = 10,
-  ): void {
-    claimPendingAction(state, actionId, employeeId);
-    const emp = state.employees.employees.find(e => e.id === employeeId)!;
-    emp.activeActionId = actionId;
-    emp.destinationX = action.targetX;
-    emp.destinationZ = action.targetZ;
-    emp.pendingTaskDuration = durationTicks;
-    emp.pendingActionType = action.type as any;
-    emp.pendingActionPayload = action.payload;
-    emp.activeTaskSkill = action.requiredSkill as any;
-  }
 
   beforeEach(() => {
     state = makeGame();
