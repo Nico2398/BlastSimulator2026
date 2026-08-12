@@ -279,6 +279,15 @@ export class LandscapeMesh {
   }
 
   /**
+   * Every tile mesh, for raycasting past the site's claimed edge (#558) —
+   * mirrors TerrainMesh.meshes so a caller can raycast both without knowing
+   * which one it hit.
+   */
+  get meshes(): THREE.Mesh[] {
+    return this.tileMeshes;
+  }
+
+  /**
    * `cut` defaults to the handle's own generation-time rect, for callers with
    * no live site to cut against (tests, and any level that never expands).
    */

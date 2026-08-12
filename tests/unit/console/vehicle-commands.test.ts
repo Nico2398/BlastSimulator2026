@@ -6,7 +6,7 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
-import type { MiningContext } from '../../../src/console/commands/mining.js';
+import { drillPlanCommand, type MiningContext } from '../../../src/console/commands/mining.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 
@@ -445,6 +445,60 @@ describe('vehicle scrap', () => {
     const result = vehicleCommand(ctx, ['scrap', 'abc'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe('Usage: vehicle scrap <id>');
+  });
+});
+
+// ── vehicle buy — spawn honours a negative world origin (#571) ──
+
+describe('vehicle buy — spawn position on a site grown into negative territory', () => {
+  // #558's full-disc survey claim (PlayableArea.claimArea) can grow the site
+  // asymmetrically, including west/south of the origin, the moment ANY
+  // off-site action runs — drill_plan add included. Once that happens
+  // state.world.minX/minZ are no longer 0, and "vehicle buy"'s spawn point
+  // must be `minX + sizeX / 2` (not the un-offset `sizeX / 2`) to land back
+  // inside the grown site instead of drifting toward its original corner.
+  //
+  // navGrid is nulled out after growing the site so the un-offset raw
+  // (buggy) coordinate is asserted directly, isolating the offset bug from
+  // NavGrid.findNearestReachableCell's separate reachability snapping (#437),
+  // which would otherwise perturb the raw coordinate and make an exact
+  // assertion flaky.
+  it('spawns at minX + sizeX/2 (not sizeX/2) once the site has grown west/south', () => {
+    const ctx = makeCtx();
+    // Pushes a drill hole to (-4, -4): its chunk isn't edge-adjacent to the
+    // starting 32x32 site, so PlayableArea.claimArea bridges it in, growing
+    // the site both west and south in one call — exactly the asymmetric
+    // growth #558 introduced.
+    const drillResult = drillPlanCommand(ctx, ['add'], { x: '-4', z: '-4' });
+    expect(drillResult.success).toBe(true);
+
+    const world = ctx.state!.world!;
+    expect(world.minX).toBeLessThan(0);
+    expect(world.minZ).toBeLessThan(0);
+
+    // Isolate the offset formula from reachability snapping (see comment above).
+    ctx.state!.navGrid = null;
+
+    const result = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(result.success).toBe(true);
+
+    const vehicle = ctx.state!.vehicles.vehicles.at(-1)!;
+    expect(vehicle.x).toBe(world.minX + world.sizeX / 2);
+    expect(vehicle.z).toBe(world.minZ + world.sizeZ / 2);
+  });
+
+  it('does NOT spawn at the un-offset grid-size midpoint once the site has grown west/south', () => {
+    const ctx = makeCtx();
+    drillPlanCommand(ctx, ['add'], { x: '-4', z: '-4' });
+    const world = ctx.state!.world!;
+    ctx.state!.navGrid = null;
+
+    vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+
+    const vehicle = ctx.state!.vehicles.vehicles.at(-1)!;
+    // The buggy formula (sizeX/2, sizeZ/2) ignores minX/minZ entirely.
+    expect(vehicle.x).not.toBe(world.sizeX / 2);
+    expect(vehicle.z).not.toBe(world.sizeZ / 2);
   });
 });
 

@@ -3239,5 +3239,8 @@
   "ui.blast_workshop.report.building_destroyed": "{type} #{id} a été détruit.",
   "ui.blast_workshop.report.oversized_hint": "{count} fragments sont trop gros pour les engins de transport standards. Un(e) {vehicle} les transformerait en argent plutôt qu'en paysage.",
   "shell.placement.outside_region": "Hors de la zone indiquée — cliquez à l’intérieur du contour bleu.",
-  "shell.placement.pick_first": "Cliquez d’abord sur la zone indiquée dans la scène."
+  "shell.placement.pick_first": "Cliquez d’abord sur la zone indiquée dans la scène.",
+  "shell.placement.refused_protected_ground": "Terrain protégé — un village, une rivière ou un site remarquable s’y trouve.",
+  "shell.placement.refused_expansion_disabled": "Hors du site, et ce site ne peut pas être agrandi.",
+  "shell.placement.refused_too_far": "Trop loin du site pour être réclamé en une seule action."
 }

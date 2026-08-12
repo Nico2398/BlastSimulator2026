@@ -430,13 +430,13 @@
         }
       ],
       "role": "player",
-      "description": "blast complete: Execute clicked, confirm dialog answered, Blast Report closed. Mechanism behind the file's original deathCount:1 changed (Finding #74/#75 follow-up), verified live rather than assumed: the file's original 9-hole/8m-depth grid is not reachable by a real click at all (both steppers are off this tutorial stage's target list, see the drill-plan step above) -- but the real 16-hole/6m-depth grid the tutorial's own rail actually produces is a bigger footprint, and still kills the same one nearby employee. deathCount:1 confirmed live, not carried over from the file's old (unreachable) premise.",
+      "description": "blast complete: Execute clicked, confirm dialog answered, Blast Report closed. deathCount raised 1 -> 2 (#558 full-disc survey claim follow-up, issue #558/PR #569): step 5's `survey seismic x:23 z:23` claims its full SURVEY_COVERAGE_RADIUS=20 disc (siteExpansion.ts's cellsInDisc), growing the site from the starting 32x32 to 48x48 before the driller is hired at step 10. Employee hire's spawn point is `minX + sizeX/2, minZ + sizeZ/2` -- on this run minX/minZ stay 0 throughout (the site only grows eastward/southward from (0,0), never crosses into negative territory), so that formula numerically equals the pre-#571 `sizeX/2` here; this scenario's deathCount:2 reproduces identically whether or not the #571 origin-offset fix is applied and is NOT evidence for that fix (verified live, both ways). The real driver is #558's site growth alone: on the grown 48x48 site the spawn point resolves to (26, 24), which lands inside this step's own 4x4/spacing-3 drill grid (x:20-29, z:20-29). Verified live by direct reproduction (both employees' positions and post-blast alive state read from a real run of this exact command sequence): Walt Dusty (surveyor) ends the survey task at (23, 23), Kurt Hardhat (driller) sits idle at the grid-centre spawn point (26, 24), and this drill plan's CATASTROPHIC-rated blast (furthest throw 27.9m) kills both via the same fragment-kinetic-energy check (Damage.ts's processEmployeeHit) -- a real, physically-grounded double death, not a miscalculation. cash is unaffected either way (lawsuits/fines from a death do not deduct immediately). The #571 origin-offset regression itself is covered separately by the unit/integration tests added in 75a06cf, which force a negative origin (x:-4, z:-4).",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 1,
+          "deathCount": 2,
           "cash": 70320
         }
       }

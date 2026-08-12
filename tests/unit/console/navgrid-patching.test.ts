@@ -99,10 +99,12 @@ describe('NavGrid patching — building placement', () => {
     const nav = ctx.state!.navGrid!;
     const prevType = nav.cells[0]![0]!.type;
 
-    // Place well outside the 32×32 site, past any chunk touching it (#473 D5)
-    const result = buildCommand(ctx, ['management_office'], { at: '100,100' });
+    // Place well outside the 32×32 site, further than the site can bridge in
+    // one action (MAX_CLAIM_BRIDGE_CHUNKS, #558) — a nearer off-site placement
+    // now bridges to the site instead of refusing (#473 D5).
+    const result = buildCommand(ctx, ['management_office'], { at: '800,800' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('out of bounds');
+    expect(result.output).toContain('too far');
 
     // NavGrid should be untouched
     expect(nav.cells[0]![0]!.type).toBe(prevType);

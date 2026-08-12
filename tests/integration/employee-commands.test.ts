@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
+import { drillPlanCommand, type MiningContext } from '../../src/console/commands/mining.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -467,5 +468,63 @@ describe('Console — employee dispatch', () => {
     expect(result.output).toBe(`Employee #${empId} (${targetName}) does not hold skill: geology.`);
     // Must not claim nobody on the roster qualifies — someone (otherId) does.
     expect(result.output).not.toContain('No employee on the roster holds skill');
+  });
+});
+
+// ── employee hire — spawn honours a negative world origin (#571) ──
+
+describe('Console — employee hire — spawn position on a site grown into negative territory', () => {
+  // Same root cause as the "vehicle buy" spawn regression (#571): #558's
+  // full-disc survey claim (PlayableArea.claimArea) can grow the site
+  // asymmetrically the moment ANY off-site action runs — drill_plan add
+  // included — leaving state.world.minX/minZ nonzero. "employee hire"'s
+  // spawn point must be `minX + sizeX / 2` (and `minZ + sizeZ / 2`), not the
+  // un-offset `sizeX / 2` / `sizeZ / 2`.
+  //
+  // navGrid is nulled out after growing the site so the un-offset raw
+  // (buggy) coordinate is asserted directly, isolating the offset bug from
+  // NavGrid.findNearestReachableCell's separate reachability snapping (#437).
+  function makeMiningCtx(): MiningContext {
+    const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+    newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+    return ctx;
+  }
+
+  it('spawns at minX + sizeX/2 (not sizeX/2) once the site has grown west/south', () => {
+    const ctx = makeMiningCtx();
+    // (-4, -4)'s chunk isn't edge-adjacent to the starting 32x32 site, so
+    // PlayableArea.claimArea bridges it in, growing the site both west and
+    // south in one call — the same asymmetric growth #558 introduced.
+    const drillResult = drillPlanCommand(ctx, ['add'], { x: '-4', z: '-4' });
+    expect(drillResult.success).toBe(true);
+
+    const world = ctx.state!.world!;
+    expect(world.minX).toBeLessThan(0);
+    expect(world.minZ).toBeLessThan(0);
+
+    // Isolate the offset formula from reachability snapping (see comment above).
+    ctx.state!.navGrid = null;
+
+    const result = employeeCommand(ctx, ['hire'], { role: 'driller' });
+    expect(result.success).toBe(true);
+
+    const employee = ctx.state!.employees.employees.at(-1)!;
+    // First hire: the `(employees.length % 5) * 2` stagger term is 0.
+    expect(employee.x).toBe(world.minX + world.sizeX / 2);
+    expect(employee.z).toBe(world.minZ + world.sizeZ / 2);
+  });
+
+  it('does NOT spawn at the un-offset grid-size midpoint once the site has grown west/south', () => {
+    const ctx = makeMiningCtx();
+    drillPlanCommand(ctx, ['add'], { x: '-4', z: '-4' });
+    const world = ctx.state!.world!;
+    ctx.state!.navGrid = null;
+
+    employeeCommand(ctx, ['hire'], { role: 'driller' });
+
+    const employee = ctx.state!.employees.employees.at(-1)!;
+    // The buggy formula (sizeX/2, sizeZ/2) ignores minX/minZ entirely.
+    expect(employee.x).not.toBe(world.sizeX / 2);
+    expect(employee.z).not.toBe(world.sizeZ / 2);
   });
 });

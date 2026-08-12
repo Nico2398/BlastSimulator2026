@@ -545,26 +545,30 @@ describe('surveyCommand', () => {
     hireSurveyor(ctx);
     const result = surveyCommand(ctx, ['seismic'], { x: '-1', z: '10' });
     expect(result.success).toBe(true);
-    expect(ctx.grid!.minX).toBe(-16);
+    // The claim now covers the survey's full seismic coverage disc (#558),
+    // not just the center cell — a 20m-radius disc around x=-1 reaches into
+    // the chunk at cx=-2 (minX=-32), one chunk further than the single cell.
+    expect(ctx.grid!.minX).toBe(-32);
     expect(ctx.grid!.containsColumn(-1, 10)).toBe(true);
   });
 
-  it('refuses a survey on ground that touches no part of the site', () => {
+  it('bridges to ground several chunks past the site instead of refusing it', () => {
     const ctx = makeMiningContext();
     hireSurveyor(ctx);
-    // makeMiningContext creates a 32×32 site; (100, 10) is four chunks past it.
+    // makeMiningContext creates a 32×32 site; (100, 10) is several chunks past
+    // it, well within MAX_CLAIM_BRIDGE_CHUNKS — the site bridges out to reach
+    // it rather than refusing it (#558).
     const result = surveyCommand(ctx, ['seismic'], { x: '100', z: '10' });
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('out of bounds');
-    expect(ctx.grid!.containsColumn(100, 10)).toBe(false);
+    expect(result.success).toBe(true);
+    expect(ctx.grid!.containsColumn(100, 10)).toBe(true);
   });
 
-  it('refuses a survey far south of the site', () => {
+  it('refuses a survey too far south for the site to bridge in one action', () => {
     const ctx = makeMiningContext();
     hireSurveyor(ctx);
-    const result = surveyCommand(ctx, ['aerial'], { x: '10', z: '200' });
+    const result = surveyCommand(ctx, ['aerial'], { x: '10', z: '800' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('out of bounds');
+    expect(result.output).toContain('too far');
   });
 
   it('does not deduct cash for a survey on ground the site cannot reach', () => {

@@ -38,11 +38,11 @@ import { Random } from '../../core/math/Random.js';
 import { buyTubing, installTubing } from '../../core/mining/Tubing.js';
 import type { FragmentData } from '../../core/mining/BlastExecution.js';
 import { runSurvey, SURVEY_METHODS, type SurveyMethod, computeBlastOreReport } from '../../core/mining/SurveyCalc.js';
-import { SURVEY_COSTS, VOXEL_SIZE_CM } from '../../core/config/balance.js';
+import { SURVEY_COSTS, VOXEL_SIZE_CM, SURVEY_COVERAGE_RADIUS } from '../../core/config/balance.js';
 import { detectOreReport } from '../../core/events/EventEngine.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { getStorageCapacity } from '../../core/entities/Building.js';
-import { claimForAction, cellsInRect } from './siteExpansion.js';
+import { claimForAction, cellsInRect, cellsInDisc } from './siteExpansion.js';
 
 // ── Extended context for mining ──
 
@@ -858,7 +858,7 @@ export function surveyCommand(
     return { success: false, output: 'Invalid coordinates: x and z must be integers.' };
   }
 
-  const claim = claimForAction(ctx, [{ x, z }], 'survey');
+  const claim = claimForAction(ctx, cellsInDisc(x, z, SURVEY_COVERAGE_RADIUS[method]), 'survey');
   if (!claim.ok) return { success: false, output: claim.output! };
 
   const result = runSurvey(ctx.state!, { method, centerX: x, centerZ: z });

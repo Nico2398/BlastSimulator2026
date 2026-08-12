@@ -21,7 +21,8 @@ export interface ClaimOutcome {
 
 const REFUSAL_TEXT: Record<ClaimRefusalReason, string> = {
   protected_structure: 'protected ground — a village, river or landmark stands there and the site can never take it',
-  not_adjacent: 'out of bounds — the site can only grow into ground that touches it',
+  not_adjacent: 'too far — the site cannot bridge that much ground in a single action',
+  too_far: 'too far — the site cannot bridge that much ground in a single action',
   expansion_disabled: 'outside the site, and this site cannot be expanded',
 };
 
@@ -46,27 +47,15 @@ export function claimForAction(
   const offSite = cells.filter(c => !playableArea.contains(Math.floor(c.x), Math.floor(c.z)));
   if (offSite.length === 0) return { ok: true, expanded: false };
 
-  let claimedMinX = Infinity, claimedMinZ = Infinity, claimedMaxX = -Infinity, claimedMaxZ = -Infinity;
-  let expanded = false;
-
-  for (const cell of offSite) {
-    const result = playableArea.claim(Math.floor(cell.x), Math.floor(cell.z));
-    if (!result.claimed) {
-      return {
-        ok: false,
-        expanded,
-        output: `Cannot ${what} at (${Math.floor(cell.x)}, ${Math.floor(cell.z)}): ${REFUSAL_TEXT[result.reason]}.`,
-      };
-    }
-    if (result.alreadyOwned) continue;
-    expanded = true;
-    claimedMinX = Math.min(claimedMinX, result.rect.minX);
-    claimedMinZ = Math.min(claimedMinZ, result.rect.minZ);
-    claimedMaxX = Math.max(claimedMaxX, result.rect.maxX);
-    claimedMaxZ = Math.max(claimedMaxZ, result.rect.maxZ);
+  const result = playableArea.claimArea(offSite.map(c => ({ x: Math.floor(c.x), z: Math.floor(c.z) })));
+  if (!result.claimed) {
+    return {
+      ok: false,
+      expanded: false,
+      output: `Cannot ${what} at chunk (${result.chunk.cx}, ${result.chunk.cz}): ${REFUSAL_TEXT[result.reason]}.`,
+    };
   }
-
-  if (!expanded) return { ok: true, expanded: false };
+  if (!result.expanded || !result.rect) return { ok: true, expanded: false };
 
   syncWorldBounds(state, grid);
   buildGameNavGrid(state, grid, state.buildings.buildings, state.drillHoles);
@@ -75,8 +64,8 @@ export function claimForAction(
   // walls have to come down now that there is ground on the other side.
   ctx.emitter.emit('terrain:updated', {
     region: {
-      minX: claimedMinX - 1, minY: 0, minZ: claimedMinZ - 1,
-      maxX: claimedMaxX, maxY: grid.sizeY - 1, maxZ: claimedMaxZ,
+      minX: result.rect.minX - 1, minY: 0, minZ: result.rect.minZ - 1,
+      maxX: result.rect.maxX, maxY: grid.sizeY - 1, maxZ: result.rect.maxZ,
     },
   });
 
@@ -88,6 +77,26 @@ export function cellsInRect(minX: number, minZ: number, maxX: number, maxZ: numb
   const cells: Array<{ x: number; z: number }> = [];
   for (let z = Math.floor(minZ); z <= Math.floor(maxZ); z++) {
     for (let x = Math.floor(minX); x <= Math.floor(maxX); x++) cells.push({ x, z });
+  }
+  return cells;
+}
+
+/**
+ * Every integer column within `radius` of (centerX, centerZ) — the cell list
+ * a disc-shaped action (e.g. a survey's coverage) claims (#558). Inclusion is
+ * `<= radius`, matching the convention `SurveyCalc.ts` uses for coverage.
+ */
+export function cellsInDisc(centerX: number, centerZ: number, radius: number): Array<{ x: number; z: number }> {
+  const cells: Array<{ x: number; z: number }> = [];
+  const xMin = Math.floor(centerX - radius);
+  const xMax = Math.ceil(centerX + radius);
+  const zMin = Math.floor(centerZ - radius);
+  const zMax = Math.ceil(centerZ + radius);
+  for (let x = xMin; x <= xMax; x++) {
+    for (let z = zMin; z <= zMax; z++) {
+      const dx = x - centerX, dz = z - centerZ;
+      if (Math.sqrt(dx * dx + dz * dz) <= radius) cells.push({ x, z });
+    }
   }
   return cells;
 }

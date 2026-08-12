@@ -47,7 +47,7 @@ export function pickScene(
   raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
 
   const entityTargets = renderer.pickables();
-  const terrainTargets = renderer.terrain?.meshes ?? [];
+  const terrainTargets = [...(renderer.terrain?.meshes ?? []), ...(renderer.landscape?.meshes ?? [])];
   const hits = raycaster.intersectObjects([...entityTargets, ...terrainTargets], true);
   const closest = hits[0];
   if (!closest) return EMPTY_PICK;

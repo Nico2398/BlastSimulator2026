@@ -15,6 +15,7 @@ import { PlacementController } from '../../../src/ui/scene/PlacementController.j
 import {
   setPickerRegion, liveArea, regionCenter, regionSpan, EXACT_LIVE_MARGIN,
 } from '../../../src/ui/tutorialPickerRegion.js';
+import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 
 const EXACT = { x1: 20, z1: 20, x2: 30, z2: 30, exact: true };
 const AREA = { x1: 20, z1: 20, x2: 30, z2: 30 };
@@ -317,6 +318,33 @@ describe('cancel via right-click vs right-drag (#544)', () => {
 
     expect(controller.currentPhase).toBe('idle');
     expect(onCancel).not.toHaveBeenCalled();
+  });
+});
+
+describe('the claim check (#558) — refusal feedback separate from a tutorial region', () => {
+  it('lets the callback see the tile and confirms when it reports no refusal', () => {
+    // No tutorial region is pinned in this suite's beforeEach, so nothing but
+    // the claim check itself is in a position to refuse this tile.
+    const claimCheck = vi.fn((): ClaimRefusalReason | null => null);
+    controller.setClaimCheck(claimCheck);
+    controller.arm({ shape: 'point' });
+
+    press(50, 50);
+
+    expect(claimCheck).toHaveBeenCalledWith(50, 50);
+    expect(controller.selection).toEqual({ x1: 50, z1: 50, x2: 50, z2: 50 });
+    expect(controller.canConfirm).toBe(true);
+    expect(controller.refusalReason).toBeNull();
+  });
+
+  it('refuses confirm and reports the reason when the claim check refuses the tile', () => {
+    controller.setClaimCheck(() => 'protected_structure');
+    controller.arm({ shape: 'point' });
+
+    press(50, 50);
+
+    expect(controller.refusalReason).toBe('protected_structure');
+    expect(controller.canConfirm).toBe(false);
   });
 });
 
