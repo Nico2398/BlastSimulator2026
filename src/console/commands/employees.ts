@@ -74,8 +74,8 @@ export function employeeCommand(
           output: `Insufficient funds: need $${formatMoney(hiringCost)}, have $${formatMoney(state.cash)}`,
         };
       }
-      const rawEmpX = state.world ? state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
-      const rawEmpZ = state.world ? state.world.sizeZ / 2 : 32;
+      const rawEmpX = state.world ? state.world.minX + state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
+      const rawEmpZ = state.world ? state.world.minZ + state.world.sizeZ / 2 : 32;
       // Same void/isolated-pocket hazard as vehicle purchase spawn (#437): a
       // blast can clear the grid centre where new hires spawn down to a
       // floorless column. A hire whose own start tile is impassable can never

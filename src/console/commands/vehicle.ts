@@ -87,8 +87,8 @@ export function vehicleCommand(
       // vehicles land on distinct tiles instead of stacking on the depot
       // point — every prior purchase overlapped at one tile, occluding all
       // but the tallest mesh (#411).
-      const baseX = state.world ? state.world.sizeX / 2 : 32;
-      const baseZ = state.world ? state.world.sizeZ / 2 : 32;
+      const baseX = state.world ? state.world.minX + state.world.sizeX / 2 : 32;
+      const baseZ = state.world ? state.world.minZ + state.world.sizeZ / 2 : 32;
       const fleetIndex = state.vehicles.vehicles.length;
       const rawSpawnX = baseX + (fleetIndex % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
       const rawSpawnZ = baseZ + Math.floor(fleetIndex / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
