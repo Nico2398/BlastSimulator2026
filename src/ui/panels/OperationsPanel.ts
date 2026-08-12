@@ -21,7 +21,7 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { ShiftMode } from '../../core/entities/SitePolicy.js';
-import type { GameState } from '../../core/state/GameState.js';
+import type { GameState, PendingAction } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
 
@@ -129,6 +129,12 @@ export class OperationsPanel {
 
     this.el.append(header, this.bodyEl);
     container.appendChild(this.el);
+
+    // Referenced (not yet called) so the skeleton typechecks without an
+    // unused-declaration error; wiring into render() lands in the TDD Green
+    // phase (#548).
+    void this.makeWorkQueueRows;
+    void this.makeWorkQueueRow;
   }
 
   get root(): HTMLElement { return this.el; }
@@ -225,6 +231,24 @@ export class OperationsPanel {
     );
     row.append(head, el('span', { text: note, attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
     return row;
+  }
+
+  // ── Work Queue ──
+
+  /**
+   * Renders one row per active PendingAction (queued/assigned/in_progress),
+   * each with a Cancel button. TODO: implement in TDD Green phase (#548).
+   */
+  private makeWorkQueueRows(state: GameState): HTMLElement[] {
+    void state;
+    throw new Error('not implemented');
+  }
+
+  /** TODO: implement in TDD Green phase (#548). */
+  private makeWorkQueueRow(action: PendingAction, state: GameState): HTMLElement {
+    void action;
+    void state;
+    throw new Error('not implemented');
   }
 
   // ── Ore on hand ──

@@ -20,7 +20,7 @@ import {
   trainableSkills,
 } from '../../core/entities/EmployeeTraining.js';
 import { addExpense } from '../../core/economy/Finance.js';
-import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
+import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
@@ -251,8 +251,13 @@ export function employeeCommand(
           + `level ${plan.targetLevel} in ${plan.ticks} ticks ($${plan.fee}).`,
       };
     }
+    case 'cancel': {
+      // TODO: implement in TDD Green phase (#548).
+      void cancelAction;
+      return { success: false, output: 'not implemented' };
+    }
     default:
-      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|dispatch|train)' };
+      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|dispatch|train|cancel)' };
   }
 }
 

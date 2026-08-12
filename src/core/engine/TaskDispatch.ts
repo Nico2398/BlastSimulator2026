@@ -111,3 +111,37 @@ export function completePendingAction(
   return action ?? null;
 }
 
+export interface CancelActionResult {
+  success: boolean;
+  /** 'not-found' — no action with that id. 'not-cancellable' — engine-owned rest action. */
+  error?: 'not-found' | 'not-cancellable';
+  /** The removed action, present on success. */
+  action?: PendingAction;
+  /** Amount refunded to state.cash, 0 when the action's type charges nothing at order time. */
+  refunded?: number;
+}
+
+/**
+ * Cancel a PendingAction by id, at any lifecycle stage (queued, assigned, in_progress).
+ * Rejects 'rest' actions — engine-owned, never player-cancellable (#548).
+ * TODO: implement in TDD Green phase.
+ */
+export function cancelAction(state: GameState, actionId: number): CancelActionResult {
+  // Referenced here (not yet called) so the skeleton typechecks without an
+  // unused-declaration error; real wiring lands in the TDD Green phase.
+  void state;
+  void actionId;
+  void actionOrderCost;
+  throw new Error('not implemented');
+}
+
+/**
+ * Order-time cost already charged for an action's type — survey today, 0 for
+ * everything else. Used by cancelAction to compute the refund.
+ * TODO: implement in TDD Green phase.
+ */
+function actionOrderCost(action: PendingAction): number {
+  void action;
+  throw new Error('not implemented');
+}
+

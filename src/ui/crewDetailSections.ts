@@ -38,7 +38,7 @@ export function moraleColor(morale: number): string {
   return bandColor(morale, MORALE_THRESHOLDS.low, MORALE_THRESHOLDS.high);
 }
 
-const ACTION_LABEL_KEY: Record<ActionType, string> = {
+export const ACTION_LABEL_KEY: Record<ActionType, string> = {
   drill_hole: 'ui.crew.action_drill_hole',
   charge_hole: 'ui.crew.action_charge_hole',
   set_sequence: 'ui.crew.action_set_sequence',
