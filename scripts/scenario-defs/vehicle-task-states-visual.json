@@ -3,17 +3,18 @@
   "description": "Visual check: vehicle state transitions through idle moving working and waiting states",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:100000",
+      "description": "cash:100000 override (campaign.ts's own `cash:` knob, mirroring new_game's) replaces dusty_hollow's default $50,000: the file now buys a debris_hauler ($25,000, pre-existing idle/moving/working coverage) AND a drill_rig ($35,000, issue #550's driving-to-task coverage) plus a driller hire ($1,000) -- $61,000 minimum before any fuel/maintenance ticks, more than the level default allows regardless of purchase order. Terrain/seed/grid are untouched (level.terrainSeed still drives regenerateGrid), so every camera-calibrated coordinate elsewhere in this file stays valid.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:100000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 100000,
           "vehicleCount": 0
         }
       }
@@ -37,7 +38,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 25000,
+          "cash": 75000,
           "vehicleCount": 1
         }
       }
@@ -88,7 +89,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 25000,
+          "cash": 75000,
           "vehicleCount": 1
         },
         "note": "vehicle list confirms idle → moving; no scalar field exists for vehicle task state"
@@ -300,11 +301,22 @@
     },
     {
       "command": "employee list",
-      "description": "Crew panel's task line should now read 'driving_to_task' (EmployeeActivityKind, EmployeeActivity.ts) rather than 'working' — the work timer only starts once the vehicle itself arrives at the target, not the employee boarding it.",
+      "description": "Crew panel's task line should now read 'driving_to_task' (EmployeeActivityKind, EmployeeActivity.ts) rather than 'working' — the work timer only starts once the vehicle itself arrives at the target, not the employee boarding it. Reopens the Crew panel (same pattern as crew-fleet-panels-visual.json's observe steps): step 14's `vehicle buy drill_rig` switched the toolbar to the Fleet panel and nothing since has switched it back, so without this click the driving-to-task-state shot below would keep showing Fleet, never the Crew panel this file exists to demonstrate.",
       "interaction": [
         {
           "type": "command",
           "command": "employee list"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "observe"
