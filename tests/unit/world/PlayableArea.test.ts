@@ -313,6 +313,28 @@ describe('PlayableArea.claimArea', () => {
     expect(!result.claimed && result.reason).toBe('expansion_disabled');
     expect(grid.chunkCount).toBe(before);
   });
+
+  // #571 — the site's own origin, not just its size, shifts once ANY
+  // off-site action (drill_plan, build_ramp, a full-disc survey…) claims
+  // ground west or south of it. This is intended (#558): the site grows to
+  // whatever shape play gives it, unbounded in every direction. Locking it in
+  // here because two console commands (vehicle buy, employee hire) were
+  // found computing their spawn point as `sizeX / 2` without adding
+  // `minX` — harmless while the origin stayed 0, wrong the moment it doesn't.
+  it('shifts the site origin negative on BOTH axes when a single footprint bridges west and south at once', () => {
+    const { grid, area } = makeArea();
+    // (-4, -4) -> chunk (-1, -1), diagonal to the site's own chunk (0, 0) —
+    // not edge-adjacent, so this exercises the same bridging path a real
+    // disc-shaped survey claim takes when its centre sits near the site's
+    // corner (the reported #571 repro: `survey seismic` near (12, 12) on a
+    // 32x32 site grows it to a negative origin on both axes in one claim).
+    const result = area.claimArea([{ x: -4, z: -4 }]);
+
+    expect(result.claimed).toBe(true);
+    expect(grid.hasChunk(-1, -1)).toBe(true);
+    expect(grid.minX).toBeLessThan(0);
+    expect(grid.minZ).toBeLessThan(0);
+  });
 });
 
 describe('PlayableArea.previewClaim', () => {
