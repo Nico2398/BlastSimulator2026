@@ -55,9 +55,9 @@ describe('OperationsPanel', () => {
     const { panel } = makePanel();
     const state = makeState();
     state.pendingActions = [
-      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null },
-      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null },
-      { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7 },
+      { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null },
+      { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null },
+      { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7, status: 'assigned', holderId: 7 },
     ];
     panel.update(state);
     const text = panel.root.textContent ?? '';

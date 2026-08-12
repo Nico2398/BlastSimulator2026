@@ -435,7 +435,10 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
     const claimedAction = state.pendingActions.find(a => a.status === 'assigned');
     const queuedAction = state.pendingActions.find(a => a.status === 'queued');
     expect(claimedAction).toBeDefined();
-    expect(claimedAction!.holderId).toBe((employee as any).activeActionId);
+    // holderId is the claiming employee's id; activeActionId is the claimed
+    // action's id — distinct values, not equal to each other (#547).
+    expect(claimedAction!.holderId).toBe(employee.id);
+    expect((employee as any).activeActionId).toBe(claimedAction!.id);
     expect(queuedAction).toBeDefined();
     expect(queuedAction!.holderId).toBeNull();
   });
