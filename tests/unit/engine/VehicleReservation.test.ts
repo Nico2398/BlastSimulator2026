@@ -19,6 +19,12 @@ import {
   releaseVehicleOnCompletion,
   reconcileVehicleReservations,
 } from '../../../src/core/engine/VehicleReservation.js';
+// reconcileVehicleReservations no longer performs the interruption itself
+// (import-cycle fix, #550) — it only reports which actions need it. Unit
+// tests are allowed to import interruptActiveAction directly to perform the
+// interruption the way ArrivalGate.tickArrivalGate now does, so the
+// end-to-end effect can still be asserted at this level.
+import { interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 
 const SEED = 42;
 
@@ -247,7 +253,16 @@ describe('reconcileVehicleReservations', () => {
     // Vehicle destroyed underneath the employee mid-drive.
     state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
 
-    reconcileVehicleReservations(state);
+    const interruptions = reconcileVehicleReservations(state);
+
+    // reconcileVehicleReservations itself is side-effect-free for this case —
+    // it only reports the need to interrupt (import-cycle fix, #550). The
+    // caller (ArrivalGate.tickArrivalGate) is the one that actually performs
+    // it via interruptActiveAction; mirror that here.
+    expect(interruptions).toEqual([{ employee, actionId: 20 }]);
+    for (const { employee: emp, actionId } of interruptions) {
+      interruptActiveAction(state, emp, actionId);
+    }
 
     const reconciled = state.pendingActions.find(a => a.id === 20)!;
     expect(reconciled.status).toBe('queued');

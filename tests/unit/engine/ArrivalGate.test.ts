@@ -18,6 +18,11 @@ import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entiti
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
 import { reconcileVehicleReservations } from '../../../src/core/engine/VehicleReservation.js';
+// reconcileVehicleReservations no longer performs the interruption itself
+// (import-cycle fix, #550) — it only reports which actions need it. Unit
+// tests are allowed to import interruptActiveAction directly to perform the
+// interruption the way ArrivalGate.tickArrivalGate now does.
+import { interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 
 const SEED = 42;
 
@@ -457,7 +462,16 @@ describe('reconcileVehicleReservations — mid-drive holder death / vehicle dest
     // Vehicle destroyed underneath the employee — e.g. a blast projection.
     state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
 
-    reconcileVehicleReservations(state);
+    const interruptions = reconcileVehicleReservations(state);
+
+    // reconcileVehicleReservations itself is side-effect-free for this case —
+    // it only reports the need to interrupt (import-cycle fix, #550). The
+    // caller (ArrivalGate.tickArrivalGate) is the one that actually performs
+    // it via interruptActiveAction; mirror that here.
+    expect(interruptions).toEqual([{ employee, actionId: 4 }]);
+    for (const { employee: emp, actionId } of interruptions) {
+      interruptActiveAction(state, emp, actionId);
+    }
 
     const reconciled = state.pendingActions.find(a => a.id === 4)!;
     expect(reconciled.status).toBe('queued');
