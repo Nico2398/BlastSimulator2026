@@ -28,6 +28,23 @@ export function clearActiveTaskFields(emp: Employee): void {
 }
 
 /**
+ * Clears every walk/task-claim field an active or in-flight claim sets on
+ * `employee`, on top of clearActiveTaskFields — shared by cancelAction (which
+ * then removes the action entirely) and interruptActiveAction (which returns
+ * the action to the pool instead). Needed because cancellation/interruption
+ * can happen while the employee is still walking to the target, a lifecycle
+ * stage tickTaskProgress's normal-completion path never sees.
+ */
+function clearHolderWalkFields(emp: Employee): void {
+  clearActiveTaskFields(emp);
+  emp.destinationX = null;
+  emp.destinationZ = null;
+  emp.moveConsecutiveFailures = 0;
+  emp.isMoveStuck = false;
+  emp.pendingTaskDuration = null;
+}
+
+/**
  * Distinguishes *why* dispatch rejected, beyond the generic `error: 'unqualified'`
  * kept for backward compatibility. Callers that need to phrase an accurate
  * rejection message (e.g. the console `dispatch` command, #406) should read
@@ -168,14 +185,7 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
 
   if (action.holderId !== null) {
     const holder = state.employees.employees.find(emp => emp.id === action.holderId);
-    if (holder) {
-      clearActiveTaskFields(holder);
-      holder.destinationX = null;
-      holder.destinationZ = null;
-      holder.moveConsecutiveFailures = 0;
-      holder.isMoveStuck = false;
-      holder.pendingTaskDuration = null;
-    }
+    if (holder) clearHolderWalkFields(holder);
   }
 
   const refunded = actionOrderCost(action);
@@ -198,5 +208,47 @@ function actionOrderCost(action: PendingAction): number {
   const method = action.payload['method'];
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;
   return SURVEY_COSTS[method as SurveyMethod];
+}
+
+/**
+ * Release `employee`'s ONE active PendingAction (`actionId`, the value of
+ * `employee.activeActionId` before a needs-driven interruption — collapse,
+ * hunger/fatigue forcing a rest — preempted it) back to the pool instead of
+ * removing it (#549). Unlike cancelAction:
+ *  - the record is NOT completed/removed — status returns to 'queued' and
+ *    holderId/ghost.claimed clear, so any qualified employee (including this
+ *    one again later) can reclaim it via tickEmployees/selectBestActionForEmployee;
+ *  - targetEmployeeId is left exactly as it was — an open-pool action goes
+ *    back to the open pool, a targeted one stays reserved for its target;
+ *  - the action's payload is preserved on `employee.interruptedActionPayload`
+ *    before the walk/task-claim fields are cleared, mirroring the exact
+ *    field-clearing cancelAction already does (clearHolderWalkFields) so the
+ *    employee is claimable again next tick instead of stuck mid-walk/mid-task.
+ *
+ * No-op if `actionId` is null, or the action no longer exists in
+ * `state.pendingActions` (already completed/removed) — the employee's walk/
+ * task-claim fields are still cleared in that case, but interruptedActionPayload
+ * is left unset since there is no payload left to preserve.
+ *
+ * Never used for 'rest' actions — collapse/need-routing rest actions
+ * self-claim synchronously at creation (tickCollapse/tickNeedRestoration/
+ * forceShiftRestIfNeeded) and are never the one being interrupted here; this
+ * only ever preempts the work the employee was doing before the need crossed
+ * its collapse threshold.
+ */
+export function interruptActiveAction(state: GameState, employee: Employee, actionId: number | null): void {
+  if (actionId !== null) {
+    const action = state.pendingActions.find(a => a.id === actionId);
+    if (action) {
+      employee.interruptedActionPayload = action.payload;
+      action.status = 'queued';
+      action.holderId = null;
+
+      const ghost = state.ghostPreviews.find(g => g.id === actionId);
+      if (ghost) ghost.claimed = false;
+    }
+  }
+
+  clearHolderWalkFields(employee);
 }
 

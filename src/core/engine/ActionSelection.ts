@@ -1,31 +1,106 @@
 // BlastSimulator2026 — Cost-based per-employee action selection (#549)
-// Skeleton only: type signatures + empty bodies. Real cost estimation,
-// pathfinding-based resolution, and ranking logic land in the implementer
-// phase. Zero imports from GameLoop.ts — avoids a dependency cycle back into
-// the tick orchestrator that will call these functions.
+// Ranks queued PendingActions by (travel + work) cost so each idle qualified
+// employee picks the cheapest reachable action instead of first-come-first-
+// served. Zero imports from GameLoop.ts — avoids a dependency cycle back into
+// the tick orchestrator that calls these functions.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
-import type { Employee } from '../entities/Employee.js';
+import type { Employee, NeedKey } from '../entities/Employee.js';
+import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
+import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
+import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
+import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
+import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
+
+/**
+ * Determine which need gauge a 'rest' PendingAction's payload is restoring,
+ * or null if the payload doesn't identify one — this is the case for the
+ * Bunkhouse Tier 2+ shift-cycle rest created by forceShiftRestIfNeeded, which
+ * processShiftCycle/completeRestTick already own end-to-end and never routes
+ * through this cost-based selection path (it self-claims at creation).
+ */
+export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | null {
+  const candidate = payload['needKey'];
+  return candidate === 'hunger' || candidate === 'fatigue' || candidate === 'breakNeed' ? candidate : null;
+}
+
+/**
+ * Work-duration ticks for `employee` performing `action` — the same
+ * computation GameLoop.ts's tickEmployees used to do inline at claim time.
+ * Single source of truth for both the cost estimate/resolution below and the
+ * claim-time seeding of pendingTaskDuration/pendingRestDuration in GameLoop.ts.
+ *
+ * A survey's own durationTicks (SURVEY_DURATION_TICKS[method], set by
+ * runSurvey) and a rest action's own restDuration override the generic
+ * proficiency-scaled duration — both already appear directly in the action's
+ * payload rather than being derived here.
+ */
+export function computeActionWorkTicks(state: GameState, employee: Employee, action: PendingAction): number {
+  if (action.type === 'rest') {
+    if (typeof action.payload['restDuration'] === 'number') {
+      return action.payload['restDuration'] as number;
+    }
+    const needKey = resolveRestNeedKey(action.payload);
+    return needKey !== null ? NEED_REST_DURATIONS[needKey] : BASE_TASK_DURATION_TICKS;
+  }
+
+  if (typeof action.payload['durationTicks'] === 'number') {
+    return action.payload['durationTicks'] as number;
+  }
+
+  const qual = action.requiredSkill !== null
+    ? employee.qualifications.find(q => q.category === action.requiredSkill)
+    : undefined;
+  const level = qual?.proficiencyLevel ?? 1;
+  const needMult = getNeedMultiplier(employee);
+  const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, state.employees.employees.length);
+  return computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
+}
 
 /**
  * Cheap admissible cost estimate for `employee` performing `action`: octile-
  * heuristic travel ticks (see `octileHeuristic` in `Pathfinding.ts`) plus work
- * ticks (via `computeTaskDuration` inputs). No real pathfinding — used to
- * rank candidates before spending a real `findPath` call on only the most
- * promising ones.
- * TODO: implement.
+ * ticks (via `computeActionWorkTicks`). No real pathfinding — used to rank
+ * candidates before spending a real `findPath` call on only the most
+ * promising ones. The octile distance is itself the direct-line estimate
+ * `tickEmployeeMovement` (EntityMovementTick.ts) falls back to when
+ * `state.navGrid` is null, so no separate null-navGrid branch is needed here.
  */
-export function estimateActionCost(_state: GameState, _employee: Employee, _action: PendingAction): number {
-  return undefined as unknown as number;
+export function estimateActionCost(state: GameState, employee: Employee, action: PendingAction): number {
+  const travelTicks = octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) / AGENT_WALK_SPEED;
+  return travelTicks + computeActionWorkTicks(state, employee, action);
 }
 
 /**
  * Real findPath-based cost for `employee` performing `action`, or `null` if
  * the target is unreachable on the current NavGrid.
- * TODO: implement.
+ *
+ * With no NavGrid built yet (state.navGrid === null), mirrors
+ * tickEmployeeMovement's own fallback (EntityMovementTick.ts): the target is
+ * treated as directly reachable via a straight line, so this never returns
+ * null purely for lack of a NavGrid.
  */
-export function resolveActionCost(_state: GameState, _employee: Employee, _action: PendingAction): { totalTicks: number } | null {
-  return undefined as unknown as { totalTicks: number } | null;
+export function resolveActionCost(state: GameState, employee: Employee, action: PendingAction): { totalTicks: number } | null {
+  const workTicks = computeActionWorkTicks(state, employee, action);
+
+  if (state.navGrid === null) {
+    const travelTicks = octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) / AGENT_WALK_SPEED;
+    return { totalTicks: travelTicks + workTicks };
+  }
+
+  const path = findPath(state.navGrid, {
+    agentId: employee.id,
+    fromX: employee.x,
+    fromZ: employee.z,
+    toX: action.targetX,
+    toZ: action.targetZ,
+    avoidVehicles: false,
+  });
+
+  if (!path.found) return null;
+
+  const travelTicks = path.totalCost / AGENT_WALK_SPEED;
+  return { totalTicks: travelTicks + workTicks };
 }
 
 /** A candidate action chosen for an employee, with its resolved real cost. */
@@ -40,8 +115,23 @@ export interface SelectedAction {
  * real cost (via `resolveActionCost`) only for the top candidates up to
  * `ACTION_SELECTION_MAX_PATH_ATTEMPTS`, returning the first reachable one.
  * Returns `null` when `candidates` is empty or none are reachable.
- * TODO: implement.
  */
-export function selectBestActionForEmployee(_state: GameState, _employee: Employee, _candidates: PendingAction[]): SelectedAction | null {
-  return undefined as unknown as SelectedAction | null;
+export function selectBestActionForEmployee(state: GameState, employee: Employee, candidates: PendingAction[]): SelectedAction | null {
+  if (candidates.length === 0) return null;
+
+  const ranked = [...candidates].sort((a, b) => {
+    const costDiff = estimateActionCost(state, employee, a) - estimateActionCost(state, employee, b);
+    return costDiff !== 0 ? costDiff : a.id - b.id;
+  });
+
+  const attempts = Math.min(ranked.length, ACTION_SELECTION_MAX_PATH_ATTEMPTS);
+  for (let i = 0; i < attempts; i++) {
+    const candidate = ranked[i]!;
+    const resolved = resolveActionCost(state, employee, candidate);
+    if (resolved !== null) {
+      return { action: candidate, totalTicks: resolved.totalTicks };
+    }
+  }
+
+  return null;
 }

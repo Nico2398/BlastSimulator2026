@@ -10,18 +10,26 @@ import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, gainXp, type NeedKey, type Employee, type SkillCategory } from '../entities/Employee.js';
-import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
-import { replenishNeed, getNeedMultiplier } from '../entities/EmployeeNeeds.js';
-import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
+import { replenishNeed } from '../entities/EmployeeNeeds.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
 import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
-import { completePendingAction, claimPendingAction, clearActiveTaskFields } from './TaskDispatch.js';
+import { completePendingAction, claimPendingAction, clearActiveTaskFields, interruptActiveAction } from './TaskDispatch.js';
+import {
+  estimateActionCost, resolveActionCost, selectBestActionForEmployee,
+  computeActionWorkTicks, resolveRestNeedKey, type SelectedAction,
+} from './ActionSelection.js';
 
 // ── Config ──
 
-import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, needRestSearchRadius, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, BASE_TASK_DURATION_TICKS } from '../config/balance.js';
+import { BASE_TICK_MS as _BASE_TICK_MS, VALID_SPEEDS as _VALID_SPEEDS, NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, NEED_REST_BUILDING_TYPES, needRestSearchRadius, NEED_WARNING_THRESHOLDS, NEED_REST_COSTS, WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
+
+// Cost-based per-employee action selection (#549) lives in ActionSelection.ts —
+// re-exported here so GameLoop.ts stays the single public surface for
+// tick-orchestration callers, same rationale as the movement/arrival-gate
+// re-exports above.
+export { estimateActionCost, resolveActionCost, selectBestActionForEmployee, type SelectedAction };
 
 // Vehicle and employee per-tick movement (NavGrid pathing, stuck-tracking) live
 // in EntityMovementTick.ts (#407 refactor) — re-exported here so GameLoop.ts
@@ -136,124 +144,71 @@ export function isValidSpeed(speed: number): speed is SpeedMultiplier {
   return VALID_SPEEDS.includes(speed as SpeedMultiplier);
 }
 
-// ── Employee dispatch ──
+// ── Employee dispatch (#549 cost-based) ──
 
 export interface TickEmployeesResult {
-  claimed: number[];     // IDs of PendingActions that were claimed
+  claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
   unqualified: number[]; // IDs of PendingActions no roster employee can ever do
-  waiting: number[];     // IDs of PendingActions where skill exists but all busy
+  waiting: number[];     // IDs of PendingActions still queued after this tick (busy/unreachable/no budget left)
 }
 
 /**
- * Match pending actions to idle qualified employees.
+ * Match pending actions to idle qualified employees, ranked by cost
+ * (estimateActionCost/selectBestActionForEmployee — travel time + work
+ * duration, ActionSelection.ts) instead of first-come-first-served (#549).
+ *
+ * Processes employees in ascending id order for determinism. For each:
+ *   1. Claim actions already targeted at this employee (targetEmployeeId ===
+ *      employee.id, still 'queued') — never contested by anyone else, so
+ *      claimed eagerly up to MAX_EMPLOYEE_TASK_QUEUE_DEPTH (active + queued).
+ *      The first one claimed while the employee is idle is promoted straight
+ *      to active; the rest are pushed onto taskQueue.
+ *   2. If still idle: recompute the cheapest entry from taskQueue (if
+ *      non-empty) from the employee's actual current position, or otherwise
+ *      claim exactly one candidate from the open pool (targetEmployeeId ===
+ *      null) — never both in the same tick.
+ *
  * Mutates state: transitions claimed actions' status/holderId in place (and
  * marks their ghost `claimed`) instead of removing them — the record and its
- * ghost persist until completePendingAction runs at completion (#547). Sets
- * activeActionId on the claiming employee. Actions already 'assigned' or
- * 'in_progress' are skipped entirely — not re-evaluated as claimable, not
- * counted as still-waiting.
+ * ghost persist until completePendingAction runs at completion (#547). An
+ * action selectBestActionForEmployee reports unreachable (null) leaves the
+ * employee idle this tick to retry next tick — never marked stuck, taskQueue
+ * left untouched. Actions already 'assigned' or 'in_progress' are skipped
+ * entirely — not re-evaluated as claimable, not counted as still-waiting.
  */
 export function tickEmployees(state: GameState): TickEmployeesResult {
   const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
 
+  // Base eligibility: alive, not injured, not in training.
+  const eligible = state.employees.employees.filter(
+    emp => emp.alive && !emp.injured && emp.trainingState === null,
+  );
+
+  // Actions no eligible employee could ever perform, computed once up front —
+  // qualification doesn't change during this tick's dispatch pass.
+  const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
-
-    // Base eligibility: alive, not injured, not in training.
-    const eligible = state.employees.employees.filter(
-      emp => emp.alive && !emp.injured && emp.trainingState === null,
-    );
-
-    // Determine the pool of employees who could ever do this action.
-    const allWithSkill = action.requiredSkill !== null
-      ? eligible.filter(emp => emp.qualifications.some(q => q.category === action.requiredSkill))
-      : eligible;
-
-    if (allWithSkill.length === 0) {
+    const hasQualified = action.requiredSkill === null
+      ? eligible.length > 0
+      : eligible.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));
+    if (!hasQualified) {
+      unqualifiedIds.add(action.id);
       result.unqualified.push(action.id);
-      continue;
     }
+  }
 
-    // Find an idle match, optionally restricted to a specific employee.
-    const idleMatch = action.targetEmployeeId !== null
-      ? allWithSkill.find(emp => emp.id === action.targetEmployeeId && emp.activeActionId === null)
-      : allWithSkill.find(emp => emp.activeActionId === null);
+  const orderedEmployees = [...eligible].sort((a, b) => a.id - b.id);
+  for (const employee of orderedEmployees) {
+    claimActionsTargetedAtEmployee(state, employee, result);
+    if (employee.activeActionId === null) {
+      fillIdleEmployeeFromQueueOrPool(state, employee, result);
+    }
+  }
 
-    if (!idleMatch) {
+  for (const action of state.pendingActions) {
+    if (action.status === 'queued' && !unqualifiedIds.has(action.id)) {
       result.waiting.push(action.id);
-      continue;
-    }
-
-    idleMatch.activeActionId = action.id;
-    result.claimed.push(action.id);
-
-    // Transition status/holderId in place (and marks the ghost claimed) via
-    // the shared claim helper — the record (and its ghost) stay visible while
-    // the employee walks to the target; only completion removes them (#547).
-    claimPendingAction(state, action.id, idleMatch.id);
-
-    // Send the employee walking toward the action's location — targetX/targetZ
-    // is documented on PendingAction as existing for exactly this purpose
-    // ("ghost rendering and employee pathfinding"), previously unused.
-    idleMatch.destinationX = action.targetX;
-    idleMatch.destinationZ = action.targetZ;
-
-    // tickCollapse/tickNeedRestoration self-claim (see above) and, like this
-    // branch, only ever *queue* the rest via pendingRestDuration/
-    // pendingRestNeedKey — ArrivalGate.tickArrivalGate promotes it into
-    // restTicksRemaining once the employee physically reaches the rest
-    // building (#437). autoInsertNeedTasks pushes 'rest' actions unclaimed
-    // (busy-employee case), so this is the first point an idle employee
-    // actually starts walking to rest. Bunkhouse Tier 2+ shift-cycle rest
-    // (forceShiftRestIfNeeded) also self-claims and carries no 'needKey'
-    // payload, so resolveRestNeedKey returns null for it and this block is a
-    // no-op there.
-    if (action.type === 'rest' && idleMatch.restTicksRemaining === null && idleMatch.pendingRestDuration === null) {
-      const needKey = resolveRestNeedKey(action.payload);
-      if (needKey !== null) {
-        const restDuration = typeof action.payload['restDuration'] === 'number'
-          ? action.payload['restDuration'] as number
-          : NEED_REST_DURATIONS[needKey];
-        idleMatch.pendingRestDuration = restDuration;
-        idleMatch.pendingRestNeedKey = needKey;
-      }
-    }
-
-    // Non-rest actions queue their task duration here — a skill-required
-    // action's claimed employee is guaranteed (via allWithSkill above) to
-    // hold requiredSkill, so the proficiency lookup below always succeeds.
-    // requiredSkill === null (e.g. a console `employee dispatch` with no
-    // skill: param — src/console/commands/employees.ts) has no qualification
-    // to scale off, so it's treated as Rookie baseline (proficiency level 1,
-    // the existing ×1.00 entry in PROFICIENCY_MULTIPLIERS) rather than being
-    // skipped — skipping it left pendingTaskDuration/taskTicksRemaining never
-    // seeded, so ArrivalGate could never promote the action to in_progress
-    // and it, and its ghost, leaked in state forever (#547 review). The
-    // countdown itself (taskTicksRemaining) does not start until
-    // ArrivalGate.tickArrivalGate confirms the employee has physically
-    // reached targetX/targetZ (#437) — a survey used to resolve the instant
-    // it was claimed, regardless of how far the surveyor still had to walk.
-    // pendingActionType/pendingActionPayload stay set through to completion
-    // (tickTaskProgress clears them) so completion handling (e.g. survey
-    // resolution) still knows what work just finished.
-    if (action.type !== 'rest') {
-      const qual = action.requiredSkill !== null
-        ? idleMatch.qualifications.find(q => q.category === action.requiredSkill)
-        : undefined;
-      const level = qual?.proficiencyLevel ?? 1;
-      const needMult = getNeedMultiplier(idleMatch);
-      const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, state.employees.employees.length);
-      // A survey's own durationTicks (SURVEY_DURATION_TICKS[method], set by
-      // runSurvey) overrides the generic proficiency-scaled duration, mirroring
-      // the 'rest' branch's restDuration override above — otherwise every
-      // survey silently took BASE_TASK_DURATION_TICKS instead of its method's
-      // own duration.
-      idleMatch.pendingTaskDuration = typeof action.payload['durationTicks'] === 'number'
-        ? action.payload['durationTicks'] as number
-        : computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
-      idleMatch.activeTaskSkill = action.requiredSkill;
-      idleMatch.pendingActionType = action.type;
-      idleMatch.pendingActionPayload = action.payload;
     }
   }
 
@@ -261,14 +216,123 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 }
 
 /**
- * Determine which need gauge a 'rest' PendingAction's payload is restoring,
- * or null if the payload doesn't identify one — this is the case for the
- * Bunkhouse Tier 2+ shift-cycle rest created by forceShiftRestIfNeeded, which
- * processShiftCycle/completeRestTick already own end-to-end.
+ * Step 1 of tickEmployees: claim every still-queued action targeted
+ * specifically at `employee`, up to MAX_EMPLOYEE_TASK_QUEUE_DEPTH total
+ * (active + taskQueue). These are never contested by another employee, so no
+ * cost ranking is needed — just claim in a deterministic (id-ascending)
+ * order. The first one claimed while the employee is still idle is promoted
+ * straight to active; any further ones go onto taskQueue.
  */
-function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | null {
-  const candidate = payload['needKey'];
-  return candidate === 'hunger' || candidate === 'fatigue' || candidate === 'breakNeed' ? candidate : null;
+function claimActionsTargetedAtEmployee(state: GameState, employee: Employee, result: TickEmployeesResult): void {
+  const targeted = state.pendingActions
+    .filter(a => a.status === 'queued' && a.targetEmployeeId === employee.id)
+    .sort((a, b) => a.id - b.id);
+
+  for (const action of targeted) {
+    const depth = (employee.activeActionId !== null ? 1 : 0) + employee.taskQueue.length;
+    if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) break;
+
+    const claimed = claimPendingAction(state, action.id, employee.id);
+    if (!claimed) continue;
+    result.claimed.push(action.id);
+
+    if (employee.activeActionId === null) {
+      promoteActionToActive(state, employee, action);
+    } else {
+      employee.taskQueue.push(action.id);
+    }
+  }
+}
+
+/**
+ * Step 2 of tickEmployees: called only when `employee` is still idle after
+ * step 1. Recomputes the cheapest entry from the employee's own taskQueue
+ * (already claimed on a prior tick) from their current position, or — when
+ * taskQueue is empty — claims exactly one candidate from the open pool
+ * (targetEmployeeId === null). Never both in the same tick.
+ */
+function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, result: TickEmployeesResult): void {
+  if (employee.taskQueue.length > 0) {
+    const candidates = employee.taskQueue
+      .map(id => state.pendingActions.find(a => a.id === id))
+      .filter((a): a is PendingAction => a !== undefined && a.status === 'assigned' && a.holderId === employee.id);
+
+    const selection = selectBestActionForEmployee(state, employee, candidates);
+    if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+
+    promoteActionToActive(state, employee, selection.action);
+    employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
+    return;
+  }
+
+  const poolCandidates = state.pendingActions.filter(a =>
+    a.status === 'queued' &&
+    a.targetEmployeeId === null &&
+    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)),
+  );
+
+  const selection = selectBestActionForEmployee(state, employee, poolCandidates);
+  if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+
+  // Exactly one open-pool claim per idle employee per tick — keeps dispatch
+  // fair so one employee doesn't front-run the whole pool in a single tick.
+  const claimed = claimPendingAction(state, selection.action.id, employee.id);
+  if (!claimed) return; // defensive: someone else claimed it between filter and here — never happens single-threaded, kept for safety
+  result.claimed.push(selection.action.id);
+  promoteActionToActive(state, employee, selection.action);
+}
+
+/**
+ * Promote a claimed action to active on `employee`: sets activeActionId,
+ * sends them walking toward the target (destinationX/Z — targetX/targetZ is
+ * documented on PendingAction as existing for exactly this purpose, "ghost
+ * rendering and employee pathfinding"), and seeds either
+ * pendingRestDuration/pendingRestNeedKey (rest) or pendingTaskDuration/
+ * activeTaskSkill/pendingActionType/pendingActionPayload (everything else) —
+ * ArrivalGate.tickArrivalGate promotes these into restTicksRemaining/
+ * taskTicksRemaining once the employee physically arrives (#437), rather than
+ * starting the timer at claim time.
+ */
+function promoteActionToActive(state: GameState, employee: Employee, action: PendingAction): void {
+  employee.activeActionId = action.id;
+  employee.destinationX = action.targetX;
+  employee.destinationZ = action.targetZ;
+
+  // tickCollapse/tickNeedRestoration self-claim outside this path and, like
+  // this branch, only ever *queue* the rest via pendingRestDuration/
+  // pendingRestNeedKey. autoInsertNeedTasks pushes 'rest' actions unclaimed
+  // (busy-employee case), so this is the first point an idle employee
+  // actually starts walking to rest. Bunkhouse Tier 2+ shift-cycle rest
+  // (forceShiftRestIfNeeded) also self-claims and carries no 'needKey'
+  // payload, so resolveRestNeedKey returns null for it and this block is a
+  // no-op there.
+  if (action.type === 'rest') {
+    if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
+      const needKey = resolveRestNeedKey(action.payload);
+      if (needKey !== null) {
+        employee.pendingRestDuration = computeActionWorkTicks(state, employee, action);
+        employee.pendingRestNeedKey = needKey;
+      }
+    }
+    return;
+  }
+
+  // Non-rest actions queue their task duration here — a skill-required
+  // action's claimed employee is guaranteed (by the qualification filters
+  // upstream) to hold requiredSkill, so computeActionWorkTicks' proficiency
+  // lookup always succeeds. requiredSkill === null (e.g. a console `employee
+  // dispatch` with no skill: param — src/console/commands/employees.ts) has
+  // no qualification to scale off, so it's treated as Rookie baseline
+  // (proficiency level 1) rather than being skipped — skipping it left
+  // pendingTaskDuration/taskTicksRemaining never seeded, so ArrivalGate could
+  // never promote the action to in_progress and it, and its ghost, leaked in
+  // state forever (#547 review). pendingActionType/pendingActionPayload stay
+  // set through to completion (tickTaskProgress clears them) so completion
+  // handling (e.g. survey resolution) still knows what work just finished.
+  employee.pendingTaskDuration = computeActionWorkTicks(state, employee, action);
+  employee.activeTaskSkill = action.requiredSkill;
+  employee.pendingActionType = action.type;
+  employee.pendingActionPayload = action.payload;
 }
 
 // ── Need restoration routing ──
@@ -354,8 +418,21 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
   for (const emp of state.employees.employees) {
     if (!emp.alive || emp.injured) continue;
 
+    // checkCollapse nulls activeActionId itself on collapse, so the previous
+    // active action (if any) must be captured before calling it — otherwise
+    // there is nothing left to release back to the pool.
+    const priorActionId = emp.activeActionId;
     const collapsedGauge = checkCollapse(emp);
     if (!collapsedGauge) continue;
+
+    // Needs-driven interruption (#549): release the ONE active action back to
+    // 'queued' (holder/exclusivity cleared) instead of leaving it permanently
+    // orphaned on the old employee — its payload is preserved on
+    // interruptedActionPayload, and taskQueue is left untouched so the
+    // employee's remaining queued work survives the collapse.
+    if (priorActionId !== null) {
+      interruptActiveAction(state, emp, priorActionId);
+    }
 
     result.collapsed.push(emp.id);
     _firedEvents?.push({ eventId: 'employee_collapsed', firedAtTick: state.tickCount });

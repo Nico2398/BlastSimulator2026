@@ -24,12 +24,22 @@ export function serialize(state: GameState): string {
 /**
  * v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
  * per-employee action selection). A pre-v9 save has no queue for any
- * employee — the field should default to an empty array so the employee is
- * simply treated as having no follow-up work queued.
- * TODO(test-writer/implementer): populate `taskQueue` for pre-v9 saves.
+ * employee — the field defaults to an empty array so the employee is simply
+ * treated as having no follow-up work queued. Mutates `obj` in place,
+ * matching every other migration block in `deserialize` below.
  */
 function migrateV8ToV9(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO(test-writer/implementer): implement migration logic.
+  const employeesRaw = obj['employees'] as Record<string, unknown> | undefined;
+  if (employeesRaw) {
+    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(employeeList)) {
+      for (const e of employeeList) {
+        if (!Array.isArray(e['taskQueue'])) {
+          e['taskQueue'] = [];
+        }
+      }
+    }
+  }
   return obj;
 }
 
