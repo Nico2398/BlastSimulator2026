@@ -22,6 +22,18 @@ export function serialize(state: GameState): string {
 }
 
 /**
+ * v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
+ * per-employee action selection). A pre-v9 save has no queue for any
+ * employee — the field should default to an empty array so the employee is
+ * simply treated as having no follow-up work queued.
+ * TODO(test-writer/implementer): populate `taskQueue` for pre-v9 saves.
+ */
+function migrateV8ToV9(obj: Record<string, unknown>): Record<string, unknown> {
+  // TODO(test-writer/implementer): implement migration logic.
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -218,6 +230,11 @@ export function deserialize(json: string): GameState {
         }
       }
     }
+  }
+
+  // v8 -> v9: Employee.taskQueue (#549).
+  if ((obj['version'] as number) < 9) {
+    migrateV8ToV9(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

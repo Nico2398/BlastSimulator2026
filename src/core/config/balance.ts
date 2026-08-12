@@ -513,6 +513,24 @@ export const STUCK_THRESHOLD = 3;
 /** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
 export const AGENT_WALK_SPEED = 2;
 
+/**
+ * Largest number of PendingAction ids an employee may hold in `taskQueue`
+ * beyond the one currently claimed (#549 cost-based dispatch). Bounds how far
+ * ahead dispatch commits an employee, so a burst of newly-issued actions
+ * doesn't lock them onto a long queue that later-arriving cheaper work can
+ * never displace.
+ */
+export const MAX_EMPLOYEE_TASK_QUEUE_DEPTH = 3;
+
+/**
+ * Upper bound on how many top-ranked candidates (by the cheap
+ * `estimateActionCost` heuristic) `selectBestActionForEmployee` will spend a
+ * real `findPath` call resolving before giving up. Caps per-employee
+ * dispatch cost at a fixed number of pathfinds regardless of how many
+ * pending actions exist.
+ */
+export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
+
 /** Morale penalty applied per tick to an employee stuck with no walkable path (see NEED_MORALE_PENALTIES for the analogous need-driven table). */
 export const STUCK_MORALE_PENALTY = 2;
 

@@ -172,6 +172,14 @@ export interface Employee {
    * ArrivalGate.tickArrivalGate on arrival.
    */
   pendingDriverVehicleId: number | null;
+  /**
+   * IDs of PendingActions queued for this employee beyond the one currently
+   * claimed (#549 cost-based dispatch), bounded by
+   * MAX_EMPLOYEE_TASK_QUEUE_DEPTH. Executed in cheapest-next order,
+   * recomputed from the employee's current position — ordering is not fixed
+   * at enqueue time. Empty when the employee has no queued follow-up work.
+   */
+  taskQueue: number[];
 }
 
 // ── Employee state ──
@@ -243,6 +251,7 @@ export function hireEmployee(
     pendingActionType: null,
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
+    taskQueue: [],
   };
   // Keep the stored salary consistent with the qualification just granted —
   // calculateSalary() sums qualification bonuses, so a base-only salary would
