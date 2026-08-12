@@ -75,9 +75,9 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 2
+          "pendingActionCount": 1
         },
-        "note": "#547: employee 1's `dispatch` carries no skill:, so it never seeds taskTicksRemaining and never completes through the normal task-duration path -- once tickEmployees claims it (this batch's first tick), its record now stays in pendingActions forever (nothing calls completePendingAction for it), a permanent +1 on top of whatever this batch's own warning-threshold rest contributes. Before #547 the claim spliced it out immediately, so this was 1 (the warning-rest alone); it is 2 for the rest of this file from here on."
+        "note": "Recalibrated for #547: the dispatch (no `skill:` param) used to never seed pendingTaskDuration and so never completed, permanently inflating this count. #547 fixed the leak (tickEmployees now seeds pendingTaskDuration for every non-rest action regardless of requiredSkill), so the dispatch genuinely completes within this batch and only the warning-threshold rest remains pending."
       }
     },
     {
@@ -146,9 +146,9 @@
         ],
         "equals": {
           "buildingCount": 1,
-          "pendingActionCount": 2
+          "pendingActionCount": 1
         },
-        "note": "#547: still the tick-40 checkpoint's warning-rest + the permanently-stuck original dispatch (see that step's note) -- nothing ticks between there and here."
+        "note": "Recalibrated for #547 (see the tick-40 checkpoint's note for root cause): still just the tick-40 checkpoint's warning-rest -- nothing ticks between there and here."
       }
     },
     {
@@ -172,13 +172,15 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
+          "cash"
+        ],
+        "increased": [
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1
+          "pendingActionCount": 0
         },
-        "note": "minFatigue is now near the collapse threshold (~5); the warning-threshold rest has been claimed and completed. #547: pendingActionCount no longer reaches 0 here -- the original null-skill dispatch (see the tick-40 checkpoint's note) never completes and its record now stays in pendingActions permanently, so this floor is 1 instead of 0 for the rest of this file."
+        "note": "Recalibrated for #547: a null-skill dispatch (no `skill:` param, this scenario's own `employee dispatch 1 x:10 z:10`) used to never seed pendingTaskDuration, so it never completed and left the employee 'busy' forever -- that leak is what let fatigue decline uninterrupted toward collapse under the old calibration. #547 fixed the leak (tickEmployees now seeds pendingTaskDuration for every non-rest action regardless of requiredSkill), so the dispatch genuinely completes (already visible at tick 40 -- 'TASK: Walt Dusty completed task'), fatigue's dip below the warning threshold (21.5 < 25) queues an auto-inserted rest the instant Walt goes idle, and by here it has been claimed, walked to, completed, and the gauge partially recovered -- an increase, not the old trajectory's continued decline toward ~5."
       }
     },
     {
@@ -226,10 +228,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 2,
-          "collapsedCount": 1
+          "pendingActionCount": 1,
+          "collapsedCount": 0
         },
-        "note": "minFatigue hits the collapse floor mid-batch (5.0 -> 1.4) and tickCollapse fires before autoInsertNeedTasks ever gets a chance at its own, earlier warning-threshold insertion (25) -- this is a genuine collapse forcing the rest task, not the calm pre-collapse insertion the file's own name implies. pendingActionCount 1->2 is real (the collapse-rest on top of the permanently-stuck original dispatch, #547), it is collapse recovery, not proactive queuing; not fixed here since it is a game-balance question (why the proactive threshold never preempts it), not a command/UI divergence."
+        "note": "Recalibrated for #547 (see the 'tick 80' step's note above for the root cause): with the dispatch-completion leak fixed, Walt now genuinely cycles between finishing work, idling, and being auto-routed to rest well above the collapse floor -- so collapsedCount stays 0 here instead of the old calibration's forced collapse, which only happened because a perpetually-'busy' employee (the pre-#547 bug) could never be idle-claimed for its own proactive rest and so drained straight through it. pendingActionCount 0->1 is a fresh dip below the fatigue warning threshold queuing another auto-inserted rest -- genuine proactive queuing, not collapse recovery. tickCollapse/collapsedCount is exercised directly (and correctly) by needs-collapse-visual instead."
       }
     },
     {
@@ -273,16 +275,14 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash"
-        ],
-        "increased": [
+          "cash",
           "minFatigue"
         ],
         "equals": {
           "pendingActionCount": 1,
           "collapsedCount": 0
         },
-        "note": "the collapse-forced rest queued in the previous step is now active: minFatigue recovers (not decreases) and the task completes, dropping pendingActionCount back to its 1 floor (#547: the permanently-stuck original dispatch, see the tick-40 checkpoint's note -- pre-#547 this floor was 0) and clearing collapsedCount. This batch is interrupted early by an unrelated random event (politics_mining_expo) -- the recovery is already visible in however many ticks actually ran."
+        "note": "Recalibrated for #547 (see the 'tick 80' step's note for root cause): there is no collapse-forced rest to recover from -- the previous step's fresh rest cycle (queued -> claimed -> completed) already finished, and Walt is back to natural fatigue decline while idle. pendingActionCount is 1 again: the decline crosses the warning threshold a second time within this batch, auto-inserting (and, once idle, claiming) another proactive rest -- nowhere near collapse. This batch is interrupted early by an unrelated random event (politics_mining_expo) -- the decline is already visible in however many ticks actually ran."
       }
     },
     {

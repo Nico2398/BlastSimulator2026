@@ -81,6 +81,22 @@
       "role": "bootstrap"
     },
     {
+      "command": "employee dispatch 1 x:10 z:10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:10 z:10"
+        }
+      ],
+      "description": "Added for #547. Queued now, second in line behind the first dispatch, this claims the instant the first completes -- ahead of any auto-inserted rest, which only gets queued once fatigue crosses its warning threshold near the end of the first task and so always lands later in pendingActions. Before #547, a null-skill dispatch never seeded pendingTaskDuration, so the single original dispatch here never completed and Walt stayed 'busy' (and undisturbable by his own proactive rest) forever -- which is what let fatigue drain straight through to collapse under the old calibration. #547 fixed that leak, so a lone dispatch now genuinely completes and frees Walt to be routed to rest before he ever reaches the collapse floor (see needs-proactive-queue-visual's equivalent note). This second dispatch keeps him continuously working across the handoff, restoring the file's own premise (\"no rest can be claimed\") instead of the accidental one the old bug provided.",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
       "command": "needs",
       "interaction": [
         {

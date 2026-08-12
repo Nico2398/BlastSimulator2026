@@ -197,7 +197,12 @@ describe('GameLoop', () => {
 describe('tickEmployees — claim logic (Task 3.6)', () => {
   const SEED = 42;
 
-  /** Build a minimal PendingAction for tests. */
+  /**
+   * Build a minimal PendingAction for tests. Defaults to 'queued'/unheld
+   * (#547) — the shape tickEmployees requires to even consider claiming it;
+   * override status/holderId explicitly for tests that need a different
+   * lifecycle state.
+   */
   function makePendingAction(
     overrides: Partial<PendingAction> & { id: number; requiredSkill: PendingAction['requiredSkill'] },
   ): PendingAction {

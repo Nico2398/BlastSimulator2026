@@ -57,6 +57,7 @@ describe('OperationsPanel', () => {
     state.pendingActions = [
       { id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null },
       { id: 2, type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null, targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'queued', holderId: null },
+      // Already claimed by employee 7 (#547) — reserved/assigned work is not "unclaimed", so this one is excluded from the count below.
       { id: 3, type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler', targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: 7, status: 'assigned', holderId: 7 },
     ];
     panel.update(state);
