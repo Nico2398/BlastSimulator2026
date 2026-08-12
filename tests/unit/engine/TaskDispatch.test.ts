@@ -24,8 +24,9 @@ import {
 } from '../../../src/core/entities/Employee.js';
 import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
-import { dispatchPendingAction, claimPendingAction, completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import { dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
+import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 
 // ── Deterministic fixture helpers ────────────────────────────────────────────
 
@@ -548,5 +549,234 @@ describe('completePendingAction (#547)', () => {
   it('is a safe no-op returning null on an empty pendingActions array', () => {
     const result = completePendingAction(state, 1);
     expect(result).toBeNull();
+  });
+});
+
+// ── Section 6: cancelAction (#548) ────────────────────────────────────────────
+//   Cancel a PendingAction at any lifecycle stage (queued, assigned, in_progress),
+//   releasing the employee cleanly, refunding any order-time cost, and removing
+//   the ghost. Engine-owned 'rest' actions are never player-cancellable.
+
+describe('cancelAction (#548)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  /**
+   * Simulates tickEmployees' claim-time field writes (GameLoop.ts) on top of
+   * claimPendingAction — the latter only flips status/holderId, not the
+   * employee's own walking/pending-task bookkeeping, which a real claim
+   * always sets alongside it.
+   */
+  function simulateClaimWalking(
+    state: GameState,
+    actionId: number,
+    employeeId: number,
+    action: { targetX: number; targetZ: number; requiredSkill: string | null; type: string; payload: Record<string, unknown> },
+    durationTicks = 10,
+  ): void {
+    claimPendingAction(state, actionId, employeeId);
+    const emp = state.employees.employees.find(e => e.id === employeeId)!;
+    emp.activeActionId = actionId;
+    emp.destinationX = action.targetX;
+    emp.destinationZ = action.targetZ;
+    emp.pendingTaskDuration = durationTicks;
+    emp.pendingActionType = action.type as any;
+    emp.pendingActionPayload = action.payload;
+    emp.activeTaskSkill = action.requiredSkill as any;
+  }
+
+  /**
+   * Simulates ArrivalGate's promotion from "walking" to "in_progress"
+   * (ArrivalGate.ts): destinationX/Z already nulled by movement, taskTicksRemaining
+   * and activeTaskTotalTicks set from pendingTaskDuration, pendingTaskDuration
+   * cleared, and the action's own status flips to 'in_progress'.
+   */
+  function simulateArrival(state: GameState, actionId: number, employeeId: number): void {
+    const emp = state.employees.employees.find(e => e.id === employeeId)!;
+    emp.destinationX = null;
+    emp.destinationZ = null;
+    emp.taskTicksRemaining = emp.pendingTaskDuration;
+    (emp as any).activeTaskTotalTicks = emp.pendingTaskDuration;
+    emp.pendingTaskDuration = null;
+    const action = state.pendingActions.find(a => a.id === actionId)!;
+    action.status = 'in_progress';
+  }
+
+  it('removes a queued, unheld action from pendingActions and ghostPreviews, refunding 0', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 1, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    const result = cancelAction(state, 1);
+
+    expect(result.success).toBe(true);
+    expect(result.refunded).toBe(0);
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 1)).toBeUndefined();
+    expect((state as any).ghostPreviews.find((g: { id: number }) => g.id === 1)).toBeUndefined();
+  });
+
+  it('resets an assigned (claimed, walking) action holder\'s task-walking fields to null', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const action = makePendingAction({ id: 2, requiredSkill: 'blasting', targetX: 12, targetZ: 8 });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 2, empId, {
+      targetX: 12, targetZ: 8, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+
+    const result = cancelAction(state, 2);
+
+    expect(result.success).toBe(true);
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.destinationX).toBeNull();
+    expect(emp.destinationZ).toBeNull();
+    expect(emp.pendingTaskDuration).toBeNull();
+    expect(emp.pendingActionType).toBeNull();
+    expect(emp.pendingActionPayload).toBeNull();
+    expect(emp.activeTaskSkill).toBeNull();
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 2)).toBeUndefined();
+    expect((state as any).ghostPreviews.find((g: { id: number }) => g.id === 2)).toBeUndefined();
+  });
+
+  it('additionally clears taskTicksRemaining/activeTaskTotalTicks for an in-progress action', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const action = makePendingAction({ id: 3, requiredSkill: 'blasting', targetX: 4, targetZ: 4 });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 3, empId, {
+      targetX: 4, targetZ: 4, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    simulateArrival(state, 3, empId);
+
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    expect(emp.taskTicksRemaining).not.toBeNull();
+
+    const result = cancelAction(state, 3);
+
+    expect(result.success).toBe(true);
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.taskTicksRemaining).toBeNull();
+    expect((emp as any).activeTaskTotalTicks == null).toBe(true);
+    expect(emp.activeTaskSkill).toBeNull();
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 3)).toBeUndefined();
+  });
+
+  it('returns { success: false, error: "not-found" } for an unknown action id, leaving state untouched', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    dispatchPendingAction(state, makePendingAction({ id: 4, requiredSkill: 'blasting' }));
+
+    const result = cancelAction(state, 9999);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('not-found');
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.id).toBe(4);
+  });
+
+  it('rejects a type:"rest" action with { success: false, error: "not-cancellable" }, leaving it and its holder untouched', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+
+    const restAction: PendingAction = {
+      id: 5,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: empId,
+      status: 'assigned',
+      holderId: empId,
+    };
+    (state as any).pendingActions.push(restAction);
+    emp.activeActionId = 5;
+    emp.destinationX = 0;
+    emp.destinationZ = 0;
+
+    const result = cancelAction(state, 5);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('not-cancellable');
+    // Nothing changes — the action stays exactly as it was, and the holder
+    // keeps their assignment.
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 5);
+    expect(stored).toBeDefined();
+    expect(stored.status).toBe('assigned');
+    expect(stored.holderId).toBe(empId);
+    expect(emp.activeActionId).toBe(5);
+    expect(emp.destinationX).toBe(0);
+    expect(emp.destinationZ).toBe(0);
+  });
+
+  it('refunds SURVEY_COSTS[method] and credits state.cash for a queued survey action with a payload.method', () => {
+    addQualifiedEmployee(state, 'geology', SEED);
+    const beforeCash = state.cash;
+    const action = makePendingAction({
+      id: 6, requiredSkill: 'geology', payload: { method: 'seismic', centerX: 10, centerZ: 10 },
+    });
+    (action as any).type = 'survey';
+    dispatchPendingAction(state, action);
+
+    const result = cancelAction(state, 6);
+
+    expect(result.success).toBe(true);
+    expect(result.refunded).toBe(SURVEY_COSTS.seismic);
+    expect(state.cash).toBe(beforeCash + SURVEY_COSTS.seismic);
+    const refundTx = state.finances.transactions.find(t => t.category === 'refund');
+    expect(refundTx).toBeDefined();
+    expect(refundTx!.amount).toBe(SURVEY_COSTS.seismic);
+  });
+
+  it('refunds 0 and adds no finance transaction for a non-survey action (general_work)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const beforeCash = state.cash;
+    const beforeTxCount = state.finances.transactions.length;
+    const action = makePendingAction({ id: 7, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    const result = cancelAction(state, 7);
+
+    expect(result.success).toBe(true);
+    expect(result.refunded).toBe(0);
+    expect(state.cash).toBe(beforeCash);
+    expect(state.finances.transactions).toHaveLength(beforeTxCount);
+  });
+
+  it('a second cancel of the same id returns { success: false, error: "not-found" }', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 8, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    const first = cancelAction(state, 8);
+    expect(first.success).toBe(true);
+
+    const second = cancelAction(state, 8);
+    expect(second.success).toBe(false);
+    expect(second.error).toBe('not-found');
+  });
+
+  it('resets moveConsecutiveFailures and isMoveStuck on a stuck-mid-walk holder', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const action = makePendingAction({ id: 9, requiredSkill: 'blasting', targetX: 99, targetZ: 99 });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 9, empId, {
+      targetX: 99, targetZ: 99, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    emp.moveConsecutiveFailures = 3;
+    emp.isMoveStuck = true;
+
+    const result = cancelAction(state, 9);
+
+    expect(result.success).toBe(true);
+    expect(emp.moveConsecutiveFailures).toBe(0);
+    expect(emp.isMoveStuck).toBe(false);
   });
 });

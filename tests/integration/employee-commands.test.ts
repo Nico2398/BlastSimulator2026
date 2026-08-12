@@ -471,6 +471,87 @@ describe('Console — employee dispatch', () => {
   });
 });
 
+// ── employee cancel (#548) ──────────────────────────────────────────────────
+
+describe('Console — employee cancel', () => {
+  let ctx: GameContext;
+  let empId: number;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+    empId = hireOne(ctx, 'driller');
+  });
+
+  it('cancels a dispatched action: success output, action gone, holder idle', () => {
+    const dispatchResult = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+    expect(dispatchResult.success).toBe(true);
+    const action = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId)!;
+    expect(action).toBeDefined();
+
+    const result = employeeCommand(ctx, ['cancel', String(action.id)], {});
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.pendingActions.find(a => a.id === action.id)).toBeUndefined();
+    expect(ctx.state!.ghostPreviews.find(g => g.id === action.id)).toBeUndefined();
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    expect(emp.activeActionId).toBeNull();
+  });
+
+  it('reports failure naming the id when the action does not exist', () => {
+    const result = employeeCommand(ctx, ['cancel', '9999'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('9999');
+  });
+
+  it('rejects the call with a usage message when no id is given', () => {
+    const result = employeeCommand(ctx, ['cancel'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/usage/i);
+  });
+
+  it('rejects cancelling a type:"rest" action pushed directly into state, leaving state unaffected', () => {
+    const restActionId = ctx.state!.nextPendingActionId++;
+    ctx.state!.pendingActions.push({
+      id: restActionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: empId,
+      status: 'assigned',
+      holderId: empId,
+    });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    emp.activeActionId = restActionId;
+
+    const result = employeeCommand(ctx, ['cancel', String(restActionId)], {});
+
+    expect(result.success).toBe(false);
+    const stored = ctx.state!.pendingActions.find(a => a.id === restActionId);
+    expect(stored).toBeDefined();
+    expect(emp.activeActionId).toBe(restActionId);
+  });
+
+  it('lets the freed employee be dispatched again after a cancel', () => {
+    const firstDispatch = employeeCommand(ctx, ['dispatch', String(empId)], { x: '10', z: '10' });
+    expect(firstDispatch.success).toBe(true);
+    const firstAction = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId)!;
+
+    employeeCommand(ctx, ['cancel', String(firstAction.id)], {});
+
+    const secondDispatch = employeeCommand(ctx, ['dispatch', String(empId)], { x: '15', z: '15' });
+
+    expect(secondDispatch.success).toBe(true);
+    const secondAction = ctx.state!.pendingActions.find(a => a.targetEmployeeId === empId);
+    expect(secondAction).toBeDefined();
+    expect(secondAction!.targetX).toBe(15);
+    expect(secondAction!.targetZ).toBe(15);
+  });
+});
+
 // ── employee hire — spawn honours a negative world origin (#571) ──
 
 describe('Console — employee hire — spawn position on a site grown into negative territory', () => {

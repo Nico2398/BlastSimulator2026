@@ -77,6 +77,7 @@ const FEATURE_SCENARIO_NAMES = [
   'hauling-gate',
   'economy-full-loop',
   'maintenance-cost-drain',
+  'action-cancel',
 ] as const;
 
 const VISUAL_SCENARIO_NAMES = [

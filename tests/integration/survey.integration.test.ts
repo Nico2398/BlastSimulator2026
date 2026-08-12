@@ -18,6 +18,7 @@ import {
   type SurveyMethod,
 } from '../../src/core/mining/SurveyCalc.js';
 import { computeBlastOreReport } from '../../src/core/mining/BlastOreReport.js';
+import { cancelAction } from '../../src/core/engine/TaskDispatch.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
@@ -551,6 +552,116 @@ describe('Survey system', () => {
     expect(state.surveyResults).toHaveLength(1);
     expect(state.surveyResults[0]!.method).toBe('core_sample');
     expect(state.surveyResults[0]!.estimates['10,10']).toBeDefined();
+  });
+});
+
+// ── Survey system — cancelling a queued/in-progress survey (#548) ──────────
+//
+// A player must be able to cancel an ordered survey at any lifecycle stage,
+// releasing the surveyor cleanly, refunding SURVEY_COSTS[method], and
+// removing the ghost — with no surveyResults entry ever produced.
+
+describe('Survey system — cancelling a queued/in-progress survey (#548)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeCtx();
+  });
+
+  it('cancels a survey while the surveyor is still walking: refund, ghost gone, no result', () => {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+
+    const beforeCash = ctx.state!.cash;
+    surveyCommand(ctx as any, ['seismic'], { x: '2', z: '2' });
+    const afterOrderCash = ctx.state!.cash;
+    expect(afterOrderCash).toBe(beforeCash - SURVEY_COSTS.seismic);
+
+    const action = ctx.state!.pendingActions.find(a => a.type === 'survey')!;
+    expect(action).toBeDefined();
+    const actionId = action.id;
+
+    // A couple of ticks only — the surveyor is walking toward (2,2), nowhere
+    // near arrival + SURVEY_DURATION_TICKS.seismic yet.
+    tickCommand(ctx, ['2'], {});
+    expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeDefined();
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+
+    const cancelResult = cancelAction(ctx.state!, actionId);
+
+    expect(cancelResult.success).toBe(true);
+    expect(cancelResult.refunded).toBe(SURVEY_COSTS.seismic);
+    expect(ctx.state!.cash).toBe(afterOrderCash + SURVEY_COSTS.seismic);
+    expect(ctx.state!.ghostPreviews.find(g => g.id === actionId)).toBeUndefined();
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.destinationX).toBeNull();
+    expect(emp.destinationZ).toBeNull();
+    const refundTx = ctx.state!.finances.transactions.find(t => t.category === 'refund');
+    expect(refundTx).toBeDefined();
+    expect(refundTx!.amount).toBe(SURVEY_COSTS.seismic);
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+  });
+
+  it('cancels a survey once it is in_progress (surveyor arrived, mid-duration): same guarantees, no completion', () => {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+
+    // Zero-travel survey — right where the surveyor stands — so a single tick
+    // is enough to reach in_progress without completing the full duration.
+    surveyCommand(ctx as any, ['core_sample'], { x: String(emp.x), z: String(emp.z) });
+    const action = ctx.state!.pendingActions.find(a => a.type === 'survey')!;
+    const actionId = action.id;
+    const afterOrderCash = ctx.state!.cash;
+
+    tickCommand(ctx, ['1'], {});
+    const stillPending = ctx.state!.pendingActions.find(a => a.id === actionId);
+    expect(stillPending).toBeDefined();
+    expect(stillPending!.status).toBe('in_progress');
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+
+    const cancelResult = cancelAction(ctx.state!, actionId);
+
+    expect(cancelResult.success).toBe(true);
+    expect(cancelResult.refunded).toBe(SURVEY_COSTS.core_sample);
+    expect(ctx.state!.cash).toBe(afterOrderCash + SURVEY_COSTS.core_sample);
+    expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+    expect(ctx.state!.ghostPreviews.find(g => g.id === actionId)).toBeUndefined();
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.taskTicksRemaining).toBeNull();
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+
+    // Ticking further must not resurrect a result for the cancelled action.
+    for (let i = 0; i < SURVEY_DURATION_TICKS.core_sample + 5; i++) tickCommand(ctx, ['1'], {});
+    expect(ctx.state!.surveyResults).toHaveLength(0);
+  });
+
+  it('the freed surveyor claims a second, later-ordered survey after the cancel', () => {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+
+    surveyCommand(ctx as any, ['core_sample'], { x: String(emp.x), z: String(emp.z) });
+    const firstAction = ctx.state!.pendingActions.find(a => a.type === 'survey')!;
+    tickCommand(ctx, ['1'], {}); // claimed, in_progress (zero travel)
+    cancelAction(ctx.state!, firstAction.id);
+    expect(emp.activeActionId).toBeNull();
+
+    // Order a second, later survey at a different location — the same
+    // surveyor is idle again and must be able to claim it.
+    const secondX = emp.x + 3;
+    const secondZ = emp.z;
+    surveyCommand(ctx as any, ['core_sample'], { x: String(secondX), z: String(secondZ) });
+    const secondAction = ctx.state!.pendingActions.find(a => a.type === 'survey')!;
+    expect(secondAction).toBeDefined();
+    expect(secondAction.id).not.toBe(firstAction.id);
+
+    for (let i = 0; i < 10 + SURVEY_DURATION_TICKS.core_sample + 5; i++) tickCommand(ctx, ['1'], {});
+
+    expect(ctx.state!.pendingActions.find(a => a.id === secondAction.id)).toBeUndefined();
+    expect(ctx.state!.surveyResults).toHaveLength(1);
+    expect(ctx.state!.surveyResults[0]!.method).toBe('core_sample');
   });
 });
 
