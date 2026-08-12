@@ -632,6 +632,18 @@ describe('Vehicle fleet', () => {
 
     it('a same-role follow-up action keeps the driller mounted in the same vehicle instead of dismounting and re-walking', () => {
       const eid = hireLicensedDriller();
+      // Master-level 'blasting' (proficiency 5, ×0.40 duration multiplier) —
+      // this test is about mount continuity across a claim, not about task
+      // duration, so it keeps both dispatches' combined drive+work time well
+      // under the ~47-tick fatigue-collapse ceiling (NEED_DRAIN_RATES.fatigue.working
+      // × NEED_COLLAPSE_THRESHOLDS.fatigue, balance.ts). At Rookie level 1 the
+      // two BASE_TASK_DURATION_TICKS=20 dispatches alone sum to ~48 ticks
+      // before any drive time, so a needs-driven rest interruption — which
+      // legitimately dismounts the driver (TaskDispatch.interruptActiveAction
+      // releases a vehicle-gated reservation on interrupt, same as
+      // cancellation) — would fire independently of, and mask, the mount-
+      // continuity behavior this test targets.
+      employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'blasting', level: '5' });
       vehicleCommand(ctx, ['buy', 'drill_rig'], {});
       const vehicle = ctx.state!.vehicles.vehicles[0]!;
 

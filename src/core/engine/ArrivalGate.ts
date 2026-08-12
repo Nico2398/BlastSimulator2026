@@ -68,7 +68,18 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       workStarted = true;
     }
 
-    if (emp.pendingTaskDuration !== null) {
+    // A vehicle-gated action's work timer starts only once the VEHICLE
+    // (not the employee) reaches action.targetX/targetZ — the vehicle-drive
+    // loop below owns that promotion entirely (#550). Skip it here even
+    // though the employee themself reads as "arrived" (aboard, no
+    // destination of their own) the instant they board; otherwise the timer
+    // would start while the vehicle is still mid-drive.
+    const activeAction = emp.activeActionId !== null
+      ? state.pendingActions.find(a => a.id === emp.activeActionId)
+      : undefined;
+    const isVehicleGated = activeAction !== undefined && activeAction.requiredVehicleRole !== null;
+
+    if (!isVehicleGated && emp.pendingTaskDuration !== null) {
       emp.taskTicksRemaining = emp.pendingTaskDuration;
       emp.activeTaskTotalTicks = emp.pendingTaskDuration;
       emp.pendingTaskDuration = null;
@@ -150,12 +161,33 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) continue;
 
     const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
-    if (!action || action.status !== 'assigned') continue; // work already started (or reservation stale) — nothing left to seed
+    if (!action) continue;
 
     const holder = action.holderId !== null ? state.employees.employees.find(e => e.id === action.holderId) : undefined;
-    if (holder) {
+    if (!holder) continue;
+
+    // Gate on the holder's own work timer rather than action.status — status
+    // already flips 'assigned' -> 'in_progress' at boarding time (mirroring
+    // #547's "claimed, walking" vs "committed" distinction), well before the
+    // vehicle itself reaches the target, so it can't double as "already
+    // seeded" here. taskTicksRemaining !== null means either a previous tick
+    // already seeded it (vehicle parked at target since) or work is already
+    // underway some other way — nothing left to do.
+    if (holder.taskTicksRemaining !== null) continue;
+
+    // seedTaskTimerFields computes and stages pendingTaskDuration but,
+    // deliberately, does not promote it — promoteVehicleGatedAction (GameLoop.ts)
+    // never calls it at claim time for this reason. Compute it now if nothing
+    // staged it already, then promote in the same step so the work timer
+    // starts the very tick the vehicle arrives, not one tick later.
+    if (holder.pendingTaskDuration === null) {
       seedTaskTimerFields(state, holder, action);
     }
+    const duration = holder.pendingTaskDuration!;
+    holder.taskTicksRemaining = duration;
+    holder.activeTaskTotalTicks = duration;
+    holder.pendingTaskDuration = null;
+    action.status = 'in_progress';
 
     vehicle.task = VEHICLE_ROLE_ARRIVAL_TASK[vehicle.type];
     tickVehicleTaskState(vehicle);
@@ -208,12 +240,20 @@ function resolveBoarding(
   if (boarded.success) {
     result.driversBoarded.push(emp.id);
     emitter?.emit('vehicle:driver_boarded', { employeeId: emp.id, vehicleId: vehicle.id });
-    // #550: a vehicle-gated action already staged targetX/targetZ on this
-    // vehicle at claim time (GameLoop.promoteVehicleGatedAction) but left
-    // task alone so an unmanned vehicle never drove itself — now that a
-    // driver is aboard, hand it to tickVehicle (ArrivalGate's own vehicle-
-    // drive loop, below) the same way moveVehicle would.
+    // #550: a vehicle-gated action normally already staged targetX/targetZ
+    // on this vehicle at claim time (GameLoop.promoteVehicleGatedAction) —
+    // but boarding is the one place a driver actually mounts, so re-stage it
+    // here from the reserved action itself rather than trust it was already
+    // done; task was deliberately left alone until now so an unmanned
+    // vehicle never drove itself — now that a driver is aboard, hand it to
+    // tickVehicle (ArrivalGate's own vehicle-drive loop, below) the same way
+    // moveVehicle would.
     if (vehicle.reservedForActionId !== null) {
+      const reservedAction = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+      if (reservedAction) {
+        vehicle.targetX = reservedAction.targetX;
+        vehicle.targetZ = reservedAction.targetZ;
+      }
       vehicle.task = 'moving';
       vehicle.waitingTicks = 0;
     }

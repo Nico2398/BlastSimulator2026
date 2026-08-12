@@ -203,16 +203,16 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] Research cancelled: ${cancelledResearch.targetType} tier ${cancelledResearch.targetTier} — Research Center destroyed, $${cancelledResearch.refund} refunded.`);
     }
 
-    // 8d. Dispatch remaining pending actions to idle qualified employees.
-    // An action requiring a skill nobody on the roster holds is not left to
-    // queue silently forever — it raises the same unqualified_task_error event
-    // used elsewhere (auto-pause, resolved via "event choose").
-    const dispatchResult = tickEmployees(state);
-    fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
-
-    // 8e. Task duration progress + XP/level-up reporting. taskTicksRemaining
-    // only counts down once ArrivalGate (8h below) has promoted it from
-    // pendingTaskDuration on a prior tick — see tickEmployees (#437).
+    // 8e (before 8d). Task duration progress + XP/level-up reporting.
+    // taskTicksRemaining only counts down once ArrivalGate (8h below) has
+    // promoted it from pendingTaskDuration on a prior tick — see tickEmployees
+    // (#437). Runs before 8d's claim pass specifically so that an employee
+    // freed by a completed vehicle-gated action is available to be reclaimed
+    // by a same-role follow-up in the SAME tick — the continuity tie-break in
+    // VehicleReservation.findFreeVehicleForRole only re-mounts a driver who
+    // is still (or, after dismounting here, freshly) at the vehicle's own
+    // position, so claiming one tick late would otherwise walk them away and
+    // back for no reason (#550).
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
       const progress = tickTaskProgress(state, emp, emitter);
@@ -265,6 +265,17 @@ export function tickCommand(
         lines.push(`[tick ${state.tickCount}] LEVELUP: ${emp.name} reached level ${progress.newLevel} in ${progress.skill}.`);
       }
     }
+
+    // 8d (after 8e). Dispatch remaining pending actions to idle qualified
+    // employees — moved after the completion pass above so an employee freed
+    // this same tick (including a vehicle-gated driver dismounted by
+    // releaseVehicleOnCompletion) can be reclaimed the same tick rather than
+    // idling for one extra tick (#550). An action requiring a skill nobody on
+    // the roster holds is not left to queue silently forever — it raises the
+    // same unqualified_task_error event used elsewhere (auto-pause, resolved
+    // via "event choose").
+    const dispatchResult = tickEmployees(state);
+    fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
     // 8f. Vehicle movement — advance every vehicle currently task='moving' one
     // step toward its target (moveVehicle/vehicle-move-command only set the
