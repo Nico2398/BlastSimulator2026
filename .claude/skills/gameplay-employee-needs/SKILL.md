@@ -43,10 +43,10 @@ All needs above 80 simultaneously → **"well-rested" bonus**: +1 morale/tick (m
 
 When any gauge hits its collapse threshold:
 
-1. Current task immediately interrupted (pushed back to front of queue)
-2. `rest` task prepended — targeting nearest available building of the correct type
+1. Current task immediately interrupted — `interruptActiveAction` (`src/core/engine/TaskDispatch.ts`) returns it to the pool as `queued`, not discarded; work-in-progress ticks are preserved, not restarted. Reclaimed later via the normal cost-based dispatch (`gameplay-employee-skills`), by this employee or another qualified one.
+2. `rest` task self-claimed for the employee — targeting nearest available building of the correct type
 3. Employee flagged `collapsing: true` — effectiveness drops to 0 until rest completes
-4. On `rest` completion: `collapsing` cleared, interrupted task resumes
+4. On `rest` completion: `collapsing` cleared, interrupted task reclaimable again
 
 | Collapsed Gauge | Rest Building | Rest Duration (ticks) |
 |----------------|--------------|----------------------|

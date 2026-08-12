@@ -78,7 +78,7 @@ src/
 ├── console.ts              # CLI entry: Node.js playable console mode
 ├── core/                   # PURE TypeScript — NO DOM, NO WebGL, NO side effects
 │   ├── state/              # GameState, SaveLoad, SaveBackend interface
-│   ├── engine/             # GameLoop (tick orchestration), ArrivalGate, EntityMovementTick, TaskDispatch
+│   ├── engine/             # GameLoop (tick orchestration), ArrivalGate, EntityMovementTick, TaskDispatch, ActionSelection (cost-based per-employee action ranking)
 │   ├── nav/                # NavGrid, Pathfinding, AgentMovement, BuildingApproach
 │   ├── campaign/           # Level definitions, Campaign progression
 │   ├── world/              # VoxelGrid, PlayableArea, TerrainGen, RockCatalog, OreCatalog, MineType

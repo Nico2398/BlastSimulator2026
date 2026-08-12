@@ -12,7 +12,7 @@ description: >
 
 Employees not interchangeable tokens. Each has skill qualifications with proficiency levels, executes queued work autonomously.
 
-- **Every physical action is queued, not instant.** Commands → global pending-action pool → free qualified employee auto-claims.
+- **Every physical action is queued, not instant.** Commands → global pending-action pool → each idle-or-eligible-busy qualified employee auto-claims the cheapest reachable action for them, not the first one in the pool.
 - **Pending actions show 3D ghost.** Semi-transparent blue fresnel-effect mesh at target position — distinguishes pending from completed.
 - **Working actions show a progress bar.** Billboarded fill above the employee, tracking `taskProgressFraction` (`src/core/entities/EmployeeActivity.ts`) from empty to full over the task's duration — distinguishes "busy" from "idle" once the ghost's action is claimed.
 - **No qualified employee = immediate error** (not silent queue). Fired when zero employees have required skill.
@@ -89,13 +89,14 @@ export type ActionType =
 
 A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` (unclaimed, `holderId: null`) → `assigned` (claimed, employee en route) → `in_progress` (employee working it) → exits the pool via completion or cancellation, the two ways an action's lifecycle ends. `claimPendingAction` (`src/core/engine/TaskDispatch.ts`) transitions `status`/`holderId` in place; `completePendingAction` removes the action from the pool on normal completion. `cancelAction` (same file) removes it at any stage — queued, assigned, or in-progress — releases the holder employee (if any) back to idle, and refunds order-time costs via `addIncome`; it refuses engine-owned `rest` actions, which are not player-cancellable. Both completion and cancellation call the shared `clearActiveTaskFields(emp)` helper to reset the employee's active-task state.
 
-**Claim logic (each tick):**
-1. For each `PendingAction` with `status: 'queued'`, scan idle employees for matching `requiredSkill`
-2. If `requiredVehicleRole` non-null, also verify a qualified vehicle+driver is available
-3. If NO employee with the skill exists on roster at all → emit `UnqualifiedTaskError` immediately
-4. If qualified employees exist but all temporarily busy → wait silently (no error)
-5. On claim: `status` moves to `assigned` (then `in_progress` once work starts), `holderId` set to the claiming employee — the action and its ghost stay in place, nothing is deleted
-6. Any count of "unclaimed work" (e.g. `OperationsPanel`) filters `status === 'queued'`, never plain presence in `state.pendingActions`
+**Claim logic (each tick, `tickEmployees` in `src/core/engine/GameLoop.ts`) — cost-based, not first-come-first-served:**
+1. Employees process in ascending id order for determinism. Each idle-or-eligible-busy employee picks the lowest-total-cost `queued` action it qualifies for, via `selectBestActionForEmployee` (`src/core/engine/ActionSelection.ts`): candidates rank by `estimateActionCost` (octile-heuristic travel + work-duration estimate), ties broken by lowest `action.id`, then only the top `ACTION_SELECTION_MAX_PATH_ATTEMPTS` candidates get a real `findPath` cost via `resolveActionCost` — the first reachable one wins. An action every attempted candidate reports unreachable leaves the employee idle that tick, retried next tick.
+2. An action with `targetEmployeeId` set is claimed only by that employee, eagerly and without cost ranking (never contested) — up to `MAX_EMPLOYEE_TASK_QUEUE_DEPTH`, no vehicle role is checked separately here.
+3. Each employee holds at most one active action plus a bounded personal `taskQueue: number[]` (action ids) — total active+queued capped at `MAX_EMPLOYEE_TASK_QUEUE_DEPTH` (`src/core/config/balance.ts`). A busy employee reserves at most one open-pool candidate ahead per tick into `taskQueue`, so a personal queue builds up gradually rather than all at once.
+4. An action is exclusive to whichever employee holds it — no two employees ever race the same `PendingAction`.
+5. If NO employee with the skill exists on roster at all → the action goes into `unqualified`, never retried.
+6. On claim: `status` moves to `assigned` (then `in_progress` once work starts), `holderId` set to the claiming employee — the action and its ghost stay in place, nothing is deleted.
+7. Any count of "unclaimed work" (e.g. `OperationsPanel`) filters `status === 'queued'`, never plain presence in `state.pendingActions`.
 
 **Ghost rendering:** For every `PendingAction`, renderer creates blue fresnel-effect translucent mesh with pulsing animation, tracked via `GhostPreview.claimed`. Claiming sets `claimed: true` — the ghost stays blue but renders dimmer and pulses slower (`src/renderer/GhostMesh.ts`) to distinguish claimed from unclaimed work without removing it. The ghost is removed when the action completes or is cancelled.
 
@@ -136,7 +137,7 @@ export interface Employee {
   name: string;
   qualifications: SkillQualification[];
   salaryPerTick: number;
-  taskQueue: PendingAction[];
+  taskQueue: number[];  // PendingAction ids, capped at MAX_EMPLOYEE_TASK_QUEUE_DEPTH (active + queued)
   // Need meters (Ch.7):
   hunger: number;
   fatigue: number;
