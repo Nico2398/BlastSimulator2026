@@ -87,7 +87,7 @@ export type ActionType =
   | 'haul_debris';
 ```
 
-A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` (unclaimed, `holderId: null`) → `assigned` (claimed, employee en route) → `in_progress` (employee working it) → removed from `state.pendingActions` only on completion. `claimPendingAction` (`src/core/engine/TaskDispatch.ts`) transitions `status`/`holderId` in place; `completePendingAction` is the only function that removes the action from the pool.
+A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` (unclaimed, `holderId: null`) → `assigned` (claimed, employee en route) → `in_progress` (employee working it) → exits the pool via completion or cancellation, the two ways an action's lifecycle ends. `claimPendingAction` (`src/core/engine/TaskDispatch.ts`) transitions `status`/`holderId` in place; `completePendingAction` removes the action from the pool on normal completion. `cancelAction` (same file) removes it at any stage — queued, assigned, or in-progress — releases the holder employee (if any) back to idle, and refunds order-time costs via `addIncome`; it refuses engine-owned `rest` actions, which are not player-cancellable. Both completion and cancellation call the shared `clearActiveTaskFields(emp)` helper to reset the employee's active-task state.
 
 **Claim logic (each tick):**
 1. For each `PendingAction` with `status: 'queued'`, scan idle employees for matching `requiredSkill`
@@ -97,7 +97,9 @@ A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` 
 5. On claim: `status` moves to `assigned` (then `in_progress` once work starts), `holderId` set to the claiming employee — the action and its ghost stay in place, nothing is deleted
 6. Any count of "unclaimed work" (e.g. `OperationsPanel`) filters `status === 'queued'`, never plain presence in `state.pendingActions`
 
-**Ghost rendering:** For every `PendingAction`, renderer creates blue fresnel-effect translucent mesh with pulsing animation, tracked via `GhostPreview.claimed`. Claiming sets `claimed: true` — the ghost stays blue but renders dimmer and pulses slower (`src/renderer/GhostMesh.ts`) to distinguish claimed from unclaimed work without removing it. The ghost is removed only when the action completes.
+**Ghost rendering:** For every `PendingAction`, renderer creates blue fresnel-effect translucent mesh with pulsing animation, tracked via `GhostPreview.claimed`. Claiming sets `claimed: true` — the ghost stays blue but renders dimmer and pulses slower (`src/renderer/GhostMesh.ts`) to distinguish claimed from unclaimed work without removing it. The ghost is removed when the action completes or is cancelled.
+
+**Cancellation (player-initiated):** Console command `employee cancel <id>` and the Operations panel's "Work Queue" section (`src/ui/panels/OperationsPanel.ts`, one row per live player-cancellable action, Cancel button; engine-owned `rest` actions excluded) both call `cancelAction`. Any count of "unclaimed work" or live actions filters by `status`, same as claim logic below.
 
 **Task progress rendering:** For every employee whose `computeEmployeeActivity` reads `kind: 'working'`, `TaskProgressBar` (`src/renderer/TaskProgressBar.ts`) billboards a fill bar above the character, parented under its `CharacterMesh.getGroup(id)` transform so it tracks position without per-frame copying. Fill fraction comes from `taskProgressFraction`, shared with the Crew panel's own progress line so the two never disagree. Removed when the task ends.
 
