@@ -235,12 +235,30 @@ function actionOrderCost(action: PendingAction): number {
  * forceShiftRestIfNeeded) and are never the one being interrupted here; this
  * only ever preempts the work the employee was doing before the need crossed
  * its collapse threshold.
+ *
+ * Work already done is preserved rather than discarded: when the employee had
+ * physically arrived and was counting down (`taskTicksRemaining` set — as
+ * opposed to still walking there, which hasn't consumed any of the task's own
+ * duration yet), the remaining tick count is written onto the action's own
+ * `payload.durationTicks` — the same override `computeActionWorkTicks`
+ * (ActionSelection.ts) already honors for a survey's method-specific
+ * duration — so whichever employee reclaims this action later (the same one
+ * post-rest, or, since an open-pool action's `targetEmployeeId` stays
+ * whatever it was, potentially a different one) resumes it instead of
+ * restarting its full work duration from scratch. Without this, a single
+ * needs-driven interruption on a long task could silently double its total
+ * completion time.
  */
 export function interruptActiveAction(state: GameState, employee: Employee, actionId: number | null): void {
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
     if (action) {
       employee.interruptedActionPayload = action.payload;
+
+      if (employee.taskTicksRemaining !== null && employee.taskTicksRemaining > 0) {
+        action.payload = { ...action.payload, durationTicks: employee.taskTicksRemaining };
+      }
+
       action.status = 'queued';
       action.holderId = null;
 
