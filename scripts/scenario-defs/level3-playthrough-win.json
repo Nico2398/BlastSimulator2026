@@ -614,7 +614,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         }
       }
     },
@@ -633,7 +633,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
-          "surveyCount": 0
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -654,7 +654,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
-          "surveyCount": 3
+          "surveyCount": 2
         }
       }
     },
@@ -673,7 +673,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "activeContractCount": 0,
-          "surveyCount": 3
+          "surveyCount": 2
         }
       },
       "role": "player"
@@ -1377,7 +1377,7 @@
           "employeeCount": 10,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 63.8380000000001,
+          "wellBeing": 63.95800000000011,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
@@ -1396,7 +1396,7 @@
       "expect": {
         "equals": {
           "cash": 16250,
-          "tickCount": 38,
+          "tickCount": 32,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 0,
@@ -1414,8 +1414,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 38,
+          "cash": 26250,
+          "tickCount": 32,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 0,
@@ -1435,8 +1435,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 0,
@@ -1454,8 +1454,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 0,
@@ -1475,8 +1475,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 0,
@@ -1503,8 +1503,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1523,8 +1523,8 @@
       "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 200 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:1000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1546,8 +1546,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1592,8 +1592,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1639,8 +1639,8 @@
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1676,8 +1676,8 @@
       "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 1 decrement click: 25ms default -> 20 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1719,8 +1719,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1742,8 +1742,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1762,8 +1762,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1782,13 +1782,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 44,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 72.28600000000019,
+          "wellBeing": 68.21800000000016,
           "safety": 0,
           "ecology": 32.980000000000004,
           "nuisance": 7.449999999999996
@@ -1806,8 +1806,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 50,
+          "cash": 26250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1825,8 +1825,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 50,
+          "cash": 36250,
+          "tickCount": 38,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1846,8 +1846,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1865,8 +1865,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1886,8 +1886,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 1,
@@ -1914,8 +1914,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -1934,8 +1934,8 @@
       "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows both active cards at 0.0 kg stored (rubble #1, blingite #2) -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 2 amount:1500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -1957,8 +1957,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2003,8 +2003,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2054,8 +2054,8 @@
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2093,8 +2093,8 @@
       "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2136,8 +2136,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2159,8 +2159,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2179,8 +2179,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2199,15 +2199,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 56,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
           "surveyCount": 3,
-          "wellBeing": 80.73400000000028,
+          "wellBeing": 72.47800000000021,
           "safety": 0,
-          "ecology": 11.819999999999968,
+          "ecology": 11.519999999999985,
           "nuisance": 0
         }
       }
@@ -2223,8 +2223,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 62,
+          "cash": 36250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2242,8 +2242,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 62,
+          "cash": 46250,
+          "tickCount": 44,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2263,8 +2263,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2282,8 +2282,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2303,8 +2303,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 2,
@@ -2331,8 +2331,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2351,8 +2351,8 @@
       "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all three active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 3 amount:2000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2374,8 +2374,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2420,8 +2420,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2491,8 +2491,8 @@
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2530,8 +2530,8 @@
       "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2573,8 +2573,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2596,8 +2596,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2616,8 +2616,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2636,13 +2636,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 68,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
           "surveyCount": 3,
-          "wellBeing": 89.18200000000037,
+          "wellBeing": 76.73800000000026,
           "safety": 0,
           "ecology": 0,
           "nuisance": 0
@@ -2660,8 +2660,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 74,
+          "cash": 46250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2679,8 +2679,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 74,
+          "cash": 56250,
+          "tickCount": 50,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2700,8 +2700,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2719,8 +2719,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2740,8 +2740,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 3,
@@ -2768,8 +2768,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -2788,8 +2788,8 @@
       "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all four active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 4 amount:2500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -2811,8 +2811,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -2857,8 +2857,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -2908,8 +2908,8 @@
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -2947,8 +2947,8 @@
       "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -2990,8 +2990,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3013,8 +3013,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3033,8 +3033,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3053,13 +3053,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 80,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
           "surveyCount": 3,
-          "wellBeing": 97.63000000000046,
+          "wellBeing": 80.9980000000003,
           "safety": 0,
           "ecology": 0,
           "nuisance": 0
@@ -3077,8 +3077,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 86,
+          "cash": 56250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3096,8 +3096,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 86,
+          "cash": 66250,
+          "tickCount": 56,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3117,8 +3117,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3136,8 +3136,8 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3157,8 +3157,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 4,
@@ -3185,8 +3185,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 5,
@@ -3205,8 +3205,8 @@
       "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all five active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 5 amount:3000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 5,
@@ -3228,8 +3228,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 5,
@@ -3248,13 +3248,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 85.25800000000035,
           "safety": 0,
           "ecology": 0,
           "nuisance": 0
@@ -3272,13 +3272,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 85.25800000000035,
           "safety": 0,
           "ecology": 0,
           "nuisance": 0
@@ -3296,13 +3296,13 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 16250,
-          "tickCount": 92,
+          "cash": 66250,
+          "tickCount": 62,
           "deathCount": 10,
           "employeeCount": 10,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 99.95,
+          "wellBeing": 85.25800000000035,
           "safety": 0,
           "ecology": 0,
           "nuisance": 0,
@@ -3310,7 +3310,7 @@
           "levelEnded": false,
           "levelEndReason": null
         },
-        "note": "Finding #62: this file recurs every established finding class from the rest of Batch 7 in one place. `campaign start level:treranium_depths` fails outright (tier-3, locked -- same as Finding #58/#59/#61, not fixed). `employee assign_skill` used the rejected positional syntax (Finding #45/#54/#59) -- fixed. All 6 `build` commands name nonexistent types (`office`/`storage_depot`/`canteen`/`break_room`/`medical_bay`/`bunkhouse`) -- left as documented no-ops. Two `debris_hauler`s are bought but neither is ever assigned a driver nor sent hauling -- `storedMassKg` stays 0 for the entire file and all 5 contract deliveries fail honestly for lack of storage; not fixed, same reasoning as `level1-win-conservative.json`/`level1-win-efficient.json`/`level2-playthrough-win.json` (the mechanism is already proven end-to-end elsewhere). Finding #52's drill-grid class recurred a 5th time across all 5 of this file's grids (declared 12/16/20/20/25 holes vs. real 24/36/30/30/64 once traced against the panel's true defaults) -- fixed the same way. Like the earlier `level2-playthrough-win.json`, this file's own hardcoded contract IDs (1 through 5) all happened to already match the real, currently-available pool at every listing -- no ID-mismatch fix needed. The corrected, dramatically larger grids (the final cycle alone goes from a declared 25 holes to a real 64) are violent enough to kill all 10 hired employees over the course of the file's 5 blasts (deathCount 0→10, `stats` confirms 'Casualties: 10') -- the most severe case yet of the Finding #40/#56/#59 real-consequence class. Unlike `level2-playthrough-win.json`, zero random events fire anywhere in this file's trace (`Total income: $0.00` never changes) -- no Finding #60-style cash softening was needed, `cash` is hard-asserted at every single step and held on the first interaction-mode run (re-run twice for determinism, both clean). No bankruptcy. ▸ 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The five vehicle buys used to overdraw to -$153,750 and stay there for the rest of the file; the run is now funded with `new_game seed:3666 cash:220000` and they are `role: 'player'` clicks on enabled dealership rows, so cash never goes negative at all and holds at $16,250 from the last purchase to the end -- flat because the first blast kills all 10 employees, so there is no payroll left to pay. Verified in both command mode and a real browser, 127/127 steps."
+        "note": "Finding #62: this file recurs every established finding class from the rest of Batch 7 in one place. `campaign start level:treranium_depths` fails outright (tier-3, locked -- same as Finding #58/#59/#61, not fixed). `employee assign_skill` used the rejected positional syntax (Finding #45/#54/#59) -- fixed. All 6 `build` commands name nonexistent types (`office`/`storage_depot`/`canteen`/`break_room`/`medical_bay`/`bunkhouse`) -- left as documented no-ops. Two `debris_hauler`s are bought but neither is ever assigned a driver nor sent hauling -- `storedMassKg` stays 0 for the entire file and all 5 contract deliveries fail honestly for lack of storage; not fixed, same reasoning as `level1-win-conservative.json`/`level1-win-efficient.json`/`level2-playthrough-win.json` (the mechanism is already proven end-to-end elsewhere). Finding #52's drill-grid class recurred a 5th time across all 5 of this file's grids (declared 12/16/20/20/25 holes vs. real 24/36/30/30/64 once traced against the panel's true defaults) -- fixed the same way. Like the earlier `level2-playthrough-win.json`, this file's own hardcoded contract IDs (1 through 5) all happened to already match the real, currently-available pool at every listing -- no ID-mismatch fix needed. The corrected, dramatically larger grids (the final cycle alone goes from a declared 25 holes to a real 64) are violent enough to kill all 10 hired employees over the course of the file's 5 blasts (deathCount 0→10, `stats` confirms 'Casualties: 10') -- the most severe case yet of the Finding #40/#56/#59 real-consequence class. No bankruptcy. ▸ 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The five vehicle buys used to overdraw to -$153,750 and stay there for the rest of the file; the run is now funded with `new_game seed:3666 cash:220000` and they are `role: 'player'` clicks on enabled dealership rows, so cash never goes negative at all. Verified in both command mode and a real browser, 127/127 steps. ▸ #549: the previous claim here (\"zero random events fire anywhere in this file's trace\", cash flat at $16,250 after the last vehicle purchase) no longer holds -- the cost-based per-employee dispatch change shifts the shared seeded Random stream's draw sequence upstream of this file's blasts, and a genuine `lucky_strike` event (the same $10,000 bonus type noted in `level1-win-efficient.json`/`level2-playthrough-win.json`) now fires once per blast, all 5 times, each caught by this file's own pre-existing `event choose 0` step right after the following `tick 6` (already present in the file for exactly this contingency, per the pattern every sibling playthrough file uses). Employees being dead (deathCount 10 after the first blast) does not gate a financial event -- `cash` climbs $10,000 at a time, ending at $66,250, not $16,250. Verified this is 5 distinct real events (one per blast) rather than a stuck/repeating one: `tick 6` runs cleanly with 'No events fired' immediately after each one resolves, for the two cycles directly traced."
       }
     }
   ]

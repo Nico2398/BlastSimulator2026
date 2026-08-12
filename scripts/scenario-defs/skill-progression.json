@@ -1,6 +1,6 @@
 {
   "name": "skill-progression",
-  "description": "Chapter 3: Hire driller, assign drilling skill, and verify Level 5 after 700 ticks of work",
+  "description": "Chapter 3: Hire driller, assign drilling skill, and verify skill progression after 700 nominal ticks of continuous work with no rest building (#549: real completions now include genuine collapse/rest cost, so the driller reaches Level 3, not the original Level 5).",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -726,9 +726,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "proficiencyTotal": 6
+          "proficiencyTotal": 4
         },
-        "note": "1 (blasting, unraised) + 5 (driving.excavator, reached its cap) — the original scenario name/goal: Level 5 after 700 ticks of real, continuous work"
+        "note": "1 (blasting, unraised) + 3 (driving.excavator) -- not the original scenario name's Level 5 goal: with no living_quarters ever built here, #549's now-correct interrupt/resume means the driller's periodic collapses genuinely cost rest ticks (no more free background progress while nominally resting), so real XP-earning work ticks fall short of Level 5's threshold inside the same 700-tick nominal budget (580 real ticks land, after one block's requested ticks are cut short by an unresolved event, per this file's own tick-chunking note above)"
       }
     },
     {
