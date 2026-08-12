@@ -191,7 +191,8 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 0
+          "surveyCount": 0,
+          "pendingActionCount": 1
         }
       }
     },
@@ -230,7 +231,8 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 0
+          "surveyCount": 0,
+          "pendingActionCount": 2
         },
         "note": "both round-1 surveys queued, neither completed yet"
       }
@@ -246,7 +248,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 0
+          "surveyCount": 0,
+          "pendingActionCount": 2
         },
         "note": "both round-1 surveys queued, neither completed yet"
       }
@@ -262,11 +265,28 @@
       "role": "observe"
     },
     {
-      "command": "tick 40",
+      "command": "tick 2",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 40"
+          "command": "tick 2"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "surveyCount": 0,
+          "pendingActionCount": 2
+        },
+        "note": "#547: tickEmployees claims both round-1 surveys on the very first of these ticks (both surveyors idle, both qualified), but their records now stay in pendingActions -- only status/holderId flip -- instead of being spliced out at claim time. Both surveyors are still many ticks from arriving at (20,20), so pendingActionCount must stay at 2 (unclaimed 0, not the pre-#547 behaviour where a claim alone dropped this to 0)."
+      }
+    },
+    {
+      "command": "tick 38",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 38"
         }
       ],
       "role": "setup"
@@ -402,7 +422,8 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 2
+          "surveyCount": 2,
+          "pendingActionCount": 1
         }
       }
     },
@@ -417,9 +438,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 2
+          "surveyCount": 2,
+          "pendingActionCount": 1
         },
-        "note": "round 2's aerial survey queued, not yet completed; round 1's 2 stay put"
+        "note": "round 2's aerial survey queued, not yet completed; round 1's 2 stay put. Both round-1 records were removed exactly on completion (#547), not at claim -- surveyCount:2 and pendingActionCount:1 here (only round 2's fresh queue entry) prove that."
       }
     },
     {

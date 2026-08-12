@@ -434,4 +434,51 @@ describe('decideClock', () => {
     });
     expect(arrived.hold).toBe(true);
   });
+
+  // -- #547: a claimed PendingAction now stays in state.pendingActions through
+  // the whole walk+work period instead of being deleted the instant it's
+  // claimed (only its status/holderId change). isWorkInProgress/workSignature
+  // only ever looked at *presence* (array length, and each entry's `id`) —
+  // never at `status`/`holderId` — so a longer-lived record must not change
+  // the tutorial's one-survey-outstanding clock-hold decision. This was
+  // already true before #547 too: an employee mid-claim already reports
+  // hasOutstandingWork via activeActionId/destinationX regardless of whether
+  // the pendingActions array still carries a matching entry — this test
+  // proves the decision (and the fingerprint driving the grace window) does
+  // not change across the record's lifecycle, not that new behavior exists.
+  it('#547: a pendingAction\'s lifecycle status (queued/assigned/in_progress) does not change the clock-hold decision or its progress signature', () => {
+    const statuses: Array<'queued' | 'assigned' | 'in_progress'> = ['queued', 'assigned', 'in_progress'];
+    const signatures: string[] = [];
+
+    for (const status of statuses) {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.pendingActions = [{
+        id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+        targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+        status, holderId: status === 'queued' ? null : 7,
+      } as unknown as GameState['pendingActions'][number]];
+
+      const decision = decideClock(s, 0, DEFAULT_TICK_BUDGET, true);
+      // Still work in progress regardless of status — the clock must not hold.
+      expect(decision.hold).toBe(false);
+      signatures.push(decision.progressSignature!);
+    }
+
+    // workSignature fingerprints pendingActions by id only, never status/
+    // holderId — the fingerprint (and therefore the grace-window bookkeeping
+    // built on it) is identical across the record's whole lifecycle.
+    expect(new Set(signatures).size).toBe(1);
+  });
+
+  it('#547: an already-claimed (assigned) action still holds the clock once budget and grace both run out, exactly like the old queued-only representation did', () => {
+    const s = state();
+    s.tickCount = DEFAULT_TICK_BUDGET + WORK_GRACE_TICKS;
+    s.pendingActions = [{
+      id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'assigned', holderId: 7,
+    } as unknown as GameState['pendingActions'][number]];
+    expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
+  });
 });

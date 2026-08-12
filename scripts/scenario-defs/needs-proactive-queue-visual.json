@@ -75,8 +75,9 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1
-        }
+          "pendingActionCount": 2
+        },
+        "note": "#547: employee 1's `dispatch` carries no skill:, so it never seeds taskTicksRemaining and never completes through the normal task-duration path -- once tickEmployees claims it (this batch's first tick), its record now stays in pendingActions forever (nothing calls completePendingAction for it), a permanent +1 on top of whatever this batch's own warning-threshold rest contributes. Before #547 the claim spliced it out immediately, so this was 1 (the warning-rest alone); it is 2 for the rest of this file from here on."
       }
     },
     {
@@ -145,8 +146,9 @@
         ],
         "equals": {
           "buildingCount": 1,
-          "pendingActionCount": 1
-        }
+          "pendingActionCount": 2
+        },
+        "note": "#547: still the tick-40 checkpoint's warning-rest + the permanently-stuck original dispatch (see that step's note) -- nothing ticks between there and here."
       }
     },
     {
@@ -174,9 +176,9 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 0
+          "pendingActionCount": 1
         },
-        "note": "minFatigue is now near the collapse threshold (~5); the earlier dispatch task has been claimed and completed"
+        "note": "minFatigue is now near the collapse threshold (~5); the warning-threshold rest has been claimed and completed. #547: pendingActionCount no longer reaches 0 here -- the original null-skill dispatch (see the tick-40 checkpoint's note) never completes and its record now stays in pendingActions permanently, so this floor is 1 instead of 0 for the rest of this file."
       }
     },
     {
@@ -224,10 +226,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1,
+          "pendingActionCount": 2,
           "collapsedCount": 1
         },
-        "note": "minFatigue hits the collapse floor mid-batch (5.0 -> 1.4) and tickCollapse fires before autoInsertNeedTasks ever gets a chance at its own, earlier warning-threshold insertion (25) -- this is a genuine collapse forcing the rest task, not the calm pre-collapse insertion the file's own name implies. pendingActionCount 0->1 is real, but it is collapse recovery, not proactive queuing; not fixed here since it is a game-balance question (why the proactive threshold never preempts it), not a command/UI divergence."
+        "note": "minFatigue hits the collapse floor mid-batch (5.0 -> 1.4) and tickCollapse fires before autoInsertNeedTasks ever gets a chance at its own, earlier warning-threshold insertion (25) -- this is a genuine collapse forcing the rest task, not the calm pre-collapse insertion the file's own name implies. pendingActionCount 1->2 is real (the collapse-rest on top of the permanently-stuck original dispatch, #547), it is collapse recovery, not proactive queuing; not fixed here since it is a game-balance question (why the proactive threshold never preempts it), not a command/UI divergence."
       }
     },
     {
@@ -277,10 +279,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 0,
+          "pendingActionCount": 1,
           "collapsedCount": 0
         },
-        "note": "the collapse-forced rest queued in the previous step is now active: minFatigue recovers (not decreases) and the task completes, dropping pendingActionCount back to 0 and clearing collapsedCount. This batch is interrupted early by an unrelated random event (politics_mining_expo) -- the recovery is already visible in however many ticks actually ran."
+        "note": "the collapse-forced rest queued in the previous step is now active: minFatigue recovers (not decreases) and the task completes, dropping pendingActionCount back to its 1 floor (#547: the permanently-stuck original dispatch, see the tick-40 checkpoint's note -- pre-#547 this floor was 0) and clearing collapsedCount. This batch is interrupted early by an unrelated random event (politics_mining_expo) -- the recovery is already visible in however many ticks actually ran."
       }
     },
     {
