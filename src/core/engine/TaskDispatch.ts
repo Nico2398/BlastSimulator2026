@@ -2,6 +2,9 @@
 // Routes pending actions to qualified employees.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
+import { SURVEY_COSTS } from '../config/balance.js';
+import type { SurveyMethod } from '../mining/SurveyCalc.js';
+import { addIncome } from '../economy/Finance.js';
 
 export type { PendingAction };
 
@@ -124,24 +127,61 @@ export interface CancelActionResult {
 /**
  * Cancel a PendingAction by id, at any lifecycle stage (queued, assigned, in_progress).
  * Rejects 'rest' actions — engine-owned, never player-cancellable (#548).
- * TODO: implement in TDD Green phase.
+ *
+ * When the action has a holder (an employee walking to or working it), the
+ * employee is released back to idle — every field claimPendingAction/
+ * tickEmployees set to claim/start it (activeActionId, walk destination,
+ * in-progress task fields, move-stuck tracking) is cleared, so the employee
+ * is claimable again next tick instead of stuck mid-walk or mid-task.
+ *
+ * Any order-time cost (survey only, today) is refunded to state.cash and
+ * recorded on the finances ledger, via the same addIncome('refund', ...)
+ * pattern used elsewhere (e.g. research cancellation).
+ *
+ * The action and its ghost are removed via completePendingAction, discarding
+ * any in-progress work — a cancel produces no result and no XP.
  */
 export function cancelAction(state: GameState, actionId: number): CancelActionResult {
-  // Referenced here (not yet called) so the skeleton typechecks without an
-  // unused-declaration error; real wiring lands in the TDD Green phase.
-  void state;
-  void actionId;
-  void actionOrderCost;
-  throw new Error('not implemented');
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (!action) return { success: false, error: 'not-found' };
+  if (action.type === 'rest') return { success: false, error: 'not-cancellable' };
+
+  if (action.holderId !== null) {
+    const holder = state.employees.employees.find(emp => emp.id === action.holderId);
+    if (holder) {
+      holder.activeActionId = null;
+      holder.destinationX = null;
+      holder.destinationZ = null;
+      holder.moveConsecutiveFailures = 0;
+      holder.isMoveStuck = false;
+      holder.taskTicksRemaining = null;
+      delete holder.activeTaskTotalTicks;
+      holder.activeTaskSkill = null;
+      holder.pendingTaskDuration = null;
+      holder.pendingActionType = null;
+      holder.pendingActionPayload = null;
+    }
+  }
+
+  const refunded = actionOrderCost(action);
+  if (refunded > 0) {
+    state.cash += refunded;
+    addIncome(state.finances, refunded, 'refund', `Cancelled ${action.type} action`, state.tickCount);
+  }
+
+  completePendingAction(state, actionId);
+
+  return { success: true, action, refunded };
 }
 
 /**
  * Order-time cost already charged for an action's type — survey today, 0 for
  * everything else. Used by cancelAction to compute the refund.
- * TODO: implement in TDD Green phase.
  */
 function actionOrderCost(action: PendingAction): number {
-  void action;
-  throw new Error('not implemented');
+  if (action.type !== 'survey') return 0;
+  const method = action.payload['method'];
+  if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;
+  return SURVEY_COSTS[method as SurveyMethod];
 }
 

@@ -252,9 +252,20 @@ export function employeeCommand(
       };
     }
     case 'cancel': {
-      // TODO: implement in TDD Green phase (#548).
-      void cancelAction;
-      return { success: false, output: 'not implemented' };
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
+      if (isNaN(id)) return { success: false, output: 'Usage: employee cancel <action-id>' };
+
+      const result = cancelAction(state, id);
+      if (!result.success) {
+        const message = result.error === 'not-cancellable'
+          ? `Action #${id} cannot be cancelled.`
+          : `Action #${id} not found.`;
+        return { success: false, output: message };
+      }
+      const refundMsg = result.refunded && result.refunded > 0
+        ? ` $${formatMoney(result.refunded)} refunded.`
+        : '';
+      return { success: true, output: `Action #${id} (${result.action!.type}) cancelled.${refundMsg}` };
     }
     default:
       return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|dispatch|train|cancel)' };
