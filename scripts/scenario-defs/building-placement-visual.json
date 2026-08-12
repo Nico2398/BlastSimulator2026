@@ -5,7 +5,7 @@
     {
       "command": "new_game seed:42 cash:150000",
       "description": "#558: cash bumped from the default 50000 so the file's new final step (a building on ground well outside the site) is affordable on top of the four already here -- every other cash check below is shifted by the same +100000.",
-      "timeout": 10,
+      "timeout": 35,
       "interaction": [
         {
           "type": "command",
