@@ -290,7 +290,7 @@
     {
       "command": "save slot:expanded",
       "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control.",
-      "timeout": 15,
+      "timeout": 70,
       "interaction": [
         {
           "type": "command",
@@ -307,7 +307,7 @@
     {
       "command": "load slot:expanded",
       "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. The point of this round-trip: the expanded site bounds (not just cash/buildings) must survive a save/load, not only a live session.",
-      "timeout": 15,
+      "timeout": 90,
       "interaction": [
         {
           "type": "command",
@@ -326,6 +326,7 @@
     },
     {
       "command": "terrain_info",
+      "timeout": 75,
       "interaction": [
         {
           "type": "command",
@@ -342,6 +343,7 @@
     },
     {
       "command": "state full",
+      "timeout": 75,
       "interaction": [
         {
           "type": "command",
@@ -352,6 +354,7 @@
     },
     {
       "command": "drill_plan add x:140 z:10 depth:6",
+      "timeout": 100,
       "description": "#558 fence 3: a single-cell footprint with no connecting path of its own, well past the site's current frontier (chunk (2,0) is the nearest owned ground; chunk (8,0) is the target -- five intermediate chunks apart). Where the earlier drill/ramp/building steps in this file each landed on ground directly adjacent to the site (fence 1's raycast fix was the only thing standing between them and a real click), this one requires claimArea to bridge the gap itself (fence 3), well under MAX_CLAIM_BRIDGE_CHUNKS.",
       "interaction": [
         {

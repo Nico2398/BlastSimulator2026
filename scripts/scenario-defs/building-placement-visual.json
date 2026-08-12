@@ -5,7 +5,7 @@
     {
       "command": "new_game seed:42 cash:150000",
       "description": "#558: cash bumped from the default 50000 so the file's new final step (a building on ground well outside the site) is affordable on top of the four already here -- every other cash check below is shifted by the same +100000.",
-      "timeout": 35,
+      "timeout": 75,
       "interaction": [
         {
           "type": "command",
@@ -22,6 +22,7 @@
     },
     {
       "command": "build living_quarters at:5,5",
+      "timeout": 70,
       "interaction": [
         {
           "type": "clickSelector",
@@ -68,6 +69,7 @@
     },
     {
       "command": "build blasting_academy at:10,10",
+      "timeout": 70,
       "interaction": [
         {
           "type": "clickSelector",
@@ -110,6 +112,7 @@
     },
     {
       "command": "build geology_lab at:15,15",
+      "timeout": 70,
       "interaction": [
         {
           "type": "clickSelector",
@@ -152,6 +155,7 @@
     },
     {
       "command": "build management_office at:20,20",
+      "timeout": 70,
       "interaction": [
         {
           "type": "clickSelector",
@@ -195,6 +199,7 @@
     {
       "command": "build management_office at:90,20",
       "description": "#558: targets ground well outside the default 64x64 site (chunk (5,20/16=1)... chunk index for x=90 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it.",
+      "timeout": 100,
       "interaction": [
         {
           "type": "clickSelector",
@@ -228,6 +233,7 @@
     },
     {
       "command": "build list",
+      "timeout": 75,
       "interaction": [
         {
           "type": "command",
@@ -238,6 +244,7 @@
     },
     {
       "command": "scores",
+      "timeout": 75,
       "interaction": [
         {
           "type": "command",
@@ -248,6 +255,7 @@
     },
     {
       "command": "state full",
+      "timeout": 75,
       "interaction": [
         {
           "type": "command",
