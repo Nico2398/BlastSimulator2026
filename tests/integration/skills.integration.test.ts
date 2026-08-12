@@ -18,9 +18,11 @@ import {
 } from '../../src/core/entities/Employee.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
 import { tickCommand } from '../../src/console/commands/events.js';
+import { surveyCommand } from '../../src/console/commands/mining.js';
 import { tickEmployees } from '../../src/core/engine/GameLoop.js';
 import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuration.js';
 import { Random } from '../../src/core/math/Random.js';
+import { SURVEY_DURATION_TICKS } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -536,5 +538,70 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
     expect(ctx.state!.events.pendingEvent?.eventId).not.toBe('unqualified_task_error');
     const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
     expect(emp.activeActionId).toBeNull();
+  });
+});
+
+// ── Issue #549: cost-based dispatch through the real tick pipeline ──────────
+//
+// tickEmployees's claim logic (exercised directly in the unit suite,
+// GameLoop.test.ts) is first-come-first-served today — array/insertion
+// order, not cost. This end-to-end test drives the same claim logic through
+// the full console `tick` pipeline (tickCommand, events.ts) with two
+// surveyors and three unclaimed survey targets at different distances, the
+// way a real scenario or player-facing flow would. Red until tickEmployees
+// is rewired onto ActionSelection.ts's cost-based selection (#549).
+
+describe('Cost-based per-employee dispatch — full tick pipeline (#549)', () => {
+  it('pairs each surveyor with their own nearest survey target, never double-claims, and every target eventually resolves', () => {
+    const ctx = makeCtx();
+    const emp1Id = hireOne(ctx, 'surveyor');
+    const emp2Id = hireOne(ctx, 'surveyor');
+    const emp1 = ctx.state!.employees.employees.find(e => e.id === emp1Id)!;
+    const emp2 = ctx.state!.employees.employees.find(e => e.id === emp2Id)!;
+    // Deliberately repositioned, far apart, on the same row.
+    emp1.x = 4; emp1.z = 4;
+    emp2.x = 26; emp2.z = 4;
+
+    // Pushed in an order that would trip up a naive "first idle employee in
+    // roster order" dispatcher: the target near emp2 is queued *before* the
+    // target near emp1, while emp1 is still first in the roster array — a
+    // first-come-first-served claimer would wrongly hand emp1 the far target.
+    const near2Result = surveyCommand(ctx as any, ['core_sample'], { x: '24', z: '4' });
+    expect(near2Result.success, near2Result.output).toBe(true);
+    const near2Action = ctx.state!.pendingActions[ctx.state!.pendingActions.length - 1]!;
+
+    const near1Result = surveyCommand(ctx as any, ['core_sample'], { x: '6', z: '4' });
+    expect(near1Result.success, near1Result.output).toBe(true);
+    const near1Action = ctx.state!.pendingActions[ctx.state!.pendingActions.length - 1]!;
+
+    const midResult = surveyCommand(ctx as any, ['core_sample'], { x: '15', z: '4' });
+    expect(midResult.success, midResult.output).toBe(true);
+    const midAction = ctx.state!.pendingActions[ctx.state!.pendingActions.length - 1]!;
+
+    // One tick is enough to claim (no travel/duration has elapsed yet).
+    tickCommand(ctx, ['1'], {});
+
+    const near1After = ctx.state!.pendingActions.find(a => a.id === near1Action.id)!;
+    const near2After = ctx.state!.pendingActions.find(a => a.id === near2Action.id)!;
+    const midAfter = ctx.state!.pendingActions.find(a => a.id === midAction.id)!;
+
+    expect(near1After.holderId).toBe(emp1Id);
+    expect(near2After.holderId).toBe(emp2Id);
+    // The target far from both surveyors is nobody's cheapest choice yet —
+    // stays queued, not claimed by whichever employee happened to be
+    // processed first.
+    expect(midAfter.status).toBe('queued');
+    expect(midAfter.holderId).toBeNull();
+
+    // Settle: both near surveys complete, freeing a surveyor to pick up the
+    // leftover target, and everything resolves — with generous padding for
+    // travel + SURVEY_DURATION_TICKS.core_sample per survey.
+    const budget = SURVEY_DURATION_TICKS.core_sample * 3 + 60;
+    for (let i = 0; i < budget && ctx.state!.pendingActions.some(a => a.type === 'survey'); i++) {
+      tickCommand(ctx, ['1'], {});
+    }
+
+    expect(ctx.state!.pendingActions.filter(a => a.type === 'survey')).toHaveLength(0);
+    expect(ctx.state!.surveyResults).toHaveLength(3);
   });
 });
