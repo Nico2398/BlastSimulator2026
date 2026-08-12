@@ -99,17 +99,19 @@ Each event presents 2-4 decision options with different consequences on scores, 
 - **Underground grid:** 3D voxel grid with rock types and ore densities (Simplex noise)
 - **Mine type choice:** Affects rocks, ores, terrain shape, settlements, climate
 
-### The site expands (#473)
+### The site expands (#473, #558)
 
-A level starts as a square, and grows wherever play takes it. Acting past the edge — drilling, surveying, building, cutting a ramp — claims the chunk under that action and generates it from the seed. The site ends up whatever shape play gives it, and is seemingly unbounded.
+A level starts as a square, and grows wherever play takes it. Acting past the edge — drilling, surveying, building, cutting a ramp — claims the action's whole footprint (e.g. a survey's full coverage disc, not just its center cell) plus whatever intermediate chunks bridge it to the site as one connected worksite, and generates it all from the seed. The site ends up whatever shape play gives it, and is seemingly unbounded.
 
 Expansion is **never implicit**: a claim answers with success or a refusal the player can read. Three things refuse:
 
 | Refusal | Meaning |
 |---------|---------|
 | `protected_structure` | A village, river or landmark stands there. Inviolable — the only permanent limit in the world, and what the border wall now marks. |
-| `not_adjacent` | The chunk touches no ground the site owns. The site grows outward, one chunk at a time; it does not teleport. |
+| `too_far` | The action's footprint is more chunks from the site than one claim will bridge (`MAX_CLAIM_BRIDGE_CHUNKS`) — a reach limit, not a hard wall; still claimable in a closer step. |
 | `expansion_disabled` | This site has a fixed boundary. |
+
+`not_adjacent` (touches no ground the site owns) still exists as a defensive fallback on the single-chunk `claim` path; the bridging claim above is what player actions actually go through.
 
 Claiming is currently free. A land price per chunk would fit the satire and is an open design question, not a technical one.
 
