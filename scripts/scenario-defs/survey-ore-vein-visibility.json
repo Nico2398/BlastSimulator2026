@@ -1,6 +1,6 @@
 {
   "name": "survey-ore-vein-visibility",
-  "description": "Validates ore vein visibility: run surveys at positions where ore is expected, then verify the overlay shows ore indicators. After a blast, check that ore vein markers are still visible or updated based on new terrain geometry. Requires the survey overlay to be wired into syncFromContext(). Finding #16: with a single surveyor and 4 survey PendingActions queued back to back (no ticks between), only 3 of the 4 ever complete — a direct engine trace (state.pendingActions/state.surveyResults sampled every 5 ticks) shows one queued action (targeting (15,25)) vanishes from pendingActions between two ticks without ever producing a SurveyResult; 'survey show' reports 'No pending surveys' regardless, since it only lists the queue, not what was dropped from it. Root cause not chased down (would need tracing tickEmployees'/PendingAction claim-and-dispatch order for one employee holding several same-type actions) — filed as a follow-up. This file's assertions use the real, verified ceiling (3, not 4) rather than the naively-expected one.",
+  "description": "Validates ore vein visibility: run surveys at positions where ore is expected, then verify the overlay shows ore indicators. After a blast, check that ore vein markers are still visible or updated based on new terrain geometry. Requires the survey overlay to be wired into syncFromContext(). Former Finding #16 (with a single surveyor and 4 survey PendingActions queued back to back, one used to silently vanish from pendingActions without ever producing a SurveyResult) is resolved by #549: interruptActiveAction now correctly requeues an interrupted survey instead of losing it, so throughput is just slower (interruption/rest cost real ticks) -- a direct engine trace confirms all 5 of this file's survey PendingActions (4 seismic + 1 core_sample) do eventually complete, given enough ticks (by cumulative tick ~161). This file's own tick budget stops short of that -- it only asserts up through 4 of 5 complete -- so its checkpoints reflect the real, slower-but-complete throughput at each point sampled, not a permanent loss ceiling.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -375,9 +375,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 3
+          "surveyCount": 1
         },
-        "note": "Finding #16: only 3 of the 4 queued seismic surveys ever complete -- the 4th's PendingAction silently vanishes from the queue rather than executing, verified via a direct engine trace (see file description); survey show still reports 'No pending surveys' since it only lists the queue, not what was dropped"
+        "note": "only 1 of the 4 queued seismic surveys has completed by cumulative tick 77 -- the single surveyor's own fatigue/hunger interrupts and resumes work along the way (#549's correct requeue-and-preserve behavior, not a loss), so throughput through this checkpoint is slower than a naive same-type-queue estimate; see file description"
       }
     },
     {
@@ -392,7 +392,7 @@
     },
     {
       "command": "survey core_sample x:20 z:20",
-      "description": "Survey 5 (Finding #16 aside): round 1's real ceiling is 3, not 4 — see file description.",
+      "description": "Survey 5 -- round 1 has completed only 1 of its 4 by this point (see file description); this one queues behind them.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -425,7 +425,7 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 3
+          "surveyCount": 1
         }
       }
     },
@@ -440,9 +440,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "surveyCount": 3
+          "surveyCount": 1
         },
-        "note": "core_sample queued, not yet completed; round 1's 3 stay put"
+        "note": "core_sample queued, not yet completed; round 1's 1 completed so far stays put"
       }
     },
     {
@@ -548,7 +548,7 @@
         "equals": {
           "surveyCount": 4
         },
-        "note": "core_sample now complete: 3 (round 1's real ceiling) + 1 = 4"
+        "note": "4 of the 5 total survey PendingActions (4 seismic + 1 core_sample) have completed by cumulative tick 124; the last seismic (targeting 15,15) is still queued, requeued at least once along the way by the surveyor's own needs interruptions -- it does eventually complete too, just past this file's own tick budget (see file description)"
       }
     },
     {

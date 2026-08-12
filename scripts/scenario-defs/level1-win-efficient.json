@@ -595,7 +595,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -614,7 +614,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -635,7 +635,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -654,7 +654,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -675,7 +675,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -695,7 +695,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -741,7 +741,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 16,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -768,7 +768,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 16,
           "chargedCount": 16,
           "sequencedCount": 0
@@ -795,7 +795,7 @@
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 16,
           "chargedCount": 16,
           "sequencedCount": 16
@@ -838,7 +838,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -861,7 +861,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -881,7 +881,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -901,8 +901,8 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "wellBeing": 41.890000000000164,
+          "surveyCount": 1,
+          "wellBeing": 42.37000000000015,
           "safety": 50,
           "ecology": 49.18,
           "nuisance": 47.95
@@ -925,8 +925,8 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "wellBeing": 41.890000000000164,
+          "surveyCount": 1,
+          "wellBeing": 42.37000000000015,
           "safety": 50,
           "ecology": 49.18,
           "nuisance": 47.95
@@ -945,11 +945,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 77,
+          "tickCount": 73,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -964,11 +964,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 77,
+          "tickCount": 73,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -985,11 +985,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1004,11 +1004,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -1025,11 +1025,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1053,11 +1053,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1077,11 +1077,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1097,11 +1097,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
@@ -1120,11 +1120,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
@@ -1143,11 +1143,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1189,11 +1189,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 25,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -1260,11 +1260,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 25,
           "chargedCount": 25,
           "sequencedCount": 0
@@ -1297,11 +1297,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 25,
           "chargedCount": 25,
           "sequencedCount": 25
@@ -1340,11 +1340,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -1363,11 +1363,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1383,11 +1383,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1403,15 +1403,15 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2,
-          "wellBeing": 32.390000000000136,
-          "safety": 0.49999999999999484,
-          "ecology": 46.45999999999997,
-          "nuisance": 40.39999999999998
+          "surveyCount": 1,
+          "wellBeing": 40.47000000000014,
+          "safety": 40.099999999999994,
+          "ecology": 46.059999999999995,
+          "nuisance": 40
         }
       }
     },
@@ -1427,15 +1427,15 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 82,
+          "tickCount": 74,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2,
-          "wellBeing": 32.390000000000136,
-          "safety": 0.49999999999999484,
-          "ecology": 46.45999999999997,
-          "nuisance": 40.39999999999998
+          "surveyCount": 1,
+          "wellBeing": 40.47000000000014,
+          "safety": 40.099999999999994,
+          "ecology": 46.059999999999995,
+          "nuisance": 40
         }
       }
     },
@@ -1451,11 +1451,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 87,
+          "tickCount": 75,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1470,11 +1470,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 87,
+          "tickCount": 75,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -1491,11 +1491,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1510,11 +1510,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -1531,11 +1531,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1559,11 +1559,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1579,11 +1579,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
@@ -1602,11 +1602,11 @@
       "expect": {
         "equals": {
           "cash": 39260,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1630,11 +1630,11 @@
       "expect": {
         "equals": {
           "cash": 38260,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 2,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1654,11 +1654,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1674,11 +1674,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1720,11 +1720,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 36,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -1791,11 +1791,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 36,
           "chargedCount": 36,
           "sequencedCount": 0
@@ -1819,11 +1819,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 1,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 36,
           "chargedCount": 36,
           "sequencedCount": 36
@@ -1862,11 +1862,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2,
+          "surveyCount": 1,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
@@ -1885,11 +1885,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1905,11 +1905,11 @@
       "expect": {
         "equals": {
           "cash": 36760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1924,11 +1924,11 @@
       "expect": {
         "equals": {
           "cash": 46760,
-          "tickCount": 92,
+          "tickCount": 76,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -1945,11 +1945,11 @@
       "expect": {
         "equals": {
           "cash": 46760,
-          "tickCount": 97,
+          "tickCount": 77,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -1964,11 +1964,11 @@
       "expect": {
         "equals": {
           "cash": 46760,
-          "tickCount": 97,
+          "tickCount": 77,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       },
       "role": "player"
@@ -1985,11 +1985,11 @@
       "expect": {
         "equals": {
           "cash": 46760,
-          "tickCount": 97,
+          "tickCount": 77,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2
+          "surveyCount": 1
         }
       }
     },
@@ -2005,14 +2005,14 @@
       "expect": {
         "equals": {
           "cash": 46760,
-          "tickCount": 97,
+          "tickCount": 77,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2,
-          "wellBeing": 22.14000000000015,
-          "safety": 0,
-          "ecology": 26.939999999999948,
+          "surveyCount": 1,
+          "wellBeing": 38.42000000000013,
+          "safety": 15.249999999999993,
+          "ecology": 25.93999999999999,
           "nuisance": 0
         }
       }
@@ -2029,14 +2029,14 @@
       "expect": {
         "equals": {
           "cash": 46760,
-          "tickCount": 97,
+          "tickCount": 77,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2,
-          "wellBeing": 22.14000000000015,
-          "safety": 0,
-          "ecology": 26.939999999999948,
+          "surveyCount": 1,
+          "wellBeing": 38.42000000000013,
+          "safety": 15.249999999999993,
+          "ecology": 25.93999999999999,
           "nuisance": 0
         }
       }
@@ -2053,14 +2053,14 @@
       "expect": {
         "equals": {
           "cash": 46760,
-          "tickCount": 97,
+          "tickCount": 77,
           "deathCount": 3,
           "employeeCount": 3,
           "activeContractCount": 3,
-          "surveyCount": 2,
-          "wellBeing": 22.14000000000015,
-          "safety": 0,
-          "ecology": 26.939999999999948,
+          "surveyCount": 1,
+          "wellBeing": 38.42000000000013,
+          "safety": 15.249999999999993,
+          "ecology": 25.93999999999999,
           "nuisance": 0,
           "bankrupt": false,
           "levelEnded": false,

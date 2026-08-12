@@ -36,12 +36,14 @@ import {
   tickArrivalGate,
 } from '../../../src/core/engine/GameLoop.js';
 import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
+import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import {
   hireEmployee, assignSkill, checkCollapse, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
 import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
+import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -60,6 +62,7 @@ import {
   NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   BASE_TASK_DURATION_TICKS,
   XP_THRESHOLDS,
+  MAX_EMPLOYEE_TASK_QUEUE_DEPTH,
 } from '../../../src/core/config/balance.js';
 
 /**
@@ -494,6 +497,262 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
     const stored = state.pendingActions.find(a => a.id === 31)!;
     expect(stored.status).toBe('in_progress');
     expect(stored.holderId).toBe(holder.id);
+  });
+});
+
+// ── Issue #549: cost-based per-employee action selection & task queues ─────
+//
+// tickEmployees's claim logic (Task 3.6, above) is first-come-first-served —
+// array/insertion order, not cost. #549 replaces that with
+// selectBestActionForEmployee (ActionSelection.ts): each idle qualified
+// employee picks its own cheapest reachable candidate (travel + work),
+// unreachable candidates are skipped this tick (not stalled — retried once
+// the grid changes), an assigned action is never reclaimed by anyone else,
+// and employees hold up to MAX_EMPLOYEE_TASK_QUEUE_DEPTH queued follow-up
+// actions (Employee.taskQueue), executed in cheapest-next order recomputed
+// from wherever the employee actually ends up — not fixed at enqueue time.
+// All tests below are Red until tickEmployees is rewired onto
+// ActionSelection.ts.
+
+describe('tickEmployees — cost-based dispatch and per-employee task queues (#549)', () => {
+  const SEED = 42;
+
+  function makeFlatNavGrid(width: number, height: number): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(width, height, cells);
+  }
+
+  /** Impassable vertical wall spanning every row at world x. */
+  function blockColumn(grid: NavGrid, x: number): void {
+    for (let z = 0; z < grid.height; z++) {
+      grid.cells[z]![x] = { type: 'blocked', moveCost: Infinity, benchLevel: 0, vehicleOccupied: false };
+    }
+  }
+
+  function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      ...overrides,
+    };
+  }
+
+  /**
+   * One full dispatch → movement → arrival → work tick, mirroring the real
+   * ordering the console `tick` command drives (events.ts) but trimmed to
+   * only the pieces this suite exercises — no needs/events/economy noise.
+   */
+  function runFullTick(state: GameState): void {
+    tickEmployees(state);
+    tickEmployeeMovement(state);
+    tickArrivalGate(state);
+    for (const emp of state.employees.employees) {
+      if (!emp.alive) continue;
+      const progress = tickTaskProgress(state, emp);
+      if (progress?.completed && progress.actionId !== undefined) {
+        completePendingAction(state, progress.actionId);
+      }
+    }
+  }
+
+  it('each of 2 idle employees claims its own nearest reachable action — none doubles up, and the leftover third goes to whoever frees first', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 5);
+    const rng = new Random(SEED);
+
+    const { employee: emp1 } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+    const { employee: emp2 } = hireEmployee(state.employees, 'blaster', rng, 30, 0);
+
+    // Near emp1, fast (short work) — emp1 frees first.
+    const nearEmp1 = makeAction({ id: 1, targetX: 2, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 2 } });
+    // Near emp2, slower than emp1's task — emp2 stays busy after emp1 frees.
+    // Total cost is travel + work (#549), so this duration is deliberately
+    // kept low enough that near-emp2's total (travel 1 + work 6 = 7) still
+    // beats the leftover's total for emp2 (travel 7.5 + work 2 = 9.5) — a
+    // duration as large as the task's own travel-vs-leftover gap would make
+    // the farther-but-shorter leftover action emp2's cheaper pick instead,
+    // which is exactly the failure mode this scenario is meant to rule out.
+    const nearEmp2 = makeAction({ id: 2, targetX: 28, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 6 } });
+    // Far from both — neither's cheapest at initial dispatch time.
+    const leftover = makeAction({ id: 3, targetX: 15, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 2 } });
+
+    // Pushed out of closest-first order deliberately — array order must not
+    // determine the outcome.
+    state.pendingActions.push(leftover, nearEmp1, nearEmp2);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.holderId).toBe(emp1.id);
+    expect(state.pendingActions.find(a => a.id === 2)!.holderId).toBe(emp2.id);
+    expect(state.pendingActions.find(a => a.id === 3)!.status).toBe('queued');
+    expect(state.pendingActions.find(a => a.id === 3)!.holderId).toBeNull();
+
+    // Settle: emp1 finishes its short task quickly and should pick up the
+    // leftover next — either directly (once idle) or via the busy-employee
+    // pool reservation ahead (step 3 of tickEmployees) on an earlier tick —
+    // long before emp2 frees from its own, still-longer task.
+    let leftoverHolderWhenClaimed: number | null | undefined;
+    for (let i = 0; i < 20 && leftoverHolderWhenClaimed === undefined; i++) {
+      runFullTick(state);
+      const current = state.pendingActions.find(a => a.id === 3);
+      if (current && current.status !== 'queued') {
+        leftoverHolderWhenClaimed = current.holderId;
+      }
+    }
+
+    expect(leftoverHolderWhenClaimed).toBe(emp1.id);
+    expect(emp2.activeActionId).toBe(2); // still deep in its own long task
+  });
+
+  it('a closer-but-unreachable action stays queued (not stalled) and is claimed once the path opens — retried, not pinned', () => {
+    const state = createGame({ seed: SEED });
+    const grid = makeFlatNavGrid(10, 10);
+    blockColumn(grid, 1); // isolates x >= 2 from the employee at x = 0
+    state.navGrid = grid;
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+
+    const action = makeAction({ id: 1, targetX: 5, targetZ: 5, requiredSkill: 'blasting' });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    // Unreachable this tick — must not be claimed, and must not be marked in
+    // any way that would prevent a later retry.
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+    expect(state.pendingActions.find(a => a.id === 1)!.holderId).toBeNull();
+    expect(employee.activeActionId).toBeNull();
+
+    // Open the path — same action, now reachable.
+    grid.cells[5]![1] = { type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false };
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.holderId).toBe(employee.id);
+  });
+
+  it("queue advances to the next entry recomputed from where the previous task actually ended, not from the employee's original position", () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(30, 30);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+
+    // A finishes at (10,0). From there, B (10,10) is closer (dist 10) than
+    // C (0,10) (dist ~14.1) — but from the ORIGINAL position (0,0), C
+    // (dist 10) is closer than B (dist ~14.1). Fixing the order at claim
+    // time (from the original position) would pick C next; recomputing from
+    // the actual end position picks B.
+    const actionA = makeAction({ id: 1, targetX: 10, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 1 } });
+    const actionB = makeAction({ id: 2, targetX: 10, targetZ: 10, requiredSkill: 'blasting', payload: { durationTicks: 1 } });
+    const actionC = makeAction({ id: 3, targetX: 0, targetZ: 10, requiredSkill: 'blasting', payload: { durationTicks: 1 } });
+    // Insertion order deliberately does not match the expected pick order.
+    state.pendingActions.push(actionC, actionB, actionA);
+
+    let aCompleted = false;
+    for (let i = 0; i < 60; i++) {
+      runFullTick(state);
+      if (!aCompleted && !state.pendingActions.find(a => a.id === 1)) aCompleted = true;
+      if (aCompleted && employee.activeActionId !== null) break;
+    }
+
+    expect(employee.activeActionId).toBe(2); // B, not C
+  });
+
+  it('reserves at most MAX_EMPLOYEE_TASK_QUEUE_DEPTH actions ahead for one employee, leaving the rest for someone else', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(30, 5);
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+
+    const total = MAX_EMPLOYEE_TASK_QUEUE_DEPTH + 2;
+    const actions: PendingAction[] = [];
+    for (let i = 1; i <= total; i++) {
+      // Long work duration — nothing completes during the settle loop below,
+      // isolating the reservation cap from completion/re-dispatch timing.
+      actions.push(makeAction({ id: i, targetX: i, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 100 } }));
+    }
+    state.pendingActions.push(...actions);
+
+    // Settle dispatch across several ticks without letting anything complete.
+    for (let i = 0; i < 10; i++) {
+      tickEmployees(state);
+      tickEmployeeMovement(state);
+      tickArrivalGate(state);
+
+      const heldByEmployee = state.pendingActions.filter(
+        a => a.holderId === employee.id && a.status !== 'queued',
+      );
+      expect(heldByEmployee.length).toBeLessThanOrEqual(MAX_EMPLOYEE_TASK_QUEUE_DEPTH);
+      expect(employee.taskQueue.length).toBeLessThanOrEqual(MAX_EMPLOYEE_TASK_QUEUE_DEPTH);
+    }
+
+    const heldByEmployee = state.pendingActions.filter(
+      a => a.holderId === employee.id && a.status !== 'queued',
+    );
+    // The single employee is the only one who could ever hold more than one
+    // of these — proves dispatch actually reserves ahead (not just the one
+    // active slot) while still respecting the cap.
+    expect(heldByEmployee.length).toBeGreaterThan(1);
+    expect(employee.taskQueue.length).toBeGreaterThan(0);
+
+    const stillQueued = state.pendingActions.filter(a => a.status === 'queued');
+    expect(stillQueued.length).toBeGreaterThanOrEqual(total - MAX_EMPLOYEE_TASK_QUEUE_DEPTH);
+  });
+
+  it("collapse releases only the active action back to queued/holderId:null — the employee's remaining taskQueue survives untouched", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+
+    // Manually construct the "mid-task with a reserved queue" shape #549
+    // dispatch produces — isolates tickCollapse's release behavior from the
+    // dispatch logic that builds this shape.
+    const active = makeAction({ id: 1, status: 'in_progress', holderId: employee.id });
+    const queuedA = makeAction({ id: 2, targetX: 1, targetZ: 1, status: 'assigned', holderId: employee.id });
+    const queuedB = makeAction({ id: 3, targetX: 2, targetZ: 2, status: 'assigned', holderId: employee.id });
+    state.pendingActions.push(active, queuedA, queuedB);
+    employee.activeActionId = active.id;
+    employee.taskTicksRemaining = 5;
+    employee.taskQueue = [queuedA.id, queuedB.id];
+
+    // Trigger collapse via hunger below the collapse threshold.
+    employee.hunger = 1;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+
+    tickCollapse(state);
+
+    // The active action is released — queued, unheld, not deleted — so it
+    // can be reclaimed later (mirrors cancelAction's release pattern,
+    // TaskDispatch.ts, #548).
+    const releasedActive = state.pendingActions.find(a => a.id === 1);
+    expect(releasedActive).toBeDefined();
+    expect(releasedActive!.status).toBe('queued');
+    expect(releasedActive!.holderId).toBeNull();
+
+    // Remaining not-yet-started queue entries are untouched by the
+    // interruption — only the active slot releases (#549 decision: taskQueue
+    // survives interruption).
+    expect(employee.taskQueue).toEqual([queuedA.id, queuedB.id]);
+    const stillReservedA = state.pendingActions.find(a => a.id === 2)!;
+    const stillReservedB = state.pendingActions.find(a => a.id === 3)!;
+    expect(stillReservedA.status).toBe('assigned');
+    expect(stillReservedA.holderId).toBe(employee.id);
+    expect(stillReservedB.status).toBe('assigned');
+    expect(stillReservedB.holderId).toBe(employee.id);
   });
 });
 

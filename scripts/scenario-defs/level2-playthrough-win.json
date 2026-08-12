@@ -621,7 +621,7 @@
           "deathCount": 0,
           "employeeCount": 7,
           "activeContractCount": 0,
-          "surveyCount": 3,
+          "surveyCount": 2,
           "cash": 126860
         }
       }
@@ -640,7 +640,7 @@
           "deathCount": 0,
           "employeeCount": 7,
           "activeContractCount": 0,
-          "surveyCount": 3,
+          "surveyCount": 2,
           "cash": 126860
         }
       },
@@ -1151,7 +1151,7 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "cash": 12040,
-          "wellBeing": 63.4000000000001,
+          "wellBeing": 63.37857142857152,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
@@ -1614,7 +1614,7 @@
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3,
-          "wellBeing": 67.60000000000012,
+          "wellBeing": 67.52714285714296,
           "safety": 0,
           "ecology": 39.22,
           "nuisance": 23.049999999999997
@@ -2179,7 +2179,7 @@
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3,
-          "wellBeing": 76.90000000000009,
+          "wellBeing": 76.72428571428578,
           "safety": 0,
           "ecology": 30.039999999999985,
           "nuisance": 0
@@ -2636,7 +2636,7 @@
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 86.24285714285719,
+          "wellBeing": 85.96428571428574,
           "safety": 0,
           "ecology": 14.749999999999993,
           "nuisance": 0
@@ -2659,7 +2659,7 @@
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 86.24285714285719,
+          "wellBeing": 85.96428571428574,
           "safety": 0,
           "ecology": 14.749999999999993,
           "nuisance": 0
@@ -2682,7 +2682,7 @@
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 86.24285714285719,
+          "wellBeing": 85.96428571428574,
           "safety": 0,
           "ecology": 14.749999999999993,
           "nuisance": 0,

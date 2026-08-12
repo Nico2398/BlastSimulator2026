@@ -54,7 +54,9 @@ import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 8;
+// v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
+// per-employee action selection). See SaveLoad.ts's migrateV8ToV9 stub.
+export const SAVE_VERSION = 9;
 
 export interface GameConfig {
   seed: number;

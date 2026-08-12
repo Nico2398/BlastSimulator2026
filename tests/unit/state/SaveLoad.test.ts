@@ -190,6 +190,83 @@ describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)',
   });
 });
 
+// ── v8→v9 migration for Employee.taskQueue (#549) ───────────────────────────
+// SAVE_VERSION bumped 8→9 when Employee gained a `taskQueue: number[]` field
+// (cost-based per-employee action selection). A save written before that has
+// no taskQueue at all on any employee — it must load with `taskQueue: []`,
+// exactly as a fresh hire would have, so a pre-#549 save works with the new
+// dispatch code instead of crashing on a missing array.
+
+describe('deserialize — v8→v9 migration for Employee.taskQueue (#549)', () => {
+  it('a v8 fixture with employees missing taskQueue loads with taskQueue: [] on every employee', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    hireEmployee(state.employees, 'driller', rng);
+    hireEmployee(state.employees, 'blaster', rng);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 8;
+    // Simulate a genuine pre-#549 save: no taskQueue field at all.
+    const employeesRaw = parsed['employees'] as Record<string, unknown>;
+    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>>;
+    expect(employeeList).toHaveLength(2);
+    for (const e of employeeList) {
+      delete e['taskQueue'];
+    }
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.employees.employees).toHaveLength(2);
+    for (const e of restored.employees.employees) {
+      expect(e.taskQueue).toEqual([]);
+    }
+  });
+
+  it('a single-employee v8 fixture migrates that employee to taskQueue: [] (boundary: one employee)', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    hireEmployee(state.employees, 'surveyor', rng);
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 8;
+    const employeesRaw = parsed['employees'] as Record<string, unknown>;
+    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>>;
+    delete employeeList[0]!['taskQueue'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.employees.employees).toHaveLength(1);
+    expect(restored.employees.employees[0]!.taskQueue).toEqual([]);
+  });
+
+  it('a v8 save with no employees at all migrates cleanly to an empty roster (boundary: zero employees)', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 8;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.employees.employees).toEqual([]);
+  });
+
+  it('a v9+ save (already carrying a populated taskQueue) is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.taskQueue = [7, 8];
+
+    const json = serialize(state);
+
+    const restored = deserialize(json);
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
+    expect(restoredEmployee.taskQueue).toEqual([7, 8]);
+  });
+});
+
 describe('serialize / deserialize', () => {
   it('round-trip produces an equivalent state', () => {
     const state = createGame({ seed: 42 });

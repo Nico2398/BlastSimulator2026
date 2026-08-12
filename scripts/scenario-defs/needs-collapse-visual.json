@@ -153,9 +153,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "collapsedCount": 1
+          "collapsedCount": 0
         },
-        "note": "50 total ticks of continuous work with no rest crosses the collapse threshold — Walt Dusty flips to COLLAPSING"
+        "note": "still OK at 50 cumulative ticks (#549: an interrupted task's own progress is now correctly preserved/resumed instead of vanishing, so this checkpoint no longer lands on a collapse). Walt does collapse later, mid-way through the next tick 200 step (a ground-rest proactive cycle tops fatigue at 70 first, then it drains again down to 0 around cumulative tick 94-101), and has fully recovered again by the time that step's own collapsedCount:0 check runs"
       }
     },
     {

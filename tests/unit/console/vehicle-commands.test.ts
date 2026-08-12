@@ -74,6 +74,7 @@ function employeeMovementDefaults(): Omit<
     pendingActionType: null,
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
+    taskQueue: [],
   };
 }
 

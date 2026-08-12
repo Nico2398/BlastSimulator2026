@@ -224,9 +224,9 @@
           "cash"
         ],
         "equals": {
-          "pendingActionCount": 1
+          "pendingActionCount": 3
         },
-        "note": "the second dispatch's ghost preview disappears here -- employee A finished the first task and auto-claimed it. Count is 1 (not 0) since #547: the second dispatch's PendingAction is now claimed-but-in-progress, still counted until it completes too."
+        "note": "employee A's fatigue crosses the collapse threshold around cumulative tick 61 (continuous work, no rest building) -- #549's interruptActiveAction correctly pauses the first dispatch (back to 'queued', its progress preserved on payload.durationTicks) and starts a genuine rest instead of silently losing or double-progressing it. Count is 3, not 1: the interrupted first dispatch (queued) + the still-reserved second dispatch (assigned, holderId unchanged) + the new self-claimed 'rest' PendingAction all count. By the next checkpoint (tick 150) the rest completes, the first dispatch resumes and finishes, and the second dispatch is claimed -- count drops back down."
       }
     },
     {

@@ -1,0 +1,372 @@
+{
+  "name": "action-queue-dispatch",
+  "description": "Issue #549: cost-based per-employee action dispatch through the real tick pipeline. Two surveyors, hired in sequence (so they spawn only 2 cells apart near world centre), are each given a survey target clearly nearer to them than to the other, plus a third target far from both. Command-mode only (backend dispatch logic, not a player-facing control beyond hire/survey, which already have visual coverage elsewhere, e.g. survey-execution.json) -- asserts via pendingActionCount/surveyCount that all three surveys are claimed without doubling up and resolve by scenario end.",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:32",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 mine_type:desert size:32"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "description": "Surveyor #1 -- spawns near world centre (16,16) with no per-hire offset (first hire of this role).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 48800,
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "description": "Surveyor #2 -- spawns 2 cells east of surveyor #1 (hireEmployee's per-hire spawn offset, Employee.ts), close enough that both are candidates for every target, far enough that the nearest-of-two comparison below is unambiguous.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 47600,
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "survey core_sample x:30 z:16",
+      "description": "Target B -- clearly nearer surveyor #2 (spawned at ~18,16) than surveyor #1 (~16,16). Queued BEFORE Target A on purpose: array/insertion order (B, then A) is the opposite of roster order (surveyor #1, then #2) -- a first-come-first-served dispatcher (today's tickEmployees) would walk pendingActions in this order and had the FIRST idle roster employee (surveyor #1) claim Target B, which is actually far from them. Cost-based dispatch must ignore this ordering entirely and still hand Target B to surveyor #2.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 30,
+          "z": 16
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "pendingActionCount"
+        ]
+      }
+    },
+    {
+      "command": "survey core_sample x:2 z:16",
+      "description": "Target A -- clearly nearer surveyor #1 (spawned at ~16,16) than surveyor #2 (~18,16). Queued second, after Target B -- see Target B's description for why the order matters.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 16
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "pendingActionCount"
+        ]
+      }
+    },
+    {
+      "command": "survey core_sample x:16 z:30",
+      "description": "Target C -- far from both surveyors (~14 cells from each), strictly farther than either's own near target -- nobody's cheapest choice at first dispatch, so it should stay queued until whichever surveyor frees first.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 16,
+          "z": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "cash": 45200,
+          "pendingActionCount": 3,
+          "surveyCount": 0
+        },
+        "note": "all 3 surveys queued, none resolved yet -- exact equals is safe here (ground rule #14), natural ceiling for surveys ordered so far"
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "tick 1",
+      "description": "One dispatch tick -- long enough for tickEmployees to claim, not long enough for any travel/work to finish. Target A and Target B should each be claimed by their own nearest surveyor; Target C should still be unclaimed (queued) -- neither surveyor's cheapest option yet. pendingActionCount stays at 3 either way (#547: a claimed action stays in pendingActions until it completes), so this step alone doesn't distinguish claimed-but-not-doubled from mis-claimed -- see the per-action holderId note in this step's own state-full dump.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 3,
+          "surveyCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "description": "Inspect this step's dump directly for the dispatch-correctness proof the generic pendingActionCount/surveyCount fields can't express: pendingActions[].holderId for Target A must equal surveyor #1's id, Target B's must equal surveyor #2's id, and Target C's must stay null -- exactly the assertions tests/unit/engine/GameLoop.test.ts and tests/integration/skills.integration.test.ts make directly against state.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "description": "Extra padding for the third (leftover) survey, which only starts once one of the two surveyors frees from their own near target.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
+    },
+    {
+      "command": "survey show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "survey show"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "surveyCount": 3,
+          "pendingActionCount": 0
+        },
+        "note": "all three surveys resolved by scenario end -- none stuck queued, none lost, none double-claimed (a double claim would have left the loser permanently unclaimed and this count below 3). This coarse count is what SerializableGameState (console-api.ts) exposes to scenario `expect` -- it has no per-action holderId field, so it cannot by itself distinguish 'each surveyor got their own nearest target' from 'the two got swapped' (both leave surveyCount at 3). That specific pairing is enforced precisely by tests/unit/engine/ActionSelection.test.ts, tests/unit/engine/GameLoop.test.ts, and tests/integration/skills.integration.test.ts, which read holderId directly off state.pendingActions. This scenario's own job is the coarser one: prove the real console pipeline (hire -> survey -> tick -> event) dispatches, walks, works, and resolves all three targets without stalling or crashing, exactly as tests/integration/skills.integration.test.ts's own full-pipeline case (#549) also does end-to-end."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 20,
+      "pitch": 60
+    }
+  ]
+}
