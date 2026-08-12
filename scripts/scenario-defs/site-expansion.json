@@ -288,74 +288,9 @@
       }
     },
     {
-      "command": "save slot:expanded",
-      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control.",
-      "timeout": 70,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "save slot:expanded"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "cash": 491200
-        }
-      },
-      "role": "setup"
-    },
-    {
-      "command": "load slot:expanded",
-      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. The point of this round-trip: the expanded site bounds (not just cash/buildings) must survive a save/load, not only a live session.",
-      "timeout": 90,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "load slot:expanded"
-        }
-      ],
-      "expect": {
-        "equals": {
-          "cash": 491200,
-          "worldSizeX": 64,
-          "worldMinX": -16,
-          "buildingCount": 1
-        }
-      },
-      "role": "setup"
-    },
-    {
-      "command": "terrain_info",
-      "timeout": 75,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "terrain_info"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "worldSizeX": 64,
-          "worldMinX": -16
-        }
-      }
-    },
-    {
-      "command": "state full",
-      "timeout": 75,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe"
-    },
-    {
       "command": "drill_plan add x:140 z:10 depth:6",
       "timeout": 100,
-      "description": "#558 fence 3: a single-cell footprint with no connecting path of its own, well past the site's current frontier (chunk (2,0) is the nearest owned ground; chunk (8,0) is the target -- five intermediate chunks apart). Where the earlier drill/ramp/building steps in this file each landed on ground directly adjacent to the site (fence 1's raycast fix was the only thing standing between them and a real click), this one requires claimArea to bridge the gap itself (fence 3), well under MAX_CLAIM_BRIDGE_CHUNKS.",
+      "description": "#558 fence 3: a single-cell footprint with no connecting path of its own, well past the site's current frontier (chunk (2,0) is the nearest owned ground; chunk (8,0) is the target -- five intermediate chunks apart). Where the earlier drill/ramp/building steps in this file each landed on ground directly adjacent to the site (fence 1's raycast fix was the only thing standing between them and a real click), this one requires claimArea to bridge the gap itself (fence 3), well under MAX_CLAIM_BRIDGE_CHUNKS. Run immediately after the blast step (before save/load/terrain_info/state) so the blast report modal that step 'blast' just dismissed hasn't had a chance to reopen (#558 round 3) and cover this step's toolbar button.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -386,6 +321,72 @@
       "expect": {
         "increased": ["holeCount", "worldSizeX"]
       }
+    },
+    {
+      "command": "save slot:expanded",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. Runs after the far-bridging claim above, so the saved state (and the load below) includes the bridged ground at chunk (8,0), not just the original blast.",
+      "timeout": 70,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "save slot:expanded"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 491200
+        }
+      },
+      "role": "setup"
+    },
+    {
+      "command": "load slot:expanded",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. The point of this round-trip: the expanded site bounds -- now including the far-bridged claim at chunk (8,0), not just the original blast -- must survive a save/load, not only a live session.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "load slot:expanded"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 491200,
+          "worldSizeX": 160,
+          "worldMinX": -16,
+          "buildingCount": 1
+        }
+      },
+      "role": "setup"
+    },
+    {
+      "command": "terrain_info",
+      "timeout": 75,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "terrain_info"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "worldSizeX": 160,
+          "worldMinX": -16
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "description": "Captures the fully-grown site, including the far-bridged claim, as persisted through the save/load round-trip above.",
+      "timeout": 75,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
     }
   ],
   "shots": [
