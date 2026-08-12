@@ -206,13 +206,18 @@ export function tickCommand(
     // 8e (before 8d). Task duration progress + XP/level-up reporting.
     // taskTicksRemaining only counts down once ArrivalGate (8h below) has
     // promoted it from pendingTaskDuration on a prior tick — see tickEmployees
-    // (#437). Runs before 8d's claim pass specifically so that an employee
-    // freed by a completed vehicle-gated action is available to be reclaimed
-    // by a same-role follow-up in the SAME tick — the continuity tie-break in
+    // (#437). Runs before 8d's claim pass — this reordering affects every
+    // employee who finishes a task this tick, on-foot or vehicle-gated alike:
+    // whoever it is becomes immediately eligible for redispatch the same
+    // tick instead of sitting idle until next tick. The motivating case is
+    // narrower — a vehicle-gated action's driver, freed by a completed
+    // action, is available to be reclaimed by a same-role follow-up in the
+    // SAME tick, since the continuity tie-break in
     // VehicleReservation.findFreeVehicleForRole only re-mounts a driver who
     // is still (or, after dismounting here, freshly) at the vehicle's own
     // position, so claiming one tick late would otherwise walk them away and
-    // back for no reason (#550).
+    // back for no reason (#550) — but the reordering itself is not scoped to
+    // that case.
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
       const progress = tickTaskProgress(state, emp, emitter);
@@ -267,10 +272,11 @@ export function tickCommand(
     }
 
     // 8d (after 8e). Dispatch remaining pending actions to idle qualified
-    // employees — moved after the completion pass above so an employee freed
-    // this same tick (including a vehicle-gated driver dismounted by
+    // employees — moved after the completion pass above so ANY employee
+    // freed this same tick by finishing a task (on-foot or, per #550,
+    // vehicle-gated — including a driver dismounted by
     // releaseVehicleOnCompletion) can be reclaimed the same tick rather than
-    // idling for one extra tick (#550). An action requiring a skill nobody on
+    // idling for one extra tick. An action requiring a skill nobody on
     // the roster holds is not left to queue silently forever — it raises the
     // same unqualified_task_error event used elsewhere (auto-pause, resolved
     // via "event choose").

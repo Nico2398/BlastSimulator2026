@@ -190,9 +190,9 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
     if (holder) clearHolderWalkFields(holder);
   }
 
-  if (action.requiredVehicleRole !== null) {
-    releaseVehicleReservation(state, action.id);
-  }
+  // releaseVehicleReservation no-ops on its own when nothing is reserved for
+  // this action id, so no need to gate the call on requiredVehicleRole here.
+  releaseVehicleReservation(state, action.id);
 
   const refunded = actionOrderCost(action);
   if (refunded > 0) {
@@ -271,9 +271,9 @@ export function interruptActiveAction(state: GameState, employee: Employee, acti
       const ghost = state.ghostPreviews.find(g => g.id === actionId);
       if (ghost) ghost.claimed = false;
 
-      if (action.requiredVehicleRole !== null) {
-        releaseVehicleReservation(state, action.id);
-      }
+      // releaseVehicleReservation no-ops on its own when nothing is reserved
+      // for this action id, so no need to gate the call on requiredVehicleRole.
+      releaseVehicleReservation(state, action.id);
     }
   }
 

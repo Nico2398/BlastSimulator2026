@@ -20,9 +20,7 @@ import {
   estimateActionCost, resolveActionCost, selectBestActionForEmployee,
   computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields, type SelectedAction,
 } from './ActionSelection.js';
-import { findFreeVehicleForRole, reserveVehicle } from './VehicleReservation.js';
-import { moveVehicle, type Vehicle } from '../entities/Vehicle.js';
-import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction } from './VehicleReservation.js';
 
 // ── Config ──
 
@@ -262,25 +260,6 @@ function claimActionsTargetedAtEmployee(state: GameState, employee: Employee, re
 }
 
 /**
- * Vehicle-gate check shared by both claim sites below (#550): for a
- * non-vehicle action this is always a pass-through no-op; for a
- * vehicle-gated one it finds (but does not yet reserve) a qualifying free
- * vehicle via VehicleReservation.findFreeVehicleForRole. `ok: false` means
- * this employee cannot claim this action right now — same "stays queued,
- * retries next tick" outcome as selectBestActionForEmployee returning null
- * for an unreachable target, not an error.
- */
-function findVehicleForClaim(
-  state: GameState,
-  action: PendingAction,
-  employee: Employee,
-): { ok: true; vehicle: Vehicle | null } | { ok: false } {
-  if (action.requiredVehicleRole === null) return { ok: true, vehicle: null };
-  const vehicle = findFreeVehicleForRole(state, action.requiredVehicleRole, employee);
-  return vehicle === null ? { ok: false } : { ok: true, vehicle };
-}
-
-/**
  * Step 2 of tickEmployees: called only when `employee` is still idle after
  * step 1. Recomputes the cheapest entry from the employee's own taskQueue
  * (already claimed on a prior tick) from their current position, or — when
@@ -389,7 +368,7 @@ function reserveOnePoolActionAhead(state: GameState, employee: Employee, result:
  * before any of the above: the employee walks to (or boards straight into,
  * via the continuity tie-break) the vehicle VehicleReservation already
  * reserved for this action at claim time, instead of walking to the action's
- * own target — see promoteVehicleGatedAction.
+ * own target — see VehicleReservation.promoteVehicleGatedAction.
  */
 function promoteActionToActive(state: GameState, employee: Employee, action: PendingAction): void {
   employee.activeActionId = action.id;
@@ -434,43 +413,6 @@ function promoteActionToActive(state: GameState, employee: Employee, action: Pen
   // set through to completion (tickTaskProgress clears them) so completion
   // handling (e.g. survey resolution) still knows what work just finished.
   seedTaskTimerFields(state, employee, action);
-}
-
-/**
- * Vehicle-gated claim transition (#550): instead of walking to the action's
- * own target, the employee walks to (or, already driving it — the
- * continuity tie-break in VehicleReservation.findFreeVehicleForRole — skips
- * straight past) the vehicle reserved for this action at claim time.
- *
- * Deliberately does not call seedTaskTimerFields here — that only happens
- * once the VEHICLE (not the employee) reaches action.targetX/targetZ, via
- * the vehicle-drive loop ArrivalGate.tickArrivalGate adds. Boarding and
- * driving reuse existing machinery end to end: VehicleBoarding.requestBoardVehicle
- * for the walk-and-board (resolved by ArrivalGate.resolveBoarding), and
- * Vehicle.moveVehicle for setting the vehicle's own destination once someone
- * is already aboard — EntityMovementTick.tickVehicle is the only thing that
- * ever actually advances a vehicle's x/z (see ArrivalGate.ts's header).
- */
-function promoteVehicleGatedAction(state: GameState, employee: Employee, action: PendingAction): void {
-  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
-  // Reservation vanished between claim and promotion (shouldn't happen within
-  // a single tick, but reconcileVehicleReservations is the backstop if it
-  // ever does) — leave the employee idle-but-claimed; next tick's reconcile
-  // sweep interrupts the action back to the pool.
-  if (!vehicle) return;
-
-  if (vehicle.driverId === employee.id) {
-    moveVehicle(state.vehicles, vehicle.id, action.targetX, action.targetZ);
-    return;
-  }
-
-  // Stage the destination now (the same targetX/targetZ tickVehicle reads),
-  // but deliberately leave vehicle.task alone — starting it 'moving' before
-  // anyone is aboard would drive an unmanned vehicle. ArrivalGate.resolveBoarding
-  // flips it to 'moving' once the employee has actually boarded.
-  vehicle.targetX = action.targetX;
-  vehicle.targetZ = action.targetZ;
-  requestBoardVehicle(state, vehicle.id, employee.id);
 }
 
 // ── Need restoration routing ──
