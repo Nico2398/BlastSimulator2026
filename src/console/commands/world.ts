@@ -15,7 +15,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
-import { sanitizeFiniteOverride } from './commandUtils.js';
+import { sanitizeFiniteOverride, parseStaffedFlag } from './commandUtils.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -208,16 +208,23 @@ export function newGameCommand(
   // testing at those aspect ratios shouldn't require a same-sized cube.
   const sizeY = named['size_y'] ? parseInt(named['size_y'], 10) : size;
   const startingCash = named['cash'] ? sanitizeFiniteOverride(parseInt(named['cash'], 10)) : undefined;
+
+  const staffedFlag = parseStaffedFlag(named['staffed']);
+  if (staffedFlag.error) {
+    return { success: false, output: staffedFlag.error };
+  }
+
   ctx.state = createGame({
     seed, mineType,
     ...(startingCash !== undefined ? { startingCash } : {}),
+    ...(staffedFlag.staffed ? { staffed: true } : {}),
   });
   ctx.state.world = createWorldState(size, sizeY, size, true);
   regenerateGrid(ctx, { seed, climateBias: biome.climateCenter, sizeX: size, sizeY, sizeZ: size });
 
   return {
     success: true,
-    output: `Game created. ${size}x${sizeY}x${size} terrain, ${mineType} biome, seed ${seed}.`,
+    output: `Game created. ${size}x${sizeY}x${size} terrain, ${mineType} biome, seed ${seed}.${staffedFlag.staffed ? ' Staffed.' : ''}`,
   };
 }
 

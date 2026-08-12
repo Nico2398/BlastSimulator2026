@@ -9,8 +9,10 @@ import type { ConsoleRunner } from '../../src/console/ConsoleRunner.js';
 import type { GameContext } from '../../src/console/commands/world.js';
 import { parseSandboxArgs } from '../../src/console/commands/sandbox.js';
 import { SANDBOX_DEFAULTS, SANDBOX_DIFFICULTIES } from '../../src/core/campaign/Sandbox.js';
-import { DEFAULT_GRID_SIZE, SANDBOX_GRID_DEPTH } from '../../src/core/config/balance.js';
+import { DEFAULT_GRID_SIZE, SANDBOX_GRID_DEPTH, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import type { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
+import type { Employee } from '../../src/core/entities/Employee.js';
+import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 
 /** Solid-voxel count — a cheap fingerprint of a generated map. */
 function solidCount(grid: VoxelGrid): number {
@@ -129,6 +131,75 @@ describe('sandbox mode', () => {
   it('generates contracts so the economy is live from the first tick', () => {
     runner.run('sandbox start biome:desert_badlands difficulty:normal seed:5');
     expect(ctx.state!.contracts.available.length).toBeGreaterThan(0);
+  });
+
+  describe('staffed option', () => {
+    /** Greedily matches each composition employee slot to a distinct hired employee. */
+    function assertEmployeesMatchComposition(employees: Employee[]): void {
+      expect(employees.length).toBe(STARTING_SITE_STAFFED_COMPOSITION.employees.length);
+      const remaining = [...employees];
+      for (const slot of STARTING_SITE_STAFFED_COMPOSITION.employees) {
+        const idx = remaining.findIndex(e =>
+          e.role === slot.role &&
+          slot.qualifications.every(q =>
+            e.qualifications.some(eq => eq.category === q.category && eq.proficiencyLevel === q.proficiencyLevel),
+          ),
+        );
+        expect(idx, `no unmatched employee for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
+        remaining.splice(idx, 1);
+      }
+    }
+
+    /** Greedily matches each composition vehicle slot to a distinct purchased, idle, unmanned vehicle. */
+    function assertVehiclesMatchComposition(vehicles: Vehicle[]): void {
+      expect(vehicles.length).toBe(STARTING_SITE_STAFFED_COMPOSITION.vehicles.length);
+      const remaining = [...vehicles];
+      for (const slot of STARTING_SITE_STAFFED_COMPOSITION.vehicles) {
+        const idx = remaining.findIndex(v =>
+          v.type === slot.role && v.tier === slot.tier && v.driverId === null && v.state === 'idle',
+        );
+        expect(idx, `no unmatched vehicle for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
+        remaining.splice(idx, 1);
+      }
+    }
+
+    it('defaults to an empty roster and fleet when staffed is omitted', () => {
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42');
+      expect(result.success).toBe(true);
+      expect(ctx.state!.employees.employees.length).toBe(0);
+      expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+    });
+
+    it('staffed:false behaves identically to the default (empty roster and fleet)', () => {
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:false');
+      expect(result.success).toBe(true);
+      expect(ctx.state!.employees.employees.length).toBe(0);
+      expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+    });
+
+    it('staffed:true hires and equips the STARTING_SITE_STAFFED_COMPOSITION roster and fleet', () => {
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true');
+      expect(result.success).toBe(true);
+      assertEmployeesMatchComposition(ctx.state!.employees.employees);
+      assertVehiclesMatchComposition(ctx.state!.vehicles.vehicles);
+    });
+
+    it('staffed:true leaves starting cash unaffected — same as an unstaffed run with identical params', () => {
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:true');
+      expect(result.success).toBe(true);
+      expect(ctx.state!.cash).toBe(SANDBOX_DIFFICULTIES.normal.startingCash);
+    });
+
+    it('rejects staffed:banana, leaving any existing game state untouched', () => {
+      runner.run('sandbox start biome:desert_badlands difficulty:normal seed:7');
+      const before = ctx.state;
+
+      const result = runner.run('sandbox start biome:desert_badlands difficulty:normal seed:42 staffed:banana');
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('Invalid staffed value');
+      expect(ctx.state).toBe(before);
+    });
   });
 });
 

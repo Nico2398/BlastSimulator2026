@@ -19,6 +19,7 @@ import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
+import { parseStaffedFlag } from './commandUtils.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
 export function parseSandboxArgs(named: Record<string, string>): Partial<SandboxConfig> {
@@ -61,6 +62,11 @@ export function sandboxCommand(
     return { success: false, output: `Unknown difficulty: "${requested.difficulty}". Valid: ${valid}` };
   }
 
+  const staffedFlag = parseStaffedFlag(named['staffed']);
+  if (staffedFlag.error) {
+    return { success: false, output: staffedFlag.error };
+  }
+
   const config = clampSandboxConfig(requested);
   const level = sandboxLevelDef(config);
 
@@ -69,6 +75,7 @@ export function sandboxCommand(
     mineType: config.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
+    ...(staffedFlag.staffed ? { staffed: true } : {}),
   });
   ctx.state.world = createWorldState(level.gridX, level.gridY, level.gridZ, true);
 
@@ -87,7 +94,8 @@ export function sandboxCommand(
   return {
     success: true,
     output: `Sandbox started. ${level.gridX}x${level.gridY}x${level.gridZ} ${config.biome}, ` +
-      `difficulty ${config.difficulty}, seed ${config.seed}, cash $${level.startingCash.toLocaleString('en-US')}.`,
+      `difficulty ${config.difficulty}, seed ${config.seed}, cash $${level.startingCash.toLocaleString('en-US')}.` +
+      `${staffedFlag.staffed ? ' Staffed.' : ''}`,
   };
 }
 

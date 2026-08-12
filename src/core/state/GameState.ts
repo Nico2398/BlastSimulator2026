@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Central game state
 // Pure data. No side effects. All game data lives here.
 
-import { STARTING_CASH } from '../config/balance.js';
+import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../config/balance.js';
 import type { DrillHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
@@ -22,10 +22,11 @@ import { NavGrid } from '../nav/NavGrid.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import type { SerializedVoxels } from './VoxelGridCodec.js';
 import type { VehicleState } from '../entities/Vehicle.js';
-import { createVehicleState } from '../entities/Vehicle.js';
+import { createVehicleState, purchaseVehicle } from '../entities/Vehicle.js';
 import type { EmployeeState, SkillCategory } from '../entities/Employee.js';
-import { createEmployeeState } from '../entities/Employee.js';
+import { createEmployeeState, hireEmployee, calculateSalary } from '../entities/Employee.js';
 import type { VehicleRole } from '../entities/Vehicle.js';
+import { Random } from '../math/Random.js';
 import type { ScoreState } from '../scores/ScoreManager.js';
 import { createScoreState } from '../scores/ScoreManager.js';
 import type { DamageState } from '../entities/Damage.js';
@@ -66,6 +67,8 @@ export interface GameConfig {
   mineType?: string;
   startingCash?: number;
   eventFreqMultiplier?: number;
+  /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
+  staffed?: boolean;
 }
 
 /** The type of action a player has issued, waiting for an employee to execute. */
@@ -286,7 +289,7 @@ export function createWorldState(sizeX: number, sizeY: number, sizeZ: number, gr
 
 /** Create a fresh GameState from config. */
 export function createGame(config: GameConfig): GameState {
-  return {
+  const state: GameState = {
     version: SAVE_VERSION,
     seed: config.seed,
     time: 0,
@@ -335,6 +338,42 @@ export function createGame(config: GameConfig): GameState {
     lastBlastPreview: null,
     tubingState: createTubingState(),
   };
+
+  if (config.staffed) {
+    applyStaffedComposition(state);
+  }
+
+  return state;
+}
+
+/**
+ * Hires STARTING_SITE_STAFFED_COMPOSITION.employees and purchases
+ * STARTING_SITE_STAFFED_COMPOSITION.vehicles into `state`, for the opt-in
+ * staffed starting site (#551). Called from `createGame` when `config.staffed`
+ * is truthy; the roster and fleet composition are defined in
+ * `STARTING_SITE_STAFFED_COMPOSITION` (src/core/config/balance.ts).
+ */
+function applyStaffedComposition(state: GameState): void {
+  const rng = new Random(state.seed);
+
+  // Small deterministic offsets near the site origin — no navGrid exists yet
+  // (this runs before regenerateGrid), so there is no reachable-cell snap
+  // available; simple staggered placement is all that's needed here.
+  STARTING_SITE_STAFFED_COMPOSITION.employees.forEach((slot, i) => {
+    const { employee } = hireEmployee(state.employees, slot.role, rng, i * 2, 0, state.tickCount);
+    // Staffing is free at game-open — hiringCost is intentionally not deducted from cash.
+    employee.qualifications = slot.qualifications.map(q => ({
+      category: q.category,
+      proficiencyLevel: q.proficiencyLevel,
+      xp: 0,
+    }));
+    employee.salary = calculateSalary(employee);
+  });
+
+  STARTING_SITE_STAFFED_COMPOSITION.vehicles.forEach((slot, i) => {
+    // Purchase cost is intentionally not deducted from cash, same as hiring above.
+    purchaseVehicle(state.vehicles, slot.role, i * 2, 2, slot.tier);
+  });
 }
 
 /**

@@ -137,6 +137,8 @@ Steps also carry `role: 'player' | 'setup' | 'observe'` and `expect` (`ScenarioS
 
 **Async commands need tick padding.** A command that queues async work (e.g. `survey seismic`) must be followed by enough `tick` steps to let it resolve before a dependent step runs, or the dependent step reads stale state. Insert several `tick 10` steps after the async command, matching `survey-then-blast.json`.
 
+**Scenarios needing a staffed site use `new_game staffed:true` / `sandbox start staffed:true`**, not manual `hire`/`purchase` setup steps. The flag hires and equips the roster and fleet defined in `STARTING_SITE_STAFFED_COMPOSITION` (`src/core/config/balance.ts`) for free, at game-open — see `blast-basic.json`'s `new_game seed:42 staffed:true`.
+
 ### Feature Scenarios (Ch.1–7 visual regression)
 
 | Scenario File | Chapter | Purpose |

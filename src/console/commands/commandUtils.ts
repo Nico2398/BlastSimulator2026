@@ -23,3 +23,29 @@ export function sanitizeFiniteOverride(parsed: number, opts?: { min?: number }):
   if (opts?.min !== undefined && parsed < opts.min) return undefined;
   return parsed;
 }
+
+/**
+ * Parses a raw named-arg string as a boolean flag. Returns `undefined` when
+ * the flag was not passed, `null` when it was passed with an unrecognized
+ * value, so callers can distinguish "not given" from "invalid".
+ */
+function parseBooleanFlag(raw: string | undefined): boolean | undefined | null {
+  if (raw === undefined) return undefined;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return null;
+}
+
+/**
+ * Parses the `staffed:true|false` console flag shared by `new_game` and
+ * `sandbox start`, defaulting to `false` when omitted. Returns an error
+ * message when the raw value is present but not `true`/`false`, so both
+ * callers can surface one unified message instead of duplicating the check.
+ */
+export function parseStaffedFlag(raw: string | undefined): { staffed: boolean; error: null } | { staffed: false; error: string } {
+  const parsed = parseBooleanFlag(raw);
+  if (parsed === null) {
+    return { staffed: false, error: `Invalid staffed value: "${raw}". Use staffed:true or staffed:false.` };
+  }
+  return { staffed: parsed === true, error: null };
+}
