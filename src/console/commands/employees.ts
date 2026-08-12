@@ -12,6 +12,7 @@ import {
   type EmployeeRole,
   type SkillCategory,
 } from '../../core/entities/Employee.js';
+import { getAllVehicleRoles, type VehicleRole } from '../../core/entities/Vehicle.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import {
   enrolInTraining,
@@ -155,6 +156,15 @@ export function employeeCommand(
       const skillRaw = named['skill'];
       const requiredSkill: SkillCategory | null = skillRaw !== undefined ? (skillRaw as SkillCategory) : null;
 
+      // Optional named vehicle:<role> param, validated against the vehicle
+      // catalog (unlike requiredSkill above) since an unrecognized role has
+      // no natural "no one qualifies" rejection path to fall back on.
+      const vehicleRaw = named['vehicle'];
+      const requiredVehicleRole: VehicleRole | null =
+        vehicleRaw !== undefined && getAllVehicleRoles().includes(vehicleRaw as VehicleRole)
+          ? (vehicleRaw as VehicleRole)
+          : null;
+
       const emp = state.employees.employees.find(e => e.id === id);
       if (!emp) return { success: false, output: `Employee #${id} not found.` };
       if (!emp.alive) return { success: false, output: `Employee #${id} is not available.` };
@@ -174,7 +184,7 @@ export function employeeCommand(
         id: actionId,
         type: 'general_work',
         requiredSkill,
-        requiredVehicleRole: null,
+        requiredVehicleRole,
         targetX: x,
         targetZ: z,
         targetY: 0,

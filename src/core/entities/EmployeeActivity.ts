@@ -8,7 +8,7 @@ import type { Employee } from './Employee.js';
 import type { Vehicle } from './Vehicle.js';
 import type { ActionType } from '../state/GameState.js';
 
-export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'walking' | 'idle';
+export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'idle';
 
 export interface EmployeeActivity {
   kind: EmployeeActivityKind;

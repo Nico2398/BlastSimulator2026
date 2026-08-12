@@ -57,6 +57,7 @@ export function describeActivity(activity: EmployeeActivity): string {
     case 'collapsed': return t('ui.crew.task_collapsed');
     case 'resting': return t('ui.crew.task_resting');
     case 'driving': return t('ui.crew.task_driving', { vehicle: `#${activity.vehicleId}` });
+    case 'driving_to_task': return t('ui.crew.task_driving_to_task', { vehicle: `#${activity.vehicleId}` });
     case 'working': return t(activity.actionType ? ACTION_LABEL_KEY[activity.actionType] : 'ui.crew.action_general_work');
     case 'walking': return activity.actionType
       ? t('ui.crew.task_walking_to', { task: t(ACTION_LABEL_KEY[activity.actionType]) })
