@@ -782,8 +782,10 @@ export interface TaskProgressResult {
  *
  * No-op (returns null) for an employee with no in-progress task
  * (taskTicksRemaining === null) — includes employees currently resting and
- * employees dispatched with no required skill (taskTicksRemaining never seeded
- * for those, see tickEmployees).
+ * any employee not yet promoted out of pendingTaskDuration by ArrivalGate
+ * (still walking to the target). requiredSkill === null no longer excludes
+ * an action from this path — tickEmployees seeds pendingTaskDuration for
+ * every non-rest action regardless of requiredSkill (#547).
  */
 export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter): TaskProgressResult | null {
   if (emp.taskTicksRemaining === null) return null;

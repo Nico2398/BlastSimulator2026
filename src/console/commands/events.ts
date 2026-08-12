@@ -219,9 +219,11 @@ export function tickCommand(
       if (progress.completed) {
         lines.push(`[tick ${state.tickCount}] TASK: ${emp.name} completed task.`);
 
-        // Skill-required actions (survey, etc.) route through tickTaskProgress
-        // — the completing action's record and ghost are removed here, once
-        // the work has actually finished, not at claim time (#547).
+        // Any completed non-rest action — skill-required (survey, etc.) or
+        // not (a null-skill general_work dispatch) — routes through
+        // tickTaskProgress and carries an actionId here; completePendingAction
+        // removes the completing action's record and ghost, once the work has
+        // actually finished, not at claim time (#547).
         if (progress.actionId !== undefined) {
           completePendingAction(state, progress.actionId);
         }

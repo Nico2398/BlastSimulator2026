@@ -167,13 +167,13 @@ export function deserialize(json: string): GameState {
     // Map pending-action id -> claiming employee id, from each employee's
     // activeActionId — the only place a pre-#547 save records "this action is
     // already claimed by me".
-    const employeesRaw2 = obj['employees'] as Record<string, unknown> | undefined;
-    const employeeList2 = employeesRaw2
-      ? (employeesRaw2['employees'] as Array<Record<string, unknown>> | undefined)
+    const employeesForActiveActionCleanupRaw = obj['employees'] as Record<string, unknown> | undefined;
+    const employeesForActiveActionCleanup = employeesForActiveActionCleanupRaw
+      ? (employeesForActiveActionCleanupRaw['employees'] as Array<Record<string, unknown>> | undefined)
       : undefined;
     const claimingEmployeeByActionId = new Map<unknown, unknown>();
-    if (Array.isArray(employeeList2)) {
-      for (const e of employeeList2) {
+    if (Array.isArray(employeesForActiveActionCleanup)) {
+      for (const e of employeesForActiveActionCleanup) {
         if (e['activeActionId'] !== null && e['activeActionId'] !== undefined) {
           claimingEmployeeByActionId.set(e['activeActionId'], e['id']);
         }
@@ -211,8 +211,8 @@ export function deserialize(json: string): GameState {
     const migratedIds = new Set(
       Array.isArray(pendingActionsRaw) ? pendingActionsRaw.map(a => a['id']) : [],
     );
-    if (Array.isArray(employeeList2)) {
-      for (const e of employeeList2) {
+    if (Array.isArray(employeesForActiveActionCleanup)) {
+      for (const e of employeesForActiveActionCleanup) {
         if (e['activeActionId'] !== null && e['activeActionId'] !== undefined && !migratedIds.has(e['activeActionId'])) {
           e['activeActionId'] = null;
         }
