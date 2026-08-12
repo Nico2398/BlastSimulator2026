@@ -204,7 +204,10 @@ describe('dispatchPendingAction — ghost preview side-effect (task 3.8)', () =>
   });
 });
 
-// ── 3.8.3 — claimPendingAction removes action and ghost, returns action ───────
+// ── 3.8.3 — claimPendingAction transitions action + ghost, returns action ─────
+//   (#547 — claiming no longer deletes the record; it moves to
+//   status:'assigned'/holderId set, and the ghost flips claimed:true. Both
+//   stay in their arrays until completePendingAction removes them.)
 
 describe('claimPendingAction (task 3.8)', () => {
   let state: GameState;
@@ -216,27 +219,42 @@ describe('claimPendingAction (task 3.8)', () => {
     dispatchPendingAction(state, makeAction({ id: 99, targetX: 1, targetZ: 2, targetY: 0 }));
   });
 
-  it('removes the action from pendingActions', () => {
-    claimPendingAction(state, 99);
+  it('does not remove the action from pendingActions', () => {
+    claimPendingAction(state, 99, 1);
 
-    expect(state.pendingActions).toHaveLength(0);
+    expect(state.pendingActions).toHaveLength(1);
   });
 
-  it('removes the corresponding ghost from ghostPreviews', () => {
-    claimPendingAction(state, 99);
+  it('does not remove the corresponding ghost from ghostPreviews', () => {
+    claimPendingAction(state, 99, 1);
 
-    expect(state.ghostPreviews).toHaveLength(0);
+    expect(state.ghostPreviews).toHaveLength(1);
+  });
+
+  it('transitions the action status to "assigned" and stamps holderId', () => {
+    claimPendingAction(state, 99, 1);
+
+    const stored = state.pendingActions.find(a => a.id === 99);
+    expect(stored!.status).toBe('assigned');
+    expect(stored!.holderId).toBe(1);
+  });
+
+  it('flips the matching ghost claimed field to true', () => {
+    claimPendingAction(state, 99, 1);
+
+    const ghost = state.ghostPreviews.find(g => g.id === 99);
+    expect(ghost!.claimed).toBe(true);
   });
 
   it('returns the claimed PendingAction object', () => {
-    const claimed = claimPendingAction(state, 99);
+    const claimed = claimPendingAction(state, 99, 1);
 
     expect(claimed).not.toBeNull();
     expect(claimed!.id).toBe(99);
   });
 
   it('returned action retains all original fields', () => {
-    const claimed = claimPendingAction(state, 99);
+    const claimed = claimPendingAction(state, 99, 1);
 
     expect(claimed!.targetX).toBe(1);
     expect(claimed!.targetZ).toBe(2);
@@ -244,48 +262,52 @@ describe('claimPendingAction (task 3.8)', () => {
   });
 
   it('returns null when actionId does not exist in pendingActions', () => {
-    const result = claimPendingAction(state, 9999);
+    const result = claimPendingAction(state, 9999, 1);
 
     expect(result).toBeNull();
   });
 
   it('does not modify pendingActions when actionId is not found', () => {
-    claimPendingAction(state, 9999);
+    claimPendingAction(state, 9999, 1);
 
     expect(state.pendingActions).toHaveLength(1);
   });
 
   it('does not modify ghostPreviews when actionId is not found', () => {
-    claimPendingAction(state, 9999);
+    claimPendingAction(state, 9999, 1);
 
     expect(state.ghostPreviews).toHaveLength(1);
   });
 
-  it('claiming one action out of many removes only that action from pendingActions', () => {
+  it('claiming one action out of many transitions only that action, leaving the others queued', () => {
     // Add two more actions (id 100 and 101) on top of the id-99 from beforeEach
     dispatchPendingAction(state, makeAction({ id: 100 }));
     dispatchPendingAction(state, makeAction({ id: 101 }));
 
-    claimPendingAction(state, 100);
+    claimPendingAction(state, 100, 1);
 
     const pending: PendingAction[] = state.pendingActions;
-    expect(pending).toHaveLength(2);
-    expect(pending.map(a => a.id)).not.toContain(100);
-    expect(pending.map(a => a.id)).toContain(99);
-    expect(pending.map(a => a.id)).toContain(101);
+    expect(pending).toHaveLength(3);
+    const claimedEntry = pending.find(a => a.id === 100);
+    expect(claimedEntry!.status).toBe('assigned');
+    expect(claimedEntry!.holderId).toBe(1);
+    const untouched99 = pending.find(a => a.id === 99);
+    const untouched101 = pending.find(a => a.id === 101);
+    expect(untouched99!.status).toBe('queued');
+    expect(untouched101!.status).toBe('queued');
   });
 
-  it('claiming one action out of many removes only that ghost from ghostPreviews', () => {
+  it('claiming one action out of many flips only that ghost, leaving the others unclaimed', () => {
     dispatchPendingAction(state, makeAction({ id: 100 }));
     dispatchPendingAction(state, makeAction({ id: 101 }));
 
-    claimPendingAction(state, 100);
+    claimPendingAction(state, 100, 1);
 
     const ghosts: GhostPreview[] = state.ghostPreviews;
-    expect(ghosts).toHaveLength(2);
-    expect(ghosts.map(g => g.id)).not.toContain(100);
-    expect(ghosts.map(g => g.id)).toContain(99);
-    expect(ghosts.map(g => g.id)).toContain(101);
+    expect(ghosts).toHaveLength(3);
+    expect(ghosts.find(g => g.id === 100)!.claimed).toBe(true);
+    expect(ghosts.find(g => g.id === 99)!.claimed).toBe(false);
+    expect(ghosts.find(g => g.id === 101)!.claimed).toBe(false);
   });
 });
 // =============================================================================
