@@ -24,7 +24,7 @@ import {
 } from '../../../src/core/entities/Employee.js';
 import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
-import { dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields } from '../../../src/core/engine/TaskDispatch.js';
+import { dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields, interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 
@@ -820,5 +820,152 @@ describe('clearActiveTaskFields (#548 — shared by cancelAction and tickTaskPro
     expect(emp.moveConsecutiveFailures).toBe(2);
     expect(emp.isMoveStuck).toBe(true);
     expect(emp.pendingTaskDuration).toBe(8);
+  });
+});
+
+// ── Section 7: interruptActiveAction (#549) ──────────────────────────────────
+//   Needs-driven interruption (collapse, hunger/fatigue forcing a rest):
+//   releases the employee's ONE active action back to 'queued' (holder/ghost
+//   cleared) instead of completing/removing it, preserves its payload on
+//   interruptedActionPayload, and leaves taskQueue untouched so the
+//   employee's remaining queued work survives.
+
+describe('interruptActiveAction (#549)', () => {
+  let state: GameState;
+
+  /**
+   * Mirrors cancelAction's own simulateClaimWalking test helper above: claims
+   * the action and stamps the walk/task-claim fields a real claim (via
+   * tickEmployees/promoteActionToActive in GameLoop.ts) always sets alongside
+   * claimPendingAction.
+   */
+  function simulateClaimWalking(
+    state: GameState,
+    actionId: number,
+    employeeId: number,
+    action: { targetX: number; targetZ: number; requiredSkill: string | null; type: string; payload: Record<string, unknown> },
+    durationTicks = 10,
+  ): void {
+    claimPendingAction(state, actionId, employeeId);
+    const emp = state.employees.employees.find(e => e.id === employeeId)!;
+    emp.activeActionId = actionId;
+    emp.destinationX = action.targetX;
+    emp.destinationZ = action.targetZ;
+    emp.pendingTaskDuration = durationTicks;
+    emp.pendingActionType = action.type as any;
+    emp.pendingActionPayload = action.payload;
+    emp.activeTaskSkill = action.requiredSkill as any;
+  }
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('happy path: releases the active action back to "queued", clears holderId/ghost.claimed, stores the payload, and leaves taskQueue untouched', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const payload = { blastId: 'test-1' };
+    const action = makePendingAction({ id: 30, requiredSkill: 'blasting', targetX: 5, targetZ: 6, payload });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 30, empId, {
+      targetX: 5, targetZ: 6, requiredSkill: 'blasting', type: 'general_work', payload,
+    });
+    emp.taskQueue = [31, 32];
+
+    interruptActiveAction(state, emp, 30);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 30);
+    expect(stored.status).toBe('queued');
+    expect(stored.holderId).toBeNull();
+    // targetEmployeeId is left exactly as it was set on dispatch (null here —
+    // an open-pool action returns to the open pool).
+    expect(stored.targetEmployeeId).toBeNull();
+
+    const ghost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 30);
+    expect(ghost.claimed).toBe(false);
+
+    expect((emp as any).interruptedActionPayload).toEqual(payload);
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.destinationX).toBeNull();
+    expect(emp.destinationZ).toBeNull();
+    expect(emp.pendingTaskDuration).toBeNull();
+    expect(emp.pendingActionType).toBeNull();
+    expect(emp.pendingActionPayload).toBeNull();
+    expect(emp.activeTaskSkill).toBeNull();
+    // taskQueue (the employee's own queued-but-not-yet-active work) survives
+    // the interruption untouched.
+    expect(emp.taskQueue).toEqual([31, 32]);
+  });
+
+  it('preserves a targeted action\'s targetEmployeeId (stays reserved for its target) on release', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const action = makePendingAction({ id: 33, requiredSkill: 'blasting', targetEmployeeId: empId });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 33, empId, {
+      targetX: 10, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+
+    interruptActiveAction(state, emp, 33);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 33);
+    expect(stored.status).toBe('queued');
+    expect(stored.targetEmployeeId).toBe(empId);
+  });
+
+  it('no-op on the action record when actionId is null, but still clears the employee\'s walk/task-claim fields', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    emp.activeActionId = null;
+    emp.destinationX = 4;
+    emp.destinationZ = 4;
+    emp.pendingTaskDuration = 10;
+    emp.pendingActionType = 'general_work' as any;
+    emp.pendingActionPayload = { some: 'value' };
+    emp.activeTaskSkill = 'blasting';
+    emp.moveConsecutiveFailures = 2;
+    emp.isMoveStuck = true;
+
+    interruptActiveAction(state, emp, null);
+
+    expect((emp as any).interruptedActionPayload).toBeNull();
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.destinationX).toBeNull();
+    expect(emp.destinationZ).toBeNull();
+    expect(emp.pendingTaskDuration).toBeNull();
+    expect(emp.pendingActionType).toBeNull();
+    expect(emp.pendingActionPayload).toBeNull();
+    expect(emp.activeTaskSkill).toBeNull();
+    expect(emp.moveConsecutiveFailures).toBe(0);
+    expect(emp.isMoveStuck).toBe(false);
+  });
+
+  it('no-op on the action record when the action was already removed from pendingActions (e.g. completed elsewhere), but still clears the employee\'s fields', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const action = makePendingAction({ id: 34, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 34, empId, {
+      targetX: 1, targetZ: 1, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    // Simulate the action having already been completed/removed by another
+    // path before interruptActiveAction runs.
+    completePendingAction(state, 34);
+
+    interruptActiveAction(state, emp, 34);
+
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 34)).toBeUndefined();
+    expect((emp as any).interruptedActionPayload).toBeNull();
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.destinationX).toBeNull();
+    expect(emp.destinationZ).toBeNull();
+    expect(emp.pendingTaskDuration).toBeNull();
+    expect(emp.pendingActionType).toBeNull();
+    expect(emp.pendingActionPayload).toBeNull();
+    expect(emp.activeTaskSkill).toBeNull();
   });
 });

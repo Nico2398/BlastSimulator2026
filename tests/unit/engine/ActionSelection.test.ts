@@ -6,21 +6,26 @@
 // few ranked candidates (resolveActionCost), and the combined picker
 // (selectBestActionForEmployee) that ranks then resolves up to
 // ACTION_SELECTION_MAX_PATH_ATTEMPTS candidates, returning the first
-// reachable one. All three are stubs as of this branch (return
-// `undefined as unknown as ...`) — every test below is Red until the
-// implementer phase fills them in.
+// reachable one.
+//
+// computeActionWorkTicks / resolveRestNeedKey get their own direct coverage
+// below too (#549 code review finding: they need their own tests per
+// .claude/rules/core-purity.md, not just transitive coverage through
+// GameLoop.ts's tickEmployees tests).
 
 import { describe, it, expect } from 'vitest';
 import {
   estimateActionCost,
   resolveActionCost,
   selectBestActionForEmployee,
+  computeActionWorkTicks,
+  resolveRestNeedKey,
 } from '../../../src/core/engine/ActionSelection.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
-import { hireEmployee, assignSkill, type Employee } from '../../../src/core/entities/Employee.js';
+import { createEmployeeState, hireEmployee, assignSkill, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS } from '../../../src/core/config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS } from '../../../src/core/config/balance.js';
 
 // ── NavGrid helpers (mirrors tests/unit/nav/Pathfinding.test.ts) ───────────
 
@@ -276,5 +281,157 @@ describe('selectBestActionForEmployee', () => {
     // The budget is spent entirely on the 5 unreachable near candidates, so
     // the reachable one is never reached — cost control over correctness.
     expect(result).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// computeActionWorkTicks / resolveRestNeedKey
+//
+// Direct unit coverage for these two ActionSelection.ts exports, not already
+// exercised transitively through GameLoop.ts's tickEmployees tests (#549 code
+// review finding). Follows the fixture/helper conventions already established
+// in tests/unit/engine/TaskDispatch.test.ts (makeGame/addQualifiedEmployee
+// shape).
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SEED = 42;
+
+/** Return a GameState whose EmployeeState is pre-populated from a fresh createEmployeeState(). */
+function makeGame(): GameState {
+  const state = createGame({ seed: SEED });
+  state.employees = createEmployeeState();
+  return state;
+}
+
+/** Add an employee with a specific skill/proficiency and no other qualifications. */
+function addQualifiedEmployee(
+  state: GameState,
+  skill: SkillCategory,
+  level: 1 | 2 | 3 | 4 | 5 = 1,
+): Employee {
+  const rng = new Random(SEED);
+  const { employee } = hireEmployee(state.employees, 'driller', rng);
+  employee.qualifications = [];
+  assignSkill(state.employees, employee.id, skill, level);
+  return employee;
+}
+
+/** Build a minimal PendingAction object with sane defaults. */
+function makeWorkAction(overrides: Partial<PendingAction>): PendingAction {
+  return {
+    id: overrides.id ?? 1,
+    type: overrides.type ?? 'general_work',
+    requiredSkill: overrides.requiredSkill === undefined ? 'blasting' : overrides.requiredSkill,
+    requiredVehicleRole: overrides.requiredVehicleRole ?? null,
+    targetX: overrides.targetX ?? 0,
+    targetZ: overrides.targetZ ?? 0,
+    targetY: overrides.targetY ?? 0,
+    payload: overrides.payload ?? {},
+    targetEmployeeId: overrides.targetEmployeeId ?? null,
+    status: overrides.status ?? 'queued',
+    holderId: overrides.holderId ?? null,
+  };
+}
+
+describe('computeActionWorkTicks (#549)', () => {
+  it('happy path: non-rest action with no durationTicks override scales BASE_TASK_DURATION_TICKS by proficiency and need/living-quarters multipliers', () => {
+    const state = makeGame();
+    // Rookie (level 1) proficiency, full needs (hunger/fatigue = 100 → needMult 1.0),
+    // no living_quarters building present (lqMult = LIVING_QUARTERS_WELLBEING_MULTIPLIERS.absent = 0.85).
+    // ticks = max(1, ceil(20 * 1.00 / (1.0 * 0.85 * 1))) = ceil(23.529...) = 24
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = makeWorkAction({ type: 'general_work', requiredSkill: 'blasting' });
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBe(24);
+  });
+
+  it('scales down for a higher proficiency level (level 2, ×0.85) with the same need/living-quarters conditions', () => {
+    const state = makeGame();
+    // ticks = max(1, ceil(20 * 0.85 / (1.0 * 0.85 * 1))) = ceil(20) = 20
+    const employee = addQualifiedEmployee(state, 'blasting', 2);
+    const action = makeWorkAction({ type: 'general_work', requiredSkill: 'blasting' });
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBe(20);
+  });
+
+  it('a payload.durationTicks override on a non-rest action bypasses the proficiency/need formula entirely', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'geology', 1);
+    const action = makeWorkAction({ type: 'survey', requiredSkill: 'geology', payload: { durationTicks: 7 } });
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBe(7);
+  });
+
+  it("rest action: payload.restDuration overrides everything else, regardless of needKey", () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = makeWorkAction({
+      type: 'rest',
+      requiredSkill: null,
+      payload: { restDuration: 15, needKey: 'hunger' },
+    });
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBe(15);
+  });
+
+  it('rest action: with no restDuration override, falls back to NEED_REST_DURATIONS[needKey]', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    const action = makeWorkAction({
+      type: 'rest',
+      requiredSkill: null,
+      payload: { needKey: 'fatigue' },
+    });
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBe(NEED_REST_DURATIONS.fatigue);
+  });
+
+  it('rest action: with no restDuration override and no recognizable needKey, falls back to BASE_TASK_DURATION_TICKS', () => {
+    const state = makeGame();
+    const employee = addQualifiedEmployee(state, 'blasting', 1);
+    // No needKey at all — the Bunkhouse Tier 2+ shift-cycle rest shape
+    // (forceShiftRestIfNeeded, GameLoop.ts), which never routes through here
+    // in practice but exercises the documented fallback branch directly.
+    const action = makeWorkAction({
+      type: 'rest',
+      requiredSkill: null,
+      payload: {},
+    });
+
+    const ticks = computeActionWorkTicks(state, employee, action);
+
+    expect(ticks).toBe(BASE_TASK_DURATION_TICKS);
+  });
+});
+
+describe('resolveRestNeedKey (#549)', () => {
+  it('returns "hunger" when payload.needKey is "hunger"', () => {
+    expect(resolveRestNeedKey({ needKey: 'hunger' })).toBe('hunger');
+  });
+
+  it('returns "fatigue" when payload.needKey is "fatigue"', () => {
+    expect(resolveRestNeedKey({ needKey: 'fatigue' })).toBe('fatigue');
+  });
+
+  it('returns "breakNeed" when payload.needKey is "breakNeed"', () => {
+    expect(resolveRestNeedKey({ needKey: 'breakNeed' })).toBe('breakNeed');
+  });
+
+  it('returns null for an unrecognized needKey value', () => {
+    expect(resolveRestNeedKey({ needKey: 'thirst' })).toBeNull();
+  });
+
+  it('returns null when payload carries no needKey at all (shift-cycle rest shape)', () => {
+    expect(resolveRestNeedKey({ triggeredBy: 'shift_cycle' })).toBeNull();
   });
 });

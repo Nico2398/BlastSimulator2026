@@ -58,17 +58,28 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
 }
 
 /**
+ * Straight-line (octile-heuristic) travel ticks for `employee` to reach
+ * `action`'s target — see `octileHeuristic` in `Pathfinding.ts`. Shared by
+ * `estimateActionCost` (always uses this direct-line estimate) and
+ * `resolveActionCost`'s null-navGrid branch, which mirrors
+ * `tickEmployeeMovement`'s own fallback (EntityMovementTick.ts) when no
+ * NavGrid has been built yet.
+ */
+function estimateTravelTicks(employee: Employee, action: PendingAction): number {
+  return octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) / AGENT_WALK_SPEED;
+}
+
+/**
  * Cheap admissible cost estimate for `employee` performing `action`: octile-
- * heuristic travel ticks (see `octileHeuristic` in `Pathfinding.ts`) plus work
- * ticks (via `computeActionWorkTicks`). No real pathfinding — used to rank
- * candidates before spending a real `findPath` call on only the most
- * promising ones. The octile distance is itself the direct-line estimate
+ * heuristic travel ticks (`estimateTravelTicks`) plus work ticks (via
+ * `computeActionWorkTicks`). No real pathfinding — used to rank candidates
+ * before spending a real `findPath` call on only the most promising ones.
+ * The octile distance is itself the direct-line estimate
  * `tickEmployeeMovement` (EntityMovementTick.ts) falls back to when
  * `state.navGrid` is null, so no separate null-navGrid branch is needed here.
  */
 export function estimateActionCost(state: GameState, employee: Employee, action: PendingAction): number {
-  const travelTicks = octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) / AGENT_WALK_SPEED;
-  return travelTicks + computeActionWorkTicks(state, employee, action);
+  return estimateTravelTicks(employee, action) + computeActionWorkTicks(state, employee, action);
 }
 
 /**
@@ -84,8 +95,7 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
   const workTicks = computeActionWorkTicks(state, employee, action);
 
   if (state.navGrid === null) {
-    const travelTicks = octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) / AGENT_WALK_SPEED;
-    return { totalTicks: travelTicks + workTicks };
+    return { totalTicks: estimateTravelTicks(employee, action) + workTicks };
   }
 
   const path = findPath(state.navGrid, {

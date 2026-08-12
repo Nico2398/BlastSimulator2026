@@ -275,6 +275,28 @@ function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, r
     return;
   }
 
+  const selection = claimOnePoolCandidate(state, employee);
+  if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+
+  result.claimed.push(selection.action.id);
+  promoteActionToActive(state, employee, selection.action);
+}
+
+/**
+ * Filter the open pool (targetEmployeeId === null, still 'queued') down to
+ * candidates `employee` qualifies for, pick the cheapest reachable one (via
+ * selectBestActionForEmployee), and claim it. Used by both
+ * fillIdleEmployeeFromQueueOrPool (idle employee, step 2 of tickEmployees)
+ * and reserveOnePoolActionAhead (busy employee, step 3) below — the only
+ * difference between the two call sites is what they do with the claimed
+ * action (promote to active vs. push onto taskQueue), which each leaves to
+ * the caller rather than this helper.
+ *
+ * Returns null when nothing in the pool is reachable within budget, or
+ * (defensively — never happens single-threaded) if the top candidate was
+ * claimed by someone else between the filter and the claim itself.
+ */
+function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAction | null {
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
@@ -282,14 +304,12 @@ function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, r
   );
 
   const selection = selectBestActionForEmployee(state, employee, poolCandidates);
-  if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+  if (selection === null) return null;
 
-  // Exactly one open-pool claim per idle employee per tick — keeps dispatch
-  // fair so one employee doesn't front-run the whole pool in a single tick.
   const claimed = claimPendingAction(state, selection.action.id, employee.id);
-  if (!claimed) return; // defensive: someone else claimed it between filter and here — never happens single-threaded, kept for safety
-  result.claimed.push(selection.action.id);
-  promoteActionToActive(state, employee, selection.action);
+  if (!claimed) return null;
+
+  return selection;
 }
 
 /**
@@ -317,17 +337,9 @@ function reserveOnePoolActionAhead(state: GameState, employee: Employee, result:
   const depth = 1 + employee.taskQueue.length;
   if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) return;
 
-  const poolCandidates = state.pendingActions.filter(a =>
-    a.status === 'queued' &&
-    a.targetEmployeeId === null &&
-    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)),
-  );
-
-  const selection = selectBestActionForEmployee(state, employee, poolCandidates);
+  const selection = claimOnePoolCandidate(state, employee);
   if (selection === null) return; // nothing reachable within budget — tries again next tick
 
-  const claimed = claimPendingAction(state, selection.action.id, employee.id);
-  if (!claimed) return; // defensive: someone else claimed it between filter and here — never happens single-threaded, kept for safety
   result.claimed.push(selection.action.id);
   employee.taskQueue.push(selection.action.id);
 }
