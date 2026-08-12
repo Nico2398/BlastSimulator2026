@@ -40,7 +40,7 @@ gh issue create --label decision-review \
   --body "<the Decisions taken block>, linking the PR"
 ```
 
-The `decision-review` label carries no `ready`, so the issue stays out of the assignment queue and halts nothing: `agentic-assign` selects on `ready` alone, and nothing in the pipeline ever applies `ready` to an issue a human filed. It is where a human goes to revisit a default at leisure; adding `ready` later is how they put it back in the queue, and a manual dispatch or the next merged pipeline PR is what starts it.
+The `decision-review` label carries no `ready`, so the issue stays out of the assignment queue and halts nothing: `agentic-assign` selects on `ready` alone, and nothing in the pipeline ever applies `ready` to an issue a human filed. It is where a human goes to revisit a default at leisure; adding `ready` later is how they put it back in the queue, and one of the pipeline's three entry points — a manual dispatch, the next merged pipeline PR, or the next run that ends `blocked` — is what starts it.
 
 `--force` updates the label when it already exists, so the step is safe to run on every issue rather than only the first. Both runners give the agent's shell a `GH_TOKEN` that already opens PRs and edits labels, and both workflows declare `issues: write`, so no extra permission is needed.
 

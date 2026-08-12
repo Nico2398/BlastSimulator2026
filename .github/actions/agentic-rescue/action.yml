@@ -11,9 +11,13 @@ description: >
   It also settles the issue. A run that reaches this action did not finish, and
   by the time it runs the session is over — so there is nothing left to wait for,
   and leaving `in-progress` on the issue defers every later assignment behind a
-  run that no longer exists. Every unfinished outcome here ends `blocked`:
-  handle-failure.yml notifies on that label, agentic-assign skips it, and the
-  queue keeps moving. Only a run that already opened its own PR is left alone.
+  run that no longer exists. Every unfinished outcome here ends `blocked`, which
+  is a terminal state and an entry point at once: handle-failure.yml notifies on
+  that label and chains to the next assignable issue, and agentic-assign skips
+  the blocked one. Only a run that already opened its own PR is left alone.
+
+  The chain is why the label has to be applied with the PAT and why it must not
+  be applied twice: a second `blocked` on the same issue re-enters the chain.
 
 inputs:
   token:
