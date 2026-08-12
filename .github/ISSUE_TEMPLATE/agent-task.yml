@@ -48,8 +48,11 @@ body:
     attributes:
       label: Blocked by
       description: >
-        Issues that must be closed before this one starts. The pipeline defers this
-        issue until every one of them is closed.
+        Issues that must have landed before this one starts. The pipeline defers this
+        issue until every one of them is closed with its pull request merged.
+        Prefer setting these in the issue's Relationships panel ("Blocked by") once
+        it exists — that is what the queue trusts. What you write here is read too,
+        and is what a human reads.
       placeholder: "#123 — level definition must exist first"
 
   - type: textarea

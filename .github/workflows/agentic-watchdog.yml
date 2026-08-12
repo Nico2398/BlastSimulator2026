@@ -159,14 +159,18 @@ jobs:
             core.info(`Swept ${swept} stalled issue(s).`);
 
       # The sweep above is the whole of this workflow: it reports lost runs and
-      # releases the issues they were holding. It deliberately does NOT restart
-      # the queue.
+      # releases the issues they were holding. It never assigns.
       #
-      # A clock-driven restart would start agent sessions nobody asked for —
-      # every hour, for as long as any `ready` issue exists. Starting a run is a
-      # deliberate act, and there are exactly two: a human dispatching
-      # `agentic-trigger.yml`, or a merged pipeline pull request chaining
-      # through `auto-assign-next.yml`. An idle queue is therefore an idle
-      # queue, and stays one until somebody asks for the next run.
+      # That is not the same as never restarting the queue. The `blocked` label
+      # the sweep applies is itself an entry point — `handle-failure.yml` reacts
+      # to it and chains to the next assignable issue — so a lost run is picked
+      # up rather than parked. The distinction that matters is where the decision
+      # comes from: the sweep reacts to a run that died, not to the clock. An
+      # idle queue with no lost run in it stays idle, however many `ready` issues
+      # are waiting, until a merge or a human asks for the next one.
+      #
+      # This is also why the sweep must label with the PAT: a label applied with
+      # GITHUB_TOKEN raises no `issues: labeled` event, and both the failure
+      # notification and the chain would be lost with it.
       - name: Report
-        run: echo 'Sweep complete. This workflow never assigns — start a run with the manual trigger, or let a merged pipeline PR chain to the next issue.'
+        run: echo 'Sweep complete. This workflow never assigns — the `blocked` label it applies is what releases the queue, through handle-failure.yml.'

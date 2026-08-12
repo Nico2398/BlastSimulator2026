@@ -5,10 +5,15 @@ on:
 
 permissions:
   issues: write
+  contents: read
 
 jobs:
   kickstart:
     runs-on: ubuntu-latest
+    # Shared with every other path into the queue, so no two can assign at once.
+    concurrency:
+      group: agentic-assignment
+      cancel-in-progress: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

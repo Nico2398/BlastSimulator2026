@@ -1,12 +1,16 @@
 // BlastSimulator2026 — Autonomy loop wiring
 // A filed issue is eligible for the pipeline, never a start signal for it. A
-// run begins in exactly two ways — a human dispatching `agentic-trigger.yml`,
-// or a merged pipeline pull request chaining to the next `ready` issue — and
-// from there every step to the merge is a workflow reacting to an event.
+// run begins in exactly three ways — a human dispatching `agentic-trigger.yml`,
+// a merged pipeline pull request chaining to the next `ready` issue, or a run
+// that ended `blocked` chaining past itself — and from there every step to the
+// merge is a workflow reacting to an event.
 // Both halves fail in silence. A removed trigger or a swapped token stops the
 // queue with nothing raised, and a new assignment path starts sessions nobody
 // asked for, which is how filing issue #489 woke a runner. These tests pin the
 // entry points shut and pin the chain between them open.
+//
+// What each of those paths is allowed to assign is a separate question, decided
+// in `.github/scripts/assignability.cjs` and tested in `assignability.test.ts`.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -19,8 +23,12 @@ const workflow = (name: string): string =>
 const ASSIGN_ACTION = 'uses: ./.github/actions/agentic-assign';
 const AUTO_MERGE_ACTION = 'uses: ./.github/actions/agentic-auto-merge';
 
-/** The only two workflows allowed to put an issue in front of an agent. */
-const ASSIGNING_WORKFLOWS = ['auto-assign-next.yml', 'agentic-trigger.yml'];
+/** The only three workflows allowed to put an issue in front of an agent. */
+const ASSIGNING_WORKFLOWS = [
+  'auto-assign-next.yml',
+  'agentic-trigger.yml',
+  'handle-failure.yml',
+];
 
 // Each of these once assigned, and each removal was deliberate. Named
 // individually rather than swept up by a glob, so restoring assignment to one
@@ -33,7 +41,7 @@ const NON_ASSIGNING_WORKFLOWS = [
 ];
 
 describe('entry points into the assignment queue', () => {
-  it('opens exactly two ways in', () => {
+  it('opens exactly three ways in', () => {
     for (const name of ASSIGNING_WORKFLOWS) {
       expect(workflow(name), `${name} no longer assigns`).toContain(ASSIGN_ACTION);
     }
@@ -117,40 +125,119 @@ describe('assignment tokens', () => {
   });
 });
 
-describe('dependency gating', () => {
-  // The parser lives inside the composite action's inline script, where it
-  // cannot be imported. Lifting the function out of the YAML tests the actual
-  // shipped source rather than a copy that drifts from it.
-  const source = readFileSync(join(ROOT, '.github/actions/agentic-assign/action.yml'), 'utf8');
-  const start = source.indexOf('const dependenciesOf');
-  const end = source.indexOf('\n          };', start);
-  expect(start).toBeGreaterThan(-1);
-  expect(end).toBeGreaterThan(start);
+// A blocked run is terminal exactly as a merge is, and a pipeline with no human
+// in it has to keep moving through both. Before this, `blocked` released the
+// issue and started nothing: the queue went idle until somebody dispatched the
+// trigger, which on a fully autonomous repository means until somebody noticed.
+describe('chaining past a run that ended blocked', () => {
+  const failure = workflow('handle-failure.yml');
 
-  const dependenciesOf = new Function(
-    `${source.slice(start, end + '\n          };'.length)} return dependenciesOf;`
-  )() as (body: string) => number[];
-
-  it('reads the `Blocked by` section the issue form and issue skill produce', () => {
-    expect(dependenciesOf('### Blocked by\n\n- #302 — level definition must exist first\n')).toEqual([302]);
+  it('assigns the next issue when a run ends blocked', () => {
+    expect(failure).toMatch(/issues:\s*\n\s*types:\s*\[labeled\]/);
+    expect(failure).toContain("github.event.label.name == 'blocked'");
+    expect(failure).toContain(ASSIGN_ACTION);
   });
 
-  it('reads the inline `Depends on` spelling older issues carry', () => {
-    expect(dependenciesOf('Depends on: #12\n')).toEqual([12]);
+  // Without the guard, a human labelling a backlog issue `blocked` — filing a
+  // note, not ending a run — would start a session.
+  it('chains only from an issue a run actually held', () => {
+    expect(failure).toContain('guard: after_blocked_run');
+    expect(failure).toContain('completed_issue: ${{ github.event.issue.number }}');
   });
 
-  it('collects every dependency in the section, not only the first', () => {
-    expect(dependenciesOf('## Blocked by\n- #7\n- #9\n')).toEqual([7, 9]);
+  // The reason this path did not exist before. A systemic failure — expired
+  // token, broken `main` — would otherwise march through the whole backlog
+  // labelling every issue `blocked` in minutes.
+  it('bounds the cascade a failure chain could cause', () => {
+    expect(failure).toContain('blocked_chain_limit:');
+    const rules = readFileSync(join(ROOT, '.github/scripts/assignability.cjs'), 'utf8');
+    expect(rules).toContain('consecutiveBlockedRuns');
+    expect(rules).toContain('latestPipelineMergeAt');
   });
 
-  it('stops at the next section', () => {
-    const body = '## Blocked by\n\n- #7\n\n## Conventions\n\n- matches the pattern in #999\n';
-    expect(dependenciesOf(body)).toEqual([7]);
+  it('still reports the failure to a human', () => {
+    expect(failure).toContain('createComment');
+    expect(failure).toContain('@Nico2398');
   });
 
-  it('treats a section with no issue reference as unblocked', () => {
-    expect(dependenciesOf('## Blocked by\n\nNone\n')).toEqual([]);
-    expect(dependenciesOf('## Context\n\nSee #55 for background.\n')).toEqual([]);
+  // The notification must survive a chain step that threw, or a failure whose
+  // assignment could not run becomes a failure nobody is told about.
+  it('reports even when the chain step failed', () => {
+    expect(failure).toMatch(/if:\s*always\(\) && github\.event\.label\.name == 'blocked'/);
+  });
+
+  // Under the PAT every pipeline comment is authored by a real user, and the
+  // runners' trigger guard only filters bots — so a mention here would wake a
+  // second run on an issue that just failed.
+  it('carries no agent mention in the notification', () => {
+    const notify = failure.slice(failure.indexOf('  notify:'));
+    expect(notify).not.toContain('@claude');
+    expect(notify).not.toContain('@opencode');
+  });
+});
+
+// A timeline cross-reference is raised by any PR that merely writes "#N" in
+// prose, and reading one as "this issue has its PR" is how docs PR #561's
+// passing mention of #547 disarmed run #133's retry (#568). The deliverable
+// predicate — a PR from `pipeline/feature-<N>`, or one GitHub records as
+// closing the issue — is deliberately inlined in the two sites that run
+// without a checkout and shared from `issue-api.cjs` everywhere else. Four
+// copies that must agree is exactly the shape that drifts silently, so each
+// copy's two arms are pinned here, and the mention predicate is pinned out.
+describe('a mention is never a deliverable', () => {
+  const SITES = [
+    ['.github/workflows/agentic-watchdog.yml', 'inline'],
+    ['.github/actions/agentic-run-state/action.yml', 'inline'],
+    ['.github/scripts/issue-api.cjs', 'shared'],
+  ] as const;
+
+  it.each(SITES)('%s carries both arms of the deliverable predicate', (file) => {
+    const text = readFileSync(join(ROOT, file), 'utf8');
+    expect(text).toContain('closedByPullRequestsReferences');
+    expect(text).toContain('includeClosedPrs: false');
+    expect(text).toMatch(/pipeline\/feature-\$\{/);
+  });
+
+  // The predicate the copies replaced. Code reading `cross-referenced` events
+  // as pull requests is the regression; comments may still tell the story.
+  it.each([
+    '.github/workflows/agentic-watchdog.yml',
+    '.github/actions/agentic-run-state/action.yml',
+    '.github/actions/agentic-assign/action.yml',
+    '.github/scripts/issue-api.cjs',
+    '.github/scripts/assignability.cjs',
+  ])('%s never reads a cross-reference as a pull request', (file) => {
+    const code = readFileSync(join(ROOT, file), 'utf8')
+      .split('\n')
+      .filter((line) => {
+        const trimmed = line.trim();
+        return !trimmed.startsWith('#') && !trimmed.startsWith('//') && !trimmed.startsWith('*');
+      })
+      .join('\n');
+    expect(code).not.toContain("'cross-referenced'");
+  });
+});
+
+// Three entry points cannot be argued safe by construction the way two could:
+// a merge and a blocked label can land in the same second. The repo-wide group
+// is what keeps two of them from reading `in-progress` before either writes it.
+describe('the entry points cannot race', () => {
+  it.each(ASSIGNING_WORKFLOWS)('%s serialises its assigning job', (name) => {
+    const text = workflow(name);
+    const assign = text.indexOf(ASSIGN_ACTION);
+    expect(assign, `${name} no longer assigns`).toBeGreaterThan(-1);
+    expect(text.slice(0, assign)).toMatch(/concurrency:\s*\n\s*group: agentic-assignment/);
+  });
+
+  // Arming auto-merge must stay outside that group. GitHub keeps one pending run
+  // per group and drops the rest, and a dropped arming run is a PR that never
+  // merges — which holds its issue and the whole queue behind it.
+  it('leaves auto-merge arming out of the group', () => {
+    const chain = workflow('auto-assign-next.yml');
+    const arm = chain.indexOf(AUTO_MERGE_ACTION);
+    const armJob = chain.slice(chain.indexOf('  arm-auto-merge:'), arm);
+    expect(arm).toBeGreaterThan(-1);
+    expect(armJob).not.toContain('agentic-assignment');
   });
 });
 

@@ -204,7 +204,11 @@ describe('a run that settles nothing is retried', () => {
     const text = action('agentic-run-state');
     expect(text).toContain("issue.state === 'closed'");
     expect(text).toContain("labels.has('blocked')");
-    expect(text).toContain('cross-referenced');
+    // The PR arm uses the deliverable predicate — the run's own branch or a
+    // closing reference, never a timeline mention (#568). Its full shape is
+    // pinned across every copy in autonomy-loop.test.ts.
+    expect(text).toContain('closedByPullRequestsReferences');
+    expect(text).toContain('pipeline/feature-${issueNumber}');
   });
 });
 
