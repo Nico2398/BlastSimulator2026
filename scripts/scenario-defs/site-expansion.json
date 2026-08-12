@@ -290,12 +290,8 @@
     {
       "command": "drill_plan add x:140 z:10 depth:6",
       "timeout": 100,
-      "description": "#558 fence 3: a single-cell footprint with no connecting path of its own, well past the site's current frontier (chunk (2,0) is the nearest owned ground; chunk (8,0) is the target -- five intermediate chunks apart). Where the earlier drill/ramp/building steps in this file each landed on ground directly adjacent to the site (fence 1's raycast fix was the only thing standing between them and a real click), this one requires claimArea to bridge the gap itself (fence 3), well under MAX_CLAIM_BRIDGE_CHUNKS. Run immediately after the blast step (before save/load/terrain_info/state) so the blast report modal that step 'blast' just dismissed hasn't had a chance to reopen (#558 round 3) and cover this step's toolbar button.",
+      "description": "#558 fence 3: a single-cell footprint with no connecting path of its own, well past the site's current frontier (chunk (2,0) is the nearest owned ground; chunk (8,0) is the target -- five intermediate chunks apart). Where the earlier drill/ramp/building steps in this file each landed on ground directly adjacent to the site (fence 1's raycast fix was the only thing standing between them and a real click), this one requires claimArea to bridge the gap itself (fence 3), well under MAX_CLAIM_BRIDGE_CHUNKS. Run immediately after the blast step (before save/load/terrain_info/state) so the blast report modal that step 'blast' just dismissed hasn't had a chance to reopen (#558 round 3) and cover this step's toolbar button. The Blast panel is already open from step 'blast' (togglePanel closes on a redundant toggle click, round 4), so this step's clicks start straight at add-hole-tool instead of re-clicking the toolbar toggle.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"add-hole-tool\"]"
