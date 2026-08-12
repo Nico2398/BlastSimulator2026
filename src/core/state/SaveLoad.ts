@@ -152,6 +152,47 @@ export function deserialize(json: string): GameState {
     if (typeof tubingRaw['inventory'] !== 'number') tubingRaw['inventory'] = 0;
   }
 
+  // v7 → v8: PendingAction/GhostPreview gained a lifecycle (status/holderId,
+  // claimed) — a pre-v8 save's actions were deleted from pendingActions the
+  // instant they were claimed (the bug #547 fixes), so every entry that
+  // survived to be saved was, by construction, still queued and unheld.
+  if ((obj['version'] as number) < 8) {
+    const pendingActionsRaw = obj['pendingActions'] as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(pendingActionsRaw)) {
+      for (const action of pendingActionsRaw) {
+        if (action['status'] === undefined) action['status'] = 'queued';
+        if (action['holderId'] === undefined) action['holderId'] = null;
+      }
+    }
+
+    const ghostPreviewsRaw = obj['ghostPreviews'] as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(ghostPreviewsRaw)) {
+      for (const ghost of ghostPreviewsRaw) {
+        if (ghost['claimed'] === undefined) ghost['claimed'] = false;
+      }
+    }
+
+    // A pre-v8 save's claimed actions were already deleted from
+    // pendingActions by the old bug, so an employee's activeActionId can
+    // reference an id no longer present after migration — clear it rather
+    // than leave tickEmployees' idle check permanently blocked on a
+    // dangling reference.
+    const migratedIds = new Set(
+      Array.isArray(pendingActionsRaw) ? pendingActionsRaw.map(a => a['id']) : [],
+    );
+    const employeesRaw2 = obj['employees'] as Record<string, unknown> | undefined;
+    if (employeesRaw2) {
+      const employeeList2 = employeesRaw2['employees'] as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(employeeList2)) {
+        for (const e of employeeList2) {
+          if (e['activeActionId'] !== null && e['activeActionId'] !== undefined && !migratedIds.has(e['activeActionId'])) {
+            e['activeActionId'] = null;
+          }
+        }
+      }
+    }
+  }
+
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always
   // null here, regardless of what an older save happened to carry. The
   // loader is responsible for rebuilding a real one.

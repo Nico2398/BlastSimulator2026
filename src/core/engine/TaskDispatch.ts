@@ -69,33 +69,45 @@ export function dispatchPendingAction(
  * its ghost) remain in `state.pendingActions`/`state.ghostPreviews` — only
  * status/holderId (and the ghost's `claimed` flag) change, so the record
  * stays visible while the employee walks to it (#547).
- * Returns the claimed action, or null if not found.
  *
- * TODO: implement — currently a stub, see #547.
+ * Returns null (a no-op guard against double-claiming) when the action does
+ * not exist, or its status is not 'queued' — an already-assigned/in_progress
+ * action cannot be claimed a second time. Returns the mutated action on
+ * success.
  */
 export function claimPendingAction(
   state: GameState,
   actionId: number,
   employeeId: number,
 ): PendingAction | null {
-  void state;
-  void actionId;
-  void employeeId;
-  return null;
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (!action || action.status !== 'queued') return null;
+
+  action.status = 'assigned';
+  action.holderId = employeeId;
+
+  const ghost = state.ghostPreviews.find(g => g.id === actionId);
+  if (ghost) ghost.claimed = true;
+
+  return action;
 }
 
 /**
  * Remove a completed action and its ghost preview from state entirely.
- * Returns the completed action, or null if not found.
- *
- * TODO: implement — currently a stub, see #547.
+ * Returns the completed action, or null if no action with that id existed —
+ * a safe no-op, callable more than once for the same id.
  */
 export function completePendingAction(
   state: GameState,
   actionId: number,
 ): PendingAction | null {
-  void state;
-  void actionId;
-  return null;
+  const idx = state.pendingActions.findIndex(a => a.id === actionId);
+  if (idx === -1) return null;
+  const [action] = state.pendingActions.splice(idx, 1);
+
+  const ghostIdx = state.ghostPreviews.findIndex(g => g.id === actionId);
+  if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
+
+  return action ?? null;
 }
 

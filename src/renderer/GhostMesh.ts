@@ -15,19 +15,23 @@ const OPACITY_MAX     = 0.60;            // brightest pulse value
 const PULSE_SPEED     = 2.2;             // radians / second
 const GHOST_SIZE      = 0.9;             // box half-extent in metres
 
-// TODO(#547): claimed ghosts (an employee is en route/working) must read
-// distinctly from unclaimed ones via `preview.claimed` — dimmer, slower
-// pulse — while staying blue. Left unstubbed here (no new exported surface;
-// constants would trip noUnusedLocals until sync()/update() consume them) —
-// the implementer adds CLAIMED_OPACITY_MIN/MAX/CLAIMED_PULSE_SPEED alongside
-// the material swap that uses them.
+// Claimed ghosts (an employee has claimed the action and is en route/working
+// it, #547) read distinctly from unclaimed ones — dimmer and pulsing slower —
+// while staying the same blue. Roughly half the opacity range and half the
+// pulse speed of the unclaimed constants above.
+const CLAIMED_OPACITY_MIN = 0.10;        // dimmest pulse value, claimed
+const CLAIMED_OPACITY_MAX = 0.30;        // brightest pulse value, claimed
+const CLAIMED_PULSE_SPEED = 1.1;         // radians / second, claimed
 
 // ---------- Main class ----------
 
 export class GhostMesh {
   private readonly scene: THREE.Scene;
   private readonly meshes = new Map<number, THREE.Mesh>();
+  /** Material for unclaimed ghosts — brighter, faster pulse. */
   private readonly material: THREE.MeshPhongMaterial;
+  /** Material for claimed ghosts (#547) — dimmer, slower pulse, still blue. */
+  private readonly claimedMaterial: THREE.MeshPhongMaterial;
   private time = 0;
 
   constructor(scene: THREE.Scene) {
@@ -41,11 +45,22 @@ export class GhostMesh {
       depthWrite: false,
       side: THREE.DoubleSide,
     });
+    this.claimedMaterial = new THREE.MeshPhongMaterial({
+      color: GHOST_COLOR,
+      emissive: EMISSIVE_COLOR,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: CLAIMED_OPACITY_MIN,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
   }
 
   /**
    * Sync ghost meshes against the current ghost preview list.
-   * Adds meshes for new previews and removes meshes for gone ones.
+   * Adds meshes for new previews and removes meshes for gone ones. A preview
+   * whose `claimed` flag flips in place (same id, existing mesh) updates that
+   * mesh's material rather than recreating it (#547).
    * Call after syncFromContext() whenever ghostPreviews may have changed.
    */
   sync(previews: GhostPreview[]): void {
@@ -60,11 +75,18 @@ export class GhostMesh {
       }
     }
 
-    // Add newly queued ghosts
     for (const preview of previews) {
-      if (this.meshes.has(preview.id)) continue;
+      const targetMaterial = preview.claimed ? this.claimedMaterial : this.material;
+      const existing = this.meshes.get(preview.id);
+      if (existing) {
+        // Update material in place on a claimed/unclaimed transition —
+        // never recreate the mesh for this.
+        if (existing.material !== targetMaterial) existing.material = targetMaterial;
+        continue;
+      }
+
       const geo = new THREE.BoxGeometry(GHOST_SIZE, GHOST_SIZE, GHOST_SIZE);
-      const mesh = new THREE.Mesh(geo, this.material);
+      const mesh = new THREE.Mesh(geo, targetMaterial);
       mesh.position.set(
         preview.targetX,
         preview.targetY + GHOST_SIZE / 2,
@@ -77,12 +99,15 @@ export class GhostMesh {
 
   /**
    * Animate ghost opacity. Call every frame with elapsed seconds.
+   * Claimed and unclaimed ghosts pulse independently (#547).
    */
   update(dt: number): void {
     if (this.meshes.size === 0) return;
     this.time += dt;
     const t = (Math.sin(this.time * PULSE_SPEED) + 1) * 0.5; // 0..1
     this.material.opacity = OPACITY_MIN + t * (OPACITY_MAX - OPACITY_MIN);
+    const tc = (Math.sin(this.time * CLAIMED_PULSE_SPEED) + 1) * 0.5; // 0..1
+    this.claimedMaterial.opacity = CLAIMED_OPACITY_MIN + tc * (CLAIMED_OPACITY_MAX - CLAIMED_OPACITY_MIN);
   }
 
   /** Remove all ghost meshes from the scene. */
@@ -102,5 +127,6 @@ export class GhostMesh {
   dispose(): void {
     this.clearAll();
     this.material.dispose();
+    this.claimedMaterial.dispose();
   }
 }

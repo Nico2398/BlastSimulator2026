@@ -14,6 +14,7 @@ import {
 } from '../config/balance.js';
 import type { GameState } from '../state/GameState.js';
 import { addExpense } from '../economy/Finance.js';
+import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
 /** The three supported methods for surveying a mining site. */
 export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial';
@@ -287,7 +288,13 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
 
   const actionId = state.nextPendingActionId++;
 
-  state.pendingActions.push({
+  // Routed through dispatchPendingAction (#547) rather than a hand-built
+  // literal — it owns constructing the full record (status: 'queued',
+  // holderId: null) and its matching GhostPreview (claimed: false), so this
+  // stays in sync with every other dispatch path. The qualification check it
+  // repeats is redundant with hasSurveyor above but harmless — the roster
+  // cannot have changed synchronously between the two checks.
+  dispatchPendingAction(state, {
     id: actionId,
     type: 'survey',
     requiredSkill: 'geology',
@@ -297,21 +304,6 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     targetY: 0,
     payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method] },
     targetEmployeeId: null,
-    // TODO(#547): minimal type-compliance defaults — real status transitions
-    // (queued → assigned → in_progress → removed) land with the lifecycle
-    // implementation, not here. This should likely be routed through
-    // dispatchPendingAction instead of a direct literal push.
-    status: 'queued',
-    holderId: null,
-  });
-
-  state.ghostPreviews.push({
-    id: actionId,
-    type: 'survey',
-    targetX: centerX,
-    targetZ: centerZ,
-    targetY: 0,
-    claimed: false,
   });
 
   return { success: true, actionId };

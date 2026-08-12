@@ -24,6 +24,7 @@ import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
 import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate } from '../../core/engine/GameLoop.js';
+import { completePendingAction } from '../../core/engine/TaskDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
@@ -217,6 +218,13 @@ export function tickCommand(
       if (!progress) continue;
       if (progress.completed) {
         lines.push(`[tick ${state.tickCount}] TASK: ${emp.name} completed task.`);
+
+        // Skill-required actions (survey, etc.) route through tickTaskProgress
+        // — the completing action's record and ghost are removed here, once
+        // the work has actually finished, not at claim time (#547).
+        if (progress.actionId !== undefined) {
+          completePendingAction(state, progress.actionId);
+        }
 
         // A completed 'survey' task resolves here — after the surveyor has
         // actually walked to and worked the site, not the instant it was
