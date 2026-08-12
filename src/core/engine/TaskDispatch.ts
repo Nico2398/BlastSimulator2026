@@ -5,8 +5,27 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 import { SURVEY_COSTS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
+import type { Employee } from '../entities/Employee.js';
 
 export type { PendingAction };
+
+/**
+ * Clears the fields an employee's active-task claim sets, shared by
+ * tickTaskProgress's completion path (GameLoop.ts) and cancelAction below —
+ * both need the task/skill bookkeeping reset once an action stops occupying
+ * the employee, whether it finished normally or was cancelled mid-flight.
+ * cancelAction additionally clears walk/stuck fields on top of this, since
+ * cancellation can happen while the employee is still walking to the target
+ * (a lifecycle stage tickTaskProgress's completion path never sees).
+ */
+export function clearActiveTaskFields(emp: Employee): void {
+  emp.activeActionId = null;
+  emp.taskTicksRemaining = null;
+  delete emp.activeTaskTotalTicks;
+  emp.activeTaskSkill = null;
+  emp.pendingActionType = null;
+  emp.pendingActionPayload = null;
+}
 
 /**
  * Distinguishes *why* dispatch rejected, beyond the generic `error: 'unqualified'`
@@ -135,8 +154,9 @@ export interface CancelActionResult {
  * is claimable again next tick instead of stuck mid-walk or mid-task.
  *
  * Any order-time cost (survey only, today) is refunded to state.cash and
- * recorded on the finances ledger, via the same addIncome('refund', ...)
- * pattern used elsewhere (e.g. research cancellation).
+ * recorded on the finances ledger via addIncome — the same dual-write
+ * (state.cash + finances ledger) pattern other cash-moving core functions
+ * use, e.g. SurveyCalc.ts's runSurvey and EventResolver.ts.
  *
  * The action and its ghost are removed via completePendingAction, discarding
  * any in-progress work — a cancel produces no result and no XP.
@@ -149,17 +169,12 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
   if (action.holderId !== null) {
     const holder = state.employees.employees.find(emp => emp.id === action.holderId);
     if (holder) {
-      holder.activeActionId = null;
+      clearActiveTaskFields(holder);
       holder.destinationX = null;
       holder.destinationZ = null;
       holder.moveConsecutiveFailures = 0;
       holder.isMoveStuck = false;
-      holder.taskTicksRemaining = null;
-      delete holder.activeTaskTotalTicks;
-      holder.activeTaskSkill = null;
       holder.pendingTaskDuration = null;
-      holder.pendingActionType = null;
-      holder.pendingActionPayload = null;
     }
   }
 

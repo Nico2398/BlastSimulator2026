@@ -17,7 +17,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
 import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
-import { completePendingAction, claimPendingAction } from './TaskDispatch.js';
+import { completePendingAction, claimPendingAction, clearActiveTaskFields } from './TaskDispatch.js';
 
 // ── Config ──
 
@@ -823,12 +823,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
     completedActionType = emp.pendingActionType ?? undefined;
     completedActionPayload = emp.pendingActionPayload ?? undefined;
     completedActionId = emp.activeActionId ?? undefined;
-    emp.activeActionId = null;
-    emp.taskTicksRemaining = null;
-    delete emp.activeTaskTotalTicks;
-    emp.activeTaskSkill = null;
-    emp.pendingActionType = null;
-    emp.pendingActionPayload = null;
+    clearActiveTaskFields(emp);
   }
 
   return {

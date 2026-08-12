@@ -24,7 +24,7 @@ import {
 } from '../../../src/core/entities/Employee.js';
 import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
-import { dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction } from '../../../src/core/engine/TaskDispatch.js';
+import { dispatchPendingAction, claimPendingAction, completePendingAction, cancelAction, clearActiveTaskFields } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 
@@ -778,5 +778,47 @@ describe('cancelAction (#548)', () => {
     expect(result.success).toBe(true);
     expect(emp.moveConsecutiveFailures).toBe(0);
     expect(emp.isMoveStuck).toBe(false);
+  });
+});
+
+describe('clearActiveTaskFields (#548 — shared by cancelAction and tickTaskProgress completion)', () => {
+  it('nulls activeActionId/taskTicksRemaining/activeTaskSkill/pendingActionType/pendingActionPayload and deletes activeTaskTotalTicks', () => {
+    const state = makeGame();
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const emp = state.employees.employees[0]!;
+    emp.activeActionId = 42;
+    emp.taskTicksRemaining = 3;
+    (emp as any).activeTaskTotalTicks = 10;
+    emp.activeTaskSkill = 'blasting';
+    emp.pendingActionType = 'general_work' as any;
+    emp.pendingActionPayload = { foo: 'bar' };
+
+    clearActiveTaskFields(emp);
+
+    expect(emp.activeActionId).toBeNull();
+    expect(emp.taskTicksRemaining).toBeNull();
+    expect('activeTaskTotalTicks' in emp).toBe(false);
+    expect(emp.activeTaskSkill).toBeNull();
+    expect(emp.pendingActionType).toBeNull();
+    expect(emp.pendingActionPayload).toBeNull();
+  });
+
+  it('leaves walk/stuck fields (destinationX, moveConsecutiveFailures, isMoveStuck, pendingTaskDuration) untouched — cancelAction clears those itself', () => {
+    const state = makeGame();
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const emp = state.employees.employees[0]!;
+    emp.destinationX = 5;
+    emp.destinationZ = 7;
+    emp.moveConsecutiveFailures = 2;
+    emp.isMoveStuck = true;
+    emp.pendingTaskDuration = 8;
+
+    clearActiveTaskFields(emp);
+
+    expect(emp.destinationX).toBe(5);
+    expect(emp.destinationZ).toBe(7);
+    expect(emp.moveConsecutiveFailures).toBe(2);
+    expect(emp.isMoveStuck).toBe(true);
+    expect(emp.pendingTaskDuration).toBe(8);
   });
 });
