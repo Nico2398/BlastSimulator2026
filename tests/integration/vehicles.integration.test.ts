@@ -20,6 +20,7 @@ import {
   createEmployeeState,
   hireEmployee,
   assignSkill,
+  killEmployee,
 } from '../../src/core/entities/Employee.js';
 import { tickVehicle } from '../../src/core/engine/GameLoop.js';
 import { Random } from '../../src/core/math/Random.js';
@@ -583,6 +584,167 @@ describe('Vehicle fleet', () => {
       expect(result.success).toBe(true);
       expect(ctx.state!.events.pendingEvent).not.toBeNull();
       expect(ctx.state!.events.pendingEvent?.eventId).toBe('traffic_jam');
+    });
+  });
+
+  // ── Vehicle-gated actions (issue #550) ──
+  //
+  // `employee dispatch ... vehicle:<role>` already parses and stores
+  // requiredVehicleRole on the PendingAction (#550 skeleton), but nothing in
+  // the tick loop reserves a vehicle, routes the employee through it, or
+  // releases it yet — every test below is Red until VehicleReservation.ts
+  // and its callers are implemented.
+
+  describe('Vehicle-gated actions (#550)', () => {
+    /** Hire a driller and grant the drill_rig licence on top of their starting 'blasting' skill. */
+    function hireLicensedDriller(): number {
+      const eid = hireOne(ctx, 'driller');
+      employeeCommand(ctx, ['assign_skill', String(eid)], { skill: 'driving.drill_rig', level: '1' });
+      return eid;
+    }
+
+    it('walks to the vehicle, boards, drives, works, and completes — XP granted, action removed, vehicle released and driver dismounted', () => {
+      const eid = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+      const xpBefore = emp.qualifications.find(q => q.category === 'blasting')!.xp;
+
+      const dispatch = employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      expect(dispatch.success).toBe(true);
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      let sawBoarded = false;
+      for (let i = 0; i < 200 && ctx.state!.pendingActions.some(a => a.id === actionId); i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.driverId === eid) sawBoarded = true;
+      }
+
+      // The driller must actually have boarded the reserved vehicle at some
+      // point before the action completed — not just walked there on foot.
+      expect(sawBoarded).toBe(true);
+      expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+      const xpAfter = emp.qualifications.find(q => q.category === 'blasting')!.xp;
+      expect(xpAfter).toBeGreaterThan(xpBefore);
+      expect(vehicle.reservedForActionId).toBeNull();
+      expect(vehicle.driverId).toBeNull();
+    });
+
+    it('a same-role follow-up action keeps the driller mounted in the same vehicle instead of dismounting and re-walking', () => {
+      const eid = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+
+      employeeCommand(ctx, ['dispatch', String(eid)], { x: '15', z: '15', skill: 'blasting', vehicle: 'drill_rig' });
+      const firstActionId = ctx.state!.pendingActions[0]!.id;
+      employeeCommand(ctx, ['dispatch', String(eid)], { x: '25', z: '25', skill: 'blasting', vehicle: 'drill_rig' });
+      const secondActionId = ctx.state!.pendingActions.find(a => a.id !== firstActionId)!.id;
+
+      let sawBoardedForFirst = false;
+      for (let i = 0; i < 200 && ctx.state!.pendingActions.some(a => a.id === firstActionId); i++) {
+        tickCommand(ctx, ['1'], {});
+        if (vehicle.driverId === eid) sawBoardedForFirst = true;
+      }
+      expect(sawBoardedForFirst).toBe(true);
+
+      // The follow-up claims the same vehicle via the continuity tie-break
+      // (findFreeVehicleForRole) — driverId must never drop back to null in
+      // between the two actions.
+      let sawUnmounted = false;
+      for (let i = 0; i < 200 && ctx.state!.pendingActions.some(a => a.id === secondActionId); i++) {
+        if (vehicle.driverId !== eid) sawUnmounted = true;
+        tickCommand(ctx, ['1'], {});
+      }
+
+      expect(sawUnmounted).toBe(false);
+    });
+
+    it('cancelling a vehicle-gated action mid-walk-to-vehicle releases the vehicle reservation and clears the dangling boarding request', () => {
+      const eid = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+
+      employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      // Simulate the mid-walk-to-vehicle state the real claim path will
+      // produce once implemented (claimed, reserved, still walking to the
+      // vehicle) — the claim path itself isn't wired yet, so this is set up
+      // directly rather than reached by ticking.
+      ctx.state!.pendingActions[0]!.status = 'assigned';
+      ctx.state!.pendingActions[0]!.holderId = eid;
+      emp.activeActionId = actionId;
+      vehicle.reservedForActionId = actionId;
+      emp.pendingDriverVehicleId = vehicle.id;
+
+      const cancel = employeeCommand(ctx, ['cancel', String(actionId)], {});
+      expect(cancel.success).toBe(true);
+
+      expect(vehicle.reservedForActionId).toBeNull();
+      expect(emp.pendingDriverVehicleId).toBeNull();
+    });
+
+    it('clears the vehicle reservation and driver when the holder dies mid-drive', () => {
+      const eid = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle = ctx.state!.vehicles.vehicles[0]!;
+      const emp = ctx.state!.employees.employees.find(e => e.id === eid)!;
+
+      employeeCommand(ctx, ['dispatch', String(eid)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      // Simulate "boarded, mid-drive" — reservation held, driver aboard,
+      // work timer not yet started.
+      ctx.state!.pendingActions[0]!.status = 'in_progress';
+      ctx.state!.pendingActions[0]!.holderId = eid;
+      emp.activeActionId = actionId;
+      vehicle.driverId = eid;
+      vehicle.reservedForActionId = actionId;
+      emp.taskTicksRemaining = null;
+
+      killEmployee(ctx.state!.employees, eid);
+      tickCommand(ctx, ['1'], {});
+
+      expect(vehicle.reservedForActionId).toBeNull();
+      expect(vehicle.driverId).toBeNull();
+    });
+
+    it('destroying the reserved vehicle mid-drive returns the action to "queued", re-claimable by a different qualified employee/vehicle pair', () => {
+      const eid1 = hireLicensedDriller();
+      vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+      const vehicle1 = ctx.state!.vehicles.vehicles[0]!;
+      const emp1 = ctx.state!.employees.employees.find(e => e.id === eid1)!;
+
+      employeeCommand(ctx, ['dispatch', String(eid1)], { x: '20', z: '20', skill: 'blasting', vehicle: 'drill_rig' });
+      const actionId = ctx.state!.pendingActions[0]!.id;
+
+      // Simulate "boarded, mid-drive" on vehicle1.
+      ctx.state!.pendingActions[0]!.status = 'assigned';
+      ctx.state!.pendingActions[0]!.holderId = eid1;
+      emp1.activeActionId = actionId;
+      vehicle1.driverId = eid1;
+      vehicle1.reservedForActionId = actionId;
+      emp1.taskTicksRemaining = null;
+
+      destroyVehicle(ctx.state!.vehicles, vehicle1.id);
+
+      // A second qualified driller + drill_rig, available to reclaim the
+      // action once it's released back to the pool.
+      const rng = new Random(7);
+      hireEmployee(ctx.state!.employees, 'driller', rng, 40, 40);
+      const eid2 = ctx.state!.employees.employees.find(e => e.id !== eid1)!.id;
+      assignSkill(ctx.state!.employees, eid2, 'driving.drill_rig', 1);
+      purchaseVehicle(ctx.state!.vehicles, 'drill_rig', 40, 40);
+
+      let sawQueued = false;
+      for (let i = 0; i < 50; i++) {
+        tickCommand(ctx, ['1'], {});
+        const action = ctx.state!.pendingActions.find(a => a.id === actionId);
+        if (action && action.status === 'queued') sawQueued = true;
+      }
+
+      expect(sawQueued).toBe(true);
     });
   });
 });

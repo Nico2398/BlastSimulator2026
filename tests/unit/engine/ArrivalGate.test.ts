@@ -11,12 +11,13 @@
 // walk — see EmployeeTraining.ts and #410.
 
 import { describe, it, expect } from 'vitest';
-import { createGame } from '../../../src/core/state/GameState.js';
+import { createGame, type PendingAction } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { hireEmployee } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { hireEmployee, assignSkill, killEmployee } from '../../../src/core/entities/Employee.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
+import { reconcileVehicleReservations } from '../../../src/core/engine/VehicleReservation.js';
 
 const SEED = 42;
 
@@ -311,5 +312,156 @@ describe('tickArrivalGate — combined multi-employee tick', () => {
     expect(resting.restTicksRemaining).toBe(2);
     expect(tasked.taskTicksRemaining).toBe(3);
     expect(vehicle.driverId).toBe(driver.id);
+  });
+});
+
+// ── Issue #550: vehicle-gated actions — boarding sends the VEHICLE toward
+// the action's target, and the work timer only starts once the vehicle
+// itself (not the employee) arrives there. tickArrivalGate does not yet know
+// about requiredVehicleRole/reservedForActionId at all — every test below is
+// Red until it does.
+
+function makeVehicleGatedAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+  return {
+    type: 'general_work',
+    requiredSkill: null,
+    requiredVehicleRole: 'drill_rig',
+    targetX: 0, targetZ: 0, targetY: 0,
+    payload: {},
+    targetEmployeeId: null,
+    status: 'assigned',
+    holderId: null,
+    ...overrides,
+  };
+}
+
+describe('tickArrivalGate — vehicle-gated boarding sends the vehicle, not the employee, toward the target (#550)', () => {
+  it("sets the vehicle's destination to the action's target on boarding, leaving the employee's own destination null (aboard, not walking)", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 5, 5);
+
+    const action = makeVehicleGatedAction({ id: 1, holderId: employee.id, targetX: 20, targetZ: 20 });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+
+    employee.x = 5;
+    employee.z = 5;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.pendingDriverVehicleId = vehicle.id;
+
+    tickArrivalGate(state);
+
+    expect(vehicle.driverId).toBe(employee.id);
+    // The vehicle, not the employee, drives the rest of the way to the
+    // action's own target — this is what #550 adds on top of plain boarding.
+    expect(vehicle.targetX).toBe(20);
+    expect(vehicle.targetZ).toBe(20);
+    expect(employee.destinationX).toBeNull();
+    expect(employee.destinationZ).toBeNull();
+  });
+
+  it('holds taskTicksRemaining at null while the vehicle is still driving toward the target, and only seeds it the tick the vehicle itself arrives', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
+    vehicle.driverId = employee.id;
+    vehicle.targetX = 20;
+    vehicle.targetZ = 20;
+    // Vehicle is mid-drive — not yet at its target.
+    vehicle.x = 10;
+    vehicle.z = 10;
+
+    const action = makeVehicleGatedAction({ id: 2, holderId: employee.id, targetX: 20, targetZ: 20, status: 'in_progress' });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+
+    // Employee is aboard: no destination of their own, but a task is queued
+    // and waiting for the vehicle's arrival to actually start.
+    employee.x = vehicle.x;
+    employee.z = vehicle.z;
+    employee.destinationX = null;
+    employee.destinationZ = null;
+    employee.taskTicksRemaining = null;
+    employee.pendingTaskDuration = 6;
+    employee.activeTaskSkill = null;
+    employee.pendingActionType = action.type;
+    employee.pendingActionPayload = action.payload;
+
+    tickArrivalGate(state);
+
+    // Still driving — the work timer must not have started yet, even though
+    // the employee's own destinationX/Z read as "arrived".
+    expect(employee.taskTicksRemaining).toBeNull();
+    expect(employee.pendingTaskDuration).toBe(6);
+
+    // The vehicle itself now reaches the target.
+    vehicle.x = 20;
+    vehicle.z = 20;
+
+    tickArrivalGate(state);
+
+    expect(employee.taskTicksRemaining).toBe(6);
+    expect(employee.pendingTaskDuration).toBeNull();
+  });
+});
+
+describe('reconcileVehicleReservations — mid-drive holder death / vehicle destruction (#550)', () => {
+  it('releases the reservation and dismounts the driver when the holder dies mid-drive', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
+    vehicle.driverId = employee.id;
+    vehicle.targetX = 20;
+    vehicle.targetZ = 20;
+
+    const action = makeVehicleGatedAction({ id: 3, holderId: employee.id, targetX: 20, targetZ: 20 });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    employee.taskTicksRemaining = null;
+
+    killEmployee(state.employees, employee.id);
+
+    reconcileVehicleReservations(state);
+
+    expect(vehicle.reservedForActionId).toBeNull();
+    expect(vehicle.driverId).toBeNull();
+  });
+
+  it("interrupts (status back to 'queued') the employee's action when the reserved vehicle is destroyed mid-drive", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 10);
+    vehicle.driverId = employee.id;
+    vehicle.targetX = 20;
+    vehicle.targetZ = 20;
+
+    const action = makeVehicleGatedAction({ id: 4, holderId: employee.id, targetX: 20, targetZ: 20 });
+    state.pendingActions.push(action);
+    employee.activeActionId = action.id;
+    vehicle.reservedForActionId = action.id;
+    employee.taskTicksRemaining = null; // still travelling, not yet working
+
+    // Vehicle destroyed underneath the employee — e.g. a blast projection.
+    state.vehicles.vehicles = state.vehicles.vehicles.filter(v => v.id !== vehicle.id);
+
+    reconcileVehicleReservations(state);
+
+    const reconciled = state.pendingActions.find(a => a.id === 4)!;
+    expect(reconciled.status).toBe('queued');
+    expect(reconciled.holderId).toBeNull();
+    expect(employee.activeActionId).toBeNull();
   });
 });

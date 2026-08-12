@@ -43,6 +43,7 @@ import {
 } from '../../../src/core/entities/Employee.js';
 import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
+import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
@@ -865,6 +866,92 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
     resolveArrival(state);
 
     expect(employee.restTicksRemaining).toBe(5);
+    expect(employee.taskTicksRemaining).toBeNull();
+  });
+});
+
+// ── Issue #550: vehicle-gated actions — a PendingAction with
+// requiredVehicleRole set can only be claimed alongside a free licensed
+// vehicle; the claiming employee walks to the vehicle first (via
+// pendingDriverVehicleId), not straight to work. tickEmployees does not yet
+// know about requiredVehicleRole at all — every test below is Red until it
+// does.
+
+describe('tickEmployees — vehicle-gated actions (#550)', () => {
+  const SEED = 42;
+
+  function makeVehicleGatedAction(
+    overrides: Partial<PendingAction> & { id: number },
+  ): PendingAction {
+    return {
+      type: 'general_work',
+      requiredSkill: 'blasting',
+      requiredVehicleRole: 'drill_rig',
+      targetX: 20, targetZ: 20, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      ...overrides,
+    };
+  }
+
+  it('stays queued (in result.waiting, not result.unqualified/claimed) when a qualified employee exists but no free licensed vehicle does', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng); // has 'blasting' already
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    // No vehicle purchased at all — nothing to reserve.
+
+    const action = makeVehicleGatedAction({ id: 1 });
+    state.pendingActions.push(action);
+
+    const result = tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+    expect(result.waiting).toContain(1);
+    expect(result.unqualified).not.toContain(1);
+    expect(result.claimed).not.toContain(1);
+    expect(employee.activeActionId).toBeNull();
+  });
+
+  it('claims exactly one of two equally qualified idle employees when only one licensed vehicle is free, and reserves that vehicle for the action', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee: empA } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, empA.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { employee: empB } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, empB.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    const action = makeVehicleGatedAction({ id: 1 });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    const claimers = [empA, empB].filter(e => e.activeActionId === action.id);
+    expect(claimers).toHaveLength(1);
+    expect(vehicle.reservedForActionId).toBe(action.id);
+  });
+
+  it('promotes a claimed vehicle-gated action onto pendingDriverVehicleId (walk-to-vehicle), not pendingTaskDuration/taskTicksRemaining directly', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    const action = makeVehicleGatedAction({ id: 1, targetEmployeeId: employee.id });
+    state.pendingActions.push(action);
+
+    tickEmployees(state);
+
+    expect(employee.activeActionId).toBe(action.id);
+    expect(employee.pendingDriverVehicleId).toBe(vehicle.id);
+    // Work duration is seeded later, on the VEHICLE's arrival at the
+    // target — not here, at claim time.
+    expect(employee.pendingTaskDuration).toBeNull();
     expect(employee.taskTicksRemaining).toBeNull();
   });
 });
