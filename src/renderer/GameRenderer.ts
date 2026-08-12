@@ -491,8 +491,7 @@ export class GameRenderer {
   raycastSurfaceY(x: number, z: number): number | null {
     if (!this.terrain) return null;
     const raycaster = new THREE.Raycaster(new THREE.Vector3(x, 10_000, z), new THREE.Vector3(0, -1, 0));
-    let hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
-    if (!hit && this.landscape) hit = raycaster.intersectObjects(this.landscape.meshes, true)[0];
+    const hit = this.raycastTerrainOrLandscape(raycaster);
     return hit ? hit.point.y : null;
   }
 
@@ -514,9 +513,22 @@ export class GameRenderer {
     if (!this.terrain) return null;
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-    let hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
-    if (!hit && this.landscape) hit = raycaster.intersectObjects(this.landscape.meshes, true)[0];
+    const hit = this.raycastTerrainOrLandscape(raycaster);
     return hit ? hit.point.clone() : null;
+  }
+
+  /**
+   * First hit against the terrain meshes, falling back to the landscape
+   * meshes past the site's claimed edge (#558) when terrain misses. Shared
+   * by raycastSurfaceY (vertical ray) and raycastTerrainFromNDC (camera ray)
+   * — both need the same terrain-then-landscape fallback, only the ray
+   * differs.
+   */
+  private raycastTerrainOrLandscape(raycaster: THREE.Raycaster): THREE.Intersection | undefined {
+    if (!this.terrain) return undefined;
+    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
+    if (hit) return hit;
+    return this.landscape ? raycaster.intersectObjects(this.landscape.meshes, true)[0] : undefined;
   }
 
   /**

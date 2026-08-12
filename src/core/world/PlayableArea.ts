@@ -195,12 +195,9 @@ export class PlayableArea {
       return { claimed: false, chunk: { cx, cz }, reason: 'protected_structure' };
     }
 
-    const grown = this.grid.addChunk(cx, cz);
     // `contains` said no, so the chunk was either absent or partially owned;
-    // either way addChunk reports the rect that just became ours.
-    const rect = grown ?? PlayableArea.chunkRect(cx, cz);
-    this.generateInto(rect);
-    this.grid.markChunkPristine(cx, cz);
+    // either way materializeChunk reports the rect that just became ours.
+    const rect = this.materializeChunk(cx, cz);
 
     return { claimed: true, chunk: { cx, cz }, rect, alreadyOwned: false };
   }
@@ -278,10 +275,7 @@ export class PlayableArea {
     for (const chunk of required.values()) {
       claimedChunks.push(chunk);
       if (this.isFullyOwned(chunk.cx, chunk.cz)) continue;
-      const grown = this.grid.addChunk(chunk.cx, chunk.cz);
-      const rect = grown ?? PlayableArea.chunkRect(chunk.cx, chunk.cz);
-      this.generateInto(rect);
-      this.grid.markChunkPristine(chunk.cx, chunk.cz);
+      const rect = this.materializeChunk(chunk.cx, chunk.cz);
       minX = Math.min(minX, rect.minX);
       minZ = Math.min(minZ, rect.minZ);
       maxX = Math.max(maxX, rect.maxX);
@@ -429,6 +423,21 @@ export class PlayableArea {
       if (path.length > maxLen) return path;
     }
     return path;
+  }
+
+  /**
+   * Bring chunk (cx, cz) into the grid and generate terrain into whatever
+   * rect it now spans — the materialization step `claim` and `claimArea`
+   * both need once a chunk has cleared their own refusal checks. Returns the
+   * rect that became owned, since `addChunk` reports it when the chunk grows
+   * an existing partial edge chunk rather than adding a fresh one.
+   */
+  private materializeChunk(cx: number, cz: number): Rect {
+    const grown = this.grid.addChunk(cx, cz);
+    const rect = grown ?? PlayableArea.chunkRect(cx, cz);
+    this.generateInto(rect);
+    this.grid.markChunkPristine(cx, cz);
+    return rect;
   }
 
   private generateInto(rect: Rect): void {
