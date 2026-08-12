@@ -9,6 +9,9 @@ import {
 } from '../../src/console/commands/world.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import type { Employee } from '../../src/core/entities/Employee.js';
+import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 
 describe('Console — world commands', () => {
   let ctx: GameContext;
@@ -56,6 +59,75 @@ describe('Console — world commands', () => {
       const result = newGameCommand(ctx, [], { mine_type: 'moon' });
       expect(result.success).toBe(false);
       expect(result.output).toContain('Unknown mine type');
+    });
+  });
+
+  describe('staffed option', () => {
+    /** Greedily matches each composition employee slot to a distinct hired employee. */
+    function assertEmployeesMatchComposition(employees: Employee[]): void {
+      expect(employees.length).toBe(STARTING_SITE_STAFFED_COMPOSITION.employees.length);
+      const remaining = [...employees];
+      for (const slot of STARTING_SITE_STAFFED_COMPOSITION.employees) {
+        const idx = remaining.findIndex(e =>
+          e.role === slot.role &&
+          slot.qualifications.every(q =>
+            e.qualifications.some(eq => eq.category === q.category && eq.proficiencyLevel === q.proficiencyLevel),
+          ),
+        );
+        expect(idx, `no unmatched employee for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
+        remaining.splice(idx, 1);
+      }
+    }
+
+    /** Greedily matches each composition vehicle slot to a distinct purchased, idle, unmanned vehicle. */
+    function assertVehiclesMatchComposition(vehicles: Vehicle[]): void {
+      expect(vehicles.length).toBe(STARTING_SITE_STAFFED_COMPOSITION.vehicles.length);
+      const remaining = [...vehicles];
+      for (const slot of STARTING_SITE_STAFFED_COMPOSITION.vehicles) {
+        const idx = remaining.findIndex(v =>
+          v.type === slot.role && v.tier === slot.tier && v.driverId === null && v.state === 'idle',
+        );
+        expect(idx, `no unmatched vehicle for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
+        remaining.splice(idx, 1);
+      }
+    }
+
+    it('defaults to an empty roster and fleet when staffed is omitted', () => {
+      const result = newGameCommand(ctx, [], { seed: '42' });
+      expect(result.success).toBe(true);
+      expect(ctx.state!.employees.employees.length).toBe(0);
+      expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+    });
+
+    it('staffed:false behaves identically to the default (empty roster and fleet)', () => {
+      const result = newGameCommand(ctx, [], { seed: '42', staffed: 'false' });
+      expect(result.success).toBe(true);
+      expect(ctx.state!.employees.employees.length).toBe(0);
+      expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+    });
+
+    it('staffed:true hires and equips the STARTING_SITE_STAFFED_COMPOSITION roster and fleet', () => {
+      const result = newGameCommand(ctx, [], { seed: '42', staffed: 'true' });
+      expect(result.success).toBe(true);
+      assertEmployeesMatchComposition(ctx.state!.employees.employees);
+      assertVehiclesMatchComposition(ctx.state!.vehicles.vehicles);
+    });
+
+    it('staffed:true leaves starting cash unaffected', () => {
+      const result = newGameCommand(ctx, [], { seed: '42', staffed: 'true' });
+      expect(result.success).toBe(true);
+      expect(ctx.state!.cash).toBe(STARTING_CASH);
+    });
+
+    it('rejects staffed:banana, leaving any existing game state untouched', () => {
+      newGameCommand(ctx, [], { seed: '7' });
+      const before = ctx.state;
+
+      const result = newGameCommand(ctx, [], { seed: '42', staffed: 'banana' });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('Invalid staffed value');
+      expect(ctx.state).toBe(before);
     });
   });
 
