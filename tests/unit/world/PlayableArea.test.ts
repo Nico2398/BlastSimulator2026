@@ -262,6 +262,27 @@ describe('PlayableArea.claimArea', () => {
     }
   });
 
+  it('refuses an astronomically distant target as too_far in bounded time, not by walking the full distance (#558)', () => {
+    // A target so far away that walking the raw chunk-stepped path to it
+    // would be millions of iterations/allocations if bridgeWalk didn't check
+    // maxLen DURING the walk. The near-limit case above (MAX+2) proves the
+    // *answer* is too_far; this proves the *cost* of getting that answer is
+    // bounded regardless of how far the target actually is — the distinction
+    // the #558 fix is about. An unbounded implementation would either hang
+    // this test well past the threshold below or exhaust memory.
+    const { grid, area } = makeArea();
+    const before = grid.chunkCount;
+
+    const start = Date.now();
+    const result = area.claimArea([{ x: 100_000_000, z: 0 }]);
+    const elapsed = Date.now() - start;
+
+    expect(result.claimed).toBe(false);
+    expect(!result.claimed && result.reason).toBe('too_far');
+    expect(grid.chunkCount).toBe(before);
+    expect(elapsed).toBeLessThan(200);
+  });
+
   it('refuses the whole action when any required chunk touches a protected structure, mutating nothing', () => {
     const { grid, area } = makeArea();
     // Chunk (2, 0) — the first cell below — is directly claimable on its own.
