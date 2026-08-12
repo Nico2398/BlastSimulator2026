@@ -349,7 +349,9 @@ export function createGame(config: GameConfig): GameState {
 /**
  * Hires STARTING_SITE_STAFFED_COMPOSITION.employees and purchases
  * STARTING_SITE_STAFFED_COMPOSITION.vehicles into `state`, for the opt-in
- * staffed starting site (#551). Not yet wired into `createGame`.
+ * staffed starting site (#551). Called from `createGame` when `config.staffed`
+ * is truthy; the roster and fleet composition are defined in
+ * `STARTING_SITE_STAFFED_COMPOSITION` (src/core/config/balance.ts).
  */
 export function applyStaffedComposition(state: GameState): void {
   const rng = new Random(state.seed);
