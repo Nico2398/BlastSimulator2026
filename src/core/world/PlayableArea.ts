@@ -254,7 +254,7 @@ export class PlayableArea {
         // Defensive fallback only — should not happen given a non-empty site.
         return { claimed: false, reason: 'not_adjacent', chunk: target };
       }
-      const bridge = PlayableArea.bridgeWalk(target, anchor);
+      const bridge = PlayableArea.bridgeWalk(target, anchor, MAX_CLAIM_BRIDGE_CHUNKS);
       if (bridge.length > MAX_CLAIM_BRIDGE_CHUNKS) {
         return { claimed: false, reason: 'too_far', chunk: target };
       }
@@ -396,10 +396,23 @@ export class PlayableArea {
    * Straight, chunk-stepped walk from `from` to `to`, moving one axis at a
    * time (x fully, then z). Excludes both endpoints: `from` is already part
    * of the claim's required set, `to` is already connected to the site.
+   *
+   * Bounded by `maxLen` DURING the walk, not just at the caller's result
+   * check (#558 security fix): `to` comes from `nearestAnchor`, which is
+   * bounded by the site's own size, but `from` is a target chunk derived
+   * directly from unbounded player-supplied coordinates (survey/drill_plan/
+   * build_ramp console args only check `NaN`, not magnitude), so the raw
+   * Chebyshev distance between them can be in the millions. Once the path
+   * exceeds `maxLen` this returns immediately with that oversized path —
+   * still enough for the caller's `bridge.length > MAX_CLAIM_BRIDGE_CHUNKS`
+   * check to refuse with `too_far` — instead of walking the full distance
+   * first. Caps total iterations/allocations at `maxLen + 1` regardless of
+   * how far `to` actually is.
    */
   private static bridgeWalk(
     from: { cx: number; cz: number },
     to: { cx: number; cz: number },
+    maxLen: number,
   ): Array<{ cx: number; cz: number }> {
     const path: Array<{ cx: number; cz: number }> = [];
     let cx = from.cx, cz = from.cz;
@@ -407,11 +420,13 @@ export class PlayableArea {
       cx += Math.sign(to.cx - cx);
       if (cx === to.cx && cz === to.cz) break;
       path.push({ cx, cz });
+      if (path.length > maxLen) return path;
     }
     while (cz !== to.cz) {
       cz += Math.sign(to.cz - cz);
       if (cx === to.cx && cz === to.cz) break;
       path.push({ cx, cz });
+      if (path.length > maxLen) return path;
     }
     return path;
   }
