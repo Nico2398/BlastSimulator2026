@@ -214,9 +214,6 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: null,
-      // Every freshly-dispatched action starts life queued/unheld (#547) —
-      // callers below override status/holderId to model an already-claimed
-      // record.
       status: 'queued',
       holderId: null,
       ...overrides,
