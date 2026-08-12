@@ -146,6 +146,13 @@ export interface TickEmployeesResult {
 /**
  * Match pending actions to idle qualified employees.
  * Mutates state: removes claimed actions from pendingActions and sets activeActionId on employees.
+ *
+ * TODO(#547): claim must transition status to 'assigned' + stamp holderId
+ * instead of splicing the action out of pendingActions; the ghost must gain
+ * `claimed: true` instead of being deleted. tickArrivalGate's promotion to
+ * 'in_progress', and rest-action bookkeeping (autoInsertNeedTasks,
+ * tickCollapse, completeRestTick) that filters the pool by action id, need
+ * updating for records that now outlive the claim.
  */
 export function tickEmployees(state: GameState): TickEmployeesResult {
   const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
@@ -528,6 +535,11 @@ function createRestPendingAction(
     targetY: 0,
     payload: overrides.payload,
     targetEmployeeId: overrides.targetEmployeeId,
+    // TODO(#547): rest actions self-claim immediately at every call site
+    // below — 'queued'/null here is a type-compliance default overwritten by
+    // the caller once the lifecycle claim path lands, not real logic.
+    status: 'queued',
+    holderId: null,
   };
 }
 

@@ -15,6 +15,13 @@ const OPACITY_MAX     = 0.60;            // brightest pulse value
 const PULSE_SPEED     = 2.2;             // radians / second
 const GHOST_SIZE      = 0.9;             // box half-extent in metres
 
+// TODO(#547): claimed ghosts (an employee is en route/working) must read
+// distinctly from unclaimed ones via `preview.claimed` — dimmer, slower
+// pulse — while staying blue. Left unstubbed here (no new exported surface;
+// constants would trip noUnusedLocals until sync()/update() consume them) —
+// the implementer adds CLAIMED_OPACITY_MIN/MAX/CLAIMED_PULSE_SPEED alongside
+// the material swap that uses them.
+
 // ---------- Main class ----------
 
 export class GhostMesh {

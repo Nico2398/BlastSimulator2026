@@ -32,7 +32,7 @@ export type DispatchRejectionReason = 'target-not-found' | 'target-unqualified' 
  */
 export function dispatchPendingAction(
   state: GameState,
-  action: PendingAction,
+  action: Omit<PendingAction, 'status' | 'holderId'>,
 ): { success: boolean; error?: string; reason?: DispatchRejectionReason } {
   const targetId = action.targetEmployeeId;
   const isQualified = (emp: { alive: boolean; qualifications: { category: string }[] }): boolean =>
@@ -50,30 +50,52 @@ export function dispatchPendingAction(
   } else if (!state.employees.employees.some(isQualified)) {
     return { success: false, error: 'unqualified', reason: 'roster-unqualified' };
   }
-  state.pendingActions.push(action);
+  // Full record constructed here — every dispatch starts life queued and
+  // unheld (#547); callers no longer supply status/holderId themselves.
+  state.pendingActions.push({ ...action, status: 'queued', holderId: null });
   state.ghostPreviews.push({
     id: action.id,
     type: action.type,
     targetX: action.targetX,
     targetZ: action.targetZ,
     targetY: action.targetY,
+    claimed: false,
   });
   return { success: true };
 }
 
 /**
- * Claim a pending action by id — removes it from both `pendingActions` and
- * `ghostPreviews` and returns the action, or null if not found.
+ * Claim a pending action by id, assigning it to `employeeId`. The action (and
+ * its ghost) remain in `state.pendingActions`/`state.ghostPreviews` — only
+ * status/holderId (and the ghost's `claimed` flag) change, so the record
+ * stays visible while the employee walks to it (#547).
+ * Returns the claimed action, or null if not found.
+ *
+ * TODO: implement — currently a stub, see #547.
  */
 export function claimPendingAction(
   state: GameState,
   actionId: number,
+  employeeId: number,
 ): PendingAction | null {
-  const idx = state.pendingActions.findIndex(a => a.id === actionId);
-  if (idx === -1) return null;
-  const [claimed] = state.pendingActions.splice(idx, 1);
-  const ghostIdx = state.ghostPreviews.findIndex(g => g.id === actionId);
-  if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
-  return claimed!;
+  void state;
+  void actionId;
+  void employeeId;
+  return null;
+}
+
+/**
+ * Remove a completed action and its ghost preview from state entirely.
+ * Returns the completed action, or null if not found.
+ *
+ * TODO: implement — currently a stub, see #547.
+ */
+export function completePendingAction(
+  state: GameState,
+  actionId: number,
+): PendingAction | null {
+  void state;
+  void actionId;
+  return null;
 }
 

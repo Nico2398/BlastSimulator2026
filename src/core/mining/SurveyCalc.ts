@@ -297,6 +297,12 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     targetY: 0,
     payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method] },
     targetEmployeeId: null,
+    // TODO(#547): minimal type-compliance defaults — real status transitions
+    // (queued → assigned → in_progress → removed) land with the lifecycle
+    // implementation, not here. This should likely be routed through
+    // dispatchPendingAction instead of a direct literal push.
+    status: 'queued',
+    holderId: null,
   });
 
   state.ghostPreviews.push({
@@ -305,6 +311,7 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     targetX: centerX,
     targetZ: centerZ,
     targetY: 0,
+    claimed: false,
   });
 
   return { success: true, actionId };
