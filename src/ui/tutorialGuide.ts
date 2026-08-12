@@ -8,6 +8,7 @@
 
 import type { GameState } from '../core/state/GameState.js';
 import type { Employee } from '../core/entities/Employee.js';
+import type { Vehicle } from '../core/entities/Vehicle.js';
 import type { TutorialStage } from './tutorialStages.js';
 
 /** Marks the body while the tutorial holds the rails. */
@@ -166,6 +167,19 @@ function hasOutstandingWork(e: Employee): boolean {
 }
 
 /**
+ * True if this vehicle has a live haul or break phase in progress (#552).
+ * Not yet wired into hasOutstandingWork/isWorkInProgress/workSignature —
+ * that is the implementer's job.
+ *
+ * Skeleton only — body filled in by the implementer (#552).
+ */
+function hasOutstandingVehicleWork(v: Vehicle): boolean {
+  // TODO: implement
+  void v;
+  return false;
+}
+
+/**
  * Fingerprint of the outstanding work so `decideClock` can tell "still moving"
  * from "stuck" instead of granting a flat grace window from step start.
  *
@@ -234,6 +248,8 @@ export function decideClock(
   waitsOnWork: boolean = false,
   progress: ClockProgress = { signature: null, tick: stepStartTick },
 ): ClockDecision {
+  // hasOutstandingVehicleWork (#552) is not wired in yet — implementer's job.
+  void hasOutstandingVehicleWork;
   const tickCount = state.tickCount ?? 0;
   const spent = Math.max(0, tickCount - stepStartTick);
   if (spent < budget) {

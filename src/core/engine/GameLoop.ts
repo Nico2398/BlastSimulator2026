@@ -1173,3 +1173,18 @@ function forceShiftRestIfNeeded(
   firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
   _emitter?.emit('employee:shift_change', { employeeId: emp.id });
 }
+
+/**
+ * Shared completion path for any vehicle-gated action (#552): continuity-
+ * promote a same-role follow-up action if one exists (mirrors
+ * tryContinueVehicleGatedAction), else release the vehicle/dismount the
+ * employee, then remove the PendingAction record and its ghost preview.
+ *
+ * Skeleton only — body filled in by the implementer (#552).
+ */
+export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Employee, actionId: number): void {
+  // TODO: implement
+  void state;
+  void emp;
+  void actionId;
+}

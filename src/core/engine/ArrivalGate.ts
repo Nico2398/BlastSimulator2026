@@ -27,6 +27,13 @@ export interface ArrivalGateResult {
   driversBoarded: number[];
   /** Employee IDs whose pending boarding was cancelled this tick, with a reason. */
   boardingCancelled: Array<{ employeeId: number; reason: 'vehicle_gone' | 'vehicle_taken' | 'vehicle_moved' | string }>;
+  /**
+   * Vehicle-gated actions (haul_debris/fragment_debris and any future
+   * vehicle-gated action) whose work completed on this tick via the vehicle
+   * drive loop below, for GameLoop's completion pass to finish off with
+   * completeVehicleGatedActionIfApplicable (#552).
+   */
+  completedVehicleActions: Array<{ actionId: number; employeeId: number }>;
 }
 
 /**
@@ -47,6 +54,7 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     taskStarted: [],
     driversBoarded: [],
     boardingCancelled: [],
+    completedVehicleActions: [],
   };
 
   for (const emp of state.employees.employees) {
