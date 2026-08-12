@@ -14,16 +14,17 @@
 // live lookup after a *_destroyed accident would find nothing).
 
 import { t } from '../../core/i18n/I18n.js';
-import { el, card, sectionHeader, emptyState, chip } from '../dom.js';
+import { el, card, sectionHeader, emptyState, chip, button } from '../dom.js';
 import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import type { ShiftMode } from '../../core/entities/SitePolicy.js';
-import type { GameState } from '../../core/state/GameState.js';
+import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
+import { ACTION_LABEL_KEY } from '../crewDetailSections.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
@@ -31,6 +32,12 @@ const RECENT_INCIDENTS = 10;
 
 /** Shift modes accepted by `set_policy` (mirrors SettingsMenu.ts's own list — SitePolicy.ts doesn't export one). */
 const SHIFT_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
+
+const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
+  queued: 'ui.operations.work_queue_status_queued',
+  assigned: 'ui.operations.work_queue_status_assigned',
+  in_progress: 'ui.operations.work_queue_status_in_progress',
+};
 
 const INCIDENT_STYLE: Record<AccidentRecord['type'], { icon: IconName; critical: boolean }> = {
   injury: { icon: 'injured', critical: false },
@@ -154,6 +161,12 @@ export class OperationsPanel {
       accidents: state.damage.accidents.length,
       injured: state.employees.employees.filter(e => e.injured && e.alive).map(e => e.id),
       unclaimed: state.pendingActions.filter(a => a.status === 'queued').length,
+      // Every live (non-rest) action's id/status/holder — so a claim or a
+      // cancellation (#548) triggers a rebuild of the Work Queue section,
+      // not just the count already covered by `unclaimed` above.
+      workQueue: state.pendingActions
+        .filter(a => a.type !== 'rest')
+        .map(a => `${a.id}:${a.status}:${a.holderId}`),
       policy: state.sitePolicy.revision,
     });
     if (signature === this.lastSignature) return;
@@ -173,6 +186,8 @@ export class OperationsPanel {
     const sections: HTMLElement[] = [
       sectionHeader(t('ui.operations.logistics')),
       this.makeLogisticsRows(state),
+      sectionHeader(t('ui.operations.work_queue')),
+      ...this.makeWorkQueueRows(state),
       sectionHeader(t('ui.operations.ore_on_hand')),
       ...this.makeOreRows(state),
       sectionHeader(t('ui.operations.last_ore_report')),
@@ -224,6 +239,57 @@ export class OperationsPanel {
       el('span', { text: value, attrs: { style: 'margin-left:auto;font:600 12px/1 var(--bsx-font-mono)' } }),
     );
     row.append(head, el('span', { text: note, attrs: { style: 'font:400 10px/1 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }));
+    return row;
+  }
+
+  // ── Work Queue ──
+
+  /**
+   * Renders one row per active, player-cancellable PendingAction — every
+   * live entry except 'rest', which is engine-owned (needs/collapse/shift
+   * cycle) and never player-cancellable (#548).
+   */
+  private makeWorkQueueRows(state: GameState): HTMLElement[] {
+    const live = state.pendingActions.filter(a => a.type !== 'rest');
+    if (live.length === 0) return [emptyState(t('ui.operations.work_queue_empty'))];
+    return live.map(a => this.makeWorkQueueRow(a, state));
+  }
+
+  private makeWorkQueueRow(action: PendingAction, state: GameState): HTMLElement {
+    const holder = action.holderId !== null
+      ? state.employees.employees.find(e => e.id === action.holderId)
+      : undefined;
+    const holderText = action.holderId === null
+      ? t('ui.operations.work_queue_holder_unclaimed')
+      : holder
+        ? holder.name
+        : t('ui.operations.work_queue_holder_unknown');
+
+    const row = el('div');
+    row.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:9px 11px;border:1px solid var(--bsx-hairline);border-radius:5px;background:var(--bsx-card)';
+
+    const headRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
+    headRow.append(
+      el('span', { text: t(ACTION_LABEL_KEY[action.type]), attrs: { style: 'font:600 11px/1 var(--bsx-font-ui)' } }),
+      el('span', {
+        text: t('ui.crew.location_coords', { x: action.targetX, z: action.targetZ }),
+        className: 'bsx-mono',
+        attrs: { style: 'font-size:10px;color:var(--bsx-text-micro)' },
+      }),
+      chip(t(WORK_QUEUE_STATUS_KEY[action.status]), action.status === 'in_progress' ? 'info' : 'neutral'),
+    );
+
+    const footRow = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
+    const cancelBtn = button('danger', t('ui.operations.work_queue_cancel'));
+    cancelBtn.style.cssText = 'margin-left:auto;height:24px;padding:0 10px;font:600 10px/1 var(--bsx-font-mono)';
+    cancelBtn.dataset['cancelAction'] = String(action.id);
+    cancelBtn.addEventListener('click', () => this.gameConsole?.(`employee cancel ${action.id}`));
+    footRow.append(
+      el('span', { text: holderText, attrs: { style: 'font:500 11px/1 var(--bsx-font-ui);color:var(--bsx-text-secondary)' } }),
+      cancelBtn,
+    );
+
+    row.append(headRow, footRow);
     return row;
   }
 

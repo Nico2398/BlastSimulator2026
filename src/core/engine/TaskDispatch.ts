@@ -2,8 +2,30 @@
 // Routes pending actions to qualified employees.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
+import { SURVEY_COSTS } from '../config/balance.js';
+import type { SurveyMethod } from '../mining/SurveyCalc.js';
+import { addIncome } from '../economy/Finance.js';
+import type { Employee } from '../entities/Employee.js';
 
 export type { PendingAction };
+
+/**
+ * Clears the fields an employee's active-task claim sets, shared by
+ * tickTaskProgress's completion path (GameLoop.ts) and cancelAction below —
+ * both need the task/skill bookkeeping reset once an action stops occupying
+ * the employee, whether it finished normally or was cancelled mid-flight.
+ * cancelAction additionally clears walk/stuck fields on top of this, since
+ * cancellation can happen while the employee is still walking to the target
+ * (a lifecycle stage tickTaskProgress's completion path never sees).
+ */
+export function clearActiveTaskFields(emp: Employee): void {
+  emp.activeActionId = null;
+  emp.taskTicksRemaining = null;
+  delete emp.activeTaskTotalTicks;
+  emp.activeTaskSkill = null;
+  emp.pendingActionType = null;
+  emp.pendingActionPayload = null;
+}
 
 /**
  * Distinguishes *why* dispatch rejected, beyond the generic `error: 'unqualified'`
@@ -109,5 +131,72 @@ export function completePendingAction(
   if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
 
   return action ?? null;
+}
+
+export interface CancelActionResult {
+  success: boolean;
+  /** 'not-found' — no action with that id. 'not-cancellable' — engine-owned rest action. */
+  error?: 'not-found' | 'not-cancellable';
+  /** The removed action, present on success. */
+  action?: PendingAction;
+  /** Amount refunded to state.cash, 0 when the action's type charges nothing at order time. */
+  refunded?: number;
+}
+
+/**
+ * Cancel a PendingAction by id, at any lifecycle stage (queued, assigned, in_progress).
+ * Rejects 'rest' actions — engine-owned, never player-cancellable (#548).
+ *
+ * When the action has a holder (an employee walking to or working it), the
+ * employee is released back to idle — every field claimPendingAction/
+ * tickEmployees set to claim/start it (activeActionId, walk destination,
+ * in-progress task fields, move-stuck tracking) is cleared, so the employee
+ * is claimable again next tick instead of stuck mid-walk or mid-task.
+ *
+ * Any order-time cost (survey only, today) is refunded to state.cash and
+ * recorded on the finances ledger via addIncome — the same dual-write
+ * (state.cash + finances ledger) pattern other cash-moving core functions
+ * use, e.g. SurveyCalc.ts's runSurvey and EventResolver.ts.
+ *
+ * The action and its ghost are removed via completePendingAction, discarding
+ * any in-progress work — a cancel produces no result and no XP.
+ */
+export function cancelAction(state: GameState, actionId: number): CancelActionResult {
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (!action) return { success: false, error: 'not-found' };
+  if (action.type === 'rest') return { success: false, error: 'not-cancellable' };
+
+  if (action.holderId !== null) {
+    const holder = state.employees.employees.find(emp => emp.id === action.holderId);
+    if (holder) {
+      clearActiveTaskFields(holder);
+      holder.destinationX = null;
+      holder.destinationZ = null;
+      holder.moveConsecutiveFailures = 0;
+      holder.isMoveStuck = false;
+      holder.pendingTaskDuration = null;
+    }
+  }
+
+  const refunded = actionOrderCost(action);
+  if (refunded > 0) {
+    state.cash += refunded;
+    addIncome(state.finances, refunded, 'refund', `Cancelled ${action.type} action`, state.tickCount);
+  }
+
+  completePendingAction(state, actionId);
+
+  return { success: true, action, refunded };
+}
+
+/**
+ * Order-time cost already charged for an action's type — survey today, 0 for
+ * everything else. Used by cancelAction to compute the refund.
+ */
+function actionOrderCost(action: PendingAction): number {
+  if (action.type !== 'survey') return 0;
+  const method = action.payload['method'];
+  if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;
+  return SURVEY_COSTS[method as SurveyMethod];
 }
 

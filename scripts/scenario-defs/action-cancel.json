@@ -1,0 +1,282 @@
+{
+  "name": "action-cancel",
+  "description": "Order a seismic survey, let the surveyor start walking (ghost visible, cost deducted), open Operations and cancel the queued action from its work-queue row -- proves the refund lands, the ghost disappears, and the freed surveyor can be re-dispatched. FAILS until cancelAction/employee-cancel/OperationsPanel work-queue wiring land (#548).",
+  "steps": [
+    {
+      "command": "new_game seed:42",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "campaign start level:dusty_hollow",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "campaign start level:dusty_hollow"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "worldSizeX"
+        ]
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:geology level:3",
+      "description": "Test-only bootstrap, not a player action: hiring already grants the Rookie starting geology qualification (ROLE_STARTING_QUALIFICATION in Employee.ts) -- this only raises the level so the survey below has a competent surveyor. No role tag has a UI equivalent; the player-facing way to raise a skill is `employee train` at a training building.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:geology level:3"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 3
+        },
+        "note": "single surveyor, geology qualification replaced (not summed) from Rookie 1 to 3"
+      }
+    },
+    {
+      "command": "survey seismic x:5 z:5",
+      "description": "Ordered far from the surveyor's spawn so several ticks of travel remain before arrival -- the cancel below must land while the surveyor is still walking, not after the survey has resolved.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 0,
+          "pendingActionCount": 1
+        },
+        "note": "seismic cost (SURVEY_COSTS.seismic = $3000) already deducted at order time -- the whole point of the refund this scenario proves"
+      }
+    },
+    {
+      "command": "tick 3",
+      "description": "A few ticks only -- nowhere near the seismic survey's travel + SURVEY_DURATION_TICKS.seismic (8) duration, so the surveyor is still walking (or, at worst, has just arrived and not yet finished the work) when the cancel below runs.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 3"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "surveyCount": 0,
+          "pendingActionCount": 1
+        },
+        "note": "still queued/assigned/in_progress -- not yet resolved into a surveyResult"
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "description": "Open Operations and look at the work-queue row for the still-active survey action before cancelling it.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-operations-panel"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-operations-panel [data-cancel-action=\"1\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee cancel 1",
+      "description": "Cancel via the work-queue row's cancel control, matching the data-cancel-action=\"<id>\" convention on OperationsPanel's per-row buttons.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-operations-panel [data-cancel-action=\"1\"]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "pendingActionCount": 0,
+          "surveyCount": 0
+        },
+        "note": "refund lands (cash increases from the order-time seismic deduction), the action and its ghost are gone, and no survey result was ever produced"
+      }
+    },
+    {
+      "command": "finances",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "finances"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "survey core_sample x:6 z:6",
+      "description": "Re-order a survey with the same surveyor now that the cancel released them -- proves the employee is not stuck holding the cancelled action.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 6,
+          "z": 6
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "pendingActionCount": 1
+        },
+        "note": "the same surveyor claims the new order -- cancel left them idle, not stuck"
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ]
+}

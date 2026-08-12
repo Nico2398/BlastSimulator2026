@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { OperationsPanel } from '../../../../src/ui/panels/OperationsPanel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
-import type { GameState } from '../../../../src/core/state/GameState.js';
+import type { GameState, PendingAction } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
 
@@ -202,5 +202,140 @@ describe('OperationsPanel', () => {
     const { panel, container } = makePanel();
     panel.dispose();
     expect(container.contains(panel.root)).toBe(false);
+  });
+});
+
+// ── Work queue (#548) ────────────────────────────────────────────────────────
+//
+// Renders one row per active PendingAction (queued/assigned/in_progress), each
+// with a Cancel control, so a player can cancel an ordered action from the
+// Operations panel. FAILS until makeWorkQueueRows/makeWorkQueueRow (currently
+// throwing "not implemented") are wired into render().
+
+function makePendingActionFixture(overrides: Partial<PendingAction> = {}): PendingAction {
+  return {
+    id: 1,
+    type: 'general_work',
+    requiredSkill: null,
+    requiredVehicleRole: null,
+    targetX: 3,
+    targetZ: 7,
+    targetY: 0,
+    payload: {},
+    targetEmployeeId: null,
+    status: 'queued',
+    holderId: null,
+    ...overrides,
+  };
+}
+
+describe('OperationsPanel — work queue (#548)', () => {
+  it('shows the empty-state text when there are no pending actions', () => {
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(makeState());
+    expect(panel.root.textContent).toContain('Work Queue');
+    expect(panel.root.textContent).toContain('No active orders.');
+  });
+
+  it('renders a queued action\'s type label, coordinates, "Unclaimed" holder text, and a cancel control', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const action = makePendingActionFixture({ id: 11, type: 'general_work', targetX: 3, targetZ: 7, status: 'queued', holderId: null });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 11, type: 'general_work', targetX: 3, targetZ: 7, targetY: 0, claimed: false });
+
+    panel.show();
+    panel.update(state);
+
+    const text = panel.root.textContent ?? '';
+    expect(text).toContain('Working'); // ui.crew.action_general_work label
+    expect(text).toContain('3');
+    expect(text).toContain('7');
+    expect(text).toContain('Unclaimed'); // ui.operations.work_queue_holder_unclaimed
+    expect(panel.root.querySelector('[data-cancel-action="11"]')).not.toBeNull();
+  });
+
+  it('shows the claimed employee\'s name for an assigned action with a known holderId', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Oz Trill' });
+    const action = makePendingActionFixture({ id: 12, status: 'assigned', holderId: emp.id });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 12, type: 'general_work', targetX: 3, targetZ: 7, targetY: 0, claimed: true });
+
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.textContent).toContain('Oz Trill');
+  });
+
+  it('falls back to "Unknown" holder text when holderId points at nobody on the roster', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const action = makePendingActionFixture({ id: 13, status: 'assigned', holderId: 999 });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 13, type: 'general_work', targetX: 3, targetZ: 7, targetY: 0, claimed: true });
+
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.textContent).toContain('Unknown'); // ui.operations.work_queue_holder_unknown
+  });
+
+  it('does not list a type:"rest" action in the work queue at all', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const emp = addEmployee(state, { name: 'Resting Randy' });
+    const restAction = makePendingActionFixture({
+      id: 14, type: 'rest', requiredSkill: null, status: 'assigned', holderId: emp.id, targetEmployeeId: emp.id,
+    });
+    state.pendingActions.push(restAction);
+
+    panel.show();
+    panel.update(state);
+
+    expect(panel.root.querySelector('[data-cancel-action="14"]')).toBeNull();
+    // The only pending action is a rest action, which the work queue excludes
+    // entirely (issue #548: rest actions are engine-owned, not player-cancellable).
+    // With nothing else pending, the queue's empty state is the correct result.
+    expect(panel.root.textContent).toContain('No active orders.');
+  });
+
+  it('clicking a row\'s cancel control dispatches "employee cancel <id>" through gameConsole', () => {
+    const { panel, gameConsole } = makePanel();
+    const state = makeState();
+    const action = makePendingActionFixture({ id: 15 });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 15, type: 'general_work', targetX: 3, targetZ: 7, targetY: 0, claimed: false });
+
+    panel.show();
+    panel.update(state);
+
+    const cancelBtn = panel.root.querySelector('[data-cancel-action="15"]') as HTMLButtonElement;
+    expect(cancelBtn).not.toBeNull();
+    cancelBtn.click();
+
+    expect(gameConsole).toHaveBeenCalledWith('employee cancel 15');
+  });
+
+  it('update() re-renders the work queue when a pending action\'s status changes between calls', () => {
+    const { panel } = makePanel();
+    const state = makeState();
+    const action = makePendingActionFixture({ id: 16, status: 'queued', holderId: null });
+    state.pendingActions.push(action);
+    state.ghostPreviews.push({ id: 16, type: 'general_work', targetX: 3, targetZ: 7, targetY: 0, claimed: false });
+
+    panel.show();
+    panel.update(state);
+    expect(panel.root.textContent).toContain('Queued'); // ui.operations.work_queue_status_queued
+
+    // Mutate to assigned, as tickEmployees would on claim (#547).
+    action.status = 'assigned';
+    action.holderId = 42;
+    panel.update(state);
+
+    expect(panel.root.textContent).toContain('Walking'); // ui.operations.work_queue_status_assigned
+    expect(panel.root.textContent).not.toContain('Queued');
   });
 });

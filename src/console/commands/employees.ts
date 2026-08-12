@@ -20,7 +20,7 @@ import {
   trainableSkills,
 } from '../../core/entities/EmployeeTraining.js';
 import { addExpense } from '../../core/economy/Finance.js';
-import { dispatchPendingAction } from '../../core/engine/TaskDispatch.js';
+import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
@@ -251,8 +251,24 @@ export function employeeCommand(
           + `level ${plan.targetLevel} in ${plan.ticks} ticks ($${plan.fee}).`,
       };
     }
+    case 'cancel': {
+      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
+      if (isNaN(id)) return { success: false, output: 'Usage: employee cancel <action-id>' };
+
+      const result = cancelAction(state, id);
+      if (!result.success) {
+        const message = result.error === 'not-cancellable'
+          ? `Action #${id} cannot be cancelled.`
+          : `Action #${id} not found.`;
+        return { success: false, output: message };
+      }
+      const refundMsg = result.refunded && result.refunded > 0
+        ? ` $${formatMoney(result.refunded)} refunded.`
+        : '';
+      return { success: true, output: `Action #${id} (${result.action!.type}) cancelled.${refundMsg}` };
+    }
     default:
-      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|dispatch|train)' };
+      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|dispatch|train|cancel)' };
   }
 }
 
