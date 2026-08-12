@@ -23,3 +23,15 @@ export function sanitizeFiniteOverride(parsed: number, opts?: { min?: number }):
   if (opts?.min !== undefined && parsed < opts.min) return undefined;
   return parsed;
 }
+
+/**
+ * Parses a raw named-arg string as a boolean flag (`staffed:true`). Returns
+ * `undefined` when the flag was not passed, `null` when it was passed with an
+ * unrecognized value, so callers can distinguish "not given" from "invalid".
+ */
+export function parseBooleanFlag(raw: string | undefined): boolean | undefined | null {
+  if (raw === undefined) return undefined;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return null;
+}

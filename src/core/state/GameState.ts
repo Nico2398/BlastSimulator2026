@@ -66,6 +66,8 @@ export interface GameConfig {
   mineType?: string;
   startingCash?: number;
   eventFreqMultiplier?: number;
+  /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
+  staffed?: boolean;
 }
 
 /** The type of action a player has issued, waiting for an employee to execute. */
@@ -335,6 +337,17 @@ export function createGame(config: GameConfig): GameState {
     lastBlastPreview: null,
     tubingState: createTubingState(),
   };
+}
+
+/**
+ * Hires STARTING_SITE_STAFFED_COMPOSITION.employees and purchases
+ * STARTING_SITE_STAFFED_COMPOSITION.vehicles into `state`, for the opt-in
+ * staffed starting site (#551). Not yet wired into `createGame`.
+ */
+export function applyStaffedComposition(_state: GameState): void {
+  // TODO(implementer): hire STARTING_SITE_STAFFED_COMPOSITION.employees and
+  // purchase STARTING_SITE_STAFFED_COMPOSITION.vehicles into `state`, per issue #551.
+  throw new Error('applyStaffedComposition not implemented');
 }
 
 /**

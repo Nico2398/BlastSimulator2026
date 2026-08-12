@@ -4,7 +4,8 @@
 
 import type { BuildingType } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
-import type { VehicleRole, VehicleTask } from '../entities/Vehicle.js';
+import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
+import type { EmployeeRole, SkillCategory } from '../entities/Employee.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -595,6 +596,58 @@ export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   rock_fragmenter: 'clearing',
   building_destroyer: 'clearing',
 };
+
+// ─── Starting Site (staffed new_game / sandbox) ────────────────────────────────
+
+export interface StartingSiteEmployeeSlot {
+  readonly role: EmployeeRole;
+  readonly qualifications: ReadonlyArray<{
+    readonly category: SkillCategory;
+    readonly proficiencyLevel: 1 | 2 | 3 | 4 | 5;
+  }>;
+}
+
+export interface StartingSiteVehicleSlot {
+  readonly role: VehicleRole;
+  readonly tier: VehicleTier;
+}
+
+/**
+ * Composition of the opt-in staffed starting site (`new_game staffed:true` /
+ * `sandbox start staffed:true`). Covers the licences and vehicle roles the
+ * queued-work pipeline (#552-#556) requires, so scenarios can boot a
+ * ready-to-work site instead of hiring/purchasing through the UI in every
+ * unrelated scenario. See issue #551.
+ */
+export const STARTING_SITE_STAFFED_COMPOSITION: {
+  readonly employees: readonly StartingSiteEmployeeSlot[];
+  readonly vehicles: readonly StartingSiteVehicleSlot[];
+} = {
+  employees: [
+    { role: 'driller', qualifications: [
+      { category: 'blasting', proficiencyLevel: 1 },
+      { category: 'driving.drill_rig', proficiencyLevel: 1 },
+    ] },
+    { role: 'blaster', qualifications: [
+      { category: 'blasting', proficiencyLevel: 1 },
+    ] },
+    { role: 'driver', qualifications: [
+      { category: 'driving.truck', proficiencyLevel: 1 },
+    ] },
+    { role: 'driver', qualifications: [
+      { category: 'driving.excavator', proficiencyLevel: 1 },
+    ] },
+    { role: 'driver', qualifications: [
+      { category: 'driving.excavator', proficiencyLevel: 1 },
+    ] },
+  ],
+  vehicles: [
+    { role: 'drill_rig', tier: 1 },
+    { role: 'debris_hauler', tier: 1 },
+    { role: 'rock_digger', tier: 1 },
+    { role: 'rock_fragmenter', tier: 1 },
+  ],
+} as const;
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
