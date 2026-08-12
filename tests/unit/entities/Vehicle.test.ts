@@ -1411,6 +1411,84 @@ describe('assignDriver — error: vehicle already has a driver', () => {
   });
 });
 
+// ── assignDriver — reservation exclusivity (#550) ─────────────────────────────
+// A vehicle-gated action's reservation is exclusive: only the employee it was
+// reserved for may board it. A different employee (or a manual `vehicle
+// driver` re-target) must be rejected; the reservation's own holder must not
+// be blocked from boarding their own reserved vehicle.
+
+describe('assignDriver — error: vehicle reserved for a different action', () => {
+  it('returns { success: false } when vehicle.reservedForActionId does not match employee.activeActionId', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    const employee = es.employees.find(e => e.id === empId)!;
+
+    vehicle.reservedForActionId = 7;
+    employee.activeActionId = null; // a different party — not the reservation's holder
+
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(false);
+  });
+
+  it('error message is exactly "Vehicle is reserved for another task"', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_digger', 'driving.excavator');
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    const employee = es.employees.find(e => e.id === empId)!;
+
+    vehicle.reservedForActionId = 7;
+    employee.activeActionId = 8; // holds a DIFFERENT action than the reservation
+
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.error).toBe('Vehicle is reserved for another task');
+  });
+
+  it('vehicle.driverId stays null after a reservation-mismatch failure', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('drill_rig', 'driving.drill_rig');
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    const employee = es.employees.find(e => e.id === empId)!;
+
+    vehicle.reservedForActionId = 7;
+    employee.activeActionId = null;
+
+    assignDriver(vs, es, vehicleId, empId);
+    expect(vehicle.driverId).toBeNull();
+  });
+});
+
+describe('assignDriver — success: reservation holder boards their own reserved vehicle', () => {
+  it('returns { success: true } when vehicle.reservedForActionId equals employee.activeActionId', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    const employee = es.employees.find(e => e.id === empId)!;
+
+    vehicle.reservedForActionId = 7;
+    employee.activeActionId = 7; // the reservation's own holder
+
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(true);
+  });
+
+  it('sets vehicle.driverId to the employee id when the reservation matches', () => {
+    const { vs, es, vehicleId, empId } = makeDriverFixture('rock_fragmenter', 'driving.excavator');
+    const vehicle = vs.vehicles.find(v => v.id === vehicleId)!;
+    const employee = es.employees.find(e => e.id === empId)!;
+
+    vehicle.reservedForActionId = 12;
+    employee.activeActionId = 12;
+
+    assignDriver(vs, es, vehicleId, empId);
+    expect(vehicle.driverId).toBe(empId);
+  });
+
+  it('an unreserved vehicle (reservedForActionId null) is unaffected by the guard', () => {
+    // Regression guard: the exclusivity check must not fire at all for the
+    // common case of an ordinary, unreserved vehicle.
+    const { vs, es, vehicleId, empId } = makeDriverFixture('debris_hauler', 'driving.truck');
+    const result = assignDriver(vs, es, vehicleId, empId);
+    expect(result.success).toBe(true);
+  });
+});
+
 // ── unassignDriver — frees a vehicle's driver so it can be reassigned ─────────
 
 describe('unassignDriver — happy path', () => {

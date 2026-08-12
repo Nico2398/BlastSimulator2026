@@ -4,6 +4,7 @@
 
 import type { BuildingType } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
+import type { VehicleRole, VehicleTask } from '../entities/Vehicle.js';
 
 // ─── Time ───────────────────────────────────────────────────────────────────────
 
@@ -585,6 +586,15 @@ export const VEHICLE_BASE_STATS = {
  * structure down), scrapping a vehicle sells it for salvage.
  */
 export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
+
+/** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
+export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
+  drill_rig: 'drilling',
+  debris_hauler: 'transport',
+  rock_digger: 'clearing',
+  rock_fragmenter: 'clearing',
+  building_destroyer: 'clearing',
+};
 
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 

@@ -44,6 +44,28 @@ function migrateV8ToV9(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * v9 -> v10: Vehicle gained a `reservedForActionId: number | null` field
+ * (#550 vehicle-gated actions). A pre-v10 save has no vehicle-gated
+ * reservations to preserve — the field defaults to null for every vehicle,
+ * matching purchaseVehicle's own default. Mutates `obj` in place, matching
+ * every other migration block in `deserialize` below.
+ */
+function migrateV9ToV10(obj: Record<string, unknown>): Record<string, unknown> {
+  const vehiclesRaw = obj['vehicles'] as Record<string, unknown> | undefined;
+  if (vehiclesRaw) {
+    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(vehicleList)) {
+      for (const v of vehicleList) {
+        if (v['reservedForActionId'] === undefined) {
+          v['reservedForActionId'] = null;
+        }
+      }
+    }
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -245,6 +267,11 @@ export function deserialize(json: string): GameState {
   // v8 -> v9: Employee.taskQueue (#549).
   if ((obj['version'] as number) < 9) {
     migrateV8ToV9(obj);
+  }
+
+  // v9 -> v10: Vehicle.reservedForActionId (#550).
+  if ((obj['version'] as number) < 10) {
+    migrateV9ToV10(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

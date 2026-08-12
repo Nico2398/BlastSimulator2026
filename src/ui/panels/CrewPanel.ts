@@ -275,6 +275,7 @@ export class CrewPanel {
     if (e.collapsing) tags.push({ icon: 'collapse', color: 'var(--bsx-critical)', tip: t('ui.crew.tag_collapsed') });
     if (e.trainingState) tags.push({ icon: 'training', color: 'var(--bsx-info)', tip: t('ui.crew.tag_training') });
     if (activity.kind === 'driving') tags.push({ icon: 'drive', color: 'var(--bsx-info)', tip: t('ui.crew.tag_driving') });
+    if (activity.kind === 'driving_to_task') tags.push({ icon: 'drive', color: 'var(--bsx-amber)', tip: t('ui.crew.tag_driving_task') });
     for (const tg of tags) {
       const chip = el('span', { attrs: { style: `color:${tg.color}`, title: tg.tip }, children: [iconEl(tg.icon, 13)] });
       wrap.appendChild(chip);

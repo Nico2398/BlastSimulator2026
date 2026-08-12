@@ -23,8 +23,9 @@ import { tickResearch, getTotalOperatingCost } from '../../core/entities/Buildin
 import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate, tryContinueVehicleGatedAction } from '../../core/engine/GameLoop.js';
 import { completePendingAction } from '../../core/engine/TaskDispatch.js';
+import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
@@ -202,10 +203,20 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] Research cancelled: ${cancelledResearch.targetType} tier ${cancelledResearch.targetTier} — Research Center destroyed, $${cancelledResearch.refund} refunded.`);
     }
 
-    // 8d. Dispatch remaining pending actions to idle qualified employees.
-    // An action requiring a skill nobody on the roster holds is not left to
-    // queue silently forever — it raises the same unqualified_task_error event
-    // used elsewhere (auto-pause, resolved via "event choose").
+    // 8d. Dispatch remaining pending actions to idle qualified employees. An
+    // action requiring a skill nobody on the roster holds is not left to
+    // queue silently forever — it raises the same unqualified_task_error
+    // event used elsewhere (auto-pause, resolved via "event choose").
+    //
+    // Runs BEFORE 8e's completion pass below, matching main's original
+    // order — an earlier fix (#550) swapped these two globally so a
+    // vehicle-gated driver freed by 8e could be redispatched the same tick,
+    // but that reordering shifted every employee's task-completion timing by
+    // up to one tick, on-foot or vehicle-gated alike, and broke survey/task
+    // timing across several scenarios that have nothing to do with vehicles.
+    // The vehicle-continuity case that motivated it is instead handled
+    // inline, scoped to vehicle-gated actions only — see
+    // tryContinueVehicleGatedAction below.
     const dispatchResult = tickEmployees(state);
     fired = fired ?? detectUnqualifiedTask(dispatchResult.unqualified, state.events, state.tickCount);
 
@@ -225,6 +236,19 @@ export function tickCommand(
         // removes the completing action's record and ghost, once the work has
         // actually finished, not at claim time (#547).
         if (progress.actionId !== undefined) {
+          // #550: look the action up before completePendingAction removes
+          // the record — nothing to look requiredVehicleRole up on
+          // afterward. For a vehicle-gated action, try the scoped same-tick
+          // continuity promotion first (tryContinueVehicleGatedAction) —
+          // reassigns the just-finished vehicle straight to a same-role
+          // follow-up already available to this employee, keeping them
+          // mounted. Only when no follow-up qualifies does the vehicle get
+          // unconditionally released/dismounted via releaseVehicleOnCompletion.
+          const completingAction = state.pendingActions.find(a => a.id === progress.actionId);
+          if (completingAction && completingAction.requiredVehicleRole !== null) {
+            const continued = tryContinueVehicleGatedAction(state, emp, completingAction);
+            if (!continued) releaseVehicleOnCompletion(state, emp, progress.actionId);
+          }
           completePendingAction(state, progress.actionId);
         }
 
@@ -264,7 +288,11 @@ export function tickCommand(
     // are driven entirely by tickArrivalGate/tickHaulingProgress instead (8h)
     // — ticking them here too would move them twice in the same tick (#437).
     for (const vehicle of state.vehicles.vehicles) {
-      if (vehicle.haulingPhase !== null) continue;
+      // Vehicle-gated actions (#550) are driven exclusively by
+      // ArrivalGate.tickArrivalGate's own vehicle-drive loop (8h below) —
+      // ticking them here too would move them twice in the same tick, same
+      // rationale as the haulingPhase skip.
+      if (vehicle.haulingPhase !== null || vehicle.reservedForActionId !== null) continue;
       tickVehicle(state, vehicle, emitter);
       tickVehicleTaskState(vehicle);
     }

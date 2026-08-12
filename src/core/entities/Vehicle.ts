@@ -150,6 +150,13 @@ export interface Vehicle {
   breakFragmentId: number | null;
   /** Single-leg break phase — travelling to the boulder. Null when idle. */
   breakPhase: 'to_boulder' | null;
+  /**
+   * PendingAction id this vehicle is exclusively reserved for — set at claim
+   * time by GameLoop for a vehicle-gated action, VehicleReservation.ts owns
+   * every transition. Distinct from driverId: reserved-but-not-yet-boarded
+   * is the walk-to-vehicle phase.
+   */
+  reservedForActionId: number | null;
 }
 
 // ── Fleet state ──
@@ -194,6 +201,7 @@ export function purchaseVehicle(
     haulingDepotBuildingId: null,
     breakFragmentId: null,
     breakPhase: null,
+    reservedForActionId: null,
   };
   state.vehicles.push(vehicle);
   return { vehicle, cost: def.purchaseCost };
