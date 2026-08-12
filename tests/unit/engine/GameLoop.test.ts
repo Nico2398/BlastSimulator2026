@@ -578,8 +578,14 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
 
     // Near emp1, fast (short work) — emp1 frees first.
     const nearEmp1 = makeAction({ id: 1, targetX: 2, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 2 } });
-    // Near emp2, slow — emp2 stays busy long after emp1 frees.
-    const nearEmp2 = makeAction({ id: 2, targetX: 28, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 40 } });
+    // Near emp2, slower than emp1's task — emp2 stays busy after emp1 frees.
+    // Total cost is travel + work (#549), so this duration is deliberately
+    // kept low enough that near-emp2's total (travel 1 + work 6 = 7) still
+    // beats the leftover's total for emp2 (travel 7.5 + work 2 = 9.5) — a
+    // duration as large as the task's own travel-vs-leftover gap would make
+    // the farther-but-shorter leftover action emp2's cheaper pick instead,
+    // which is exactly the failure mode this scenario is meant to rule out.
+    const nearEmp2 = makeAction({ id: 2, targetX: 28, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 6 } });
     // Far from both — neither's cheapest at initial dispatch time.
     const leftover = makeAction({ id: 3, targetX: 15, targetZ: 0, requiredSkill: 'blasting', payload: { durationTicks: 2 } });
 
@@ -595,7 +601,9 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
     expect(state.pendingActions.find(a => a.id === 3)!.holderId).toBeNull();
 
     // Settle: emp1 finishes its short task quickly and should pick up the
-    // leftover next, long before emp2 frees from its 40-tick task.
+    // leftover next — either directly (once idle) or via the busy-employee
+    // pool reservation ahead (step 3 of tickEmployees) on an earlier tick —
+    // long before emp2 frees from its own, still-longer task.
     let leftoverHolderWhenClaimed: number | null | undefined;
     for (let i = 0; i < 20 && leftoverHolderWhenClaimed === undefined; i++) {
       runFullTick(state);

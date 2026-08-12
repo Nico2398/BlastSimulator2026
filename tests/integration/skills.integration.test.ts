@@ -33,11 +33,18 @@ function makeCtx(): GameContext {
   return ctx;
 }
 
-/** Hire one employee and return their numeric ID (always 1 on a fresh state). */
+/**
+ * Hire one employee and return their numeric ID. Always the *last* entry in
+ * the roster, not `employees[0]` — on a fresh state that's the same employee,
+ * but the #549 dispatch test below calls this twice on one ctx, and reading
+ * index 0 both times silently returned the first hire's id for the second
+ * call too (both "emp1Id" and "emp2Id" variables pointing at one employee).
+ */
 function hireOne(ctx: GameContext, role = 'blaster'): number {
   const result = employeeCommand(ctx, ['hire'], { role });
   if (!result.success) throw new Error(`Setup: hire failed — ${result.output}`);
-  return ctx.state!.employees.employees[0]!.id;
+  const employees = ctx.state!.employees.employees;
+  return employees[employees.length - 1]!.id;
 }
 
 /**

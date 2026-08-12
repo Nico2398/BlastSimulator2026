@@ -167,6 +167,14 @@ export interface TickEmployeesResult {
  *      non-empty) from the employee's actual current position, or otherwise
  *      claim exactly one candidate from the open pool (targetEmployeeId ===
  *      null) — never both in the same tick.
+ *   3. If still busy afterward with a genuine, non-'rest' active task (not a
+ *      resting employee, and not one whose activeActionId doesn't correspond
+ *      to a real record) and taskQueue has room under
+ *      MAX_EMPLOYEE_TASK_QUEUE_DEPTH: reserve exactly one more candidate from
+ *      the open pool ahead into taskQueue — this is what lets a single busy
+ *      employee build up a multi-action personal queue from open-pool work
+ *      (not just targeted actions) across several ticks, one reservation per
+ *      tick, same fairness rule as step 2's single pool claim.
  *
  * Mutates state: transitions claimed actions' status/holderId in place (and
  * marks their ghost `claimed`) instead of removing them — the record and its
@@ -203,6 +211,8 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);
+    } else {
+      reserveOnePoolActionAhead(state, employee, result);
     }
   }
 
@@ -280,6 +290,46 @@ function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, r
   if (!claimed) return; // defensive: someone else claimed it between filter and here — never happens single-threaded, kept for safety
   result.claimed.push(selection.action.id);
   promoteActionToActive(state, employee, selection.action);
+}
+
+/**
+ * Step 3 of tickEmployees: called only when `employee` is still busy after
+ * steps 1-2 (activeActionId !== null). Reserves exactly one more open-pool
+ * candidate (targetEmployeeId === null) ahead into taskQueue, when there is
+ * room under MAX_EMPLOYEE_TASK_QUEUE_DEPTH — the mechanism that lets a busy
+ * employee build a multi-action personal queue out of open-pool work over
+ * several ticks (targeted actions already get this eagerly via
+ * claimActionsTargetedAtEmployee; open-pool candidates only ever get claimed
+ * one at a time, matching step 2's single-claim fairness rule, so they
+ * accumulate one reservation per tick instead of all at once).
+ *
+ * No-op for an employee whose "active" slot isn't a genuine, trackable,
+ * non-'rest' task — an employee resting (or mid-walk to rest) must not pick
+ * up new work while occupied, and an activeActionId with no matching
+ * PendingAction record (defensive) has nothing to confirm work is real
+ * against. Both cases are distinguished by looking up the actual record
+ * rather than trusting activeActionId alone.
+ */
+function reserveOnePoolActionAhead(state: GameState, employee: Employee, result: TickEmployeesResult): void {
+  const activeAction = state.pendingActions.find(a => a.id === employee.activeActionId);
+  if (activeAction === undefined || activeAction.type === 'rest') return;
+
+  const depth = 1 + employee.taskQueue.length;
+  if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) return;
+
+  const poolCandidates = state.pendingActions.filter(a =>
+    a.status === 'queued' &&
+    a.targetEmployeeId === null &&
+    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)),
+  );
+
+  const selection = selectBestActionForEmployee(state, employee, poolCandidates);
+  if (selection === null) return; // nothing reachable within budget — tries again next tick
+
+  const claimed = claimPendingAction(state, selection.action.id, employee.id);
+  if (!claimed) return; // defensive: someone else claimed it between filter and here — never happens single-threaded, kept for safety
+  result.claimed.push(selection.action.id);
+  employee.taskQueue.push(selection.action.id);
 }
 
 /**
