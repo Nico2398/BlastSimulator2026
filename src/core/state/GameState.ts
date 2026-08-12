@@ -353,7 +353,7 @@ export function createGame(config: GameConfig): GameState {
  * is truthy; the roster and fleet composition are defined in
  * `STARTING_SITE_STAFFED_COMPOSITION` (src/core/config/balance.ts).
  */
-export function applyStaffedComposition(state: GameState): void {
+function applyStaffedComposition(state: GameState): void {
   const rng = new Random(state.seed);
 
   // Small deterministic offsets near the site origin — no navGrid exists yet
