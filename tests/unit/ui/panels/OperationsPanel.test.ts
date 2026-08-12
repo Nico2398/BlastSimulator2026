@@ -296,10 +296,10 @@ describe('OperationsPanel — work queue (#548)', () => {
     panel.update(state);
 
     expect(panel.root.querySelector('[data-cancel-action="14"]')).toBeNull();
-    // No holder line for the resting employee should come from the work
-    // queue (their name may legitimately appear elsewhere, e.g. incidents —
-    // this only proves no cancel control exists for the rest action itself).
-    expect(panel.root.textContent).not.toContain('No active orders.');
+    // The only pending action is a rest action, which the work queue excludes
+    // entirely (issue #548: rest actions are engine-owned, not player-cancellable).
+    // With nothing else pending, the queue's empty state is the correct result.
+    expect(panel.root.textContent).toContain('No active orders.');
   });
 
   it('clicking a row\'s cancel control dispatches "employee cancel <id>" through gameConsole', () => {
