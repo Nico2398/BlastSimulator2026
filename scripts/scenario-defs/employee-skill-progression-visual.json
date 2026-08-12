@@ -136,7 +136,7 @@
     },
     {
       "command": "tick 1",
-      "description": "tickEmployees claims the dispatch: employee A becomes busy and taskTicksRemaining is seeded from BASE_TASK_DURATION_TICKS scaled by proficiency/need/living-quarters multipliers.",
+      "description": "tickEmployees claims the dispatch: employee A becomes busy and taskTicksRemaining is seeded from BASE_TASK_DURATION_TICKS scaled by proficiency/need/living-quarters multipliers. Since #547, claiming transitions the PendingAction's status in place instead of deleting it, so it still counts until the task completes.",
       "interaction": [
         {
           "type": "command",
@@ -147,7 +147,7 @@
       "expect": {
         "equals": {
           "cash": 47700,
-          "pendingActionCount": 0
+          "pendingActionCount": 1
         }
       }
     },
@@ -163,9 +163,9 @@
       "expect": {
         "equals": {
           "cash": 47700,
-          "pendingActionCount": 1
+          "pendingActionCount": 2
         },
-        "note": "the second dispatch's ghost preview -- employee A is still busy with the first task and employee B can't claim it (wrong skill), so this stays queued through the next several checkpoints"
+        "note": "the second dispatch's ghost preview -- employee A is still busy with the first task and employee B can't claim it (wrong skill), so this stays queued through the next several checkpoints. Count is 2 (not 1) since #547: the first dispatch's claimed-but-in-progress PendingAction still counts alongside this new unclaimed one."
       },
       "role": "bootstrap"
     },
@@ -195,7 +195,7 @@
           "cash"
         ],
         "equals": {
-          "pendingActionCount": 1
+          "pendingActionCount": 2
         }
       }
     },
@@ -224,9 +224,9 @@
           "cash"
         ],
         "equals": {
-          "pendingActionCount": 0
+          "pendingActionCount": 1
         },
-        "note": "the second dispatch's ghost preview disappears here -- employee A finished the first task and auto-claimed it"
+        "note": "the second dispatch's ghost preview disappears here -- employee A finished the first task and auto-claimed it. Count is 1 (not 0) since #547: the second dispatch's PendingAction is now claimed-but-in-progress, still counted until it completes too."
       }
     },
     {

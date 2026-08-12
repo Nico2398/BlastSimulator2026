@@ -465,7 +465,7 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
     expect(masterSeeded).toBeLessThan(rookieSeeded);
   });
 
-  it('dispatch without a skill: param still queues general_work with requiredSkill: null and gets claimed (regression)', () => {
+  it('dispatch without a skill: param still queues general_work with requiredSkill: null, gets claimed and seeded, and reaches completion (regression, #547 review — the widened tickEmployees condition, action.type !== \'rest\' rather than requiredSkill !== null, is what makes this possible)', () => {
     const ctx = makeCtx();
     const empId = hireOne(ctx, 'driller');
 
@@ -476,10 +476,42 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
     expect(action).toBeDefined();
     expect(action!.requiredSkill).toBeNull();
     expect(action!.type).toBe('general_work');
+    const dispatchedActionId = action!.id;
 
+    // Claim happens the very next tick — pendingTaskDuration is seeded on the
+    // claiming employee at claim time (tickEmployees), regardless of
+    // requiredSkill being null. Against the old narrow condition
+    // (requiredSkill !== null), this would stay null forever.
     tickCommand(ctx, ['1'], {});
-    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
-    expect(emp.activeActionId).not.toBeNull();
+    const empAfterClaim = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    expect(empAfterClaim.activeActionId).not.toBeNull();
+    expect(empAfterClaim.pendingTaskDuration).not.toBeNull();
+
+    // ArrivalGate promotes pendingTaskDuration into taskTicksRemaining once
+    // the employee physically reaches (3,3) (#437).
+    tickUntilTaskSeeded(ctx, empId);
+    const seeded = ctx.state!.employees.employees.find(e => e.id === empId)!.taskTicksRemaining;
+    expect(seeded).not.toBeNull();
+    expect(seeded!).toBeGreaterThan(0);
+
+    // Tick through to completion — capped well beyond the seeded duration so
+    // a genuine regression (task stuck in_progress forever) fails fast rather
+    // than hanging.
+    for (let i = 0; i < seeded! + 5; i++) {
+      tickCommand(ctx, ['1'], {});
+      if (ctx.state!.employees.employees.find(e => e.id === empId)!.taskTicksRemaining === null) break;
+    }
+
+    const empFinal = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    expect(empFinal.taskTicksRemaining).toBeNull();
+    expect(empFinal.activeActionId).toBeNull();
+
+    // The old narrow condition left pendingTaskDuration (and thus
+    // taskTicksRemaining) unseeded for a null-skill action, so it could never
+    // reach in_progress/completion and its record + ghost leaked forever.
+    // With the fix, both are cleaned up on completion (#547).
+    expect(ctx.state!.pendingActions.find(a => a.id === dispatchedActionId)).toBeUndefined();
+    expect(ctx.state!.ghostPreviews.find(g => g.id === dispatchedActionId)).toBeUndefined();
   });
 
   it('dispatching to a skill nobody on the roster holds is rejected immediately, rather than silently queuing forever', () => {

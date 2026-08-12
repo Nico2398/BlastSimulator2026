@@ -66,6 +66,8 @@ ticksRequired = baseDuration / (proficiency_multiplier * wellbeing_multiplier * 
 export interface PendingAction {
   id: number;
   type: ActionType;
+  status: 'queued' | 'assigned' | 'in_progress';
+  holderId: number | null;  // employee id once claimed, else null
   requiredSkill: SkillQualification;
   requiredVehicleRole: VehicleRole | null;  // null = on-foot task
   targetX: number;
@@ -85,13 +87,17 @@ export type ActionType =
   | 'haul_debris';
 ```
 
+A `PendingAction` has a lifecycle, not a single claimed/unclaimed bit: `queued` (unclaimed, `holderId: null`) → `assigned` (claimed, employee en route) → `in_progress` (employee working it) → removed from `state.pendingActions` only on completion. `claimPendingAction` (`src/core/engine/TaskDispatch.ts`) transitions `status`/`holderId` in place; `completePendingAction` is the only function that removes the action from the pool.
+
 **Claim logic (each tick):**
-1. For each unclaimed `PendingAction`, scan idle employees for matching `requiredSkill`
+1. For each `PendingAction` with `status: 'queued'`, scan idle employees for matching `requiredSkill`
 2. If `requiredVehicleRole` non-null, also verify a qualified vehicle+driver is available
 3. If NO employee with the skill exists on roster at all → emit `UnqualifiedTaskError` immediately
 4. If qualified employees exist but all temporarily busy → wait silently (no error)
+5. On claim: `status` moves to `assigned` (then `in_progress` once work starts), `holderId` set to the claiming employee — the action and its ghost stay in place, nothing is deleted
+6. Any count of "unclaimed work" (e.g. `OperationsPanel`) filters `status === 'queued'`, never plain presence in `state.pendingActions`
 
-**Ghost rendering:** For every `PendingAction`, renderer creates blue fresnel-effect translucent mesh with pulsing animation. Ghost removed on claim.
+**Ghost rendering:** For every `PendingAction`, renderer creates blue fresnel-effect translucent mesh with pulsing animation, tracked via `GhostPreview.claimed`. Claiming sets `claimed: true` — the ghost stays blue but renders dimmer and pulses slower (`src/renderer/GhostMesh.ts`) to distinguish claimed from unclaimed work without removing it. The ghost is removed only when the action completes.
 
 **Task progress rendering:** For every employee whose `computeEmployeeActivity` reads `kind: 'working'`, `TaskProgressBar` (`src/renderer/TaskProgressBar.ts`) billboards a fill bar above the character, parented under its `CharacterMesh.getGroup(id)` transform so it tracks position without per-frame copying. Fill fraction comes from `taskProgressFraction`, shared with the Crew panel's own progress line so the two never disagree. Removed when the task ends.
 

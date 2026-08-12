@@ -197,7 +197,12 @@ describe('GameLoop', () => {
 describe('tickEmployees — claim logic (Task 3.6)', () => {
   const SEED = 42;
 
-  /** Build a minimal PendingAction for tests. */
+  /**
+   * Build a minimal PendingAction for tests. Defaults to 'queued'/unheld
+   * (#547) — the shape tickEmployees requires to even consider claiming it;
+   * override status/holderId explicitly for tests that need a different
+   * lifecycle state.
+   */
   function makePendingAction(
     overrides: Partial<PendingAction> & { id: number; requiredSkill: PendingAction['requiredSkill'] },
   ): PendingAction {
@@ -209,6 +214,8 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
       ...overrides,
     };
   }
@@ -225,17 +232,22 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     tickEmployees(state);
 
-    // Action should have been claimed — removed from pendingActions
-    expect(state.pendingActions).toHaveLength(0);
+    // Action should have been claimed — the record STAYS in pendingActions,
+    // only its status/holderId change (#547); it is no longer spliced out at
+    // claim time.
+    expect(state.pendingActions).toHaveLength(1);
+    expect(state.pendingActions[0]!.status).toBe('assigned');
+    expect(state.pendingActions[0]!.holderId).toBe(employee.id);
     // Employee should hold the action's id
     expect((employee as any).activeActionId).toBe(action.id);
   });
 
-  it('removes the matching GhostPreview when the action is claimed (issue #406)', () => {
+  it('flips the matching GhostPreview to claimed:true when the action is claimed, without removing it (#547, regression for #406)', () => {
     // tickEmployees is the tick loop's real claim path — claimPendingAction in
     // TaskDispatch.ts is a separate helper nothing in the loop calls — so it
-    // must own clearing ghostPreviews itself, or the blue marker never
-    // disappears once an employee actually picks up the work.
+    // must own updating ghostPreviews itself. Before #547 this deleted the
+    // ghost outright; now the ghost survives the claim (dimmer/slower — see
+    // GhostMesh.ts) and only disappears when the action itself completes.
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
 
@@ -244,24 +256,28 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     const action = makePendingAction({ id: 3, requiredSkill: 'blasting', targetX: 5, targetZ: 6 });
     state.pendingActions.push(action);
-    state.ghostPreviews.push({ id: 3, type: action.type, targetX: 5, targetZ: 6, targetY: 0 });
+    state.ghostPreviews.push({ id: 3, type: action.type, targetX: 5, targetZ: 6, targetY: 0, claimed: false });
 
     tickEmployees(state);
 
-    expect(state.ghostPreviews.find(g => g.id === 3)).toBeUndefined();
+    const ghost = state.ghostPreviews.find(g => g.id === 3);
+    expect(ghost).toBeDefined();
+    expect(ghost!.claimed).toBe(true);
   });
 
-  it('leaves an unclaimed action\'s GhostPreview untouched (issue #406)', () => {
+  it('leaves an unclaimed action\'s GhostPreview untouched, still claimed:false (issue #406)', () => {
     const state = createGame({ seed: SEED });
     // No employees hired — action stays pending and unclaimed.
 
     const action = makePendingAction({ id: 4, requiredSkill: 'geology', targetX: 1, targetZ: 2 });
     state.pendingActions.push(action);
-    state.ghostPreviews.push({ id: 4, type: action.type, targetX: 1, targetZ: 2, targetY: 0 });
+    state.ghostPreviews.push({ id: 4, type: action.type, targetX: 1, targetZ: 2, targetY: 0, claimed: false });
 
     tickEmployees(state);
 
-    expect(state.ghostPreviews.find(g => g.id === 4)).toBeDefined();
+    const ghost = state.ghostPreviews.find(g => g.id === 4);
+    expect(ghost).toBeDefined();
+    expect(ghost!.claimed).toBe(false);
   });
 
   it('returns claimed action ID in result.claimed', () => {
@@ -382,8 +398,13 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     tickEmployees(state);
 
-    // Both actions must have been claimed
-    expect(state.pendingActions).toHaveLength(0);
+    // Both actions must have been claimed — and, per #547, both records
+    // still live in pendingActions (only status/holderId changed).
+    expect(state.pendingActions).toHaveLength(2);
+    for (const a of state.pendingActions) {
+      expect(a.status).toBe('assigned');
+      expect(a.holderId).not.toBeNull();
+    }
     // Each employee holds one of the action IDs
     const assignedIds = [
       (emp1 as any).activeActionId,
@@ -408,9 +429,71 @@ describe('tickEmployees — claim logic (Task 3.6)', () => {
 
     tickEmployees(state);
 
-    // Only one action can be assigned to the single employee per tick
-    expect(state.pendingActions).toHaveLength(1);
+    // Only one action can be assigned to the single employee per tick — but
+    // per #547 the other stays queued and unheld rather than being spliced
+    // away, so BOTH records remain in pendingActions.
+    expect(state.pendingActions).toHaveLength(2);
     expect((employee as any).activeActionId).not.toBeNull();
+    const claimedAction = state.pendingActions.find(a => a.status === 'assigned');
+    const queuedAction = state.pendingActions.find(a => a.status === 'queued');
+    expect(claimedAction).toBeDefined();
+    // holderId is the claiming employee's id; activeActionId is the claimed
+    // action's id — distinct values, not equal to each other (#547).
+    expect(claimedAction!.holderId).toBe(employee.id);
+    expect((employee as any).activeActionId).toBe(claimedAction!.id);
+    expect(queuedAction).toBeDefined();
+    expect(queuedAction!.holderId).toBeNull();
+  });
+
+  // ── #547: an already-assigned/in_progress action is not re-claimed ─────────
+
+  it('skips an action already "assigned" to another employee — not re-claimed, not counted in claimed/waiting/unqualified', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee: holder } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, holder.id, 'blasting', 1);
+    const { employee: idle } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, idle.id, 'blasting', 1);
+
+    const action = makePendingAction({ id: 30, requiredSkill: 'blasting', status: 'assigned', holderId: holder.id });
+    state.pendingActions.push(action);
+    holder.activeActionId = 30; // mirrors what claiming it would have set
+
+    const result = tickEmployees(state);
+
+    // The idle, equally-qualified employee must not be diverted onto an
+    // action someone else already holds.
+    expect(idle.activeActionId).toBeNull();
+    expect(result.claimed).not.toContain(30);
+    expect(result.waiting).not.toContain(30);
+    expect(result.unqualified).not.toContain(30);
+    // The record is untouched — still held by the original claimant.
+    const stored = state.pendingActions.find(a => a.id === 30)!;
+    expect(stored.status).toBe('assigned');
+    expect(stored.holderId).toBe(holder.id);
+  });
+
+  it('skips an "in_progress" action the same way', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+
+    const { employee: holder } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, holder.id, 'blasting', 1);
+    const { employee: idle } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, idle.id, 'blasting', 1);
+
+    const action = makePendingAction({ id: 31, requiredSkill: 'blasting', status: 'in_progress', holderId: holder.id });
+    state.pendingActions.push(action);
+    holder.activeActionId = 31;
+
+    const result = tickEmployees(state);
+
+    expect(idle.activeActionId).toBeNull();
+    expect(result.claimed).not.toContain(31);
+    const stored = state.pendingActions.find(a => a.id === 31)!;
+    expect(stored.status).toBe('in_progress');
+    expect(stored.holderId).toBe(holder.id);
   });
 });
 
@@ -441,6 +524,8 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
       requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0,
       payload: {},
+      status: 'queued',
+      holderId: null,
       ...overrides,
     };
   }
@@ -515,6 +600,7 @@ describe('tickEmployees — task duration seeding on claim (Ch.3 skill progressi
       targetX: 0, targetZ: 0, targetY: 0,
       payload: { needKey: 'hunger', restDuration: 5 },
       targetEmployeeId: employee.id,
+      status: 'queued', holderId: null,
     });
     tickEmployees(state);
     resolveArrival(state);
@@ -537,6 +623,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
     state.pendingActions.push({
       id: actionId, type: 'general_work', requiredSkill: 'blasting', requiredVehicleRole: null,
       targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employeeId,
+      status: 'queued', holderId: null,
     });
     tickEmployees(state);
     resolveArrival(state);
@@ -614,6 +701,7 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
     state.pendingActions.push({
       id: 2, type: 'general_work', requiredSkill: 'blasting', requiredVehicleRole: null,
       targetX: 1, targetZ: 1, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null,
     });
     const result = tickEmployees(state);
 
@@ -783,6 +871,8 @@ describe('tickNeedRestoration (Task 3.11)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
     };
     state.pendingActions.push(workAction);
 
@@ -1420,6 +1510,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: employee.id,
+      status: 'queued', holderId: null,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -1609,6 +1700,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: empB.id,
+      status: 'queued', holderId: null,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -1673,6 +1765,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: employee.id,
+      status: 'queued', holderId: null,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -1709,6 +1802,7 @@ describe('autoInsertNeedTasks (7.7)', () => {
       targetY: 0,
       payload: {},
       targetEmployeeId: employee.id,
+      status: 'queued', holderId: null,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
@@ -2308,6 +2402,8 @@ describe('tickGeneralRestCompletion', () => {
       targetY: 0,
       payload: { needKey: 'hunger' },
       targetEmployeeId: employee.id,
+      status: 'in_progress',
+      holderId: employee.id,
     });
 
     placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
@@ -2398,5 +2494,44 @@ describe('tickGeneralRestCompletion', () => {
     expect(result.completed).toEqual([{ employeeId: employee.id, needKey: 'hunger' }]);
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.activeActionId).toBeNull();
+  });
+
+  // ── Test 5: record + ghost both vanish on completion (#547) ────────────────
+  // A rest action's own pendingActions record now outlives its claim just like
+  // any other action, so completion must clean up both the record and any
+  // ghost preview sharing its id — the same completePendingAction contract
+  // TaskDispatch.ts exposes for the dispatch/claim path.
+  it('removes both the pendingActions record and any ghost preview sharing the completed rest action\'s id', () => {
+    const state = createGame({ seed: SEED });
+    state.cash = 1000;
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.hunger = 10;
+    employee.restTicksRemaining = 1;
+    const actionId = state.nextPendingActionId++;
+    employee.activeActionId = actionId;
+    employee.restNeedKey = 'hunger';
+    state.pendingActions.push({
+      id: actionId,
+      type: 'rest',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 5,
+      targetZ: 5,
+      targetY: 0,
+      payload: { needKey: 'hunger' },
+      targetEmployeeId: employee.id,
+      status: 'in_progress',
+      holderId: employee.id,
+    });
+    state.ghostPreviews.push({ id: actionId, type: 'rest', targetX: 5, targetZ: 5, targetY: 0, claimed: true });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    tickGeneralRestCompletion(state);
+
+    expect(state.pendingActions.find(a => a.id === actionId)).toBeUndefined();
+    expect(state.ghostPreviews.find(g => g.id === actionId)).toBeUndefined();
   });
 });

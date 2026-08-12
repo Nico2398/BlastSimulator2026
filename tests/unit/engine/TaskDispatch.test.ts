@@ -24,7 +24,7 @@ import {
 } from '../../../src/core/entities/Employee.js';
 import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── New module (CH1.4 — does not exist yet; ALL tests fail at import) ─────────
-import { dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import { dispatchPendingAction, claimPendingAction, completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 
 // ── Deterministic fixture helpers ────────────────────────────────────────────
@@ -375,4 +375,178 @@ describe('dispatchPendingAction — all SkillCategory values are routable', () =
       expect(result.error).toBe('unqualified');
     });
   }
+});
+
+// ── Section 5: PendingAction lifecycle (#547) ────────────────────────────────
+//   Claiming no longer deletes the record the instant an employee picks it up
+//   — the action (and its ghost) stay visible through the walk and the work
+//   itself, only disappearing on genuine completion.
+
+describe('dispatchPendingAction — pushes lifecycle-ready records (#547)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('the pushed PendingAction starts life status:"queued", holderId:null', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 1, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    const stored: PendingAction = (state as any).pendingActions[0];
+    expect(stored.status).toBe('queued');
+    expect(stored.holderId).toBeNull();
+  });
+
+  it('the mirrored GhostPreview starts life claimed:false', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 2, requiredSkill: 'blasting', targetX: 4, targetZ: 7 });
+    dispatchPendingAction(state, action);
+
+    const ghost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 2);
+    expect(ghost).toBeDefined();
+    expect(ghost.claimed).toBe(false);
+  });
+});
+
+describe('claimPendingAction (#547)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('transitions a queued action to "assigned" and stamps holderId, without removing it from pendingActions', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 10, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    const claimed = claimPendingAction(state, 10, 999);
+
+    expect(claimed).not.toBeNull();
+    expect(claimed!.status).toBe('assigned');
+    expect(claimed!.holderId).toBe(999);
+    // Still in the array — not spliced out (#547 is exactly about this).
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.status).toBe('assigned');
+    expect(pending[0]!.holderId).toBe(999);
+  });
+
+  it('flips the matching GhostPreview to claimed:true without removing it', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 11, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    claimPendingAction(state, 11, 5);
+
+    const ghosts: Array<{ id: number; claimed: boolean }> = (state as any).ghostPreviews;
+    expect(ghosts).toHaveLength(1);
+    expect(ghosts[0]!.id).toBe(11);
+    expect(ghosts[0]!.claimed).toBe(true);
+  });
+
+  it('returns null for an id with no matching pendingAction', () => {
+    const result = claimPendingAction(state, 9999, 1);
+    expect(result).toBeNull();
+  });
+
+  it('a second claim on an already-"assigned" action returns null and leaves the original holder intact', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 12, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    const first = claimPendingAction(state, 12, 1);
+    expect(first).not.toBeNull();
+    expect(first!.holderId).toBe(1);
+
+    const second = claimPendingAction(state, 12, 2);
+
+    expect(second).toBeNull();
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 12);
+    expect(stored.holderId).toBe(1);
+    expect(stored.status).toBe('assigned');
+    // The ghost still reads as claimed by the original holder's claim, not the rejected second one.
+    const ghost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 12);
+    expect(ghost.claimed).toBe(true);
+  });
+
+  it('a second claim on an "in_progress" action also returns null and leaves the holder intact', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 13, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+    claimPendingAction(state, 13, 1);
+    // Simulate ArrivalGate's later 'assigned' -> 'in_progress' promotion.
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 13);
+    stored.status = 'in_progress';
+
+    const second = claimPendingAction(state, 13, 2);
+
+    expect(second).toBeNull();
+    expect(stored.holderId).toBe(1);
+    expect(stored.status).toBe('in_progress');
+  });
+});
+
+describe('completePendingAction (#547)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('removes the completed action from pendingActions and returns it', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 20, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+    claimPendingAction(state, 20, 1);
+
+    const removed = completePendingAction(state, 20);
+
+    expect(removed).not.toBeNull();
+    expect(removed!.id).toBe(20);
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending.find(a => a.id === 20)).toBeUndefined();
+  });
+
+  it('removes the matching GhostPreview from ghostPreviews', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 21, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+
+    completePendingAction(state, 21);
+
+    const ghosts: Array<{ id: number }> = (state as any).ghostPreviews;
+    expect(ghosts.find(g => g.id === 21)).toBeUndefined();
+  });
+
+  it('leaves unrelated actions and ghosts untouched', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    dispatchPendingAction(state, makePendingAction({ id: 22, requiredSkill: 'blasting' }));
+    dispatchPendingAction(state, makePendingAction({ id: 23, requiredSkill: 'blasting' }));
+
+    completePendingAction(state, 22);
+
+    const pending: PendingAction[] = (state as any).pendingActions;
+    const ghosts: Array<{ id: number }> = (state as any).ghostPreviews;
+    expect(pending.find(a => a.id === 23)).toBeDefined();
+    expect(ghosts.find(g => g.id === 23)).toBeDefined();
+  });
+
+  it('is a safe no-op returning null for an unknown action id', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    dispatchPendingAction(state, makePendingAction({ id: 24, requiredSkill: 'blasting' }));
+
+    const result = completePendingAction(state, 999999);
+
+    expect(result).toBeNull();
+    const pending: PendingAction[] = (state as any).pendingActions;
+    expect(pending).toHaveLength(1);
+  });
+
+  it('is a safe no-op returning null on an empty pendingActions array', () => {
+    const result = completePendingAction(state, 1);
+    expect(result).toBeNull();
+  });
 });

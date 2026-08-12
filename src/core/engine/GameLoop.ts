@@ -17,6 +17,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
 import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
+import { completePendingAction, claimPendingAction } from './TaskDispatch.js';
 
 // ── Config ──
 
@@ -145,13 +146,19 @@ export interface TickEmployeesResult {
 
 /**
  * Match pending actions to idle qualified employees.
- * Mutates state: removes claimed actions from pendingActions and sets activeActionId on employees.
+ * Mutates state: transitions claimed actions' status/holderId in place (and
+ * marks their ghost `claimed`) instead of removing them — the record and its
+ * ghost persist until completePendingAction runs at completion (#547). Sets
+ * activeActionId on the claiming employee. Actions already 'assigned' or
+ * 'in_progress' are skipped entirely — not re-evaluated as claimable, not
+ * counted as still-waiting.
  */
 export function tickEmployees(state: GameState): TickEmployeesResult {
   const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
-  const remaining: PendingAction[] = [];
 
   for (const action of state.pendingActions) {
+    if (action.status !== 'queued') continue;
+
     // Base eligibility: alive, not injured, not in training.
     const eligible = state.employees.employees.filter(
       emp => emp.alive && !emp.injured && emp.trainingState === null,
@@ -164,7 +171,6 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
     if (allWithSkill.length === 0) {
       result.unqualified.push(action.id);
-      remaining.push(action);
       continue;
     }
 
@@ -175,26 +181,22 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
     if (!idleMatch) {
       result.waiting.push(action.id);
-      remaining.push(action);
       continue;
     }
 
     idleMatch.activeActionId = action.id;
     result.claimed.push(action.id);
-    // action is consumed — not pushed to remaining
+
+    // Transition status/holderId in place (and marks the ghost claimed) via
+    // the shared claim helper — the record (and its ghost) stay visible while
+    // the employee walks to the target; only completion removes them (#547).
+    claimPendingAction(state, action.id, idleMatch.id);
 
     // Send the employee walking toward the action's location — targetX/targetZ
     // is documented on PendingAction as existing for exactly this purpose
     // ("ghost rendering and employee pathfinding"), previously unused.
     idleMatch.destinationX = action.targetX;
     idleMatch.destinationZ = action.targetZ;
-
-    // This is the actual claim path the tick loop uses (claimPendingAction in
-    // TaskDispatch.ts is a separate helper nothing here calls), so it owns
-    // clearing the ghost preview too — otherwise the blue marker never
-    // disappears once a real employee picks up the work (#406).
-    const ghostIdx = state.ghostPreviews.findIndex(g => g.id === action.id);
-    if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
 
     // tickCollapse/tickNeedRestoration self-claim (see above) and, like this
     // branch, only ever *queue* the rest via pendingRestDuration/
@@ -217,9 +219,16 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
       }
     }
 
-    // Non-rest actions requiring a skill queue their task duration here — the
-    // claimed employee is guaranteed (via allWithSkill above) to hold
-    // requiredSkill, so proficiency lookup below always succeeds. The
+    // Non-rest actions queue their task duration here — a skill-required
+    // action's claimed employee is guaranteed (via allWithSkill above) to
+    // hold requiredSkill, so the proficiency lookup below always succeeds.
+    // requiredSkill === null (e.g. a console `employee dispatch` with no
+    // skill: param — src/console/commands/employees.ts) has no qualification
+    // to scale off, so it's treated as Rookie baseline (proficiency level 1,
+    // the existing ×1.00 entry in PROFICIENCY_MULTIPLIERS) rather than being
+    // skipped — skipping it left pendingTaskDuration/taskTicksRemaining never
+    // seeded, so ArrivalGate could never promote the action to in_progress
+    // and it, and its ghost, leaked in state forever (#547 review). The
     // countdown itself (taskTicksRemaining) does not start until
     // ArrivalGate.tickArrivalGate confirms the employee has physically
     // reached targetX/targetZ (#437) — a survey used to resolve the instant
@@ -227,8 +236,10 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // pendingActionType/pendingActionPayload stay set through to completion
     // (tickTaskProgress clears them) so completion handling (e.g. survey
     // resolution) still knows what work just finished.
-    if (action.type !== 'rest' && action.requiredSkill !== null) {
-      const qual = idleMatch.qualifications.find(q => q.category === action.requiredSkill);
+    if (action.type !== 'rest') {
+      const qual = action.requiredSkill !== null
+        ? idleMatch.qualifications.find(q => q.category === action.requiredSkill)
+        : undefined;
       const level = qual?.proficiencyLevel ?? 1;
       const needMult = getNeedMultiplier(idleMatch);
       const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, state.employees.employees.length);
@@ -246,7 +257,6 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     }
   }
 
-  state.pendingActions = remaining;
   return result;
 }
 
@@ -299,18 +309,19 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
 
     const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
 
+    // Immediately claimed (unlike autoInsertNeedTasks) — status/holderId
+    // reflect that from creation (#547).
     const restAction = createRestPendingAction(state, {
       targetX: approach.x,
       targetZ: approach.z,
       targetEmployeeId: emp.id,
       payload: { buildingId: building.id, needKey, restDuration },
-    });
+    }, emp.id);
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
-    // Immediately claimed (unlike autoInsertNeedTasks) — but the rest timer
-    // itself does not start until ArrivalGate.tickArrivalGate confirms the
-    // employee has walked to the building (#437).
+    // The rest timer itself does not start until ArrivalGate.tickArrivalGate
+    // confirms the employee has walked to the building (#437).
     emp.pendingRestDuration = restDuration;
     emp.pendingRestNeedKey = needKey;
     emp.destinationX = approach.x;
@@ -383,20 +394,26 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
     // is claimed immediately. Left in the queue it is claimed the moment the
     // collapse rest ends — a second rest cycle and a second NEED_REST_COSTS
     // charge for one collapse, listed alongside the active one in the roster panel.
-    state.pendingActions = state.pendingActions.filter(
-      a => !(a.type === 'rest' && a.targetEmployeeId === emp.id),
-    );
+    // completePendingAction removes both the record and its ghost — a
+    // superseded action is discarded outright, not completed by an employee,
+    // but the removal shape (record + ghost, together) is the same (#547).
+    for (const superseded of state.pendingActions.filter(
+      a => a.type === 'rest' && a.targetEmployeeId === emp.id,
+    )) {
+      completePendingAction(state, superseded.id);
+    }
 
+    // Immediately claimed — status/holderId reflect that from creation (#547).
     const restAction = createRestPendingAction(state, {
       targetX,
       targetZ,
       targetEmployeeId: emp.id,
       payload: { buildingId, collapsedNeed: collapsedGauge, needKey: collapsedGauge, restDuration },
-    });
+    }, emp.id);
 
     state.pendingActions.push(restAction);
     emp.activeActionId = restAction.id;
-    // Immediately claimed — but the rest timer itself does not start until
+    // The rest timer itself does not start until
     // ArrivalGate.tickArrivalGate confirms arrival (mirrors tickNeedRestoration, #437).
     // When resting in place (targetX/Z === emp.x/z, the two no-building branches
     // above) the employee is already "arrived" and the gate resolves next tick.
@@ -513,10 +530,18 @@ export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled.
  * Generates a new ID from state.nextPendingActionId.
+ *
+ * `claimedByEmployeeId`, when given, constructs the record already-claimed
+ * (status 'assigned', holderId set) — the shape tickNeedRestoration,
+ * tickCollapse, and forceShiftRestIfNeeded all need, since each self-claims
+ * a rest action synchronously at creation rather than leaving it for
+ * tickEmployees to match. Omit it for autoInsertNeedTasks' busy-employee
+ * case, which leaves the action genuinely 'queued'/unheld.
  */
 function createRestPendingAction(
   state: GameState,
   overrides: Pick<PendingAction, 'targetX' | 'targetZ' | 'targetEmployeeId' | 'payload'>,
+  claimedByEmployeeId?: number,
 ): PendingAction {
   return {
     id: state.nextPendingActionId++,
@@ -528,6 +553,8 @@ function createRestPendingAction(
     targetY: 0,
     payload: overrides.payload,
     targetEmployeeId: overrides.targetEmployeeId,
+    status: claimedByEmployeeId !== undefined ? 'assigned' : 'queued',
+    holderId: claimedByEmployeeId ?? null,
   };
 }
 
@@ -660,10 +687,10 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
 
     const completedActionId = emp.activeActionId;
     completeRestForEmployee(state, emp, needKey);
-    // tickCollapse/tickNeedRestoration leave the rest action in pendingActions
-    // at creation (they self-claim instead of routing through tickEmployees),
-    // so nothing else removes it once the rest completes.
-    state.pendingActions = state.pendingActions.filter(a => a.id !== completedActionId);
+    // tickCollapse/tickNeedRestoration/autoInsertNeedTasks leave the rest
+    // action in pendingActions at creation (self-claimed or claimed later via
+    // tickEmployees), so nothing else removes it once the rest completes.
+    if (completedActionId !== null) completePendingAction(state, completedActionId);
 
     completed.push({ employeeId: emp.id, needKey });
   }
@@ -744,6 +771,8 @@ export interface TaskProgressResult {
   actionType?: ActionType;
   /** Payload of the task that just completed — only present when `completed` is true. */
   actionPayload?: Record<string, unknown>;
+  /** ID of the PendingAction that just completed — only present when `completed` is true (#547). */
+  actionId?: number;
 }
 
 /**
@@ -753,8 +782,10 @@ export interface TaskProgressResult {
  *
  * No-op (returns null) for an employee with no in-progress task
  * (taskTicksRemaining === null) — includes employees currently resting and
- * employees dispatched with no required skill (taskTicksRemaining never seeded
- * for those, see tickEmployees).
+ * any employee not yet promoted out of pendingTaskDuration by ArrivalGate
+ * (still walking to the target). requiredSkill === null no longer excludes
+ * an action from this path — tickEmployees seeds pendingTaskDuration for
+ * every non-rest action regardless of requiredSkill (#547).
  */
 export function tickTaskProgress(state: GameState, emp: Employee, emitter?: EventEmitter): TaskProgressResult | null {
   if (emp.taskTicksRemaining === null) return null;
@@ -781,13 +812,17 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
   let completed = false;
   let completedActionType: ActionType | undefined;
   let completedActionPayload: Record<string, unknown> | undefined;
+  let completedActionId: number | undefined;
   if (emp.taskTicksRemaining <= 0) {
     completed = true;
     // pendingActionType/pendingActionPayload were left set by tickEmployees at
     // claim time (#437) specifically so completion handling — e.g. resolving
-    // a completed survey — still knows what work this was.
+    // a completed survey — still knows what work this was. activeActionId is
+    // captured here, before it's nulled below, so the caller can remove the
+    // matching PendingAction/ghost via completePendingAction (#547).
     completedActionType = emp.pendingActionType ?? undefined;
     completedActionPayload = emp.pendingActionPayload ?? undefined;
+    completedActionId = emp.activeActionId ?? undefined;
     emp.activeActionId = null;
     emp.taskTicksRemaining = null;
     delete emp.activeTaskTotalTicks;
@@ -803,6 +838,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
     ...(levelUpLevels ? { oldLevel: levelUpLevels.oldLevel, newLevel: levelUpLevels.newLevel } : {}),
     ...(completedActionType !== undefined ? { actionType: completedActionType } : {}),
     ...(completedActionPayload !== undefined ? { actionPayload: completedActionPayload } : {}),
+    ...(completedActionId !== undefined ? { actionId: completedActionId } : {}),
   };
 }
 
@@ -824,7 +860,12 @@ function completeRestTick(
   emp.restTicksRemaining -= 1;
 
   if (emp.restTicksRemaining <= 0) {
+    const completedActionId = emp.activeActionId;
     completeRestForEmployee(state, emp, 'fatigue');
+    // forceShiftRestIfNeeded self-claims this action at creation, so — like
+    // tickGeneralRestCompletion's own rest sources — nothing else removes it
+    // from pendingActions/ghostPreviews once the rest completes (#547).
+    if (completedActionId !== null) completePendingAction(state, completedActionId);
     emp.ticksWorked = 0;
     restCompleted.push(emp.id);
   }
@@ -891,12 +932,13 @@ function forceShiftRestIfNeeded(
   // confirms the employee has walked to the bunkhouse (#437).
   emp.pendingRestDuration = SHIFT_SLEEP_DURATION_TICKS;
 
+  // Immediately claimed — status/holderId reflect that from creation (#547).
   const restAction = createRestPendingAction(state, {
     targetX,
     targetZ,
     targetEmployeeId: emp.id,
     payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
-  });
+  }, emp.id);
 
   state.pendingActions.push(restAction);
   emp.activeActionId = restAction.id;

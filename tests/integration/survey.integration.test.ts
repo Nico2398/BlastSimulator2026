@@ -285,6 +285,78 @@ describe('Survey system', () => {
     expect(ctx.state!.surveyResults[0]!.method).toBe('seismic');
   });
 
+  // ── PendingAction/ghost lifecycle spans the whole claim+walk+work period (#547) ──
+  //
+  // Before #547, tickEmployees deleted the PendingAction (and its ghost) the
+  // instant an employee claimed it — long before the surveyor actually
+  // reached the target. This proves the record and its ghost both survive
+  // multiple ticks of walking (only status/holderId/claimed flip), and are
+  // removed together on the exact tick the survey result lands, not before.
+
+  it('a queued survey record and ghost survive multiple ticks while the surveyor walks, and both vanish exactly on the tick the result lands', () => {
+    const empId = hireEmployeeByRole(ctx, 'surveyor');
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+
+    // Survey far enough from the surveyor's spawn that several ticks of
+    // travel are needed before arrival.
+    surveyCommand(ctx as any, ['seismic'], { x: '2', z: '2' });
+
+    const dispatched = ctx.state!.pendingActions.find(a => a.type === 'survey');
+    expect(dispatched).toBeDefined();
+    expect(dispatched!.status).toBe('queued');
+    expect(dispatched!.holderId).toBeNull();
+    const actionId = dispatched!.id;
+
+    let ghost = ctx.state!.ghostPreviews.find(g => g.id === actionId);
+    expect(ghost).toBeDefined();
+    expect(ghost!.claimed).toBe(false);
+
+    // First tick: tickEmployees claims the action — still walking, nowhere
+    // near the target yet.
+    tickCommand(ctx, ['1'], {});
+
+    const claimed = ctx.state!.pendingActions.find(a => a.id === actionId);
+    expect(claimed).toBeDefined(); // record survives the claim — this is the whole point of #547
+    expect(['assigned', 'in_progress']).toContain(claimed!.status);
+    expect(claimed!.holderId).toBe(empId);
+
+    ghost = ctx.state!.ghostPreviews.find(g => g.id === actionId);
+    expect(ghost).toBeDefined();
+    expect(ghost!.claimed).toBe(true);
+
+    const travelTicks = Math.ceil(Math.hypot(emp.x - 2, emp.z - 2) / AGENT_WALK_SPEED);
+
+    // Walk through the remaining travel ticks (short of full arrival+work) —
+    // both the record and its ghost must stay present the entire time, and no
+    // survey result may land early.
+    for (let i = 0; i < Math.max(1, travelTicks - 1); i++) {
+      tickCommand(ctx, ['1'], {});
+      expect(ctx.state!.pendingActions.find(a => a.id === actionId)).toBeDefined();
+      expect(ctx.state!.ghostPreviews.find(g => g.id === actionId)).toBeDefined();
+      expect(ctx.state!.surveyResults).toHaveLength(0);
+    }
+
+    // Remaining ticks cover arrival + the full survey duration with slack.
+    // The result lands on exactly one tick — the same tick both the record
+    // and its ghost disappear, never one tick apart.
+    let removedOnTick = -1;
+    for (let i = 0; i < SURVEY_DURATION_TICKS.seismic + 10; i++) {
+      tickCommand(ctx, ['1'], {});
+      const stillPending = ctx.state!.pendingActions.find(a => a.id === actionId) !== undefined;
+      const stillGhosted = ctx.state!.ghostPreviews.find(g => g.id === actionId) !== undefined;
+      if (!stillPending || !stillGhosted) {
+        expect(stillPending).toBe(false);
+        expect(stillGhosted).toBe(false);
+        removedOnTick = i;
+        break;
+      }
+    }
+
+    expect(removedOnTick).toBeGreaterThanOrEqual(0);
+    expect(ctx.state!.surveyResults).toHaveLength(1);
+  });
+
   it('surveyCommand rejects and queues nothing when no qualified surveyor is available', () => {
     // No employee hired — runSurvey requires a qualified surveyor at queue time.
     const result = surveyCommand(ctx as any, ['core_sample'], { x: '16', z: '16' });

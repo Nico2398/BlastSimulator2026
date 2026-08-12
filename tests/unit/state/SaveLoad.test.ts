@@ -4,6 +4,8 @@ import * as path from 'path';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
 
 const TEST_SAVE_DIR = path.join(process.cwd(), 'tmp-test-saves');
 
@@ -60,6 +62,131 @@ describe('deserialize — v4→v5 migration for collectedOre (task 5.18)', () =>
     });
     const restored = deserialize(v4save);
     expect(restored.collectedOre).toEqual({});
+  });
+});
+
+// ── v7→v8 migration for PendingAction lifecycle (#547) ──────────────────────
+// SAVE_VERSION bumped 7→8 when PendingAction gained status/holderId. A save
+// written before that has pendingActions entries with neither field — they
+// must load as status:'queued', holderId:null (the pre-#547 semantics: an
+// entry in the array always meant "still waiting to be claimed"). An
+// employee whose activeActionId pointed at an action that isn't present after
+// migration must have that reference cleared to null rather than dangling.
+
+describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)', () => {
+  it('a pre-v8 pendingActions entry with no status field loads as status:"queued", holderId:null', () => {
+    const state = createGame({ seed: 42 });
+    state.pendingActions.push({
+      id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 3, targetZ: 4, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'queued', holderId: null,
+    });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 7;
+    // Simulate a genuine pre-#547 save: no status/holderId field at all.
+    const pending = parsed['pendingActions'] as Array<Record<string, unknown>>;
+    delete pending[0]!['status'];
+    delete pending[0]!['holderId'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.pendingActions).toHaveLength(1);
+    expect(restored.pendingActions[0]!.status).toBe('queued');
+    expect(restored.pendingActions[0]!.holderId).toBeNull();
+  });
+
+  it('multiple pre-v8 entries all migrate to queued/null independently', () => {
+    const state = createGame({ seed: 42 });
+    state.pendingActions.push(
+      {
+        id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+        targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+        status: 'queued', holderId: null,
+      },
+      {
+        id: 2, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+        targetX: 1, targetZ: 1, targetY: 0, payload: {}, targetEmployeeId: null,
+        status: 'queued', holderId: null,
+      },
+    );
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 7;
+    const pending = parsed['pendingActions'] as Array<Record<string, unknown>>;
+    for (const p of pending) {
+      delete p['status'];
+      delete p['holderId'];
+    }
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.pendingActions).toHaveLength(2);
+    for (const p of restored.pendingActions) {
+      expect(p.status).toBe('queued');
+      expect(p.holderId).toBeNull();
+    }
+  });
+
+  it('an employee whose activeActionId refers to an action absent from the migrated list has activeActionId cleared to null', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    // Points at an action id that never made it into this save at all.
+    employee.activeActionId = 999;
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 7;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
+    expect(restoredEmployee.activeActionId).toBeNull();
+  });
+
+  it('leaves activeActionId untouched when it refers to a pendingAction that survives migration', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    state.pendingActions.push({
+      id: 5, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employee.id,
+      status: 'assigned', holderId: employee.id,
+    });
+    employee.activeActionId = 5;
+
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 7;
+    const pending = parsed['pendingActions'] as Array<Record<string, unknown>>;
+    delete pending[0]!['status'];
+    delete pending[0]!['holderId'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
+    expect(restoredEmployee.activeActionId).toBe(5);
+    // The surviving record's own status/holderId were stripped to simulate a
+    // pre-#547 save; migration re-derives them from the employee's
+    // activeActionId, so the action comes back 'assigned' to that employee.
+    expect(restored.pendingActions[0]!.status).toBe('assigned');
+    expect(restored.pendingActions[0]!.holderId).toBe(employee.id);
+  });
+
+  it('a v8+ save (already carrying status/holderId) is left untouched by the migration', () => {
+    const state = createGame({ seed: 42 });
+    state.pendingActions.push({
+      id: 1, type: 'survey', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null,
+      status: 'in_progress', holderId: 3,
+    });
+    const json = serialize(state);
+
+    const restored = deserialize(json);
+
+    expect(restored.pendingActions[0]!.status).toBe('in_progress');
+    expect(restored.pendingActions[0]!.holderId).toBe(3);
   });
 });
 

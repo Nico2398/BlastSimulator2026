@@ -53,12 +53,15 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     const arrived = emp.destinationX === null && emp.destinationZ === null;
     if (!arrived) continue;
 
+    let workStarted = false;
+
     if (emp.pendingRestDuration !== null) {
       emp.restTicksRemaining = emp.pendingRestDuration;
       emp.restNeedKey = emp.pendingRestNeedKey;
       emp.pendingRestDuration = null;
       emp.pendingRestNeedKey = null;
       result.restStarted.push(emp.id);
+      workStarted = true;
     }
 
     if (emp.pendingTaskDuration !== null) {
@@ -71,6 +74,15 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       // them itself. Clearing them here would make every task's completion
       // handler blind to what it just did (see survey.integration.test.ts).
       result.taskStarted.push(emp.id);
+      workStarted = true;
+    }
+
+    // The employee has physically reached the target and started working —
+    // promote the PendingAction from 'assigned' (claimed, still walking) to
+    // 'in_progress' (#547).
+    if (workStarted && emp.activeActionId !== null) {
+      const action = state.pendingActions.find(a => a.id === emp.activeActionId);
+      if (action) action.status = 'in_progress';
     }
 
     if (emp.pendingDriverVehicleId !== null) {

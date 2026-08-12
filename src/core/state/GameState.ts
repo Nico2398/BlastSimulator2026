@@ -54,7 +54,7 @@ import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
 
 /** Save format version — increment when GameState shape changes. */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 export interface GameConfig {
   seed: number;
@@ -76,6 +76,14 @@ export type ActionType =
   | 'rest'
   | 'general_work';
 
+/**
+ * Lifecycle status of a PendingAction — 'queued' (waiting, unclaimed),
+ * 'assigned' (claimed by an employee still walking to the target), or
+ * 'in_progress' (the employee has arrived and is executing it). The record
+ * (and its ghost) is only removed on completion (#547).
+ */
+export type PendingActionStatus = 'queued' | 'assigned' | 'in_progress';
+
 /** A lightweight renderer preview entry — mirrors a PendingAction for ghost-mesh display. */
 export interface GhostPreview {
   id: number;
@@ -83,6 +91,8 @@ export interface GhostPreview {
   targetX: number;
   targetZ: number;
   targetY: number;
+  /** True once an employee has claimed the underlying action (#547). */
+  claimed: boolean;
 }
 
 /** A pending action waiting for a qualified employee to execute it. */
@@ -100,6 +110,10 @@ export interface PendingAction {
   payload: Record<string, unknown>;
   /** If set, only this employee may claim the action. null = any qualified employee. */
   targetEmployeeId: number | null;
+  /** Lifecycle status — see PendingActionStatus (#547). */
+  status: PendingActionStatus;
+  /** Employee currently holding (assigned to/working) this action, or null while 'queued' (#547). Distinct from targetEmployeeId, which restricts eligibility rather than recording who claimed it. */
+  holderId: number | null;
 }
 
 /**

@@ -191,6 +191,14 @@ export class SurveyPanel {
     const affordable = state.cash >= cost;
     this.runBtn.disabled = !hasSurveyor || !affordable;
 
+    // Deliberately not filtered by status like OperationsPanel's `unclaimed`
+    // count (status === 'queued') — this is meant to span the whole
+    // queued+assigned+in_progress window, matching this panel's "in
+    // progress" label. Pre-#547, claiming deleted the record immediately, so
+    // this undercounted (a claimed-but-not-yet-complete survey vanished from
+    // the total); now the record persists through completion, so this
+    // correctly reflects everything still underway. Don't "fix" this to
+    // match OperationsPanel's filter.
     const pending = state.pendingActions.filter(a => a.type === 'survey').length;
     const done = state.surveyResults.length;
 
