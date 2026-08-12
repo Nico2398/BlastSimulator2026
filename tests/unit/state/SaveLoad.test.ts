@@ -167,10 +167,11 @@ describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)',
 
     const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id)!;
     expect(restoredEmployee.activeActionId).toBe(5);
-    // The surviving record itself still migrates its own status to 'queued' —
-    // migration does not try to infer 'assigned' from the employee side.
-    expect(restored.pendingActions[0]!.status).toBe('queued');
-    expect(restored.pendingActions[0]!.holderId).toBeNull();
+    // The surviving record's own status/holderId were stripped to simulate a
+    // pre-#547 save; migration re-derives them from the employee's
+    // activeActionId, so the action comes back 'assigned' to that employee.
+    expect(restored.pendingActions[0]!.status).toBe('assigned');
+    expect(restored.pendingActions[0]!.holderId).toBe(employee.id);
   });
 
   it('a v8+ save (already carrying status/holderId) is left untouched by the migration', () => {
