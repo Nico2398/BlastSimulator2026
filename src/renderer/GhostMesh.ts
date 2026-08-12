@@ -23,6 +23,20 @@ const CLAIMED_OPACITY_MIN = 0.10;        // dimmest pulse value, claimed
 const CLAIMED_OPACITY_MAX = 0.30;        // brightest pulse value, claimed
 const CLAIMED_PULSE_SPEED = 1.1;         // radians / second, claimed
 
+/** Builds a ghost mesh material at the given starting opacity — the unclaimed
+ *  and claimed materials differ only in that value (#547 review). */
+function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
+  return new THREE.MeshPhongMaterial({
+    color: GHOST_COLOR,
+    emissive: EMISSIVE_COLOR,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
+
 // ---------- Main class ----------
 
 export class GhostMesh {
@@ -36,24 +50,8 @@ export class GhostMesh {
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    this.material = new THREE.MeshPhongMaterial({
-      color: GHOST_COLOR,
-      emissive: EMISSIVE_COLOR,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: OPACITY_MIN,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    this.claimedMaterial = new THREE.MeshPhongMaterial({
-      color: GHOST_COLOR,
-      emissive: EMISSIVE_COLOR,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: CLAIMED_OPACITY_MIN,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
+    this.material = createGhostMaterial(OPACITY_MIN);
+    this.claimedMaterial = createGhostMaterial(CLAIMED_OPACITY_MIN);
   }
 
   /**

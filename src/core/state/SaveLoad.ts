@@ -153,41 +153,68 @@ export function deserialize(json: string): GameState {
   }
 
   // v7 → v8: PendingAction/GhostPreview gained a lifecycle (status/holderId,
-  // claimed) — a pre-v8 save's actions were deleted from pendingActions the
-  // instant they were claimed (the bug #547 fixes), so every entry that
-  // survived to be saved was, by construction, still queued and unheld.
+  // claimed). A pre-v8 save's *dispatched-and-idle-claimed* actions were
+  // deleted from pendingActions the instant they were claimed (the bug #547
+  // fixes) — but rest actions created by tickCollapse/tickNeedRestoration/
+  // forceShiftRestIfNeeded (GameLoop.ts) already self-claimed synchronously
+  // at creation even pre-#547: they push the action to pendingActions AND
+  // set the claiming employee's activeActionId immediately, removing it only
+  // at rest completion. So a save taken mid-rest genuinely has a surviving
+  // pendingActions entry already claimed by a specific employee, not queued.
   if ((obj['version'] as number) < 8) {
     const pendingActionsRaw = obj['pendingActions'] as Array<Record<string, unknown>> | undefined;
+
+    // Map pending-action id -> claiming employee id, from each employee's
+    // activeActionId — the only place a pre-#547 save records "this action is
+    // already claimed by me".
+    const employeesRaw2 = obj['employees'] as Record<string, unknown> | undefined;
+    const employeeList2 = employeesRaw2
+      ? (employeesRaw2['employees'] as Array<Record<string, unknown>> | undefined)
+      : undefined;
+    const claimingEmployeeByActionId = new Map<unknown, unknown>();
+    if (Array.isArray(employeeList2)) {
+      for (const e of employeeList2) {
+        if (e['activeActionId'] !== null && e['activeActionId'] !== undefined) {
+          claimingEmployeeByActionId.set(e['activeActionId'], e['id']);
+        }
+      }
+    }
+
     if (Array.isArray(pendingActionsRaw)) {
       for (const action of pendingActionsRaw) {
-        if (action['status'] === undefined) action['status'] = 'queued';
-        if (action['holderId'] === undefined) action['holderId'] = null;
+        const holderId = claimingEmployeeByActionId.get(action['id']);
+        if (action['status'] === undefined) {
+          action['status'] = holderId !== undefined ? 'assigned' : 'queued';
+        }
+        if (action['holderId'] === undefined) {
+          action['holderId'] = holderId !== undefined ? holderId : null;
+        }
       }
     }
 
     const ghostPreviewsRaw = obj['ghostPreviews'] as Array<Record<string, unknown>> | undefined;
     if (Array.isArray(ghostPreviewsRaw)) {
       for (const ghost of ghostPreviewsRaw) {
-        if (ghost['claimed'] === undefined) ghost['claimed'] = false;
+        if (ghost['claimed'] === undefined) {
+          ghost['claimed'] = claimingEmployeeByActionId.has(ghost['id']);
+        }
       }
     }
 
-    // A pre-v8 save's claimed actions were already deleted from
-    // pendingActions by the old bug, so an employee's activeActionId can
-    // reference an id no longer present after migration — clear it rather
-    // than leave tickEmployees' idle check permanently blocked on a
-    // dangling reference.
+    // A pre-v8 save's dispatched-and-claimed actions (not the self-claimed
+    // rest actions handled above) were already deleted from pendingActions by
+    // the old bug, so an employee's activeActionId can reference an id no
+    // longer present after migration — clear a truly-dangling reference
+    // rather than leave tickEmployees' idle check permanently blocked on it.
+    // An action that matched a claiming employee above is, by construction,
+    // still present, so this only ever clears the genuinely-stale case.
     const migratedIds = new Set(
       Array.isArray(pendingActionsRaw) ? pendingActionsRaw.map(a => a['id']) : [],
     );
-    const employeesRaw2 = obj['employees'] as Record<string, unknown> | undefined;
-    if (employeesRaw2) {
-      const employeeList2 = employeesRaw2['employees'] as Array<Record<string, unknown>> | undefined;
-      if (Array.isArray(employeeList2)) {
-        for (const e of employeeList2) {
-          if (e['activeActionId'] !== null && e['activeActionId'] !== undefined && !migratedIds.has(e['activeActionId'])) {
-            e['activeActionId'] = null;
-          }
+    if (Array.isArray(employeeList2)) {
+      for (const e of employeeList2) {
+        if (e['activeActionId'] !== null && e['activeActionId'] !== undefined && !migratedIds.has(e['activeActionId'])) {
+          e['activeActionId'] = null;
         }
       }
     }
