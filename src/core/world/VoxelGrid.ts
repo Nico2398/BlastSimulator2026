@@ -261,6 +261,35 @@ export class VoxelGrid {
     return this.ownerOf(x, 0, z) !== null;
   }
 
+  /** True at an owned column, or at the single-voxel west/north halo column
+   *  TerrainMesh's "march one cube past the site" wall-sealing convention
+   *  actually emits geometry into. #559 root cause 4: LandscapeMesh must
+   *  treat this set, not raw containsColumn, as "already TerrainMesh's
+   *  ground" so the two meshes claim disjoint cells. */
+  claimsColumnForMeshing(x: number, z: number): boolean {
+    if (this.containsColumn(x, z)) return true;
+
+    // West halo: TerrainMesh.rebuildChunk marches one column west of an
+    // owned chunk's own rect when that chunk has no owned neighbour to its
+    // west. (x, z) is that halo column exactly when (x+1, z) is owned (which,
+    // combined with (x, z) itself being unowned, means x+1 sits at the west
+    // edge of its owning chunk's rect) and that chunk has no west neighbour.
+    if (this.containsColumn(x + 1, z)) {
+      const cx = chunkIndexOf(x + 1);
+      const cz = chunkIndexOf(z);
+      if (!this.hasChunk(cx - 1, cz)) return true;
+    }
+
+    // North halo: symmetric on z.
+    if (this.containsColumn(x, z + 1)) {
+      const cx = chunkIndexOf(x);
+      const cz = chunkIndexOf(z + 1);
+      if (!this.hasChunk(cx, cz - 1)) return true;
+    }
+
+    return false;
+  }
+
   /** The chunk covering (x, z) if the site has one, or null. Does not check the chunk's owned sub-rect. */
   private chunkAt(x: number, z: number): VoxelChunk | null {
     const key = chunkKey(chunkIndexOf(x), chunkIndexOf(z));
@@ -689,18 +718,24 @@ export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number
 /**
  * Continuous height of the topmost solid-to-air crossing at column (x, z),
  * in the same datum as heightToVoxelYContinuous. Mirrors
- * computeVoxelColumnSurfaceY's top-down scan and clamp-to-edge-column
- * behaviour, but returns the fractional crossing height (via densityAt
- * interpolation between the topmost solid voxel and the one above it),
- * matching what TerrainMesh's marching cubes actually renders at that
- * column right now, pre- or post-blast. Returns 0 for a column with no
- * solid voxel at all.
+ * computeVoxelColumnSurfaceY's top-down scan, but returns the fractional
+ * crossing height (via densityAt interpolation between the topmost solid
+ * voxel and the one above it), matching what TerrainMesh's marching cubes
+ * actually renders at that column right now, pre- or post-blast. Returns 0
+ * for an owned column with no solid voxel at all.
+ *
+ * Unlike computeVoxelColumnSurfaceY, does NOT clamp an out-of-bounds (x, z)
+ * to the edge column — it returns NaN instead (#559). LandscapeMesh's live
+ * boundary-height sampling needs an honest "no live data here" signal at the
+ * claim edge, since the claim itself moves; a silent clamp there produced
+ * the seam this function's fix closes.
  */
 export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: number): number {
   if (grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
+  if (!grid.containsColumn(x, z)) return NaN;
 
-  const cx = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
-  const cz = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
+  const cx = Math.floor(x);
+  const cz = Math.floor(z);
   for (let y = grid.sizeY - 1; y >= 0; y--) {
     const density0 = grid.densityAt(cx, y, cz);
     if (density0 >= 0.5) {

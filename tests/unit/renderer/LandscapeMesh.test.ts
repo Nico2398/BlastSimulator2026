@@ -9,6 +9,8 @@ import {
   rockBlendFor,
   classifyQuad,
   buildBoundaryQuad,
+  subdivideOutsideQuad,
+  MID_STEP,
   type PlayableCut,
 } from '../../../src/renderer/terrain/LandscapeMesh.js';
 import { rockIndexOf } from '../../../src/core/world/RockCatalog.js';
@@ -934,4 +936,238 @@ describe('LandscapeMesh — per-biome coverage (#491)', () => {
       lm.dispose();
     });
   }
+});
+
+// #559: the landscape/playable-mesh boundary. Root causes 3 and 4 of that
+// issue: LandscapeMesh must not read a NaN live height as a real one, and
+// must treat TerrainMesh's own meshing footprint (meshClaimsColumn), not raw
+// ownsColumn, as ground it must not draw into.
+
+describe('LandscapeMesh — dense boundary sample walk against a known height field (#559)', () => {
+  const POSITION_TOLERANCE = 1e-3;
+  const NORMAL_ANGLE_TOLERANCE_DEG = 5;
+
+  it('every boundary-ring vertex along a dense walk of the site edge matches the theoretical height and slope within tolerance', () => {
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    // A single flat plane: the playable surface height function and the
+    // landscape height function are literally the same function, so they
+    // agree everywhere -- including densely along the whole boundary, not
+    // just at one spot-checked point.
+    const field = (x: number, z: number) => 20 + x * 0.2 - z * 0.15;
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const n = 60;
+    const tile = makeFakeTile(-100, -100, n, compId);
+    const step = 4;
+    for (let row = 0; row < n; row++) {
+      for (let col = 0; col < n; col++) {
+        tile.heights[row * n + col] = field(-100 + col * step, -100 + row * step);
+      }
+    }
+    const handle = makeFakeHandle(rect, [tile], n, compId, (x, z) => ({ height: field(x, z), biomeId: 0, surfCompId: compId }));
+    const playable: PlayableCut = { rect, ownsColumn: (x, z) => x > rect.minX && x < rect.maxX && z > rect.minZ && z < rect.maxZ, boundaryHeightAt: field };
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette, playable);
+
+    const dhdx = 0.2, dhdz = -0.15; // analytic slope of `field`
+    const expectedLen = Math.hypot(dhdx, 1, dhdz);
+    const expectedNormal = [-dhdx / expectedLen, 1 / expectedLen, -dhdz / expectedLen] as const;
+    const angleToleranceRad = (NORMAL_ANGLE_TOLERANCE_DEG * Math.PI) / 180;
+
+    let sampled = 0;
+    for (const child of scene.children) {
+      const mesh = child as THREE.Mesh;
+      const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+      const nrm = mesh.geometry.getAttribute('normal').array as Float32Array;
+      for (let i = 0; i < pos.length; i += 3) {
+        const x = pos[i]!, y = pos[i + 1]!, z = pos[i + 2]!;
+        // Only the ring right at the claim boundary -- within 2m of the rect
+        // edge AND within the rect's own extended footprint, so a vertex far
+        // along an unrelated tile edge (which merely happens to share one
+        // coordinate with a rect edge) isn't mistaken for a boundary vertex.
+        const inExtendedBox =
+          x >= rect.minX - 2 && x <= rect.maxX + 2 && z >= rect.minZ - 2 && z <= rect.maxZ + 2;
+        const nearBoundary =
+          inExtendedBox && (
+            Math.abs(x - rect.minX) < 2 || Math.abs(x - rect.maxX) < 2 ||
+            Math.abs(z - rect.minZ) < 2 || Math.abs(z - rect.maxZ) < 2
+          );
+        if (!nearBoundary) continue;
+        sampled++;
+
+        expect(Math.abs(y - field(x, z))).toBeLessThan(POSITION_TOLERANCE);
+
+        const nx = nrm[i]!, ny = nrm[i + 1]!, nz = nrm[i + 2]!;
+        const dot = nx * expectedNormal[0] + ny * expectedNormal[1] + nz * expectedNormal[2];
+        const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
+        expect(angle).toBeLessThan(angleToleranceRad);
+      }
+    }
+    expect(sampled).toBeGreaterThan(0); // the walk actually found boundary vertices to check
+    lm.dispose();
+  });
+});
+
+describe('LandscapeMesh — classifyQuad/buildBoundaryQuad must honor meshClaimsColumn, not raw ownsColumn (#559 root cause 4)', () => {
+  it('emits no triangle inside the west halo column TerrainMesh now claims via meshClaimsColumn', () => {
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const n = 60;
+    const tile = makeFakeTile(-100, -100, n, compId);
+    const handle = makeFakeHandle(rect, [tile], n, compId);
+
+    const playable: PlayableCut = {
+      rect,
+      ownsColumn: (x, z) => x >= 0 && x < 32 && z >= 0 && z < 32,
+      // Mirrors TerrainMesh's own outward march (rebuildChunk's xStart =
+      // rect.minX - 1 when no owned chunk lies to the west): one extra
+      // column claimed to the west of ownsColumn's own rect, same z range.
+      meshClaimsColumn: (x, z) => x >= -1 && x < 32 && z >= 0 && z < 32,
+    };
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette, playable);
+
+    // With FINE_STEP === 1 every emitted vertex sits at an integer x whether
+    // or not the halo cell is skipped, so a vertex-position range check (the
+    // bug this test used to guard: `-1 < x < 0` can never contain an
+    // integer) can never fail regardless of what classifyQuad/buildBoundaryQuad
+    // do. Check the index buffer instead: the fine cell whose 4 corners are
+    // (x=-1,z)/(x=0,z)/(x=-1,z+1)/(x=0,z+1) is exactly the halo column
+    // TerrainMesh now claims via meshClaimsColumn, so buildBoundaryQuad must
+    // never push either of that cell's 2 triangles. A triangle belongs to
+    // that cell iff all 3 of its vertices sit at x === -1 or x === 0 AND at
+    // least one vertex sits at each (ruling out a triangle that merely
+    // touches the x=-1 or x=0 seam from its own neighbouring, legitimately
+    // emitted cell without spanning the halo column itself), restricted to z
+    // strictly inside the rect's own [minZ, maxZ) span -- meshClaimsColumn's
+    // own z upper bound is exclusive (z < 32), so the one fine cell touching
+    // z === maxZ has a genuinely unclaimed NE corner and is legitimately
+    // still emitted, same as the tile's SW/NW corner quads outside z >= minZ.
+    let haloColumnTriangles = 0;
+    for (const child of scene.children) {
+      const mesh = child as THREE.Mesh;
+      const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+      const index = mesh.geometry.getIndex();
+      if (!index) continue;
+      const idx = index.array;
+      for (let t = 0; t < idx.length; t += 3) {
+        const xs = [0, 1, 2].map(k => pos[idx[t + k]! * 3]!);
+        const zs = [0, 1, 2].map(k => pos[idx[t + k]! * 3 + 2]!);
+        const allOnHaloEdges = xs.every(x => Math.abs(x + 1) < 1e-6 || Math.abs(x) < 1e-6);
+        const spansBothEdges = xs.some(x => Math.abs(x + 1) < 1e-6) && xs.some(x => Math.abs(x) < 1e-6);
+        const strictlyInsideRectZ = zs.every(z => z >= rect.minZ - 1e-6 && z < rect.maxZ - 1e-6);
+        if (allOnHaloEdges && spansBothEdges && strictlyInsideRectZ) haloColumnTriangles++;
+      }
+    }
+    expect(haloColumnTriangles).toBe(0);
+    lm.dispose();
+  });
+
+  it('still emits ground two columns west of the rect, outside even the meshClaimsColumn halo', () => {
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const n = 60;
+    const tile = makeFakeTile(-100, -100, n, compId);
+    const handle = makeFakeHandle(rect, [tile], n, compId);
+
+    const playable: PlayableCut = {
+      rect,
+      ownsColumn: (x, z) => x >= 0 && x < 32 && z >= 0 && z < 32,
+      meshClaimsColumn: (x, z) => x >= -1 && x < 32 && z >= 0 && z < 32,
+    };
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette, playable);
+
+    let sawFarWestGround = false;
+    for (const child of scene.children) {
+      const mesh = child as THREE.Mesh;
+      const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+      for (let i = 0; i < pos.length; i += 3) {
+        if (pos[i]! < -1 - 1e-6) sawFarWestGround = true;
+      }
+    }
+    expect(sawFarWestGround).toBe(true);
+    lm.dispose();
+  });
+});
+
+describe('LandscapeMesh — boundaryHeightAt NaN falls back to the theoretical sampleColumn height (#559 root cause 2/3)', () => {
+  it('never emits a NaN position or normal, and falls back to the theoretical height, for an irregular (#473-style) shape whose unowned notch reports NaN', () => {
+    const scene = makeScene();
+    const { palette, compId } = makePalette();
+    const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
+    const n = 60;
+    const theoreticalH = 30;
+    const tile = makeFakeTile(-100, -100, n, compId, theoreticalH);
+    const handle = makeFakeHandle(rect, [tile], n, compId, () => ({ height: theoreticalH, biomeId: 0, surfCompId: compId }));
+
+    // Irregular #473-style shape inside the rectangular rect: an L, where the
+    // (x < 16, z < 16) corner is an unclaimed notch.
+    const playable: PlayableCut = {
+      rect,
+      ownsColumn: (x, z) => x >= 16 || z >= 16,
+      // Mirrors computeVoxelColumnSurfaceHeight's post-#559 answer for a
+      // column truly outside every owned chunk: NaN, not a clamped guess.
+      boundaryHeightAt: (x, z) => (x < 16 && z < 16 ? NaN : theoreticalH),
+    };
+
+    const lm = new LandscapeMesh(scene, makeMaterial());
+    lm.build(handle, palette, playable);
+
+    expect(scene.children.length).toBeGreaterThan(0);
+    for (const child of scene.children) {
+      const mesh = child as THREE.Mesh;
+      const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+      const nrm = mesh.geometry.getAttribute('normal').array as Float32Array;
+      for (const v of pos) expect(Number.isNaN(v)).toBe(false);
+      for (const v of nrm) expect(Number.isNaN(v)).toBe(false);
+      // Every vertex height must land on the theoretical field's constant
+      // height -- both because the true field IS that constant everywhere,
+      // and because the notch's own boundaryHeightAt reports NaN, so any
+      // vertex sampled there can only be correct by having fallen back.
+      for (let i = 1; i < pos.length; i += 3) {
+        expect(pos[i]).toBeCloseTo(theoreticalH, 4);
+      }
+    }
+    lm.dispose();
+  });
+});
+
+describe('subdivideOutsideQuad / MID_STEP (#559, optional coarse-to-fine transition)', () => {
+  it('exports MID_STEP as an intermediate step between FINE_STEP (1m) and a typical coarse step (4m)', () => {
+    expect(MID_STEP).toBeGreaterThan(1);
+    expect(MID_STEP).toBeLessThan(4);
+  });
+
+  it('emits MID_STEP-subdivided, index-coherent geometry for one coarse outside quad', () => {
+    const { palette, compId } = makePalette();
+    const sample = (x: number, z: number) => ({ height: 10 + x * 0.1 + z * 0.1, biomeId: 0, surfCompId: compId });
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const rockA: number[] = [];
+    const rockB: number[] = [];
+    const rockWeight: number[] = [];
+    const ore: number[] = [];
+    const indices: number[] = [];
+
+    subdivideOutsideQuad(
+      positions, normals, rockA, rockB, rockWeight, ore, indices,
+      0, 0, 4, 4, sample, palette, MID_STEP,
+    );
+
+    expect(indices.length).toBeGreaterThan(0);
+    expect(indices.length % 3).toBe(0);
+    const vertexCount = positions.length / 3;
+    expect(vertexCount).toBeGreaterThan(4); // finer than the single coarse quad's 4 corners
+    expect(normals.length).toBe(positions.length);
+    expect(rockA.length).toBe(vertexCount);
+    expect(rockB.length).toBe(vertexCount);
+    expect(rockWeight.length).toBe(vertexCount);
+    expect(ore.length).toBe(vertexCount * 2);
+  });
 });

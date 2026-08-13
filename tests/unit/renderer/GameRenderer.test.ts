@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { GameRenderer } from '../../../src/renderer/GameRenderer.js';
 import { FragmentMesh } from '../../../src/renderer/FragmentMesh.js';
 import { CharacterMesh } from '../../../src/renderer/CharacterMesh.js';
+import { TerrainMesh } from '../../../src/renderer/TerrainMesh.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
@@ -794,5 +795,90 @@ describe('GameRenderer — survey confidence overlay visibility preference (#496
     renderer.syncFromContext(ctx); // re-sync with still-empty results
 
     expect(hideSpy).toHaveBeenCalled();
+  });
+});
+
+// ── Terrain/landscape boundary wiring (#559) ────────────────────────────────
+//
+// playableCut()'s meshClaimsColumn field, the edge-height sampler's
+// setEdgeHeightSampler()-before-buildAll() init ordering, and its idempotent
+// re-apply on landscape rebuild all previously shipped with zero test
+// coverage (semantic-reviewer, #559 fix-bug pass).
+
+describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
+  async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
+    const { newGameCommand } = await import('../../../src/console/commands/world.js');
+    const ctx: MiningContext = {
+      state: null, grid: null, landscape: null,
+      emitter: new EventEmitter(),
+    };
+    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
+    expect(result.success).toBe(true); // guard: the rest of the test is meaningless if setup itself failed
+    return ctx;
+  }
+
+  it('playableCut(grid).meshClaimsColumn delegates to grid.claimsColumnForMeshing', async () => {
+    const claimsSpy = vi.spyOn(VoxelGrid.prototype, 'claimsColumnForMeshing');
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+
+    renderer.syncFromContext(await makeLandscapeCtx());
+
+    // The landscape build cuts itself against playableCut(grid), whose
+    // meshClaimsColumn is wired straight to grid.claimsColumnForMeshing
+    // (GameRenderer.playableCut) -- a boundary quad anywhere in the built
+    // landscape necessarily calls it via LandscapeMesh's classifyQuad.
+    expect(claimsSpy).toHaveBeenCalled();
+    const [x, z] = claimsSpy.mock.calls[0]!;
+    expect(typeof x).toBe('number');
+    expect(typeof z).toBe('number');
+    claimsSpy.mockRestore();
+  });
+
+  it('loadGame() sets the terrain edge-height sampler BEFORE buildAll(), and it is non-null afterward', async () => {
+    const setSamplerSpy = vi.spyOn(TerrainMesh.prototype, 'setEdgeHeightSampler');
+    const buildAllSpy = vi.spyOn(TerrainMesh.prototype, 'buildAll');
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+
+    renderer.syncFromContext(await makeLandscapeCtx());
+
+    expect(setSamplerSpy).toHaveBeenCalled();
+    expect(buildAllSpy).toHaveBeenCalled();
+    // vitest mock functions record a global invocation order counter --
+    // setEdgeHeightSampler's first call must precede buildAll's first call,
+    // pinning the #559 init-ordering fix (previously buildAll ran first,
+    // so the initial mesh missed the boundary-normal fix entirely).
+    expect(setSamplerSpy.mock.invocationCallOrder[0]!).toBeLessThan(buildAllSpy.mock.invocationCallOrder[0]!);
+    // The dead-code concern (quality-reviewer): currentEdgeHeightSampler
+    // actually earns its keep here, proving the sampler GameRenderer wired in
+    // reached TerrainMesh, not just that some setter was called.
+    expect(renderer.terrain!.currentEdgeHeightSampler).not.toBeNull();
+
+    setSamplerSpy.mockRestore();
+    buildAllSpy.mockRestore();
+  });
+
+  it('rebuildLandscapeMesh() (level swap) re-applies the edge-height sampler', async () => {
+    const setSamplerSpy = vi.spyOn(TerrainMesh.prototype, 'setEdgeHeightSampler');
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await makeLandscapeCtx();
+    renderer.syncFromContext(ctx); // loadGame() — 1st setEdgeHeightSampler call
+    const callsAfterLoad = setSamplerSpy.mock.calls.length;
+    expect(callsAfterLoad).toBeGreaterThan(0);
+
+    // Same seed, different grid object — the "grid changed, same seed" branch
+    // that calls rebuildLandscapeMesh() a second time without going through
+    // loadGame()'s clearAll() first (mirrors a campaign level swap), exactly
+    // as the existing ambient-mesh test above exercises.
+    ctx.grid = new VoxelGrid(64, 64, 64);
+    ctx.landscape = null;
+    renderer.syncFromContext(ctx);
+
+    expect(setSamplerSpy.mock.calls.length).toBeGreaterThan(callsAfterLoad);
+    expect(renderer.terrain!.currentEdgeHeightSampler).not.toBeNull();
+
+    setSamplerSpy.mockRestore();
   });
 });
