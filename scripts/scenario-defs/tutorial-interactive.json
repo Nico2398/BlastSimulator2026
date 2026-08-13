@@ -612,7 +612,7 @@
     {
       "command": "contract accept 20",
       "timeout": 30,
-      "description": "contract-accept complete: Accept clicked on the first offer in the Contracts panel. #553: contract ID drifted from #1 to #20 -- CONTRACT_REFRESH_INTERVAL (20 ticks) keeps rolling the counter forward while this file's own driving_center/training/drilling wait grew by well over 300 ticks, so far more contracts have refreshed past by the time this step runs. The unqualified .bs-contract-accept selector is unaffected (still the first available card), so only the command-mode ID needs updating.",
+      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: the accept click is scoped to `[data-contract-id]` rather than a bare `.bs-contract-accept`, which always resolves to whichever offered card leads the DOM -- unscoped, command mode accepted the contract the command named while interaction mode accepted whatever led the list, two channels driving different contracts with both reporting pass, because `activeContractCount` counts accepts and not identities. #553: the id itself drifted from #1 to #20 -- the available pool refreshes on its own clock (REFRESH_INTERVAL, Contract.ts) and this file now spends well over 300 extra ticks on the driving_center, the drill_rig course and the drilling itself, so contract #1 is long gone by the time this step runs. Both halves move together: the command and the selector name the same contract, which is the whole point of scoping it.",
       "role": "player",
       "interaction": [
         {
@@ -621,7 +621,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
         },
         {
           "type": "waitForTutorialStep",

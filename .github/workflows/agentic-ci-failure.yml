@@ -140,6 +140,23 @@ jobs:
               return;
             }
 
+            // The opt-out, and the honest half of the live-session guard below.
+            // That guard can only see the two runner workflows, so a session
+            // driven from the web app, the desktop app, or a human at a terminal
+            // is invisible to it — and nudging then wakes a second worker onto a
+            // branch somebody is already fixing. "Is a human working on this" is
+            // not observable from the Actions API, so it is declared rather than
+            // detected: this label says hands off, and the fail-safe believes it.
+            const HOLD_LABEL = 'ci-fix-hold';
+            const labels = (pr.labels || []).map((label) => (typeof label === 'string' ? label : label.name));
+            if (labels.includes(HOLD_LABEL)) {
+              core.info(
+                `#${pr.number}: carries \`${HOLD_LABEL}\` — somebody owns this red CI already. ` +
+                'Remove the label to hand it back to the agent.'
+              );
+              return;
+            }
+
             // ── The guard that makes this safe to fire on every red CI ──
             // A session that is still running is already waiting on this very
             // verdict: `agentic-pipeline-finalization`'s `[await-ci]` step reads
