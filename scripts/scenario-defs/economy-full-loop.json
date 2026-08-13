@@ -3,17 +3,18 @@
   "description": "Full economy pipeline: blast spawns fragments without instant payout, a debris_hauler hauls them into a freight_warehouse, and contract delivery pays out only from that stored inventory (issue #456).",
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit",
+      "command": "campaign start level:tutorial_pit cash:250000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit"
+          "command": "campaign start level:tutorial_pit cash:250000"
         }
       ],
+      "description": "#553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, and (see below) a rock_fragmenter/second driver to clear the oversized fragments this same charge always produced, on top of the original driver/debris_hauler/freight_warehouse shopping list.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 80000
+          "cash": 250000
         }
       }
     },
@@ -66,7 +67,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 78800,
+          "cash": 248800,
           "proficiencyTotal": 5
         }
       },
@@ -182,11 +183,55 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 73700,
+          "cash": 243700,
           "proficiencyTotal": 10
         }
       },
       "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed a drill_rig at all) now needs one before drill_plan can ever land. Vehicle #1; destroyed by the blast further down, so the debris_hauler purchased later becomes #2 and the rock_fragmenter #3.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "description": "Grants the driller (employee #2) the licence to drive the drill_rig just purchased -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow); left as a test-only bootstrap since this file's focus is the economy loop, not re-proving vehicle licensing.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "cash": 208700,
+          "proficiencyTotal": 11
+        }
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
@@ -221,10 +266,41 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 4
+          "orderedHoleCount": 4,
+          "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below."
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "description": "#553: waits for the driller to drive the drill_rig to all 4 ordered holes and drill them -- a single 50-tick round lands the whole 2x2 grid on tutorial_pit's small map.",
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Defensive: a `tick N` step silently completes fewer ticks than requested if a random event fires mid-wait, and every subsequent tick then refuses until the event is resolved. No-op when nothing is pending.",
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:3 stemming:2",
@@ -383,6 +459,7 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
+      "description": "#553: qualificationCount/proficiencyTotal bumped by 1 each over the pre-#553 baseline -- the driller (employee #2) now also carries the driving.drill_rig licence added above.",
       "role": "player",
       "expect": {
         "decreased": [
@@ -390,8 +467,8 @@
         ],
         "equals": {
           "employeeCount": 3,
-          "qualificationCount": 3,
-          "proficiencyTotal": 11
+          "qualificationCount": 4,
+          "proficiencyTotal": 12
         }
       }
     },
@@ -406,8 +483,8 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 72900,
-          "proficiencyTotal": 15
+          "cash": 196734,
+          "proficiencyTotal": 16
         }
       },
       "role": "bootstrap"
@@ -451,6 +528,114 @@
       }
     },
     {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "description": "#553: this file's charge (amount:3kg boomite at spacing:4) always left some oversized boulders alongside the haulable rubble -- pre-#553, blast landed at tick 0 so the single debris_hauler driver's cost-ranked action window (ACTION_SELECTION_MAX_PATH_ATTEMPTS=5, ActionSelection.ts) never filled with fragment_debris the driver could never claim (no rock_fragmenter existed). Post-#553 the drilling wait shifts nothing about the blast's own geometry, but empirically the closest 5 pending actions to a debris_hauler driver's hire position are fragment_debris, and with no rock_fragmenter ever able to claim them they never clear -- permanently starving the driver's own haul_debris candidates out of its bounded top-5 window. A second driver crewing a rock_fragmenter (bought below, before the debris_hauler) clears that oversized boulder backlog so the debris_hauler's window actually reaches a haul_debris action. Employee #4.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 4,
+          "qualificationCount": 5,
+          "proficiencyTotal": 17
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.excavator level:5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.excavator level:5"
+        }
+      ],
+      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #4 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator (the rock_fragmenter's licence) belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow, and rock-fragmenter-breaking.json's identical bootstrap). Left as a test-only bootstrap since this file's focus is the hauling/contract loop, not re-proving excavator licensing.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "cash": 180934,
+          "proficiencyTotal": 22
+        }
+      }
+    },
+    {
+      "command": "vehicle buy rock_fragmenter",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: vehicle #2 -- #1 was the drill_rig purchased above, destroyed by the blast. Bought (and crewed, below) before the debris_hauler on purpose: newly purchased vehicles spawn staggered off the grid centre (VehicleCommands.ts), which on tutorial_pit's small map lands right in the single-file approach to the blast crater -- an idle vehicle parked there blocks any other vehicle needing the same cell (two vehicles never share one, EntityMovementTick.ts's isCellOccupiedByOtherVehicle). Buying and crewing the rock_fragmenter first, then waiting for it to actually depart its spawn tile before the debris_hauler ever exists, means neither vehicle is ever parked in the other's way.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 2 4",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 148934
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "description": "#553: lets the rock_fragmenter's driver board and drive off toward its first boulder, clearing its spawn tile before the debris_hauler purchase below ever lands a vehicle there.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
@@ -466,32 +651,33 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
+      "description": "#553: vehicle #3 -- #1 was the drill_rig (destroyed by the blast), #2 the rock_fragmenter bought above.",
       "role": "player",
       "expect": {
         "decreased": [
           "cash"
         ],
         "equals": {
-          "vehicleCount": 1
+          "vehicleCount": 2
         }
       }
     },
     {
-      "command": "vehicle driver 1 3",
+      "command": "vehicle driver 3 3",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 32900
+          "cash": 123857
         }
       }
     },
@@ -516,7 +702,7 @@
     },
     {
       "command": "tick 1",
-      "description": "#552: replaces the old manual 'vehicle haul 1 fragment:138' step and its .bs-vehicle-haul-btn click -- once the debris_hauler and its licensed driver exist, the on-ground fragment's own haul_debris PendingAction is claimed and driven to automatically, with no player command or button naming which fragment. Ordering a haul costs nothing, but this extra tick still drains its own tick's worth of salary/maintenance upkeep, so cash only decreases here rather than holding at the retired command's old exact equals:29770 (which itself never cost anything, only the tick around it did). The following tick-10 step lets the drive-load-deliver cycle actually finish.",
+      "description": "#552: replaces the old manual 'vehicle haul 1 fragment:138' step and its .bs-vehicle-haul-btn click -- once the debris_hauler and its licensed driver exist, the on-ground fragment's own haul_debris PendingAction is claimed and driven to automatically, with no player command or button naming which fragment. Ordering a haul costs nothing, but this extra tick still drains its own tick's worth of salary/maintenance upkeep, so cash only decreases here rather than holding at the retired command's old exact equals:29770 (which itself never cost anything, only the tick around it did). The following tick-10 rounds let the drive-load-deliver cycle actually finish.",
       "interaction": [
         {
           "type": "command",
@@ -532,7 +718,128 @@
     },
     {
       "command": "tick 10",
-      "description": "Long enough for the driver to haul fragment #0 all the way to the freight_warehouse.",
+      "description": "#553: the debris_hauler driver's own cost-ranked action window only starts reaching a haul_debris candidate once the rock_fragmenter has cleared enough of the oversized boulders closer to the crater -- five rounds of tick 10 (with a defensive event-resolve after each, same pattern as the drill-plan wait above) cover that, ending on the round that actually lands storedMassKg > 0.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "description": "Long enough for the rock_fragmenter to clear the boulders blocking the debris_hauler driver's own action window, and for the driver to then haul the first cleared fragment all the way to the freight_warehouse.",
       "interaction": [
         {
           "type": "command",
@@ -560,7 +867,7 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 6",
       "interaction": [
         {
           "type": "clickSelector",
@@ -575,6 +882,7 @@
           "selector": "#bs-contract-panel .bs-contract-accept"
         }
       ],
+      "description": "#553: contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL (20 ticks) keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks, so far more contracts have refreshed past by the time this step runs. The unqualified .bs-contract-accept selector is unaffected (still the only/first available card), so only the command-mode ID needs updating.",
       "role": "player",
       "expect": {
         "equals": {
@@ -583,7 +891,7 @@
       }
     },
     {
-      "command": "contract deliver 1 amount:200",
+      "command": "contract deliver 6 amount:200",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -600,12 +908,12 @@
         }
       ],
       "role": "player",
-      "description": "Real click path: type 200 into the ACTIVE card's amount box and press DELIVER, so the kilograms the click sends are the same 200 the `command` field declares. The panel is already open from the accept step above, and contract #1 is the only active card, so the unqualified `.bs-contract-amount`/`.bs-contract-deliver` selectors are unambiguous here. awaitUsable is the real assertion: ContractsPanel disables the input, MAX and DELIVER together whenever min(remaining, stored) is 0, so a run that hauled nothing fails here instead of quietly delivering nothing. Traced maxDeliverable at this step: 262.5 kg of rubble against 430 kg remaining, so 200 is genuinely deliverable.",
+      "description": "Real click path: type 200 into the ACTIVE card's amount box and press DELIVER, so the kilograms the click sends are the same 200 the `command` field declares. The panel is already open from the accept step above, and contract #6 is the only active card, so the unqualified `.bs-contract-amount`/`.bs-contract-deliver` selectors are unambiguous here. awaitUsable is the real assertion: ContractsPanel disables the input, MAX and DELIVER together whenever min(remaining, stored) is 0, so a run that hauled nothing fails here instead of quietly delivering nothing. #553: contract #6 (\"Dispose of rubble\", 330kg @ $1.95/kg) needs 330kg total against the ~1050kg the hauling waits above have already stored, so 200 is genuinely deliverable.",
       "expect": {
         "increased": [
           "cash"
         ],
-        "note": "delivery genuinely pays out here (unlike contract-negotiation.json, which never hauls anything into storage) -- confirmed via direct trace: Payment $234.49"
+        "note": "#553: delivery genuinely pays out here (unlike contract-negotiation.json, which never hauls anything into storage) -- confirmed via direct trace against contract #6's $1.95/kg rubble rate."
       }
     },
     {
@@ -626,12 +934,13 @@
           "command": "state full"
         }
       ],
+      "description": "#553: employeeCount/vehicleCount bumped over the pre-#553 baseline -- employee #2 (the driller, needed to drive the drill_rig) and employee #4 (the second driver, crewing the rock_fragmenter) are both new. vehicleCount is 2: the debris_hauler and rock_fragmenter are both still alive; the drill_rig (#1) was destroyed by the blast and no longer counts.",
       "role": "observe",
       "expect": {
         "equals": {
-          "employeeCount": 3,
+          "employeeCount": 4,
           "buildingCount": 1,
-          "vehicleCount": 1,
+          "vehicleCount": 2,
           "activeContractCount": 1,
           "surveyCount": 1
         }

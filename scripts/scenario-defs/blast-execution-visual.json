@@ -3,22 +3,22 @@
   "description": "Visual verification of blast execution and effects: explosion animation, energy propagation visualization, fragment spawning, projection flyrock, Tier A projected vs Tier B collapse physics, and PHYSICS_FRAGMENT_CAP overflow fallback",
   "steps": [
     {
-      "command": "new_game seed:42 cash:250000",
+      "command": "new_game seed:42 cash:3000000",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:250000"
+          "command": "new_game seed:42 cash:3000000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 250000,
+          "cash": 3000000,
           "holeCount": 0
         }
       },
-      "description": " #553: cash bumped from $50,000 to $250,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits."
+      "description": " #553: cash bumped from $50,000 to $3,000,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits, and the 4th cycle restores its pre-#553 rows:8 cols:8 (64-hole) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts to stress the projectile-grouping path (#404) -- which a single driller/drill_rig takes over 1000 ticks to land door-to-door even at tight spacing:1."
     },
     {
       "command": "employee hire role:driller",
@@ -240,6 +240,26 @@
       }
     },
     {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
       "command": "employee fire 1",
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
       "interaction": [
@@ -269,26 +289,6 @@
         }
       ],
       "role": "player"
-    },
-    {
-      "command": "fragments",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "fragments"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe"
     },
     {
       "command": "inspect 20,20,0",
@@ -508,6 +508,26 @@
       }
     },
     {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
       "command": "employee fire 2",
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
       "interaction": [
@@ -537,26 +557,6 @@
         }
       ],
       "role": "player"
-    },
-    {
-      "command": "fragments",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "fragments"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe"
     },
     {
       "command": "inspect 45,20,0",
@@ -859,6 +859,26 @@
       }
     },
     {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
       "command": "employee fire 3",
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
       "interaction": [
@@ -888,26 +908,6 @@
         }
       ],
       "role": "player"
-    },
-    {
-      "command": "fragments",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "fragments"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe"
     },
     {
       "command": "inspect 5,45,0",
@@ -984,8 +984,8 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:5,5",
-      "description": "Grid 4/4. #553: shrunk from the original 8x8 (64 holes) to 2x2 (4 holes) — a single driller cannot land 64 holes without a genuine worker_revolt (see the opening step's note); PHYSICS_FRAGMENT_CAP overflow was always speculative here ('if anywhere in this suite', not a hard assertion), and no expect in this file ever checked fragment count directly, so this file's real, checkable point (per-grid drill/charge/sequence/blast counts and the Tier A/B projection visuals) is unaffected.",
+      "command": "drill_plan grid rows:8 cols:8 spacing:1 depth:6 start:5,5",
+      "description": "Grid 4/4. #553 restores this file's original 8x8 (64 holes) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts's own coverage regression guard (#404), which locks in a rows:8/cols:8 grid to exceed MAX_ACTIVE_PROJECTILES (256, balance.ts) and exercise the projectile-grouping path once heavily overcharged below. Spacing tightened to 1m (two decrement clicks off the 3m default, floored at 1) so the drag only spans (5,5)-(12,12): a single driller/drill_rig still takes over 1000 ticks door-to-door even at this minimum footprint (see the wait rounds below), so a wider spacing was not affordable inside any reasonable file runtime.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1004,11 +1004,15 @@
           "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 5,
           "z1": 5,
-          "x2": 33,
-          "z2": 33
+          "x2": 12,
+          "z2": 12
         },
         {
           "type": "screenshot"
@@ -1021,17 +1025,17 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 4,
+          "orderedHoleCount": 64,
           "holeCount": 0
         }
       }
     },
     {
-      "command": "tick 50",
+      "command": "tick 150",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 150"
         }
       ],
       "role": "setup"
@@ -1046,11 +1050,11 @@
       "role": "player"
     },
     {
-      "command": "tick 50",
+      "command": "tick 150",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 150"
         }
       ],
       "role": "setup"
@@ -1065,18 +1069,113 @@
       "role": "player"
     },
     {
-      "command": "tick 50",
+      "command": "tick 150",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 50"
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 4
+          "holeCount": 64
         }
       }
     },
@@ -1149,7 +1248,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 64
         }
       }
     },
@@ -1168,7 +1267,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 4
+          "sequencedCount": 64
         }
       }
     },
@@ -1214,6 +1313,26 @@
       }
     },
     {
+      "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    },
+    {
       "command": "employee fire 4",
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
       "interaction": [
@@ -1243,26 +1362,6 @@
         }
       ],
       "role": "player"
-    },
-    {
-      "command": "fragments",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "fragments"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "state full",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "state full"
-        }
-      ],
-      "role": "observe"
     },
     {
       "command": "inspect 10,10,0",

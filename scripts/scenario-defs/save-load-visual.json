@@ -3,19 +3,20 @@
   "description": "Visual verification of the save/load UI: multiple save slots, auto-save indicator, save/load buttons, export/import options, slot metadata display (date, level, cash, playtime), and IndexedDB backend for web persistence.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "new_game seed:42 cash:120000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "new_game seed:42 cash:120000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 120000
         }
-      }
+      },
+      "description": "#553: was `campaign start level:dusty_hollow` -- a manually-bought vehicle spawns at grid centre (FleetPanel/vehicle.ts), and dusty_hollow's 96x40x96 campaign grid put that centre dozens of tiles from this file's own drill site (15,15), the same terrain-reachability trap found and worked around in scores-display-visual.json. Switched to new_game's flat 64x64x64 default (no obstruction) and bumped cash from $50,000 to $120,000 -- this file now needs a driller/drill_rig it never used to, on top of the original save/load-only shopping list."
     },
     {
       "command": "time resume",
@@ -28,6 +29,76 @@
       "role": "setup"
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed any roster at all) now needs one first. Employee #1.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "description": "#553: vehicle #1.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
+      "description": "Grants the driller (employee #1) the licence to drive the drill_rig just purchased -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow); left as a test-only bootstrap since this file's focus is save/load, not re-proving vehicle licensing.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "cash": 84000
+        }
+      }
+    },
+    {
       "command": "tick 10",
       "interaction": [
         {
@@ -38,9 +109,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 83360
         },
-        "note": "confirmed via direct trace: cash stays flat with no employees/buildings/vehicles to drain it"
+        "note": "#553: no longer flat -- the driller/drill_rig now on the roster drain payroll/maintenance even while idle, unlike the pre-#553 empty roster this file used to open with."
       }
     },
     {
@@ -64,7 +135,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 82720
         }
       }
     },
@@ -109,7 +180,7 @@
       ],
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 82720
         }
       },
       "role": "setup"
@@ -130,7 +201,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 82720
         }
       }
     },
@@ -154,14 +225,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 82720
         },
         "note": "the real UI slot_1 here goes through SavesModal.ts's own IndexedDB-backed persistence -- a completely separate backend from the console save/load commands' in-memory quickSaveSlots map used above. This is the actual save the later load step reads back."
       }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15",
-      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about. depth corrected from 4 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about. depth corrected from 4 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -193,9 +264,39 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 70",
+      "description": "#553: waits for the driller to drive the drill_rig to all 4 ordered holes and drill them (sandbox-measured: lands around tick 70 on new_game's flat default terrain, well inside this single round).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 70"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 4
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -209,7 +310,7 @@
       "expect": {
         "equals": {
           "chargedCount": 4,
-          "cash": 50000
+          "cash": 77946
         }
       }
     },
@@ -287,10 +388,9 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 0,
-          "cash": 50000
+          "holeCount": 0
         },
-        "note": "command mode's own command field is the inert `state` read (see this step's description) -- it never actually reverts anything, so these values hold here simply because the post-blast state already matches them (blast always zeroes hole/charge/sequence counts, and nothing in this file ever spends cash). In a real browser, the same values hold for the opposite reason: the click genuinely reverts to slot_1's pre-blast save. Both paths converge on the same scalars, but only interaction mode is actually testing the load -- the terrain/voxel revert this step's whole point is about has no state field to check at all, only the screenshot."
+        "note": "#553: cash dropped from this check -- command mode's own command field is the inert `state` read (see this step's description), so it never actually reverts anything and reports whatever cash the post-blast state already holds. Before #553 that coincidentally equalled the pre-save value too, because nothing in this file ever spent cash; now that the driller/drill_rig genuinely drain payroll over the drilling wait, post-blast cash and the saved slot's cash have diverged for real, so cash is no longer safely checkable across both modes (same class as Findings #21/#22/#31). holeCount stays checkable: it is 0 in both paths for the same reason as before (post-blast always zeroes it; the saved slot never had any holes ordered yet either). In a real browser, the click genuinely reverts cash to slot_1's pre-blast save -- only interaction mode is actually testing the load; the terrain/voxel revert this step's whole point is about has no state field to check at all, only the screenshot."
       }
     },
     {
@@ -314,10 +414,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000,
-          "holeCount": 0,
-          "tickCount": 20
-        }
+          "holeCount": 0
+        },
+        "note": "#553: cash/tickCount dropped from this check for the same cross-mode-divergence reason as the load step above -- command mode never actually reverts, so both now read whatever the post-blast state holds (cash 79226, tickCount 90ish) rather than the saved slot's own values (cash 82720, tickCount 20). holeCount stays checkable since it is 0 either way."
       }
     }
   ],

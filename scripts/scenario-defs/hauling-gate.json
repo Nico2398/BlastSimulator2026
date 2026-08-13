@@ -377,16 +377,14 @@
     },
     {
       "command": "tick 40",
+      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Not re-asserting the amount a second time, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all. #553: cash no longer asserted decreased here either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing. No checkable field left that holds on every seed/timing; the next state-full step's exact equals block is this step's real proof that nothing broke.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 40"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "note": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Left as increased/under-asserted-exact rather than hard-pinning a specific kg figure, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all -- not re-asserting the amount a second time. #553: cash no longer asserted decreased here -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing."
-      }
+      "role": "setup"
     },
     {
       "command": "fragments",
