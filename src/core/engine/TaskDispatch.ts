@@ -6,7 +6,7 @@ import { SURVEY_COSTS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
-import { releaseVehicleReservation } from './VehicleReservation.js';
+import { releaseVehicleReservation, releaseVehicleReservationKeepDriver } from './VehicleReservation.js';
 
 export type { PendingAction };
 
@@ -74,22 +74,30 @@ export type DispatchRejectionReason = 'target-not-found' | 'target-unqualified' 
 export function dispatchPendingAction(
   state: GameState,
   action: Omit<PendingAction, 'status' | 'holderId'>,
+  options?: { skipQualificationCheck?: boolean },
 ): { success: boolean; error?: string; reason?: DispatchRejectionReason } {
   const targetId = action.targetEmployeeId;
   const isQualified = (emp: { alive: boolean; qualifications: { category: string }[] }): boolean =>
     emp.alive && (action.requiredSkill === null
       || emp.qualifications.some(q => q.category === action.requiredSkill));
 
-  if (targetId !== null && targetId !== undefined) {
-    const target = state.employees.employees.find(emp => emp.id === targetId);
-    if (target === undefined) {
-      return { success: false, error: 'unqualified', reason: 'target-not-found' };
+  // skipQualificationCheck (#552): HaulDispatch.ts's syncHaulDispatch needs a
+  // haul_debris/fragment_debris action to sit queued silently even when the
+  // roster currently has nobody qualified (a fresh site with no hauler/driver
+  // yet) — the actual qualification these action types need is enforced at
+  // claim time via requiredVehicleRole/findVehicleForClaim instead, not here.
+  if (!options?.skipQualificationCheck) {
+    if (targetId !== null && targetId !== undefined) {
+      const target = state.employees.employees.find(emp => emp.id === targetId);
+      if (target === undefined) {
+        return { success: false, error: 'unqualified', reason: 'target-not-found' };
+      }
+      if (!isQualified(target)) {
+        return { success: false, error: 'unqualified', reason: 'target-unqualified' };
+      }
+    } else if (!state.employees.employees.some(isQualified)) {
+      return { success: false, error: 'unqualified', reason: 'roster-unqualified' };
     }
-    if (!isQualified(target)) {
-      return { success: false, error: 'unqualified', reason: 'target-unqualified' };
-    }
-  } else if (!state.employees.employees.some(isQualified)) {
-    return { success: false, error: 'unqualified', reason: 'roster-unqualified' };
   }
   // Full record constructed here — every dispatch starts life queued and
   // unheld (#547); callers no longer supply status/holderId themselves.
@@ -255,7 +263,12 @@ function actionOrderCost(action: PendingAction): number {
  * needs-driven interruption on a long task could silently double its total
  * completion time.
  */
-export function interruptActiveAction(state: GameState, employee: Employee, actionId: number | null): void {
+export function interruptActiveAction(
+  state: GameState,
+  employee: Employee,
+  actionId: number | null,
+  options?: { keepVehicleDriver?: boolean },
+): void {
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
     if (action) {
@@ -273,7 +286,15 @@ export function interruptActiveAction(state: GameState, employee: Employee, acti
 
       // releaseVehicleReservation no-ops on its own when nothing is reserved
       // for this action id, so no need to gate the call on requiredVehicleRole.
-      releaseVehicleReservation(state, action.id);
+      // options.keepVehicleDriver (#552) skips the dismount for the one
+      // caller (ArrivalGate.ts's resolveBoarding) interrupting an action
+      // whose driver had *just* boarded this same tick for it — every other
+      // caller keeps the full dismount-and-idle release.
+      if (options?.keepVehicleDriver) {
+        releaseVehicleReservationKeepDriver(state, action.id);
+      } else {
+        releaseVehicleReservation(state, action.id);
+      }
     }
   }
 

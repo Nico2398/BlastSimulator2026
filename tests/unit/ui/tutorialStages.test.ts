@@ -9,7 +9,6 @@ import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { TUTORIAL_STAGES, stagesFor } from '../../../src/ui/tutorialStages.js';
 import { TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
-import { TOOLBAR_TARGET } from '../../../src/ui/tutorialStepHelpers.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
 import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
 
@@ -155,8 +154,10 @@ describe('tutorial stage table', () => {
     // Every one of these opens a panel before acting in it. A single stage here
     // is the bug this whole table exists to fix.
     for (const stepId of [
+      // haul-debris (#552) is deliberately excluded: hauling self-dispatches
+      // now, so the step is a single watch-only stage, not a click sequence.
       'hire-surveyor', 'survey', 'drill-plan', 'blast', 'contract-accept',
-      'vehicle-buy-assign', 'build-storage', 'haul-debris', 'box-cut', 'set-policy',
+      'vehicle-buy-assign', 'build-storage', 'box-cut', 'set-policy',
     ]) {
       expect(TUTORIAL_STAGES[stepId]!.length, `${stepId} should be multi-stage`)
         .toBeGreaterThan(1);
@@ -164,13 +165,41 @@ describe('tutorial stage table', () => {
   });
 });
 
-describe('haul-debris stage list (#466)', () => {
-  it('is a two-stage Vehicles-only sequence: open the toolbar, then use the Haul button', () => {
-    const stages = TUTORIAL_STAGES['haul-debris'];
-    expect(stages, 'TUTORIAL_STAGES is missing a "haul-debris" entry').toBeDefined();
-    expect(stages).toHaveLength(2);
-    expect(stages![0]!.target).toBe(TOOLBAR_TARGET.vehicles);
-    expect(stages![1]!.target).toBe('#bs-vehicle-panel .bs-vehicle-haul-btn');
+describe('haul-debris stage list (#552 — self-dispatching, no manual Haul button)', () => {
+  // Hauling is fully automatic now: on-ground fragments spawn their own
+  // PendingActions and a qualified employee claims/drives/delivers them with
+  // no player click. The step has nothing left to walk the player through
+  // stage by stage — it teaches watching, not clicking — so TUTORIAL_STAGES
+  // carries one explicit watch-only stage (matching every other step's
+  // convention of a keyed entry) pointing at the same Fleet toolbar target
+  // as the step's own highlightTarget, rather than relying on stagesFor's
+  // generic fallback.
+
+  it('has a single keyed TUTORIAL_STAGES entry pointing at the Fleet toolbar', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris')!;
+    expect(step.highlightTarget).toBeDefined();
+
+    expect(TUTORIAL_STAGES['haul-debris']).toHaveLength(1);
+    expect(TUTORIAL_STAGES['haul-debris']![0]!.target).toBe(step.highlightTarget);
+  });
+
+  it('agrees with stagesFor when the step\'s own highlightTarget is passed', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris')!;
+
+    const stages = stagesFor('haul-debris', step.highlightTarget);
+
+    expect(stages).toHaveLength(1);
+    expect(stages[0]!.target).toBe(step.highlightTarget);
+  });
+
+  it('never targets the retired Fleet-panel Haul button', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris')!;
+    const stages = stagesFor('haul-debris', step.highlightTarget);
+
+    for (const stage of stages) {
+      expect(stage.target).not.toBe('#bs-vehicle-panel .bs-vehicle-haul-btn');
+      expect(stage.also ?? []).not.toContain('#bs-vehicle-panel .bs-vehicle-haul-btn');
+    }
   });
 });
 

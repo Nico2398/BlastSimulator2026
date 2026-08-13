@@ -481,4 +481,113 @@ describe('decideClock', () => {
     } as unknown as GameState['pendingActions'][number]];
     expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
   });
+
+  // -- #552: a debris_hauler/rock_fragmenter vehicle mid-haul or mid-break is
+  // outstanding work with no PendingAction and no employee-side signal at all
+  // (the driver reads as fully idle — activeActionId null, no destination,
+  // nothing pending) once the vehicle itself is driving/working. Before this,
+  // hasOutstandingWork/isWorkInProgress/workSignature only ever looked at
+  // employees and state.pendingActions, so a tutorial step waiting on a haul
+  // held the clock the instant an employee boarded, mid-delivery — the real
+  // "stuck on 17/24" playthrough bug. hasOutstandingVehicleWork (unexported,
+  // exercised only through decideClock here) is the fix.
+  describe('vehicle-gated hauling/breaking work (#552)', () => {
+    it('keeps running past budget while a vehicle has a live haulingPhase, even though every employee is fully idle', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.employees.employees = [];
+      s.vehicles.vehicles = [
+        { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x: 3, z: 4 } as never,
+      ];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+    });
+
+    it('keeps running past budget while a vehicle has a live breakPhase, even though every employee is fully idle', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.employees.employees = [];
+      s.vehicles.vehicles = [
+        { id: 1, haulingPhase: null, breakPhase: 'to_boulder', x: 3, z: 4 } as never,
+      ];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(false);
+    });
+
+    it('holds once budget is spent when no vehicle has a live phase and no employee has work outstanding (control)', () => {
+      const s = state();
+      s.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s.employees.employees = [];
+      s.vehicles.vehicles = [
+        { id: 1, haulingPhase: null, breakPhase: null, x: 3, z: 4 } as never,
+      ];
+      expect(decideClock(s, 0, DEFAULT_TICK_BUDGET, true).hold).toBe(true);
+    });
+
+    it('never holds while a hauling vehicle keeps moving, even well past budget + twice the grace window', () => {
+      const budget = DEFAULT_TICK_BUDGET;
+      let progress: ClockProgress = { signature: null, tick: 0 };
+      for (let tick = 0; tick <= budget + 2 * WORK_GRACE_TICKS; tick++) {
+        const s = state();
+        s.tickCount = tick;
+        s.employees.employees = [];
+        // A fresh position every tick — the haul is provably still moving.
+        s.vehicles.vehicles = [
+          { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x: tick, z: 0 } as never,
+        ];
+        const decision = decideClock(s, 0, budget, true, progress);
+        if (tick > budget + WORK_GRACE_TICKS) {
+          expect(decision.hold).toBe(false);
+        }
+        progress = { signature: decision.progressSignature, tick: decision.lastProgressTick };
+      }
+    });
+
+    it('workSignature differs between two states where only the vehicle\'s x/z/haulingPhase differ', () => {
+      const s1 = state();
+      s1.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s1.employees.employees = [];
+      s1.vehicles.vehicles = [
+        { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x: 3, z: 4 } as never,
+      ];
+      const d1 = decideClock(s1, 0, DEFAULT_TICK_BUDGET, true);
+
+      const s2 = state();
+      s2.tickCount = DEFAULT_TICK_BUDGET + 5;
+      s2.employees.employees = [];
+      s2.vehicles.vehicles = [
+        { id: 1, haulingPhase: 'to_depot', breakPhase: null, x: 9, z: 1 } as never,
+      ];
+      const d2 = decideClock(s2, 0, DEFAULT_TICK_BUDGET, true);
+
+      expect(d1.progressSignature).not.toBeNull();
+      expect(d2.progressSignature).not.toBeNull();
+      expect(d1.progressSignature).not.toBe(d2.progressSignature);
+    });
+
+    it('holds the clock once a stalled hauling vehicle stops changing position/phase for a full WORK_GRACE_TICKS window', () => {
+      const budget = DEFAULT_TICK_BUDGET;
+      const freezeAt = budget + 5;
+      let progress: ClockProgress = { signature: null, tick: 0 };
+      let last: ReturnType<typeof decideClock> | null = null;
+      for (let tick = 0; tick <= freezeAt + WORK_GRACE_TICKS; tick++) {
+        const s = state();
+        s.tickCount = tick;
+        s.employees.employees = [];
+        // Moves every tick up to freezeAt, then genuinely stops changing —
+        // simulating a hauler that stalls mid-drive (e.g. blocked path).
+        const x = tick <= freezeAt ? tick : freezeAt;
+        s.vehicles.vehicles = [
+          { id: 1, haulingPhase: 'to_fragment', breakPhase: null, x, z: 0 } as never,
+        ];
+        const decision = decideClock(s, 0, budget, true, progress);
+        last = decision;
+        if (tick < freezeAt + WORK_GRACE_TICKS) {
+          expect(decision.hold).toBe(false);
+        }
+        progress = { signature: decision.progressSignature, tick: decision.lastProgressTick };
+      }
+      // Grace measured from when staleness began (freezeAt), not from
+      // stepStartTick(0) — same contract as the employee-walk stall test above.
+      expect(last!.hold).toBe(true);
+    });
+  });
 });

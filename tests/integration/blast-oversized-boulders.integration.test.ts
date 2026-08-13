@@ -111,7 +111,20 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
     expect(haulAttempt.output.length).toBeGreaterThan(0);
     expect(ctx.state!.logistics.fragments.find(f => f.fragment.id === oversizedId)!.state).toBe('on_ground');
 
-    // 3. Crew a rock_fragmenter and break the oversized fragment in place.
+    // 3. Crew a rock_fragmenter — hauling/fragmenting is self-dispatching now
+    // (#552): syncHaulDispatch already queued a fragment_debris action for
+    // every oversized fragment in this rubble field the instant the blast
+    // landed, so the moment this fragmenter is crewed and idle it auto-claims
+    // one and starts driving to it on its own. Calling the manual
+    // `vehicle break` command here would race that auto-claim and fail with
+    // "Vehicle is already breaking a fragment" — the manual command is still
+    // a valid scripting/debug primitive (see the manual `haul` refusal check
+    // above, which never races because it fails deterministically before any
+    // vehicle state changes), but this step's whole premise (drive a crewed
+    // fragmenter to the boulder and break it) is now exactly what auto-dispatch
+    // does unprompted, so assert that automatic outcome instead. The rubble
+    // field can hold more than one oversized fragment, so this waits out
+    // however many the fragmenter works through before it reaches ours.
     const hireFragmenterDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
     expect(hireFragmenterDriver.success).toBe(true);
     const fragmenterDriverId = ctx.state!.employees.employees
@@ -121,31 +134,30 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
 
     const buyFragmenter = vehicleCommand(ctx, ['buy', 'rock_fragmenter'], {});
     expect(buyFragmenter.success).toBe(true);
-    const fragmenterId = ctx.state!.vehicles.vehicles.find(v => v.type === 'rock_fragmenter')!.id;
 
-    const assignFragmenter = vehicleCommand(ctx, ['driver', String(fragmenterId), String(fragmenterDriverId)], {});
+    const assignFragmenter = vehicleCommand(ctx, ['driver', String(ctx.state!.vehicles.vehicles.find(v => v.type === 'rock_fragmenter')!.id), String(fragmenterDriverId)], {});
     expect(assignFragmenter.success).toBe(true);
-    for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
 
-    // The undercharged, wide-spacing blast leaves a whole rubble field (#484
-    // only breaks the ONE targeted boulder), so "the resulting pieces" must
-    // be scoped to fragments that did not exist before the split — every
-    // other on_ground fragment already sitting in the field, oversized or
-    // not, is unrelated and must not be swept into this check.
-    const idsBeforeBreak = new Set(ctx.state!.logistics.fragments.map(f => f.fragment.id));
-
-    const breakResult = vehicleCommand(ctx, ['break', String(fragmenterId)], { fragment: String(oversizedId) });
-    expect(breakResult.success).toBe(true);
-
+    // The undercharged, wide-spacing blast leaves a whole rubble field with
+    // many oversized fragments (#484 only breaks the ONE targeted boulder),
+    // and self-dispatch (#552) works through whichever it reaches first —
+    // not necessarily ours. So "the resulting pieces" can't be scoped against
+    // one snapshot taken before the wait: any other boulder the fragmenter
+    // finishes first would leave its own pieces in that diff too. A single
+    // fragmenter completes at most one break per tick, so re-snapshotting on
+    // every iteration and keeping only the one taken immediately before
+    // oversizedId itself vanishes isolates exactly its own split.
+    let idsJustBeforeBreak = new Set(ctx.state!.logistics.fragments.map(f => f.fragment.id));
     let ticks = 0;
-    while (ctx.state!.logistics.fragments.some(f => f.fragment.id === oversizedId) && ticks < 60) {
+    while (ctx.state!.logistics.fragments.some(f => f.fragment.id === oversizedId) && ticks < 500) {
+      idsJustBeforeBreak = new Set(ctx.state!.logistics.fragments.map(f => f.fragment.id));
       tickCommand(ctx, ['1'], {});
       ticks++;
     }
     expect(ctx.state!.logistics.fragments.some(f => f.fragment.id === oversizedId)).toBe(false);
 
     const pieces = ctx.state!.logistics.fragments.filter(
-      f => f.state === 'on_ground' && !idsBeforeBreak.has(f.fragment.id),
+      f => f.state === 'on_ground' && !idsJustBeforeBreak.has(f.fragment.id),
     );
     expect(pieces.length).toBeGreaterThan(0);
 

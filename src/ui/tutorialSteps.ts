@@ -205,15 +205,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 
   // ── Step 14b: haul-debris ──
   // Fires when stored mass increases — the same "value went up" pattern every
-  // other comparison step uses. Points at the Vehicles toolbar; the console
-  // hint names the reachability-aware fragment id a player would look up via
-  // the Haul button rather than guessing one.
+  // other comparison step uses. Hauling is self-dispatching (#552): a
+  // qualified idle employee auto-claims a free debris_hauler and drives it to
+  // the nearest fragment on its own, no player click required — so this step
+  // carries no command hint (nothing to type or press) and just points at the
+  // Fleet panel to watch it happen.
   createComparisonStep(
     'haul-debris',
     'tutorial.step_haul.title',
     'tutorial.step_haul',
     (s) => s.logistics?.storedMassKg ?? 0,
-    ['vehicle haul <vehicleId> fragment:<fragmentId>'],
+    undefined,
     TOOLBAR_TARGET.vehicles,
     { tickBudget: 20, waitsOnWork: true },
   ),

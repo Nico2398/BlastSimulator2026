@@ -954,6 +954,27 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
     expect(employee.pendingTaskDuration).toBeNull();
     expect(employee.taskTicksRemaining).toBeNull();
   });
+
+  it('falls through a nearer vehicle-gated action with no free vehicle and claims a farther, unblocked one instead of staying idle (#552)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    // No drill_rig vehicle purchased — the nearer action can never be claimed
+    // right now, but this must not stall the employee for the whole tick.
+
+    const nearButBlocked = makeVehicleGatedAction({ id: 1, targetX: 2, targetZ: 2 });
+    const farButClaimable = makeVehicleGatedAction({
+      id: 2, targetX: 25, targetZ: 25, requiredVehicleRole: null,
+    });
+    state.pendingActions.push(nearButBlocked, farButClaimable);
+
+    tickEmployees(state);
+
+    expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
+    expect(state.pendingActions.find(a => a.id === 2)!.holderId).toBe(employee.id);
+    expect(employee.activeActionId).toBe(2);
+  });
 });
 
 describe('tickTaskProgress — per-tick countdown, incremental XP, and completion (Ch.3 skill progression, issue #406)', () => {

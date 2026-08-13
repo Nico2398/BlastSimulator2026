@@ -706,21 +706,12 @@
       }
     },
     {
-      "command": "vehicle haul 1 fragment:1",
+      "command": "tick 1",
       "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn",
-          "timeout": 30000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-haul-btn"
         },
         {
           "type": "waitForTutorialStep",
@@ -729,7 +720,7 @@
         }
       ],
       "role": "player",
-      "description": "NEW step (Finding #74/#75 follow-up), same gap class as box-cut: this file never drove the tutorial's own haul-debris stage -- with the rail active, the Contracts panel's Deliver button downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven haul-debris step: the Vehicles panel's Haul button sends the hauler to a reachable fragment, and waitForTutorialStep drives the real clock for the trip. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "#552 (supersedes the Finding #74/#75 follow-up this step was originally inserted for): the Fleet panel's Haul button is retired, and hauling self-dispatches automatically once the debris_hauler, its licensed driver, and the freight_warehouse are all in place -- there is no click left to make here. The step teaches watching, not clicking: waitForTutorialStep still drives the real clock for the trip, exactly as before, just without a button triggering it. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "tutorialStep": "contract-deliver"
       }
@@ -765,7 +756,7 @@
         }
       ],
       "role": "player",
-      "description": "Outcome changed from the file's original premise (Finding #74/#75 follow-up): with the newly-inserted haul-debris step actually delivering material to storage for real, Deliver now genuinely succeeds -- unlike the old command-mode-only version, which never drove a real `vehicle haul` at all and documented the resulting \"0.0 kg available\" failure as its point. Same divergence tutorial-interactive.json already documents for the identical reason (command mode's `vehicle haul` dispatches but never waits for real arrival/unload, so command mode and interaction mode read genuinely different outcomes here). Not asserted with an exact equals here, matching tutorial-interactive.json's own contract-deliver step: the waitForTutorialStep gate above is itself the proof of completion (the tutorial's own isComplete requires completedHistory to grow), and the exact delivered tonnage is position/timing-dependent, the same reasoning hauling-gate.json documents (Finding #33)."
+      "description": "Outcome changed from the file's original premise (Finding #74/#75 follow-up, superseded again by #552): with the haul-debris step above now automatic rather than a manual `vehicle haul` click, Deliver still genuinely succeeds in interaction mode -- the real clock drives the hauler through pickup/drive/deliver the same as before, just with no button starting it. Same divergence tutorial-interactive.json already documents for the identical reason (command mode's automatic dispatch needs real ticks it never gets between the haul-debris step's single tick and this one, so command mode and interaction mode read genuinely different outcomes here). Not asserted with an exact equals here, matching tutorial-interactive.json's own contract-deliver step: the waitForTutorialStep gate above is itself the proof of completion (the tutorial's own isComplete requires completedHistory to grow), and the exact delivered tonnage is position/timing-dependent, the same reasoning hauling-gate.json documents (Finding #33)."
     },
     {
       "command": "finances",

@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
-import { getEventById } from '../../core/events/EventPool.js';
+import { getEventById, type EventDef } from '../../core/events/EventPool.js';
 import { tickEventSystem, clearLastOutcome } from '../../core/events/EventSystem.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
 import type { EventContext } from '../../core/events/EventPool.js';
@@ -23,7 +23,8 @@ import { tickResearch, getTotalOperatingCost } from '../../core/entities/Buildin
 import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate, tryContinueVehicleGatedAction } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate, tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable } from '../../core/engine/GameLoop.js';
+import { syncHaulDispatch } from '../../core/economy/HaulDispatch.js';
 import { completePendingAction } from '../../core/engine/TaskDispatch.js';
 import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
@@ -78,6 +79,18 @@ function buildEventContext(ctx: GameContext): EventContext {
     activeContractCount: s.contracts.active.length,
     weatherId: 'clear', // TODO: wire actual weather when available
   };
+}
+
+/**
+ * Appends the numbered option list and the "how to decide" hint shared by
+ * every place a pending event gets reported to the player (auto-fired mid-tick
+ * and the "event fire" debug command) — mutates `lines` in place.
+ */
+function pushEventOptionLines(lines: string[], def: EventDef): void {
+  for (let j = 0; j < def.options.length; j++) {
+    lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
+  }
+  lines.push('  → Use "event choose <index>" to decide.');
 }
 
 // ── tick command ──
@@ -203,6 +216,13 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] Research cancelled: ${cancelledResearch.targetType} tier ${cancelledResearch.targetTier} — Research Center destroyed, $${cancelledResearch.refund} refunded.`);
     }
 
+    // 8c-3. Haul/fragment dispatch (#552): scan on-ground fragments for ones
+    // with no existing haul_debris/fragment_debris action yet (any status)
+    // and queue one. Idempotent, run before 8d so a fragment that becomes
+    // eligible this tick (a blast, or a break that finished on a prior tick)
+    // can be claimed the same tick it is queued.
+    syncHaulDispatch(state);
+
     // 8d. Dispatch remaining pending actions to idle qualified employees. An
     // action requiring a skill nobody on the roster holds is not left to
     // queue silently forever — it raises the same unqualified_task_error
@@ -322,6 +342,17 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] BOARDING CANCELLED: ${emp?.name ?? `employee #${cancelled.employeeId}`} (${cancelled.reason}).`);
     }
 
+    // 8i. Vehicle-gated haul/fragment completions (#552): tickArrivalGate's
+    // own haul/break drive loop reports every action whose full deliver/break
+    // cycle finished this tick — finish it through the same completion path
+    // as every other action (continuity-promote a same-role follow-up, else
+    // release/dismount) so the PendingAction/ghost clear and the employee
+    // keeps working instead of idling.
+    for (const completedVehicle of arrivalResult.completedVehicleActions) {
+      const emp = state.employees.employees.find(e => e.id === completedVehicle.employeeId);
+      if (emp) completeVehicleGatedActionIfApplicable(state, emp, completedVehicle.actionId);
+    }
+
     // 9. Level stats snapshot + campaign profit check
     snapshotStats(state.levelStats, state);
     const levelResult = checkLevelComplete(state, state.campaign, emitter);
@@ -365,10 +396,7 @@ export function tickCommand(
       if (def) {
         lines.push(`[tick ${state.tickCount}] EVENT: ${t(def.titleKey)}`);
         lines.push(`  ${t(def.descKey)}`);
-        for (let j = 0; j < def.options.length; j++) {
-          lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
-        }
-        lines.push('  → Use "event choose <index>" to decide.');
+        pushEventOptionLines(lines, def);
       }
       state.isPaused = true;
       break;
@@ -483,10 +511,7 @@ export function eventCommand(
         `EVENT: ${t(def.titleKey)}`,
         `  ${t(def.descKey)}`,
       ];
-      for (let j = 0; j < def.options.length; j++) {
-        lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
-      }
-      lines.push('  → Use "event choose <index>" to decide.');
+      pushEventOptionLines(lines, def);
       return { success: true, output: lines.join('\n') };
     }
 

@@ -12,7 +12,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
-import { findRequestVehicle, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
 import { tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
@@ -37,10 +37,9 @@ export function requestBreakBoulder(
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  const found = findRequestVehicle(state, vehicleId);
+  const found = findRequestVehicleOfRole(state, vehicleId, 'rock_fragmenter', 'Vehicle is not a rock fragmenter');
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicle.type !== 'rock_fragmenter') return { success: false, error: 'Vehicle is not a rock fragmenter' };
   if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.breakPhase !== null) return { success: false, error: 'Vehicle is already breaking a fragment' };
 
@@ -138,7 +137,15 @@ export function tickBreakProgress(state: GameState, vehicle: Vehicle): number | 
     state.logistics.fragments.push({ fragment: newFragment, state: 'on_ground', vehicleId: null });
   }
 
-  abortBreak(vehicle);
+  // Inlined instead of calling abortBreak (#552): a successful split must
+  // leave reservedForActionId alone so GameLoop's completion pass can still
+  // find this vehicle afterward (to continue it onto a same-role follow-up
+  // or release/dismount it) — mirrors HaulingTask.ts's tickHaulingProgress,
+  // whose 'to_depot' success branch likewise inlines its own cleanup instead
+  // of calling abortHaul.
+  vehicle.breakFragmentId = null;
+  vehicle.breakPhase = null;
+  vehicle.task = 'idle';
   return originalId;
 }
 
@@ -182,9 +189,18 @@ function highestFragmentId(state: GameState): number {
   return max;
 }
 
-/** Cancel an in-progress break and return the vehicle to idle. */
+/**
+ * Cancel an in-progress break and return the vehicle to idle. Also releases
+ * `reservedForActionId` (#552) — only ever called when the boulder has
+ * vanished out from under a still-claimed fragment_debris action (or the
+ * defensive fragmentBoulder-rejects-post-arrival case), never on a
+ * successful split (see tickBreakProgress's own inlined success cleanup) —
+ * without this the vehicle would stay permanently reserved for an action
+ * nothing will ever complete.
+ */
 function abortBreak(vehicle: Vehicle): void {
   vehicle.breakFragmentId = null;
   vehicle.breakPhase = null;
   vehicle.task = 'idle';
+  vehicle.reservedForActionId = null;
 }

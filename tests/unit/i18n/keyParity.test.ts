@@ -91,10 +91,15 @@ describe('en.json / fr.json — key-set parity', () => {
     // Baseline is now 3254 (up from 3252): #550 added ui.crew.task_driving_to_task
     // and ui.crew.tag_driving_task for the vehicle-gated "driving to task"
     // activity state, both locales translated.
+    // Baseline is now 3253 (down from 3254): #552 retired the Fleet panel's
+    // manual Haul button (hauling is self-dispatching now) and removed its
+    // now-dead ui.vehicles.haul key from both locales. tutorial.stage.vehicle_haul
+    // was renamed to tutorial.stage.vehicle_watch in the same change, a 1-for-1
+    // swap that leaves the count unaffected.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3254);
+    expect(Object.keys(en).length).toBe(3253);
   });
 });
 

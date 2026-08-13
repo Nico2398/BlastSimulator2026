@@ -4,8 +4,12 @@
 // transition, and releasing it — whether that's on completion, cancellation,
 // needs-interruption, or the vehicle being destroyed underneath it.
 // GameLoop.ts's claim/promotion sites call into this module rather than
-// duplicating any of it. Core-pure: imports only from entities/, state/, and
-// EntityMovementTick.js (one-way, EntityMovementTick.ts never imports back).
+// duplicating any of it. Core-pure: imports only from entities/, state/,
+// EntityMovementTick.js (one-way, EntityMovementTick.ts never imports back),
+// and — for the haul_debris/fragment_debris continuity case (#552) —
+// economy/FragmentTaskLifecycle.js (startVehicleGatedFragmentWork, shared
+// with ArrivalGate.ts's resolveBoarding), which does not import anything
+// from engine/ that could cycle back here.
 // Deliberately does NOT import TaskDispatch.ts — TaskDispatch.ts imports
 // releaseVehicleReservation from here, so calling into it back would be a
 // cycle. Where reconciliation needs to interrupt an active action (case (c)
@@ -20,6 +24,7 @@ import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
 import { setVehicleIdle } from './EntityMovementTick.js';
+import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -102,6 +107,31 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
   if (!vehicle) return;
 
   if (vehicle.driverId === employee.id) {
+    // #552: haul_debris/fragment_debris are driven end to end by their own
+    // request*/tick* phase machinery (HaulingTask.ts/BoulderBreaking.ts),
+    // not a single generic moveVehicle target — the continuity case (already
+    // driving this vehicle, no boarding needed) has to kick that request off
+    // itself, mirroring what ArrivalGate.resolveBoarding does for a fresh
+    // boarding (both call the same startVehicleGatedFragmentWork helper,
+    // FragmentTaskLifecycle.ts). Any failure here (fragment/depot vanished
+    // between claim and promotion — practically unreachable within one
+    // synchronous tick, but never crashes) just leaves the vehicle idle;
+    // reconcileVehicleReservations (ArrivalGate.ts) is the backstop that
+    // interrupts a claim nothing is actually working.
+    const started = startVehicleGatedFragmentWork(state, vehicle, action);
+    if (started === false) {
+      // Conditions changed between claim and promotion (fragment gone, no
+      // active depot) — release the reservation so
+      // reconcileVehicleReservations (ArrivalGate.ts) catches it next tick
+      // and returns the action to the pool instead of leaving it claimed
+      // with nothing actually driving it. Keeps the driver seated (#552,
+      // see releaseVehicleReservationKeepDriver) — they are already
+      // aboard this exact vehicle via the continuity tie-break, so
+      // dismounting them here would only force a needless walk-back-and-
+      // reboard the moment a depot appears.
+      releaseVehicleReservationKeepDriver(state, action.id);
+    }
+    if (started !== null) return;
     moveVehicle(state.vehicles, vehicle.id, action.targetX, action.targetZ);
     return;
   }
@@ -130,6 +160,26 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
     unassignDriver(state.vehicles, vehicle.id);
     setVehicleIdle(vehicle);
   }
+}
+
+/**
+ * Lighter release for the one case where dismounting is actively harmful:
+ * a haul_debris/fragment_debris workflow (HaulingTask.ts/BoulderBreaking.ts's
+ * request*) that could not start this tick — no active depot yet, fragment
+ * picked clean between claim and promotion — right after the driver had
+ * *just* boarded (or was already driving) this exact vehicle for it. Clears
+ * only reservedForActionId, leaving the driver seated and the vehicle idle:
+ * next tick's claim reads them as idle again and findFreeVehicleForRole's own
+ * continuity tie-break (driverId === employee.id) hands the same vehicle
+ * straight back, instead of forcing a dismount-then-walk-back-and-reboard
+ * cycle every single tick nothing can start yet (#552). No-op if no vehicle
+ * is reserved for `actionId`.
+ */
+export function releaseVehicleReservationKeepDriver(state: GameState, actionId: number): void {
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  if (!vehicle) return;
+
+  vehicle.reservedForActionId = null;
 }
 
 /**

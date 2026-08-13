@@ -202,9 +202,12 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     ...pickerStages('tutorial.stage.build_site', REGION.warehouse),
   ],
 
+  // No button to press — hauling self-dispatches (#552). One stage, so the
+  // glow just sits on the Fleet toolbar button the whole step, inviting the
+  // player to open it and watch the fleet work rather than pointing at a
+  // control that no longer exists.
   'haul-debris': [
-    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
-    { target: '#bs-vehicle-panel .bs-vehicle-haul-btn', hintKey: 'tutorial.stage.vehicle_haul' },
+    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.vehicle_watch' },
   ],
 
   'contract-deliver': [

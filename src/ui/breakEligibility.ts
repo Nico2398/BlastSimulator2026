@@ -1,10 +1,9 @@
 // BlastSimulator2026 — Break-button eligibility cache (redesign P6 conventions)
 //
-// Boulder-breaking counterpart to haulEligibility.ts (#484 rock_fragmenter
-// feature ported onto the P6 Fleet panel). Same shape, same `[data-*-slot]`
-// incremental-refresh pattern, own slot attribute so both can share one
-// actions row without colliding — a vehicle is never eligible for both at
-// once (haul requires debris_hauler, break requires rock_fragmenter).
+// Boulder-breaking button for the Fleet panel (#484 rock_fragmenter feature).
+// Hauling's own equivalent (haulEligibility.ts) was retired in #552 — hauling
+// is self-dispatching now, so this is the only eligibility-cache/button pair
+// left on the panel.
 
 import { t } from '../core/i18n/I18n.js';
 import type { GameState } from '../core/state/GameState.js';

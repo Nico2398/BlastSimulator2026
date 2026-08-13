@@ -12,12 +12,14 @@ import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.
 import { pickupFragment, deliverToDepot } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
-import { findRequestVehicle, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
- * hauling task already in progress — the shared eligibility gate for
- * findReachableGroundFragment and the UI's Haul button.
+ * hauling task already in progress — the eligibility gate for
+ * findReachableGroundFragment, used by the manual `vehicle haul` console
+ * command and tests. Hauling is otherwise self-dispatching (HaulDispatch.ts,
+ * #552); there is no Haul button on the Fleet panel anymore.
  *
  * requestHaulFragment keeps its own per-condition checks instead of calling
  * this: it reports which specific condition failed (no driver vs. already
@@ -39,10 +41,9 @@ export function requestHaulFragment(
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  const found = findRequestVehicle(state, vehicleId);
+  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicle.type !== 'debris_hauler') return { success: false, error: 'Vehicle is not a debris hauler' };
   if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is already hauling' };
 
@@ -179,11 +180,22 @@ function resolveDepotApproach(state: GameState, building: Building, vehicle: Veh
   return findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), vehicle.x, vehicle.z);
 }
 
-/** Cancel an in-progress haul and return the vehicle to idle. */
+/**
+ * Cancel an in-progress haul and return the vehicle to idle. Also releases
+ * `reservedForActionId` (#552) — only ever called mid-haul when the fragment
+ * or its depot has vanished out from under a still-claimed haul_debris
+ * action, so without this the vehicle would stay permanently reserved for an
+ * action nothing will ever complete. Never called on a successful delivery
+ * (see tickHaulingProgress's 'to_depot' branch, which inlines its own
+ * cleanup instead) — reservedForActionId deliberately survives a successful
+ * haul so GameLoop's completion pass can still find the vehicle to continue
+ * or release it.
+ */
 function abortHaul(vehicle: Vehicle): void {
   vehicle.haulingFragmentId = null;
   vehicle.haulingPhase = null;
   vehicle.haulingDepotBuildingId = null;
   vehicle.payloadKg = 0;
   vehicle.task = 'idle';
+  vehicle.reservedForActionId = null;
 }
