@@ -100,10 +100,15 @@ describe('en.json / fr.json — key-set parity', () => {
     // ui.blast_workshop.drill.status_ordered — the ORDERED status chip for a
     // hole still in state.plannedDrillHoles, awaiting its drill_hole action —
     // both locales translated.
+    // Baseline is now 3263 (up from 3254): #553's tutorial fix adds three new
+    // tutorial steps (build-driving-center, train-driller, buy-drill-rig-assign)
+    // closing the deadlock where drill_hole's vehicle gate left the driller
+    // hired but never licensed/equipped to drive a drill_rig — 9 new keys
+    // (3 step text + 3 step title + 3 stage hint), both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3254);
+    expect(Object.keys(en).length).toBe(3263);
   });
 });
 

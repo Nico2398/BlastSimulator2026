@@ -5,8 +5,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 24 entries (#466 adds haul-debris)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(24);
+  it('has exactly 27 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(27);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -92,6 +92,9 @@ describe('tutorialSteps', () => {
       'hire-surveyor',
       'survey',
       'hire-driller',
+      'build-driving-center',
+      'train-driller',
+      'buy-drill-rig-assign',
       'box-cut',
       'drill-plan',
       'charge',
@@ -118,14 +121,18 @@ describe('tutorialSteps', () => {
   });
 
   // ── 12 ───────────────────────────────────────────────────────────────────
-  it('steps 9, 18, 20 (1-indexed) have autoAdvanceMs set to 2000', () => {
-    // 0-indexed: 8 = scores, 17 = finances, 19 = needs.
-    // #466 inserts haul-debris at index 15 (between build-storage and
-    // contract-deliver), shifting finances/needs up by one from their old
-    // 16/18 positions.
-    expect(TUTORIAL_STEPS[9].autoAdvanceMs).toBe(2000);
-    expect(TUTORIAL_STEPS[18].autoAdvanceMs).toBe(2000);
-    expect(TUTORIAL_STEPS[19].autoAdvanceMs).toBe(2000);
+  it('scores/finances/needs have autoAdvanceMs set to 2000', () => {
+    // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
+    // right after hire-driller, shifting every step from box-cut onward up
+    // by 3 from their pre-#553 positions (scores 9->12, finances 18->21,
+    // needs 19->22). Looked up by id instead of a hardcoded index so the
+    // next insertion does not have to re-derive these by hand again.
+    const scores = TUTORIAL_STEPS.find((s) => s.id === 'scores')!;
+    const finances = TUTORIAL_STEPS.find((s) => s.id === 'finances')!;
+    const needs = TUTORIAL_STEPS.find((s) => s.id === 'needs')!;
+    expect(scores.autoAdvanceMs).toBe(2000);
+    expect(finances.autoAdvanceMs).toBe(2000);
+    expect(needs.autoAdvanceMs).toBe(2000);
   });
 
   // ── set-policy ───────────────────────────────────────────────────────────
@@ -162,7 +169,7 @@ describe('tutorialSteps', () => {
 
   // ── 14 (event-fire-resolve) ──────────────────────────────────────────────
   describe('step 9 (event-fire-resolve, index 9)', () => {
-    const step9 = TUTORIAL_STEPS[10];
+    const step9 = TUTORIAL_STEPS.find((s) => s.id === 'event-fire-resolve')!;
 
     it('drives itself: autoCommands fast-forward and fire the scripted event', () => {
       expect(step9.autoCommands).toEqual(['tick 3', 'event fire tutorial_synergy_consultant']);
@@ -212,7 +219,7 @@ describe('tutorialSteps', () => {
 
   // ── 15 (hire-manager) ────────────────────────────────────────────────────
   describe('step 10 (hire-manager, index 10)', () => {
-    const step10 = TUTORIAL_STEPS[11];
+    const step10 = TUTORIAL_STEPS.find((s) => s.id === 'hire-manager')!;
 
     it('isComplete returns false when pendingEvent is not null even if manager hired', () => {
       const state = {
@@ -234,9 +241,9 @@ describe('tutorialSteps', () => {
   });
 
   // ── 13 ───────────────────────────────────────────────────────────────────
-  it('steps 9, 18, 20 (1-indexed) have captureSnapshot that returns step-specific data', () => {
-    // Step 9 (scores) — captures scores + collectedOre
-    const step9 = TUTORIAL_STEPS[9];
+  it('scores/finances/needs have captureSnapshot that returns step-specific data', () => {
+    // scores — captures scores + collectedOre
+    const step9 = TUTORIAL_STEPS.find((s) => s.id === 'scores')!;
     expect(step9.captureSnapshot).toBeDefined();
     const snap9 = step9.captureSnapshot!({
       scores: { wellBeing: 75, safety: 80, ecology: 60, nuisance: 30 },
@@ -246,9 +253,8 @@ describe('tutorialSteps', () => {
     expect(snap9.scores).toBeDefined();
     expect(snap9.collectedOre).toBeDefined();
 
-    // Step 19 (finances — shifted by the #466 haul-debris insertion and the
-    // box-cut step, minus the removed late ramp step) — captures cash + contracts
-    const step18 = TUTORIAL_STEPS[18];
+    // finances — captures cash + contracts
+    const step18 = TUTORIAL_STEPS.find((s) => s.id === 'finances')!;
     expect(step18.captureSnapshot).toBeDefined();
     const snap18 = step18.captureSnapshot!({
       cash: 100000,
@@ -256,8 +262,8 @@ describe('tutorialSteps', () => {
     } as GameState);
     expect(snap18.cash).toBe(100000);
 
-    // Step 20 (needs, shifted from 19) — captures employee needs
-    const step20 = TUTORIAL_STEPS[19];
+    // needs — captures employee needs
+    const step20 = TUTORIAL_STEPS.find((s) => s.id === 'needs')!;
     expect(step20.captureSnapshot).toBeDefined();
     const snap20 = step20.captureSnapshot!({
       employees: { employees: [{ needs: { hunger: 50, fatigue: 30, breakPressure: 20 } }] },
@@ -266,10 +272,9 @@ describe('tutorialSteps', () => {
   });
 
   // ── 15 ───────────────────────────────────────────────────────────────────
-  it('step 23 (congratulations, shifted from 22 by the #466 haul-debris insertion) uses tutorial.complete_title and tutorial.complete_text', () => {
-    const step23 = TUTORIAL_STEPS[23];
-    // After implementation: keys changed from tutorial.step23.title/tutorial.step23
-    // to tutorial.complete_title / tutorial.complete_text
+  it('congratulations (last step) uses tutorial.complete_title and tutorial.complete_text', () => {
+    const step23 = TUTORIAL_STEPS[TUTORIAL_STEPS.length - 1]!;
+    expect(step23.id).toBe('congratulations');
     expect(step23.titleKey).toBe('tutorial.complete_title');
     expect(step23.textKey).toBe('tutorial.complete_text');
   });
@@ -289,6 +294,7 @@ describe('tutorialSteps', () => {
     // Steps that should definitely have highlight targets
     const stepsWithTarget = new Set([
       'time-speed', 'hire-surveyor', 'survey', 'hire-driller',
+      'build-driving-center', 'train-driller', 'buy-drill-rig-assign',
       'drill-plan', 'charge', 'sequence', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager', 'contract-accept',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'contract-deliver',
@@ -344,7 +350,7 @@ describe('tutorialSteps', () => {
 
   // ── 19 ───────────────────────────────────────────────────────────────────
   describe('step 7 (blast, index 7)', () => {
-    const blastStep = TUTORIAL_STEPS[8]!;
+    const blastStep = TUTORIAL_STEPS.find((s) => s.id === 'blast')!;
 
     it('completes on a barren blast, not only when ore is found', () => {
       // A legitimate blast that turns up no ore still satisfied the objective:
@@ -436,7 +442,7 @@ describe('tutorialSteps', () => {
     // the player: the card never completes and there is nothing left to click.
     // vehicle-buy-assign did exactly that — assigning a driver sends them
     // walking to the vehicle, and ArrivalGate only seats them on arrival.
-    const SIMULATION_OWNED = ['survey', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver'];
+    const SIMULATION_OWNED = ['survey', 'train-driller', 'buy-drill-rig-assign', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver'];
 
     for (const id of SIMULATION_OWNED) {
       it(`"${id}" waits on work and is given a tick allowance`, () => {

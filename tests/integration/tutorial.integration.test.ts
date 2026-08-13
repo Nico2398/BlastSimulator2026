@@ -126,10 +126,13 @@ describe('Tutorial flow', () => {
 // separately in tutorial-pause.integration.test.ts.
 
 describe('haul-debris step (#552): self-dispatching, no manual command', () => {
-  it('is the 17th of 24 tutorial steps (0-based index 16), between build-storage and contract-deliver', () => {
+  it('is the 20th of 27 tutorial steps (0-based index 19), between build-storage and contract-deliver', () => {
+    // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
+    // right after hire-driller, shifting every later step (including this
+    // one) up by 3 from their pre-#553 positions.
     const ids = TUTORIAL_STEPS.map(s => s.id);
     const idx = ids.indexOf('haul-debris');
-    expect(idx).toBe(16);
+    expect(idx).toBe(19);
     expect(ids[idx - 1]).toBe('build-storage');
     expect(ids[idx + 1]).toBe('contract-deliver');
   });

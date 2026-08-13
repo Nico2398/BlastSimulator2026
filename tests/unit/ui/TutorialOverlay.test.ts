@@ -192,9 +192,9 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 24" at step 0 and has progress bar fill', () => {
-      // 24, not 23: #466 inserts the haul-debris step between build-storage
-      // and contract-deliver.
+    it('shows step counter "1 / 27" at step 0 and has progress bar fill', () => {
+      // 27, not 24: #553 inserts build-driving-center/train-driller/
+      // buy-drill-rig-assign right after hire-driller.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -202,7 +202,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*24/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*27/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -468,11 +468,11 @@ describe('TutorialOverlay (12.4)', () => {
     });
 
     it('highlightTarget with undefined selector does not throw', () => {
-      // Step 23 (congratulations, shifted from 22 by the #466 haul-debris
-      // insertion) has no highlightTarget
+      // congratulations (last step, index 26 after #553's tutorial fix
+      // added three drill-rig-licensing steps) has no highlightTarget
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      tut.stepIndex = 23;
+      tut.stepIndex = 26;
       expect(() => tut.render()).not.toThrow();
     });
 
@@ -518,11 +518,12 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (shifted by one when the box-cut step joined the early tutorial).
-      tut.stepIndex = 9;
+      // (index 12/13 after #553's tutorial fix added three drill-rig-licensing
+      // steps earlier in the sequence).
+      tut.stepIndex = 12;
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(10);
+      expect(tut.stepIndex).toBe(13);
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -535,7 +536,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createMockState does not include events → pendingEvent is undefined (== null)
-      tut.stepIndex = 9;
+      tut.stepIndex = 12;
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
@@ -548,9 +549,9 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
       // Do NOT call setGameConsole — gameConsole stays null
 
-      tut.stepIndex = 8;
+      tut.stepIndex = 11;
       expect(() => tut.advanceToNextStep()).not.toThrow();
-      expect(tut.stepIndex).toBe(9);
+      expect(tut.stepIndex).toBe(12);
     });
   });
 
@@ -580,9 +581,9 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (index 23, shifted from 22 by
-      // the #466 haul-debris insertion) and render
-      tut.stepIndex = 23;
+      // Directly set to congratulations step (last step, index 26 after
+      // #553's tutorial fix added three drill-rig-licensing steps) and render
+      tut.stepIndex = 26;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;
