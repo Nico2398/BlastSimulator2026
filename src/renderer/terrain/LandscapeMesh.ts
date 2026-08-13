@@ -197,17 +197,23 @@ export function buildBoundaryQuad(
   const h11 = sampleColumn(x1, z1).height;
 
   // Slope source for shading: the live/theoretical field, never the
-  // flat-edge-adjusted position (a T-junction fix, not a slope). Only trust
-  // the live value at a point the site actually owns, and only when it
-  // isn't NaN — the claim boundary moves, and computeVoxelColumnSurfaceHeight
+  // flat-edge-adjusted position (a T-junction fix, not a slope). Trust the
+  // live value whenever the caller can supply one, and only when it isn't
+  // NaN — the claim boundary moves, and computeVoxelColumnSurfaceHeight
   // answers NaN rather than clamping for a column outside the site (#559).
+  // Gating on ownsColumn here as well would be redundant with that NaN
+  // contract in production (boundaryHeightAt IS computeVoxelColumnSurfaceHeight,
+  // which already returns NaN for exactly the columns ownsColumn rejects) and
+  // wrong the moment a caller's live source legitimately covers ground just
+  // past ownsColumn's strict edge (e.g. TerrainMesh's meshClaimsColumn halo,
+  // or a live post-blast height one ring out) — #559 root cause 1.
   const heightCache = new Map<string, number>();
   const trueHeightAt = (x: number, z: number): number => {
     const key = `${x},${z}`;
     const cached = heightCache.get(key);
     if (cached !== undefined) return cached;
     let h = sampleColumn(x, z).height;
-    if (playable.ownsColumn(x, z) && playable.boundaryHeightAt) {
+    if (playable.boundaryHeightAt) {
       const live = playable.boundaryHeightAt(x, z);
       if (!Number.isNaN(live)) h = live;
     }
@@ -284,6 +290,10 @@ export function buildBoundaryQuad(
  * quads to coarse open-ground quads isn't a one-step cliff that itself reads
  * as a seam. Flat-edge-interpolates its own outer perimeter against
  * unsubdivided coarse neighbours per the existing #491 rule.
+ *
+ * `step` is the target sample spacing to subdivide the quad down to (the
+ * caller always passes MID_STEP) — the same "spacing, not a count" meaning
+ * FINE_STEP carries in buildBoundaryQuad, not the coarse tile's own step.
  */
 export function subdivideOutsideQuad(
   positions: number[],
@@ -301,7 +311,7 @@ export function subdivideOutsideQuad(
   palette: CompositionPalette,
   step: number,
 ): void {
-  const subdiv = Math.max(1, Math.round(step / MID_STEP));
+  const subdiv = Math.max(1, Math.round((x1 - x0) / step));
 
   // Parent coarse corner heights. A plain bilinear interpolation of these
   // four naturally reduces to the flat-edge rule's linear interpolation
@@ -548,7 +558,7 @@ export class LandscapeMesh {
           if (adjacentToBoundary) {
             subdivideOutsideQuad(
               positions, normals, rockA, rockB, rockWeight, ore, indices,
-              x0, z0, x1, z1, sampleColumn, palette, step,
+              x0, z0, x1, z1, sampleColumn, palette, MID_STEP,
             );
             continue;
           }

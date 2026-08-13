@@ -1030,13 +1030,18 @@ describe('LandscapeMesh — classifyQuad/buildBoundaryQuad must honor meshClaims
     const lm = new LandscapeMesh(scene, makeMaterial());
     lm.build(handle, palette, playable);
 
+    // x === -1 exactly is the halo column's own west edge -- the shared seam
+    // vertex both LandscapeMesh and TerrainMesh must emit for a watertight
+    // join (mirrors the sibling test below, which treats x < -1 as "west of
+    // the halo" and x === -1 as already inside it). Only x strictly greater
+    // than -1 is actually inside the column TerrainMesh claims.
     let violations = 0;
     for (const child of scene.children) {
       const mesh = child as THREE.Mesh;
       const pos = mesh.geometry.getAttribute('position').array as Float32Array;
       for (let i = 0; i < pos.length; i += 3) {
         const x = pos[i]!;
-        if (x >= -1 - 1e-6 && x < 0 - 1e-6) violations++;
+        if (x > -1 + 1e-6 && x < 0 - 1e-6) violations++;
       }
     }
     expect(violations).toBe(0);
