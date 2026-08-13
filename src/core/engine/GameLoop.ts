@@ -195,10 +195,22 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
   );
 
   // Actions no eligible employee could ever perform, computed once up front —
-  // qualification doesn't change during this tick's dispatch pass.
+  // qualification doesn't change during this tick's dispatch pass. A
+  // vehicle-gated action (requiredVehicleRole !== null, e.g. HaulDispatch's
+  // haul_debris/fragment_debris, #552) is never flagged here regardless of
+  // roster headcount — its real gate is vehicle/driver availability at claim
+  // time (findVehicleForClaim, VehicleReservation.ts), not this employee-skill
+  // check. Treating "zero employees on the whole roster" as "unqualified" for
+  // these would auto-pause a fresh, unstaffed site with an unresolvable
+  // unqualified_task_error every single tick forever (no option on that event
+  // actually removes the action) the instant a blast leaves debris on the
+  // ground — HaulDispatch.ts's own doc comment already promises these sit
+  // queued silently until a hauler/driver exists; requiredSkill===null alone
+  // doesn't deliver that promise when the roster is completely empty.
   const unqualifiedIds = new Set<number>();
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
+    if (action.requiredVehicleRole !== null) continue;
     const hasQualified = action.requiredSkill === null
       ? eligible.length > 0
       : eligible.some(emp => emp.qualifications.some(q => q.category === action.requiredSkill));

@@ -1081,10 +1081,10 @@
           "command": "scores"
         }
       ],
-      "description": "safety no longer reaches an exact 0 floor in this file's corrected form (only 1 casualty total, vs. the 2+ that used to pin it) -- still a real, deterministic value from a zero-random-event trace, just not a pinned one, so it is asserted exactly rather than left as 'safe once pinned' the way Findings #42/#43/#44 do.",
+      "description": "safety no longer reaches an exact 0 floor in this file's corrected form (only 1 casualty total, vs. the 2+ that used to pin it) -- still a real, deterministic value from a zero-random-event trace, just not a pinned one, so it is asserted exactly rather than left as 'safe once pinned' the way Findings #42/#43/#44 do. wellBeing corrected for #552: Frank Crater (driver) is now auto-dispatched onto a haul_debris action right after the blast above instead of sitting idle, so his needs gauges (and the per-tick avgMorale ScoreManager's decay is driven by) trace a different path between the blast and this read -- deterministic, reconfirmed via direct trace, just a different real value than the pre-auto-dispatch one.",
       "expect": {
         "equals": {
-          "wellBeing": 94.6187500000003,
+          "wellBeing": 94.57375000000025,
           "safety": 1.4499999999999955,
           "ecology": 41.17,
           "nuisance": 27.924999999999997

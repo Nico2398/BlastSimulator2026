@@ -1547,10 +1547,11 @@
         }
       ],
       "role": "player",
+      "description": "deathCount corrected for #552: an employee auto-dispatched onto a haul_debris action from the previous blast's debris (syncHaulDispatch, HaulDispatch.ts) is still walking/working near this blast's site when it fires and is killed by a projectile fragment (accidents log: entityId 7, fragmentId 994) -- a 3rd death this run instead of the pre-auto-dispatch 2. Deterministic, reconfirmed via direct trace; every deathCount read for the rest of this file (through step 107) carries the same +1.",
       "expect": {
         "equals": {
           "tickCount": 38,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3,
@@ -1572,7 +1573,7 @@
       "expect": {
         "equals": {
           "tickCount": 38,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1591,7 +1592,7 @@
       "expect": {
         "equals": {
           "tickCount": 38,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1610,11 +1611,11 @@
       "expect": {
         "equals": {
           "tickCount": 38,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3,
-          "wellBeing": 67.52714285714296,
+          "wellBeing": 67.52428571428581,
           "safety": 0,
           "ecology": 39.22,
           "nuisance": 23.049999999999997
@@ -1633,7 +1634,7 @@
       "expect": {
         "equals": {
           "tickCount": 38,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1651,7 +1652,7 @@
       "expect": {
         "equals": {
           "tickCount": 38,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1671,7 +1672,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1689,7 +1690,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1709,7 +1710,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1736,7 +1737,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -1755,7 +1756,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -1777,7 +1778,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -1796,7 +1797,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -1841,7 +1842,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3,
@@ -1891,7 +1892,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3,
@@ -1929,7 +1930,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3,
@@ -1971,7 +1972,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3,
@@ -1993,7 +1994,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -2012,7 +2013,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -2030,7 +2031,7 @@
       "expect": {
         "equals": {
           "tickCount": 44,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -2050,7 +2051,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -2068,7 +2069,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -2088,7 +2089,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 3,
           "surveyCount": 3
@@ -2115,7 +2116,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2134,7 +2135,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2156,7 +2157,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2175,11 +2176,11 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3,
-          "wellBeing": 76.72428571428578,
+          "wellBeing": 76.59285714285726,
           "safety": 0,
           "ecology": 30.039999999999985,
           "nuisance": 0
@@ -2198,7 +2199,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2218,7 +2219,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2238,7 +2239,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2257,7 +2258,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2302,7 +2303,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3,
@@ -2348,7 +2349,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3,
@@ -2386,7 +2387,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3,
@@ -2428,7 +2429,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3,
@@ -2450,7 +2451,7 @@
       "expect": {
         "equals": {
           "tickCount": 50,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2469,7 +2470,7 @@
       "expect": {
         "equals": {
           "tickCount": 56,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2487,7 +2488,7 @@
       "expect": {
         "equals": {
           "tickCount": 56,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2507,7 +2508,7 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2525,7 +2526,7 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2545,7 +2546,7 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 4,
           "surveyCount": 3
@@ -2572,7 +2573,7 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3
@@ -2591,7 +2592,7 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3
@@ -2613,7 +2614,7 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3
@@ -2632,11 +2633,11 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 85.96428571428574,
+          "wellBeing": 85.6957142857144,
           "safety": 0,
           "ecology": 14.749999999999993,
           "nuisance": 0
@@ -2655,11 +2656,11 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 85.96428571428574,
+          "wellBeing": 85.6957142857144,
           "safety": 0,
           "ecology": 14.749999999999993,
           "nuisance": 0
@@ -2678,11 +2679,11 @@
       "expect": {
         "equals": {
           "tickCount": 62,
-          "deathCount": 2,
+          "deathCount": 3,
           "employeeCount": 7,
           "activeContractCount": 5,
           "surveyCount": 3,
-          "wellBeing": 85.96428571428574,
+          "wellBeing": 85.6957142857144,
           "safety": 0,
           "ecology": 14.749999999999993,
           "nuisance": 0,
