@@ -1,6 +1,6 @@
 {
   "name": "vibration-budget",
-  "description": "Chapter 5: 3 catastrophic overcharge blasts crater nuisance and ecology scores. Finding #9: the file's original premise (\"exceed vibration budget 3 times... verify $5,000 fine is applied\") has no implementation anywhere in the codebase to test \u2014 recordVibration (ScoreManager.ts) only moves nuisance/ecology, no budget counter or cash fine exists, and no event/campaign rule ties one to blast count either. That claim is dropped here in favor of the real, checkable effect (nuisance/ecology cratering); whether a real fine mechanic should exist is a game-design question, out of scope for a test-assertion pass \u2014 filed as a follow-up, not silently implemented.",
+  "description": "Chapter 5: 3 catastrophic overcharge blasts crater nuisance and ecology scores. Finding #9: the file's original premise (\"exceed vibration budget 3 times... verify $5,000 fine is applied\") has no implementation anywhere in the codebase to test — recordVibration (ScoreManager.ts) only moves nuisance/ecology, no budget counter or cash fine exists, and no event/campaign rule ties one to blast count either. That claim is dropped here in favor of the real, checkable effect (nuisance/ecology cratering); whether a real fine mechanic should exist is a game-design question, out of scope for a test-assertion pass — filed as a follow-up, not silently implemented.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -60,12 +60,12 @@
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "createScoreState's neutral baseline (ScoreManager.ts), before any blast \u2014 the 3 that follow must crater ecology/nuisance from here"
+        "note": "createScoreState's neutral baseline (ScoreManager.ts), before any blast — the 3 that follow must crater ecology/nuisance from here"
       }
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action \u2014 a driller physically drives a drill_rig to each hole \u2014 so each of this file's 3 blast cycles now needs its own fresh crew: rumblox at this overcharge is genuinely lethal (Finding #9's honest premise), and the driller/drill_rig that just drilled a site routinely dies/is destroyed in its own blast (sandbox-measured), so a new one is hired for each grid rather than reused. Fired again right after each blast (see below) so a surviving-but-idle driller from an earlier cycle doesn't drag the roster's average wellbeing down across the whole file and risk a worker_revolt on cycle 3.",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action — a driller physically drives a drill_rig to each hole — so each of this file's 3 blast cycles now needs its own fresh crew: rumblox at this overcharge is genuinely lethal (Finding #9's honest premise), and the driller/drill_rig that just drilled a site routinely dies/is destroyed in its own blast (sandbox-measured), so a new one is hired for each grid rather than reused. Fired again right after each blast (see below) so a surviving-but-idle driller from an earlier cycle doesn't drag the roster's average wellbeing down across the whole file and risk a worker_revolt on cycle 3.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -82,7 +82,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -106,7 +108,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -125,7 +129,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:10,10",
-      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless \u2014 confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
+      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless — confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -221,7 +225,7 @@
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
-      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 \u2014 amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/sequence/blast pipeline in every run of this file's history \u2014 no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead \u2014 the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state \u2014 selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m \u2014 producing a normal, non-catastrophic blast (nuisance barely moved, 50\u219249.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5\u219215kg (10 clicks, 1kg/click) and the stemming stepper 2\u21921m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All \u2014 the same class of gap as Finding #4/#5, generalized to explosive selection.",
+      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 — amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/sequence/blast pipeline in every run of this file's history — no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead — the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state — selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m — producing a normal, non-catastrophic blast (nuisance barely moved, 50→49.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5→15kg (10 clicks, 1kg/click) and the stemming stepper 2→1m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All — the same class of gap as Finding #4/#5, generalized to explosive selection.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -361,19 +365,39 @@
           "nuisance",
           "ecology"
         ],
-        "note": "a fired blast clears the plan back to zero; the rumblox overcharge's real, checkable effect \u2014 nuisance and ecology both crater from the 50/50 baseline (recordVibration, ScoreManager.ts) \u2014 not the fabricated fine (see file description)"
+        "note": "a fired blast clears the plan back to zero; the rumblox overcharge's real, checkable effect — nuisance and ecology both crater from the 50/50 baseline (recordVibration, ScoreManager.ts) — not the fabricated fine (see file description)"
       }
     },
     {
       "command": "employee fire 1",
-      "description": "#553: a surviving driller left idle after their blast (rumblox at this overcharge routinely kills them anyway, but not always) drags the roster's average wellbeing down for the rest of the file with no job left to do \u2014 fired so cycle 2's fresh driller starts from a clean roster, not because this file is about employee management.",
+      "description": "#553: a surviving driller left idle after their blast (rumblox at this overcharge routinely kills them anyway, but not always) drags the roster's average wellbeing down for the rest of the file with no job left to do — fired so cycle 2's fresh driller starts from a clean roster, not because this file is about employee management.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee fire 1"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "role": "bootstrap"
+      "role": "player"
     },
     {
       "command": "finances",
@@ -388,12 +412,12 @@
         "equals": {
           "cash": 207232
         },
-        "note": "explosive cost is never deducted from cash in this build (ground rule #11) \u2014 cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to)"
+        "note": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to)"
       }
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 2/3 \u2014 see grid 1's own hire step for why (a new one each cycle, fired after each blast).",
+      "description": "#553: a fresh driller for grid 2/3 — see grid 1's own hire step for why (a new one each cycle, fired after each blast).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -410,7 +434,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -434,7 +460,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -453,7 +481,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,10",
-      "description": "Grid 2/3. #553: spacing tightened from 4m to 2m \u2014 see grid 1's own note.",
+      "description": "Grid 2/3. #553: spacing tightened from 4m to 2m — see grid 1's own note.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -711,11 +739,31 @@
       "description": "#553: see grid 1's own fire step for why — a fresh driller each cycle, fired right after their blast.",
       "interaction": [
         {
-          "type": "command",
-          "command": "employee fire 2"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
         }
       ],
-      "role": "bootstrap"
+      "role": "player"
     },
     {
       "command": "finances",
@@ -751,7 +799,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1
         }
@@ -775,7 +825,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -1006,7 +1058,7 @@
     },
     {
       "command": "blast",
-      "description": "Blast 3/3 \u2014 the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
+      "description": "Blast 3/3 — the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
       "interaction": [
         {
           "type": "clickSelector",

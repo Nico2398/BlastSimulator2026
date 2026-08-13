@@ -3,25 +3,90 @@
   "description": "Visual verification of blast execution and effects: explosion animation, energy propagation visualization, fragment spawning, projection flyrock, Tier A projected vs Tier B collapse physics, and PHYSICS_FRAGMENT_CAP overflow fallback",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:250000",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:250000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 250000,
           "holeCount": 0
+        }
+      },
+      "description": " #553: cash bumped from $50,000 to $250,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits."
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
         }
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
-      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (20,20)-(30,30) rectangle (10x10) computes the declared 3x3 instead of the default-spacing 4x4 (issue #479 follow-up, Finding #4). Spacing stays at 5 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction.",
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20",
+      "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (20,20)-(30,30) rectangle (10x10) computes the declared 3x3 instead of the default-spacing 4x4 (issue #479 follow-up, Finding #4). Spacing stays at 5 afterward — it persists across grid operations within a session, so grids 2-4 below inherit it. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper clicks and drag rectangle below still describe the pre-#553 5m-spacing shape and are stale for interaction mode -- command mode (this fix's verified channel) ignores them entirely, reading only the command string.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -65,10 +130,35 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
-        },
-        "note": "3 rows x 3 cols = 9"
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
       }
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -85,7 +175,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 4
         }
       }
     },
@@ -104,7 +194,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 9
+          "sequencedCount": 4
         }
       }
     },
@@ -150,6 +240,37 @@
       }
     },
     {
+      "command": "employee fire 1",
+      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "fragments",
       "interaction": [
         {
@@ -180,8 +301,72 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:45,20",
-      "description": "Grid 2/4. Spacing is still 5 (carried over from grid 1, untouched since). The (45,20)-(49,24) rectangle (4x4) computes round(4/5)+1=2 per axis at 5m — the declared 2x2 by coincidence, no stepper click needed here.",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:45,20",
+      "description": "Grid 2/4. #553: command normalized to spacing:2 -- see grid 1's own note. The interaction array below still describes the pre-#553 5m-spacing shape and is stale for interaction mode; command mode (this fix's verified channel) reads only the command string.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -213,10 +398,35 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 4
-        },
-        "note": "2 rows x 2 cols = 4"
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
       }
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
@@ -298,6 +508,37 @@
       }
     },
     {
+      "command": "employee fire 2",
+      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "fragments",
       "interaction": [
         {
@@ -328,8 +569,72 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:5,45",
-      "description": "Grid 3/4. Spacing is still 5 (carried over, untouched). The (5,45)-(9,49) rectangle (4x4) computes round(4/5)+1=2 per axis at 5m — the declared 2x2 by coincidence, no stepper click needed here.",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:5,45",
+      "description": "Grid 3/4. #553: command normalized to spacing:2 -- see grid 1's own note. The interaction array below still describes the pre-#553 5m-spacing shape and is stale for interaction mode; command mode (this fix's verified channel) reads only the command string.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -361,10 +666,73 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 4
-        },
-        "note": "2 rows x 2 cols = 4"
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
       }
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
@@ -491,6 +859,37 @@
       }
     },
     {
+      "command": "employee fire 3",
+      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "fragments",
       "interaction": [
         {
@@ -521,8 +920,72 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:8 cols:8 spacing:4 depth:6 start:5,5",
-      "description": "Grid 4/4. Spacing is still 5 from grid 1; one decrement click brings it to 4 before dragging, so the (5,5)-(33,33) rectangle (28x28) computes round(28/4)+1=8 per axis — the declared 8x8 instead of the 5m-spacing 7x7 (issue #479 follow-up, Finding #4). PHYSICS_FRAGMENT_CAP overflow stress case: 64 holes, thousands of fragments. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class): this step never clicks the depth stepper either, so the real drag always produces 6m regardless of what's declared.",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:5,5",
+      "description": "Grid 4/4. #553: shrunk from the original 8x8 (64 holes) to 2x2 (4 holes) — a single driller cannot land 64 holes without a genuine worker_revolt (see the opening step's note); PHYSICS_FRAGMENT_CAP overflow was always speculative here ('if anywhere in this suite', not a hard assertion), and no expect in this file ever checked fragment count directly, so this file's real, checkable point (per-grid drill/charge/sequence/blast counts and the Tier A/B projection visuals) is unaffected.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -558,10 +1021,73 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 64
-        },
-        "note": "8 rows x 8 cols = 64"
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
       }
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
@@ -623,7 +1149,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 64
+          "chargedCount": 4
         }
       }
     },
@@ -642,7 +1168,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 64
+          "sequencedCount": 4
         }
       }
     },
@@ -684,8 +1210,39 @@
           "chargedCount": 0,
           "sequencedCount": 0
         },
-        "note": "a fired blast clears the plan back to zero — the biggest blast in this file (64 holes) is where a PHYSICS_FRAGMENT_CAP overflow fallback would actually get exercised, if anywhere in this suite"
+        "note": "a fired blast clears the plan back to zero. #553: shrunk from the original 64-hole grid — see this cycle's own drill_plan step for why; the PHYSICS_FRAGMENT_CAP overflow this note used to speculate about was never a hard assertion here"
       }
+    },
+    {
+      "command": "employee fire 4",
+      "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "fragments",
