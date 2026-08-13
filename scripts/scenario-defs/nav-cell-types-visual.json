@@ -3,11 +3,12 @@
   "description": "Tests the 4 console-reachable NavCell types (walkable, blocked, drill_hole, ramp) render on the overlay",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:70000 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped from the default $50,000 to $70,000 so the site stays comfortably clear of BANKRUPTCY_THRESHOLD ($5,000) through the ~140-tick wait below plus the office/ramp purchases after it (no income anywhere in this file).",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:70000 staffed:true"
         },
         {
           "type": "keypress",
@@ -17,7 +18,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 70000,
           "buildingCount": 0,
           "holeCount": 0
         }
@@ -25,7 +26,7 @@
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:5,5",
-      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (5,5)-(10,10) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle — the command and the click were silently testing two different grids. Caught by adding expect.equals.holeCount (issue #479 follow-up); fixed by describing what the click actually produces instead of an unverified guess.",
+      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (5,5)-(10,10) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle — the command and the click were silently testing two different grids. Caught by adding expect.equals.holeCount (issue #479 follow-up); fixed by describing what the click actually produces instead of an unverified guess. #553: confirming the grid queues 9 drill_hole PendingActions and pushes 9 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. This file's whole point is the NavCell overlay's 'drill_hole' cell type, which NavGrid only ever marks from an actually-drilled state.drillHoles entry (NavGrid.ts) — an ordered-but-undrilled hole renders no differently than open ground, so waiting for the plan to actually land (next step) isn't optional here the way a pure charge/sequence/blast scenario's wait would be.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -57,8 +58,27 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
+          "orderedHoleCount": 9,
+          "holeCount": 0
         }
+      }
+    },
+    {
+      "command": "tick 140",
+      "description": "#553: drain the ordered plan so the 'drill_hole' NavCell type actually appears on the overlay — sandbox-measured landing at tick 133 for this pattern.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 140"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        },
+        "note": "All 9 holes have landed — the NavCell overlay now has real 'drill_hole' cells to render."
       }
     },
     {
@@ -93,9 +113,9 @@
       "expect": {
         "increased": ["buildingCount"],
         "equals": {
-          "cash": 42000
+          "cash": 21356
         },
-        "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost)"
+        "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost) off the $29,356 the site had left after the #553 drilling wait"
       }
     },
     {
@@ -131,7 +151,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 41000
+          "cash": 20356
         },
         "note": "confirmed against the real state dump (1000 for this 10-tile ramp), not computed from the pricing formula"
       }

@@ -3,17 +3,18 @@
   "description": "Tests move cost visualization showing different cell types with varying costs",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:80000 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped from the default $50,000 to $80,000 so the debris_hauler purchase below ($25,000) stays affordable after the wait and the office (no income anywhere in this file).",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:80000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 80000,
           "holeCount": 0
         }
       }
@@ -55,6 +56,24 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 3,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 90",
+      "description": "#553: drain the ordered plan so the NavGrid actually has 'drill_hole' cost cells to visualize (NavGrid.ts only marks that cell type from a real, drilled state.drillHoles entry) — sandbox-measured landing at tick 12 for H1, well inside this pad for all 3.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 90"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 3
         }
       }
@@ -90,14 +109,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 42000,
+          "cash": 46092,
           "buildingCount": 1
         }
       }
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Buy a vehicle and send it moving across cells of different NavGrid cost (walkable, drill_hole) so per-tick progress is visible.",
+      "description": "Buy a vehicle and send it moving across cells of different NavGrid cost (walkable, drill_hole) so per-tick progress is visible. #553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -115,18 +134,18 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 17000,
-          "vehicleCount": 1
+          "cash": 21092,
+          "vehicleCount": 5
         }
       }
     },
     {
-      "command": "vehicle move 1 to:5,9",
+      "command": "vehicle move 5 to:5,9",
       "interaction": [
         {
           "type": "clickEntity",
           "kind": "vehicle",
-          "id": 1
+          "id": 5
         },
         {
           "type": "awaitUsable",
@@ -152,11 +171,11 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Real click path: select hauler #1 in the 3D scene, rest the cursor on (5,9), then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre here, which is where the camera ray lands on this flat stretch; it was measured in a real browser (dispatched command read `vehicle move 1 to:5,9`), not assumed -- other tiles need an offset, so re-measure rather than copy.",
+      "description": "Real click path: select hauler #5 in the 3D scene (#553: the just-bought debris_hauler is the fleet's 5th vehicle under staffed:true, not its 1st), rest the cursor on (5,9), then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- false since the SelectionBar gained `move_here` (G4), usable with a mouse since ScenePicking started latching `.aim` (47f4fef). The focus point is the tile centre here, which is where the camera ray lands on this flat stretch; it was measured in a real browser (dispatched command read `vehicle move 5 to:5,9`), not assumed -- other tiles need an offset, so re-measure rather than copy.",
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 17000
+          "cash": 21092
         }
       }
     },
