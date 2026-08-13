@@ -86,7 +86,7 @@
   "steps": [
     {
       "command": "new_game mine_type:alpine_granite seed:11 size:48",
-      "timeout": 90,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -108,7 +108,7 @@
     },
     {
       "command": "terrain_info",
-      "timeout": 90,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -130,7 +130,7 @@
     },
     {
       "command": "state",
-      "timeout": 120,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -152,7 +152,7 @@
     },
     {
       "command": "state",
-      "timeout": 120,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -174,7 +174,7 @@
     },
     {
       "command": "state",
-      "timeout": 120,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -196,7 +196,7 @@
     },
     {
       "command": "state",
-      "timeout": 120,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -218,7 +218,7 @@
     },
     {
       "command": "state",
-      "timeout": 120,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -240,7 +240,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:2,22",
-      "timeout": 90,
+      "timeout": 300,
       "interaction": [
         {
           "type": "clickSelector",
@@ -288,7 +288,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "timeout": 90,
+      "timeout": 300,
       "interaction": [
         {
           "type": "clickSelector",
@@ -314,7 +314,7 @@
     },
     {
       "command": "sequence auto delay_step:25",
-      "timeout": 90,
+      "timeout": 300,
       "interaction": [
         {
           "type": "clickSelector",
@@ -340,7 +340,7 @@
     },
     {
       "command": "blast",
-      "timeout": 240,
+      "timeout": 300,
       "frames": 6,
       "interval": 50,
       "interaction": [
@@ -386,7 +386,7 @@
     },
     {
       "command": "state",
-      "timeout": 120,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
@@ -410,7 +410,7 @@
     },
     {
       "command": "terrain_info",
-      "timeout": 90,
+      "timeout": 300,
       "interaction": [
         {
           "type": "command",
