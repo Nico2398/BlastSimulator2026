@@ -65,10 +65,35 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 5. **Test files map to the test pyramid** (unit/integration/visual/scenario) per `dev-testing-strategy`.
 6. **Leave out implementation hints, solution approaches, and code snippets** — the run derives those from the codebase.
 7. **Context explains the "why"** — what feature, what phase, what goal.
-8. **Single task per issue.** A task touching several concerns is several issues.
+8. **Single task per issue.** A task touching several concerns is several issues. So is a task that is one concern but too large for one run — Sizing below is the test, and Splitting is what to do about it.
 9. **SMART compliance.** Specific (one clear goal), Measurable (verifiable outcome), Achievable (within an agent's capabilities), Relevant (part of the larger feature), Time-bound (a single atomic task).
 10. **`full-ci` is off by default — an issue has to earn it.** The label starts the interaction-mode browser job, which costs the merge path real time, so it goes on an issue only where that job is the only thing that could catch the regression: an interaction-mode scenario clicks its way through the control, panel or flow the issue changes, or the issue touches shared input, picking, camera, rendering or harness machinery every scenario runs through. **Never on a backend-only issue.** A change confined to `src/core/`, `src/console/`, config or pure logic is proven by `static`, `logic` and command-mode `scenario`; replaying browser flows the diff never reaches reports nothing about it. **Never where there is no interaction regression to catch** — a renderer detail no scenario reaches, a control added to an existing panel, copy, a new command parameter. The `visual` channel covers those in-session against the thing that actually changed, which is stronger evidence than a suite that never touches it. When in doubt, leave it off. Full test and cost: `agentic-pipeline-pr-management`.
 11. **Label transfer.** A PR opened from a `full-ci` issue gets the same label: `gh pr edit <number> --add-label "full-ci"`.
+
+## ▶ Sizing — one issue is one run, and a run has a ceiling
+
+An issue is not a unit of work, it is a unit of **assignment**: one run picks it up and carries it to a merged pull request inside a single job, whose budget is finite (`agentic-autonomous-pipeline` holds the number and what happens at the end of it). An issue that cannot finish inside that budget does not fail politely. The job is cancelled mid-work and what survives is whatever `agentic-rescue` can push — an unreviewed branch, a draft PR, a `blocked` issue, and a human who now has to work out which half is done. Issue #553 is the case to remember: its `## Test` section listed 64 scenario definitions to update **one at a time**, the run spent the entire budget, and it was cut off with 11 of them still red.
+
+Before filing, ask whether **one run** could take this to a merged PR. Each of these says it could not, and each one means split:
+
+- The Files or Test section enumerates more than about ten files.
+- The body says "one at a time", "every remaining", "each of the N", or names a suite to migrate.
+- The change breaks a behaviour that many tests, scenarios or callers depend on. The blast radius is the size, not the diff.
+- Landing it means re-deriving values other files assert — tick counts, cash schedules, win/lose outcomes — in more than a handful of them.
+
+Atomic is not the same as small. An issue that changes one mechanic across the three files that own it is atomic however deep the change goes, and splitting it further only buys handovers.
+
+Parallel delegation raises this ceiling, but only for the right shape of work: a fan-out of sub-agents over N independent files multiplies throughput when every file takes the same recipe, and buys nothing where each file needs its own premise re-derived. Size the issue for the second case unless the first is demonstrably true. What parallel means here, and the backgrounding it never means, is in `agentic-pipeline-review-pr`.
+
+## ▶ Splitting a change that breaks a whole suite
+
+The obvious split — the mechanic in one issue, the tests it breaks in the next — is the one split that is never allowed. Its first PR merges red, and `main` stops being something the next run can branch from. **Every issue in a split must be able to reach a green PR on its own.** Three ways to get there, in the order to try them:
+
+1. **Split the enablers off first, not the files.** Ask what makes each of the N files expensive and file *that* as its own issue ahead of the migration. It is usually a missing affordance: a knob the scenarios cannot set, a wait each file has to hand-measure, an identifier that drifts. #553 carried three — `campaign start` had no `staffed:` option (#551 gave one to `new_game` and `sandbox` only), every file needed its own sandbox-measured tick pad before its holes landed, and contract ids drifted under the added ticks so each file had to be renumbered by hand. Land a `staffed:` for campaign starts, a `tick_until <field>:<value>` step, and a stable way to name a contract, and most of the 64 files become a two-line edit that fits in one run. This is the best split available: it shrinks the work instead of rescheduling it, and the affordances outlive the migration.
+2. **Land the new behaviour switched off, migrate, then flip it.** The mechanic ships opt-in so the suite still passes on the old path, each batch issue moves a slice of callers onto the new one, and the last issue flips the default and deletes the switch. Every PR is green. The cost is a dual code path that must not be allowed to survive, so file the flip issue in the same batch as the rest, `Blocked by` all of them.
+3. **Stack the batches on an integration branch.** Sub-issues target the feature branch rather than `main`, and only the final merge has to be green. Last resort: assignability, auto-merge and rescue all assume a PR against `main`, so a human has to shepherd it.
+
+Batch issues are ordinary issues — `Blocked by` the enabler, one slice each, verification of their own.
 
 ## Setting a dependency
 
@@ -110,6 +135,8 @@ recorded can be picked up in that window.
 - [ ] For a batch, every relationship set before `ready` goes on any of them
 - [ ] Verification is a concrete observable outcome
 - [ ] SMART criteria respected
+- [ ] One run could carry this to a merged PR — no signal from Sizing fires
+- [ ] If it was split: every issue in the split reaches a green PR on its own, and the enablers were split off before the files
 - [ ] An issue that must stay out of the queue carries its own lifecycle label
 - [ ] `full-ci` left off unless the interaction-mode job is the only thing that could catch the regression — never on a backend-only issue, never where no interaction regression exists
 - [ ] If the issue has `full-ci`, the PR gets `full-ci` when opened
