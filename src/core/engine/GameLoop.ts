@@ -302,16 +302,30 @@ function claimActionsTargetedAtEmployee(state: GameState, employee: Employee, re
  */
 function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, result: TickEmployeesResult): void {
   if (employee.taskQueue.length > 0) {
-    const candidates = employee.taskQueue
-      .map(id => state.pendingActions.find(a => a.id === id))
-      .filter((a): a is PendingAction => a !== undefined && a.status === 'assigned' && a.holderId === employee.id);
+    // Prune stale entries first: a queued id goes stale when the action it
+    // named was claimed here (e.g. by claimActionsTargetedAtEmployee pushing
+    // a same-tick, already-busy targeted rest request onto taskQueue instead
+    // of promoting it) but then completed/was removed through a different
+    // path before this employee ever got back to it — a synchronous
+    // tickCollapse rest superseding it, for instance. Left unpruned, an
+    // empty candidates list used to short-circuit below and strand the
+    // employee idle forever, never falling through to the open pool even
+    // once genuinely nothing remained to resume.
+    employee.taskQueue = employee.taskQueue.filter(id => {
+      const a = state.pendingActions.find(entry => entry.id === id);
+      return a !== undefined && a.status === 'assigned' && a.holderId === employee.id;
+    });
 
-    const selection = selectBestActionForEmployee(state, employee, candidates);
-    if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+    if (employee.taskQueue.length > 0) {
+      const candidates = employee.taskQueue.map(id => state.pendingActions.find(a => a.id === id)!);
 
-    promoteActionToActive(state, employee, selection.action);
-    employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
-    return;
+      const selection = selectBestActionForEmployee(state, employee, candidates);
+      if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+
+      promoteActionToActive(state, employee, selection.action);
+      employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
+      return;
+    }
   }
 
   const selection = claimOnePoolCandidate(state, employee);

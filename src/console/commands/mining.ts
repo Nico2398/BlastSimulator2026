@@ -291,7 +291,7 @@ export function chargeCommand(
   }
 
   // Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format
-  const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
+  const holeId = (ctx.state!.drillHoles.find(h => h.id === holeSpec) || ctx.state!.plannedDrillHoles.find(h => h.id === holeSpec))
     ? holeSpec
     : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
   const hole = ctx.state!.drillHoles.find(h => h.id === holeId);
