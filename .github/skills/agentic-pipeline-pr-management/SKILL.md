@@ -47,9 +47,24 @@ A run that defaulted an open requirement keeps `READY TO MERGE` and records the 
 
 `READY TO MERGE` says **this run has nothing left to add**. It never says every check has already reported, and it is never withheld to wait for one.
 
-A marked PR whose runs are still going is the ordinary state of a PR the pipeline just opened. `agentic-auto-merge` reads it as `pending`, logs which runs it is waiting on, and stops — and the CI-completion sweep re-evaluates it when they report: green merges it, red fails the sweep step naming the PR. Marking is what hands the PR to that machinery. Withholding the marker takes it away.
+A marked PR whose runs are still going is the ordinary state of a PR the pipeline just opened. `agentic-auto-merge` reads it as `pending`, logs which runs it is waiting on, and stops — and the CI-completion sweep re-evaluates it when they report. Marking is what hands the PR to that machinery. Withholding the marker takes it away.
 
 So a channel this session cannot run but CI does — interaction-mode `visual`/`scenario` — is **covered**, and the PR ships marked; when the change earns the `full-ci` label below, that job is what reports on it. Only a channel no mechanism will ever report on is a draft case.
+
+### Marked is not finished — the run stays until CI reports
+
+The sweep merges a green PR. **It does nothing at all with a red one**: `agentic-auto-merge.yml` declines to run when the CI run it reacts to concluded `failure`, because a failed run has nothing to merge. So a red CI on a marked PR is not reported to anyone by the merge machinery, and the watchdog passes the issue over precisely because a PR is linked to it.
+
+PR #581 is what that cost. Every channel its session ran was green, the body was marked, and two interaction-mode shards were red in CI. Nothing merged, nothing chained, and issue #552 held `in-progress` with every assignment behind it, until a human looked.
+
+Marking hands the PR to the merge machinery. It does not hand off the *verdict*: the run that opened the PR owns every channel it deferred, right up to the report. `agentic-pipeline-finalization`'s `[await-ci]` step is where that is paid — `npm run ci:await -- --pr <number>` listens to the workflow runs on the head until they finish, and a red one is work, not an ending. **Never end a run on a marked PR whose CI has not reported.**
+
+Two things this does not change:
+
+- **The marker still goes in at open-pr**, unconditionally and never as a later edit. Waiting for CI is not withholding the marker; it is reading the result of having given it.
+- **A channel CI owns is still covered, not pending.** Covered means a machine reports on it and the run reads that report. It never meant the run may leave before it arrives.
+
+If the session dies before the wait returns, `agentic-ci-failure.yml` posts the failure back to the agent on the same PR, bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`, and parks the PR as a draft with the issue `blocked` when the limit is spent. That net exists for a crashed session and a dropped webhook. It is not the plan.
 
 **There is no third state.** Every pipeline PR leaves the run either marked or `--draft`. A non-draft PR carrying no marker is invisible to the entire loop: `agentic-auto-merge` skips it, `auto-assign-next` chains from a merge that never happens, and the watchdog skips any issue that has a linked PR — so the issue holds `in-progress` and every assignment behind it waits until a human notices. PRs #507 and #508 both ended exactly there, both promising the marker "will follow once those jobs report". Nothing comes back to add it; the only session that could have is over. `agentic-auto-merge` now fails its step on a non-draft `pipeline/feature-*` PR with no marker, so the state is loud instead of silent — but the run must not create it in the first place.
 

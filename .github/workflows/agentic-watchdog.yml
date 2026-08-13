@@ -8,6 +8,8 @@ on:
 
 permissions:
   issues: write
+  pull-requests: read
+  actions: write
 
 jobs:
   sweep:
@@ -158,8 +160,73 @@ jobs:
 
             core.info(`Swept ${swept} stalled issue(s).`);
 
-      # The sweep above is the whole of this workflow: it reports lost runs and
-      # releases the issues they were holding. It never assigns.
+      # The sweep above leaves alone any issue that has a linked pull request,
+      # because a PR means the run produced something and its CI and review
+      # carry it from here. That is right until the PR's CI goes red with no
+      # session left to read it: `agentic-auto-merge.yml` skips a failed CI run,
+      # so nothing merges, nothing chains, and the linked-PR skip above makes the
+      # stall invisible. Issue #552 held the queue that way behind PR #581.
+      #
+      # `agentic-ci-failure.yml` is what handles that, on the CI-completion
+      # event. It declines while any agent session is live — a live session reads
+      # its own verdict through `[await-ci]`, and a second comment would queue a
+      # second runner onto one branch — and that decline is the case this step
+      # covers: it re-raises the same event later by dispatching that workflow,
+      # which re-applies every one of its guards. A dropped `workflow_run`
+      # webhook lands here too.
+      #
+      # This is still not the queue restarting on a clock. Nothing here selects
+      # an issue or assigns anything; it hands a pull request that already exists
+      # back to the agent that already owns it. The `actions: write` scope is for
+      # the dispatch, and the PAT for the same reason as everything else here.
+      - name: Re-raise a red CI on an open pipeline PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const PIPELINE_HEAD = /^pipeline\/feature-\d+$/;
+            const RUN_FAILURES = ['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'];
+
+            const open = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+
+            let raised = 0;
+            for (const pr of open) {
+              // Scope, in the same order the fail-safe applies it: the
+              // pipeline's own branch, and never a draft — a draft is a channel
+              // the run already reported it could not turn green.
+              if (!PIPELINE_HEAD.test(pr.head?.ref || '') || pr.draft) continue;
+
+              const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                owner, repo, head_sha: pr.head.sha, per_page: 100
+              });
+              const ci = runs
+                .filter((run) => run.path === '.github/workflows/ci.yml')
+                .sort((a, b) => b.id - a.id)[0];
+
+              if (!ci || ci.status !== 'completed' || !RUN_FAILURES.includes(ci.conclusion)) continue;
+
+              // Every other decision — is a session live, has this commit
+              // already been asked about, is the attempt limit spent — belongs
+              // to the fail-safe and is made there, once, on the current state.
+              core.warning(`#${pr.number}: CI \`${ci.conclusion}\` on ${pr.head.sha.slice(0, 7)} — re-raising the fail-safe.`);
+              await github.rest.actions.createWorkflowDispatch({
+                owner, repo,
+                workflow_id: 'agentic-ci-failure.yml',
+                ref: context.payload.repository?.default_branch || 'main',
+                inputs: { pr: String(pr.number) }
+              });
+              raised += 1;
+            }
+
+            core.info(`Re-raised ${raised} red pipeline PR(s).`);
+
+      # The two sweeps above are the whole of this workflow: it reports lost runs
+      # and releases the issues they were holding, and it re-raises a red CI
+      # nobody is reading. It never assigns.
       #
       # That is not the same as never restarting the queue. The `blocked` label
       # the sweep applies is itself an entry point — `handle-failure.yml` reacts
