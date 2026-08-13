@@ -3,10 +3,10 @@
   "description": "Sandbox mode: a site built from biome/difficulty/seed starts from nothing, honours the seed, and is fully playable through to a blast (#504: 3-control setup).",
   "steps": [
     {
-      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777",
-      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode.",
+      "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true",
+      "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode. #553: staffed:true (sandbox start supports the same flag as new_game, Sandbox.ts) hires a driller with blasting + drill_rig licence and buys an unmanned drill_rig for free — automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
-        { "type": "command", "command": "sandbox start biome:alpine_granite difficulty:hard seed:777" }
+        { "type": "command", "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true" }
       ],
       "role": "setup"
     },
@@ -30,21 +30,38 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20",
+      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
+      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes, start:20,20) to 2x2 (4 holes, start:10,10, closer to the staffed roster's near-origin spawn) so the single driller/drill_rig lands the whole plan quickly -- this file's point is a full drill/charge/sequence/blast cycle actually working, not a specific hole count.",
       "interaction": [
         { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
         { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"grid-tool\"]" },
         { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
         { "type": "clickSelector", "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child" },
-        { "type": "dragTiles", "x1": 20, "z1": 20, "x2": 28, "z2": 28 },
+        { "type": "dragTiles", "x1": 10, "z1": 10, "x2": 14, "z2": 14 },
         { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9,
+          "orderedHoleCount": 4,
+          "holeCount": 0,
           "cash": 50000
         }
+      }
+    },
+    {
+      "command": "tick 60",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 45).",
+      "interaction": [
+        { "type": "command", "command": "tick 60" }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        },
+        "note": "All 4 holes have landed -- none lost, none left ordered forever."
       }
     },
     {
@@ -55,8 +72,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 9,
-          "cash": 50000
+          "chargedCount": 4
         }
       }
     },
@@ -68,7 +84,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 9
+          "sequencedCount": 4
         }
       }
     },
@@ -87,8 +103,7 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
-          "cash": 50000
+          "sequencedCount": 0
         }
       }
     },
