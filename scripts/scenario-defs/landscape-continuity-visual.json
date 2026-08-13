@@ -11,6 +11,76 @@
       "name": "birdseye",
       "yaw": 0,
       "pitch": 80
+    },
+    {
+      "name": "desert-edge-west-closeup",
+      "yaw": 90,
+      "pitch": 14,
+      "target": [2, 32],
+      "distance": 45
+    },
+    {
+      "name": "desert-topdown-boundary",
+      "yaw": 0,
+      "pitch": 82,
+      "target": [32, 32],
+      "distance": 150
+    },
+    {
+      "name": "alpine-edge-closeup",
+      "yaw": 0,
+      "pitch": 12,
+      "target": [32, 3],
+      "distance": 45
+    },
+    {
+      "name": "foothills-edge-closeup",
+      "yaw": 0,
+      "pitch": 12,
+      "target": [3, 32],
+      "distance": 42
+    },
+    {
+      "name": "karst-corner-grazing",
+      "yaw": 225,
+      "pitch": 10,
+      "target": [4, 4],
+      "distance": 60
+    },
+    {
+      "name": "karst-high-boundary",
+      "yaw": 45,
+      "pitch": 55,
+      "target": [32, 32],
+      "distance": 120
+    },
+    {
+      "name": "desert-north-edge-closeup",
+      "yaw": 180,
+      "pitch": 14,
+      "target": [32, 2],
+      "distance": 45
+    },
+    {
+      "name": "alpine-topdown-boundary",
+      "yaw": 0,
+      "pitch": 78,
+      "target": [32, 32],
+      "distance": 140
+    },
+    {
+      "name": "foothills-topdown-boundary",
+      "yaw": 90,
+      "pitch": 80,
+      "target": [32, 32],
+      "distance": 140
+    },
+    {
+      "name": "karst-edge-closeup",
+      "yaw": 135,
+      "pitch": 14,
+      "target": [4, 32],
+      "distance": 45
     }
   ],
   "steps": [

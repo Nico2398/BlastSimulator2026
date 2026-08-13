@@ -395,6 +395,13 @@
       "name": "east-frontier",
       "yaw": 90,
       "pitch": 25
+    },
+    {
+      "name": "l-notch-corner",
+      "yaw": 45,
+      "pitch": 25,
+      "target": [32, 16],
+      "distance": 40
     }
   ]
 }
