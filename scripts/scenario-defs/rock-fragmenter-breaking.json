@@ -3,24 +3,91 @@
   "description": "Chapter 5/2 (#484), superseded by #552's self-dispatching hauling/fragmenting: an undercharged blast leaves an oversized boulder that auto-dispatch routes to a crewed rock_fragmenter (fragment_debris PendingAction) rather than a debris_hauler (haul_debris) -- no player command or button picks which vehicle goes where any more, and there is no rejection to test either, since an oversized fragment simply never spawns a haul_debris action in the first place. A resulting sub-fragment is then hauled and stored automatically once a freight_warehouse exists. Buy/driver-assign purchases still go through real Vehicles-panel clicks; the break/haul actions themselves are proven by ticking forward and reading the automatic outcome.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:100000",
+      "command": "new_game seed:42 cash:150000",
+      "description": "#553: cash bumped from $100,000 to $150,000 to cover the driller/drill_rig this file now needs (see below) on top of the original driver/debris_hauler/driver/rock_fragmenter/freight_warehouse shopping list.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:100000"
+          "command": "new_game seed:42 cash:150000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000,
+          "cash": 150000,
           "holeCount": 0
         }
       }
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed any roster before the driver/fragmenter dance below) now needs one first. Employee #1; the debris_hauler driver hired later becomes #2, and the rock_fragmenter driver #3, one slot later than this file's pre-#553 numbering.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "employeeCount": 1,
+          "cash": 149000
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "vehicleCount": 1,
+          "cash": 114000
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "cash": 114000,
+          "qualificationCount": 2
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:18,19",
-      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (18,19)-(23,24) rectangle (5x5) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks raise it to 5 before dragging, so the (18,19)-(23,24) rectangle (5x5) computes the declared 2x2 instead of the default-spacing 3x3 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -60,9 +127,29 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 4
+          "orderedHoleCount": 4,
+          "holeCount": 0
         },
-        "note": "2 rows x 2 cols = 4"
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 80",
+      "description": "#553: drain the ordered plan — the driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 18 for H4).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 80"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4,
+          "cash": 108568
+        },
+        "note": "All 4 holes have landed — none lost, none left ordered forever."
       }
     },
     {
@@ -152,7 +239,7 @@
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #1 \u2014 will be crewed onto the debris_hauler.",
+      "description": "Employee #2 (#553: #1 is now the driller hired at the top of this file) \u2014 will be crewed onto the debris_hauler.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -170,19 +257,19 @@
       "role": "player",
       "expect": {
         "equals": {
-          "employeeCount": 1,
-          "cash": 99200
+          "employeeCount": 2,
+          "cash": 107768
         },
         "note": "HIRING_COSTS.driver = 800 (balance.ts)"
       }
     },
     {
-      "command": "employee assign_skill 1 skill:driving.truck level:5",
+      "command": "employee assign_skill 2 skill:driving.truck level:5",
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 skill:driving.truck level:5"
+          "command": "employee assign_skill 2 skill:driving.truck level:5"
         }
       ],
       "role": "bootstrap"
@@ -207,7 +294,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Vehicle #1 \u2014 a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
+      "description": "Vehicle #2 (#553: #1 was the drill_rig bought at the top of this file, destroyed sitting inside its own hole's blast radius \u2014 see the blast step above) \u2014 a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -222,22 +309,22 @@
       "expect": {
         "equals": {
           "vehicleCount": 1,
-          "cash": 74200
+          "cash": 82768
         },
-        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts)"
+        "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts); vehicleCount is 1, not 2, because the blast above destroyed vehicle #1 (the drill_rig)"
       }
     },
     {
-      "command": "vehicle driver 1 1",
-      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #1 \u2014 the assign button click alone boards them.",
+      "command": "vehicle driver 2 2",
+      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #2 (#553's driller renumbering) \u2014 the assign button click alone boards them.",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         },
         {
           "type": "clickSelector",
-          "selector": "[data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         }
       ],
       "role": "player"
@@ -282,7 +369,7 @@
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #2 \u2014 will be crewed onto the rock_fragmenter.",
+      "description": "Employee #3 (#553: #1 is now the driller, #2 the debris_hauler driver) \u2014 will be crewed onto the rock_fragmenter.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -300,7 +387,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "employeeCount": 2
+          "employeeCount": 3
         },
         "decreased": [
           "cash"
@@ -309,19 +396,19 @@
       }
     },
     {
-      "command": "employee assign_skill 2 skill:driving.excavator level:5",
-      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #2 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow). Left as a test-only bootstrap since this file's focus is the rock_fragmenter break/haul flow, not re-proving excavator licensing.",
+      "command": "employee assign_skill 3 skill:driving.excavator level:5",
+      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #3 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow). Left as a test-only bootstrap since this file's focus is the rock_fragmenter break/haul flow, not re-proving excavator licensing.",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 2 skill:driving.excavator level:5"
+          "command": "employee assign_skill 3 skill:driving.excavator level:5"
         }
       ],
       "role": "bootstrap"
     },
     {
       "command": "vehicle buy rock_fragmenter",
-      "description": "Vehicle #2 \u2014 a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
+      "description": "Vehicle #3 (#553: #1 was the drill_rig, destroyed by the blast; #2 is the debris_hauler) \u2014 a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -348,15 +435,15 @@
       }
     },
     {
-      "command": "vehicle driver 2 2",
+      "command": "vehicle driver 3 3",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+          "selector": "[data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
         },
         {
           "type": "clickSelector",
-          "selector": "[data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+          "selector": "[data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
         }
       ],
       "role": "player"
@@ -399,6 +486,16 @@
         ],
         "note": "50 ticks of salary/maintenance drain since the last checkpoint \u2014 decreased, not an exact value; interaction mode's real wall-clock ticking (isPaused:false by default, no explicit pause in this file) advances the sim beyond exactly N ticks during every click round-trip, a drift command mode's headless tick N can't reproduce"
       }
+    },
+    {
+      "command": "event choose 0",
+      "description": "#553: idempotent \u2014 a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block (sandbox-measured: a Book Club event fires around here on seed 42). A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "fragments",
