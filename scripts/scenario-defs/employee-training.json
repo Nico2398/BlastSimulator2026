@@ -1,31 +1,22 @@
 {
   "name": "employee-training",
-  "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs the deleted playtests/training.json's beats required -- then complete a blast task",
+  "description": "Chapter 3: hire an employee, obtain a licence no role starts with (driving.excavator) and promote an already-held one (blasting) via real click-driven training -- the two proofs the deleted playtests/training.json's beats required -- then complete a blast task. #553: drill_hole is now a queued, vehicle-gated action (a driller physically drives a drill_rig to each hole), so this file also trains driving.drill_rig (no role starts with it either) and buys a drill_rig -- without both, the drill_plan below would queue forever with no vehicle able to claim it. campaign start was replaced with new_game: a manually-bought vehicle spawns at grid centre (FleetPanel/vehicle.ts), and dusty_hollow's 96x40x96 campaign grid put that centre far enough from the drill site to matter; new_game's 64x64x64 default halves the trip. blasting_academy moved from (7,5) (2 tiles from driving_center at (5,5)) to (5,15): enrolInTraining teleports the trainee to one tile outside the school's footprint (EmployeeTraining.ts) on enrolment -- two schools placed that close land the post-training teleport on top of the other school's own footprint, an unreachable navmesh cell that stranded the driller (and the drill_rig with it) permanently once blasting training finished last. drill_plan grid shrunk from 3x3 (9 holes) to 2x2 (4 holes): a single driller/drill_rig lands one hole roughly every 40-45 ticks door-to-door, so 9 holes risked the site's own cash burn (no income anywhere in this file) before the plan finished -- 4 is enough to prove charge/sequence/blast still work post-#553. `event choose 0` follows every tick block: idempotent no-op when nothing is pending (a bare `tick` command refuses outright once one is), and this file's own ~250-tick training-then-drilling runway is long enough for the real event timers to fire at least once (verified: an Aesthetic Pollution lawsuit fires here on seed 42).",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "new_game seed:42 cash:150000",
+      "description": "#553: cash bumped from the default $50,000 to cover the drill_rig ($35,000) on top of the original curriculum's driving_center/blasting_academy/training costs, with headroom for the ~250-tick runway's payroll/vehicle upkeep (no income anywhere in this file) and one lawsuit event (observed: Aesthetic Pollution, $15,000, seed 42).",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "new_game seed:42 cash:150000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 150000
         }
       }
-    },
-    {
-      "command": "time resume",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "time resume"
-        }
-      ],
-      "role": "setup"
     },
     {
       "command": "employee hire role:driller",
@@ -56,8 +47,35 @@
       }
     },
     {
+      "command": "vehicle buy drill_rig",
+      "description": "#553: without a drill_rig on site, drill_hole's vehicle gate (#550) never finds a free vehicle to claim -- the drill_plan below would sit queued forever.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
       "command": "build driving_center at:5,5",
-      "description": "Real UI training gap (parity with the deleted playtests/training.json, #479): driving.excavator belongs to no hiring role (ROLE_STARTING_QUALIFICATION), so a driving_center -- the only school that teaches it -- is the sole in-game path to ever holding it. Placed away from the drill grid below (15,15)-(20,20).",
+      "description": "Real UI training gap (parity with the deleted playtests/training.json, #479): driving.excavator belongs to no hiring role (ROLE_STARTING_QUALIFICATION), so a driving_center -- the only school that teaches it -- is the sole in-game path to ever holding it. Placed away from the drill grid below (20,20)-(23,23).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -144,6 +162,73 @@
       }
     },
     {
+      "command": "event choose 0",
+      "description": "#553: idempotent -- a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block. A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "employee train 1 skill:driving.drill_rig",
+      "description": "#553: driving.drill_rig belongs to no hiring role either (ROLE_STARTING_QUALIFICATION) -- same parity gap as driving.excavator above, and now load-bearing: without this licence the driller can never staff the drill_rig bought above, so drill_hole's vehicle gate (#550) never claims.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "trainingCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "description": "Same course length as the excavator licence above -- both are a Tier-1 driving_center's first level.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "trainingCount": 0,
+          "qualificationCount": 3
+        },
+        "note": "driving.drill_rig obtained -- the driller can now staff the drill_rig bought above"
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "employee assign_skill 1 skill:geology level:2",
       "interaction": [
         {
@@ -151,19 +236,17 @@
           "command": "employee assign_skill 1 skill:geology level:2"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Free (no cost), unlike a real academy course.",
       "expect": {
         "equals": {
-          "cash": 33240,
-          "qualificationCount": 3,
-          "proficiencyTotal": 4
+          "qualificationCount": 4
         }
       },
       "role": "bootstrap"
     },
     {
-      "command": "build blasting_academy at:7,5",
-      "description": "The second half of #479's parity gap: prove a promotion (raising an already-held qualification above Rookie) is obtainable via real clicks too, not just a brand-new licence. Placed beside the driving_center, away from the drill grid.",
+      "command": "build blasting_academy at:5,15",
+      "description": "The second half of #479's parity gap: prove a promotion (raising an already-held qualification above Rookie) is obtainable via real clicks too, not just a brand-new licence. #553: moved from (7,5) -- 2 tiles from driving_center at (5,5) -- to (5,15): enrolInTraining's post-enrolment teleport (one tile outside the school's own footprint, EmployeeTraining.ts) landed the driller on driving_center's footprint when the two schools sat this close, an unreachable navmesh cell that permanently stranded them (and the drill_rig reserved for their next drill_hole claim) once blasting training finished last. (5,15) is far enough from both driving_center and the drill grid at (20,20)-(23,23) to avoid it.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -179,8 +262,8 @@
         },
         {
           "type": "pickTile",
-          "x": 7,
-          "z": 5
+          "x": 5,
+          "z": 15
         },
         {
           "type": "clickSelector",
@@ -240,11 +323,19 @@
         ],
         "equals": {
           "trainingCount": 0,
-          "qualificationCount": 3,
-          "proficiencyTotal": 5
+          "qualificationCount": 4
         },
         "note": "a promotion raises the level of a held qualification rather than adding a second copy of it -- qualificationCount unchanged, proficiencyTotal +1"
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "employee list",
@@ -257,8 +348,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:15,15",
-      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
+      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes) to 2x2 (4 holes) -- confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles, none drilled yet, so holeCount stays 0 right after confirm. A single driller/drill_rig lands roughly one hole every 40-45 ticks door-to-door (walk to vehicle, drive, drill, return for the next); 9 holes risked the site's own cash burn (no income anywhere in this file) outrunning the plan.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -274,10 +365,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 15,
-          "z1": 15,
-          "x2": 20,
-          "z2": 20
+          "x1": 20,
+          "z1": 20,
+          "x2": 23,
+          "z2": 23
         },
         {
           "type": "screenshot"
@@ -290,9 +381,96 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
-        }
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
       }
+    },
+    {
+      "command": "tick 40",
+      "description": "#553: drain the ordered plan in bounded chunks rather than one huge tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 40",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 40",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 40",
+      "description": "#553: sandbox-measured landing for this exact sequence (seed 42): all 4 holes down by the end of this 4th 40-tick chunk.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        },
+        "note": "All 4 holes have landed — none lost, none left ordered forever."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -305,7 +483,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 4
         }
       }
     },
@@ -320,7 +498,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 9
+          "sequencedCount": 4
         }
       }
     },
@@ -378,8 +556,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "qualificationCount": 3,
-          "proficiencyTotal": 5
+          "qualificationCount": 4,
+          "proficiencyTotal": 6
         }
       }
     }

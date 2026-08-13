@@ -109,12 +109,12 @@
       "role": "observe"
     },
     {
-      "command": "tick 110",
-      "description": "#553: drain the rest of the plan — every ordered hole eventually lands. Kept well under the staffed site's own bankruptcy-grace window (observed ~259 ticks with no income) since this is a single unconditional tick command, not a loop that stops once the plan finishes.",
+      "command": "tick 200",
+      "description": "#553: drain the rest of the plan — every ordered hole eventually lands. Sandbox-measured landing at tick 230 total (40 + 190) for this spacing:5/start:20,20 pattern (slower than the spacing:4/start:15,15 pattern used elsewhere) — bumped from the original 110 pad, still comfortably under the staffed site's own bankruptcy-grace window (100 sustained ticks below $5000; cash first dips below threshold around hole 4/5, ~50 ticks before landing).",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 110"
+          "command": "tick 200"
         }
       ],
       "role": "setup",

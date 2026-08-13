@@ -57,9 +57,28 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 6,
+          "holeCount": 0
+        },
+        "note": "2 rows x 3 cols = 6 ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 130",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 6 holes well inside this pad (sandbox-measured landing at tick 125).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 130"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 6
         },
-        "note": "2 rows x 3 cols = 6"
+        "note": "All 6 holes have landed."
       }
     },
     {
