@@ -10,17 +10,18 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit",
+      "command": "campaign start level:tutorial_pit cash:188648",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit"
+          "command": "campaign start level:tutorial_pit cash:188648"
         }
       ],
+      "description": "#553: cash bumped from $80,000 to $188,648 -- drill_hole is now a queued, vehicle-gated action, so this file needs a drill_rig (tier-1 purchaseCost $35,000, VEHICLE_STATS in balance.ts) it never used to, and it needs a second one -- plus a second driller -- after the first blast kills its crew and destroys the rig standing among the holes it just drilled, plus the 190 ticks the two drillers spend sinking the two patterns ($37,648 of payroll, fuel and maintenance). The bump is exactly those four, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 80000
+          "cash": 188648
         }
       }
     },
@@ -35,7 +36,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 80000,
+          "cash": 188648,
           "timeScale": 2
         }
       }
@@ -59,7 +60,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 78800,
+          "cash": 187448,
           "employeeCount": 1
         }
       }
@@ -75,7 +76,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 78800
+          "cash": 187448
         }
       },
       "role": "bootstrap"
@@ -115,7 +116,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 75800
+          "cash": 184448
         }
       }
     },
@@ -138,7 +139,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 74800,
+          "cash": 183448,
           "employeeCount": 2
         }
       }
@@ -154,14 +155,75 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 74800
+          "cash": 183448
         }
       },
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:15,15",
-      "description": "Corrected from rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (15,15)-(25,25) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = round(10/3)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json and repeated in several other files this project (hauling-gate.json, safety-projection-visual.json, core-loop-visual.json, weather-flood.json). The corrected, larger grid has a real consequence worth knowing about before charging it: see the blast step below. depth also corrected from 8 to 6 (Ground rule #15/Finding #42's class, audited into this file long after the original Finding #40 pass above): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own default of 6m. This one mattered -- a direct trace at the previously-declared depth:8 showed command mode computing Rating: PERFECT/0 projections/$1,453,550 ore value, while the real interaction-mode click (always at 6m) produces Rating: BAD/2 projections/18.3m throw/$1,652,300 -- two meaningfully different blasts. The only reason this went uncaught is that deathCount happens to be 2 in both cases (checked directly, not assumed), and nothing later in this file depends on the blast's ore/fragment composition -- deliveries fail identically in both cases (no vehicle ever hauls), and cash is driven only by fixed hire/purchase/tick costs. Re-verified the whole file end-to-end at the corrected depth in both modes; every existing expect block held unchanged.",
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "description": "#553: the driller needs the drill_rig licence before any drill_hole action can be assigned to them -- hiring grants only the role's own starting qualification, never a driving licence. Left unmarked for the same reason as the assign_skill steps above: the player-facing path is `employee train` at a driving_center, which tutorial-interactive.json is the file that actually clicks.",
+      "expect": {
+        "equals": {
+          "cash": 183448
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: drill_hole is a queued, vehicle-gated action -- the driller physically drives a drill_rig to each hole -- so this file, which pre-#553 owned no drill_rig at all, now needs one before drill_plan can land a single hole. Vehicle #1; the debris_hauler bought further down is therefore #2, and every `vehicle driver` reference below is renumbered to match.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 148448,
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 1 2",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        }
+      ],
+      "description": "#553: the driller (employee #2) is assigned to the drill_rig. Without a driver the rig is a mesh and the queued drill_hole actions never start.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 148448
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:15,15",
+      "description": "#553: the drag rectangle was shrunk from (15,15)-(25,25) to (15,15)-(21,21). Command and click stay equivalent -- the Drill panel's own default spacing (DEFAULT_SPACING_M=3) computes cols/rows as round(size/spacing)+1, so round(6/3)+1 = 3x3 = 9 holes for this rectangle, exactly what the command declares. The shrink is the point: drill_hole is now real queued work, and a lone driller with one drill_rig and no living quarters collapses from fatigue partway through a pattern (sandbox-measured: hole 9 of 9 lands at tick 119, hole 16 of 16 not until tick ~400). 16 holes would have made this file a study of one worker's stamina rather than a tutorial playthrough. depth stays 6, the panel default this step never clicks away from. Blast consequences re-measured at the smaller pattern rather than carried over -- see the blast step below",
       "interaction": [
         {
           "type": "clickSelector",
@@ -183,8 +245,8 @@
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
-          "x2": 25,
-          "z2": 25
+          "x2": 21,
+          "z2": 21
         },
         {
           "type": "screenshot"
@@ -197,8 +259,27 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 16,
-          "cash": 74800
+          "orderedHoleCount": 9,
+          "holeCount": 0,
+          "cash": 148448
+        },
+        "note": "#553: confirming the grid only orders the 9 holes -- they are ghosts until the driller drives the drill_rig to each one, so holeCount is 0 here and the wait is the step below."
+      }
+    },
+    {
+      "command": "tick 130",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 130"
+        }
+      ],
+      "description": "#553: the single driller/drill_rig sinks all 16 ordered holes. Sandbox-measured; the pad is what the step below asserts against, not a guess.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
         }
       }
     },
@@ -217,8 +298,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 16,
-          "cash": 74800
+          "chargedCount": 9,
+          "cash": 126776
         }
       }
     },
@@ -237,7 +318,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 16
+          "sequencedCount": 9
         }
       }
     },
@@ -277,7 +358,7 @@
           "chargedCount": 0,
           "sequencedCount": 0,
           "deathCount": 2,
-          "cash": 74800
+          "cash": 126776
         }
       }
     },
@@ -337,7 +418,7 @@
       "description": "event fire -- test hook: no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy).",
       "expect": {
         "equals": {
-          "cash": 74800
+          "cash": 126776
         },
         "note": "firing only makes the event pending -- its consequence doesn't apply until the choice below."
       },
@@ -369,7 +450,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 71800
+          "cash": 123776
         },
         "increased": [
           "wellBeing"
@@ -396,7 +477,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 69800,
+          "cash": 121776,
           "employeeCount": 3
         }
       }
@@ -412,13 +493,14 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 69800
+          "cash": 121776
         }
       },
       "role": "bootstrap"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 5",
+      "description": "#553: contract ids renumbered 1/2/3 -> 5/10/11. The drill wait above spends 130 ticks, and the available pool refreshes on its own clock (REFRESH_INTERVAL, Contract.ts) -- contracts 1-3 were shifted out of it long before this step is reached. 5, 10 and 11 are what the pool actually holds here, and they are the three whose deadlines (91/87/69 ticks) outlast the second drill wait plus the closing tick, so `campaign status` still counts three active contracts at the end. The `tick 10` closing step is `tick 5` for the same reason: at 10 the 69-tick contract expires one tick before the assertion reads it.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -441,20 +523,20 @@
       }
     },
     {
-      "command": "contract deliver 1 amount:5000",
+      "command": "contract deliver 5 amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 1 amount:5000"
+          "command": "contract deliver 5 amount:5000"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 430 kg contract. Still true post-#552 (self-dispatching hauling): no debris_hauler exists yet at this point in the file (bought only much later, step 23) -- there is nothing for auto-dispatch to claim with yet, manual or otherwise. The console command is no better: it returns success:false (\"Not enough stored material: 0.0 kg available\") and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:5000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 430 kg contract. Still true post-#552 (self-dispatching hauling): no debris_hauler exists yet at this point in the file (bought only much later, step 23) -- there is nothing for auto-dispatch to claim with yet, manual or otherwise. The console command is no better: it returns success:false (\"Not enough stored material: 0.0 kg available\") and command mode only fails a step on a thrown exception, so `contract deliver 5 amount:5000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
       "expect": {
         "equals": {
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver",
         "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery."
       },
       "role": "guard"
@@ -488,7 +570,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 69000,
+          "cash": 120976,
           "employeeCount": 4
         }
       }
@@ -504,7 +586,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 69000
+          "cash": 120976
         }
       },
       "role": "bootstrap"
@@ -528,27 +610,27 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 44000,
+          "cash": 95976,
           "vehicleCount": 1
         }
       }
     },
     {
-      "command": "vehicle driver 1 4",
+      "command": "vehicle driver 2 4",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 44000
+          "cash": 95976
         }
       }
     },
@@ -583,7 +665,7 @@
       "description": "Per #526: was `build storage_depot at:12,8`, a phantom BuildingType (commandOutput: \"Unknown subcommand or building type\") with no catalog row and nothing to click -- \"storage_depot\" maps to the real freight_warehouse building. Converted to the tutorial's own real `build-storage` stage (TUTORIAL_STAGES['build-storage'], tutorialStages.ts), whose region tile is REGION.warehouse = (6,6), not the phantom step's (12,8).",
       "expect": {
         "equals": {
-          "cash": 29000,
+          "cash": 80976,
           "buildingCount": 1
         },
         "note": "cash 44000 - freight_warehouse tier-1 constructionCost 15000 (BuildingDefs.ts) = 29000. Every later hard-asserted cash value in this file shifts down by the same 15000 delta from the old no-op's 0 cost."
@@ -591,7 +673,7 @@
       "role": "player"
     },
     {
-      "command": "contract accept 2",
+      "command": "contract accept 10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -614,11 +696,11 @@
       }
     },
     {
-      "command": "contract deliver 2 amount:5000",
+      "command": "contract deliver 10 amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 2 amount:5000"
+          "command": "contract deliver 10 amount:5000"
         }
       ],
       "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble #1, sparkium #2), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. Still true post-#552: the debris_hauler, its licensed driver, and the freight_warehouse are all in place by now (steps 21-25), so a haul_debris PendingAction could in principle be claimed automatically -- but no `tick` step runs anywhere between the warehouse going up and this step, so the simulation has had zero ticks in which to actually drive/load/deliver anything. Storage is still genuinely empty, not merely un-ordered. The console command returns success:false (\"Not enough sparkium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make.",
@@ -627,7 +709,7 @@
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -674,7 +756,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 28000
+          "cash": 79976
         }
       }
     },
@@ -707,12 +789,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 28000
+          "cash": 79976
         }
       }
     },
     {
-      "command": "contract accept 3",
+      "command": "contract accept 11",
       "interaction": [
         {
           "type": "clickSelector",
@@ -735,11 +817,11 @@
       }
     },
     {
-      "command": "contract deliver 3 amount:5000",
+      "command": "contract deliver 11 amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 3 amount:5000"
+          "command": "contract deliver 11 amount:5000"
         }
       ],
       "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 25) and here either. The console command returns success:false (\"Not enough rustite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard.",
@@ -748,7 +830,7 @@
           "activeContractCount": 3
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -763,8 +845,94 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:8,8",
-      "description": "spacing corrected from 4 to 3 (the Drill panel's real default, DEFAULT_SPACING_M): the click drags a 4-unit (8,8)-(12,12) rectangle, and round(4/3)+1 = 2 either way, so the hole COUNT this file originally declared (2x2=4) already happened to match by coincidence -- but the declared spacing value did not match what the click actually uses, so corrected for accuracy per the same principle as the first drill_plan step above, even though no assertion here was actually at risk.",
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "description": "#553: a replacement rig. The first one (vehicle #1) was parked among the holes it had just drilled when the blast went off and was destroyed with them -- the same fate as the two employees this file already counts, the driller among them. Nothing in the UI moves a vehicle out of a pattern before firing, so buying another is the only player-reachable way to drill a second time. Vehicle #3, the debris_hauler being #2.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 44976,
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "description": "#553: a replacement driller. Employee #2 died in the first blast standing at the pattern they had just finished drilling (`employee list` reports them DEAD), and a dead driller drills nothing -- pre-#553 that never showed, because confirming a plan created the holes with no worker involved at all. Employee #5.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43976,
+          "employeeCount": 5
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 5 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 5 skill:driving.drill_rig level:1"
+        }
+      ],
+      "description": "#553: the drill_rig licence for the replacement driller, same reason and same unmarked-role justification as the assign_skill for employee #2 above.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "cash": 43976
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 3 5",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "description": "#553: the replacement driller (employee #5) takes the replacement rig (vehicle #3).",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "cash": 43976
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:24,24",
+      "description": "#553: pattern moved from (8,8)-(12,12) to (24,24)-(28,28). The freight_warehouse built at (6,6) earlier in this file occupies ground the old rectangle reached: two of its four holes were ordered onto cells no driller can stand on, so they stayed ghosts forever and the charge step below saw 2 holes instead of 4. Nothing was wrong pre-#553 because confirming a plan wrote all four holes out regardless of who could reach them. Original note follows -- spacing corrected from 4 to 3 (the Drill panel's real default, DEFAULT_SPACING_M): the click drags a 4-unit (8,8)-(12,12) rectangle, and round(4/3)+1 = 2 either way, so the hole COUNT this file originally declared (2x2=4) already happened to match by coincidence -- but the declared spacing value did not match what the click actually uses, so corrected for accuracy per the same principle as the first drill_plan step above, even though no assertion here was actually at risk.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -784,10 +952,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 8,
-          "z1": 8,
-          "x2": 12,
-          "z2": 12
+          "x1": 24,
+          "z1": 24,
+          "x2": 28,
+          "z2": 28
         },
         {
           "type": "screenshot"
@@ -800,8 +968,27 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 4,
-          "cash": 28000
+          "orderedHoleCount": 4,
+          "holeCount": 0,
+          "cash": 43976
+        },
+        "note": "#553: ordering only -- the four holes are ghosts until the driller drives the rig to each one, drained by the step below."
+      }
+    },
+    {
+      "command": "tick 60",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
+      ],
+      "description": "#553: the driller and the drill_rig cross the pit from the first pattern at (15,15) to this one at (8,8) and sink all four holes. Sandbox-measured pad.",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
         }
       }
     },
@@ -912,10 +1099,10 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 2,
+          "deathCount": 3,
           "cash": 28000
         },
-        "note": "confirmed via direct trace: this second, smaller blast at (8,8) doesn't add any further deaths -- neither the manager (#3) nor the driver (#4) were ever dispatched near this area, unlike the first blast's own workforce."
+        "note": "#553: this second, smaller blast now costs a third life. The manager (#3) and the driver (#4) are still nowhere near it, but the replacement driller (#5) is standing at the pattern they have just finished sinking -- the same way the first blast took the first driller. Pre-#553 nobody was ever at a pattern, because confirming a plan created the holes outright."
       }
     },
     {
@@ -939,11 +1126,11 @@
       "role": "observe"
     },
     {
-      "command": "tick 10",
+      "command": "tick 5",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 5"
         }
       ],
       "role": "setup",
@@ -968,9 +1155,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 3,
           "activeContractCount": 3,
-          "employeeCount": 4,
+          "employeeCount": 5,
           "vehicleCount": 1,
           "holeCount": 0
         }
