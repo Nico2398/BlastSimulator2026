@@ -15,13 +15,14 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 size:32",
+      "command": "new_game seed:42 size:32 staffed:true",
       "timeout": 30,
       "role": "setup",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:32"
+          "command": "new_game seed:42 size:32 staffed:true"
         }
       ],
       "expect": {
@@ -52,7 +53,7 @@
       "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 60,
       "role": "player",
-      "description": "Split out of the original bundled setup step (issue #479). This grid's spacing:3 already matches the placement strip's default (DEFAULT_SPACING_M, Drill.ts) — unlike blast-drill-plan-ui.json/blast-drill-plan-visual.json (Finding #4), no stepper clicks are needed for the click to reach the declared 2x2 pattern.",
+      "description": "Split out of the original bundled setup step (issue #479). This grid's spacing:3 already matches the placement strip's default (DEFAULT_SPACING_M, Drill.ts) — unlike blast-drill-plan-ui.json/blast-drill-plan-visual.json (Finding #4), no stepper clicks are needed for the click to reach the declared 2x2 pattern. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -80,6 +81,24 @@
       ],
       "expect": {
         "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 45",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 35 after this file's own tick 20 contract-refresh wait).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 45"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 4
         }
       }
