@@ -130,12 +130,26 @@ describe('arguments', () => {
     });
   });
 
-  // Long enough to outlive the sharded interaction-mode job, which is the
-  // slowest channel CI owns.
-  it('waits long enough for the slowest channel by default', () => {
-    const parsed = parseArgs(['--pr', '1']);
-    expect(parsed).toMatchObject({ timeoutMinutes: 45 });
-    expect((parsed as { timeoutMinutes: number }).timeoutMinutes).toBeGreaterThan(12);
+  // Any default here would be a guess about how long CI takes, and a wrong guess
+  // turns "still running" into a reported outcome — #581's ending, reintroduced
+  // the first time a shard count or a scenario suite grows. The wait ends when
+  // the runs end; its real bound is the runner's own job timeout, and hitting
+  // that hands the PR to `agentic-ci-failure.yml` rather than losing it.
+  it('sets no deadline of its own', () => {
+    expect(parseArgs(['--pr', '1'])).not.toHaveProperty('timeoutMinutes', expect.anything());
+    expect((parseArgs(['--pr', '1']) as { timeoutMinutes?: number }).timeoutMinutes).toBeUndefined();
+  });
+
+  // Still available for a human who wants to stop looking.
+  it('accepts a deadline when one is asked for', () => {
+    expect(parseArgs(['--pr', '1', '--timeout-minutes', '20'])).toMatchObject({ timeoutMinutes: 20 });
+  });
+
+  // The poll interval is how often the question is asked, not a threshold any
+  // verdict is taken on.
+  it('polls on an interval that decides nothing', () => {
+    expect(parseArgs(['--pr', '1'])).toMatchObject({ intervalSeconds: 30 });
+    expect(parseArgs(['--pr', '1', '--interval-seconds', '5'])).toMatchObject({ intervalSeconds: 5 });
   });
 
   it.each([[[]], [['--pr']], [['--pr', '0']], [['--pr', 'x']], [['--nope', '1']]])(

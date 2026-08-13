@@ -689,20 +689,35 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
     expect(failsafe).toContain('pr.head.sha !== reported');
   });
 
-  // The marker carries the SHA, so a CI re-run, a duplicated webhook and the
-  // watchdog's hourly re-raise cannot stack requests for the same commit.
-  it('asks once per head commit within the cooldown', () => {
+  // Repeated question versus new one is decided on *event identity*, never on a
+  // duration. A workflow run has an id and a redelivered webhook carries the same
+  // one, so the `workflow_run` path answers each CI run exactly once.
+  it('answers each CI run once, identified by its run id', () => {
     expect(failsafe).toContain("const MARKER = '<!-- agentic-ci-failure -->'");
-    expect(failsafe).toContain('const COOLDOWN_MINUTES = 60');
-    expect(failsafe).toContain('ageMinutes < COOLDOWN_MINUTES');
+    expect(failsafe).toContain('`run:${ciRunId}`');
+    expect(failsafe).toContain('if (askedAboutThisRun && !dispatchedLookup)');
+    expect(failsafe).toContain('run:${ciRunId}`');
   });
 
-  // The hole a permanent per-SHA skip would leave: a session that took the
-  // handback and died before pushing anything never moves the SHA, so the PR
-  // would sit unattended with attempts still on the clock.
-  it('asks again past the cooldown when the commit never moved', () => {
-    const skip = failsafe.slice(failsafe.indexOf('const COOLDOWN_MINUTES'));
-    expect(skip).toContain('that session ended without pushing a fix. Asking again.');
+  // The clock-free retry. A session that took the handback and died before
+  // pushing leaves the head — and therefore the run id — unchanged, so a
+  // permanent per-run skip would strand the PR with attempts still unspent. A
+  // dispatch bypasses the dedup and counts against the limit, so the retry is
+  // bounded by the brake instead of by a guessed interval.
+  it('lets a re-raise ask again about a run whose session produced nothing', () => {
+    const retry = failsafe.slice(failsafe.indexOf('if (askedAboutThisRun && !dispatchedLookup)'));
+    expect(retry).toContain('that attempt produced nothing. Asking again.');
+    expect(retry).toContain('nudges.length >= limit');
+  });
+
+  // A cooldown long enough for today's CI is a stall tomorrow, and one short
+  // enough for tomorrow double-asks today. There is no interval to get wrong.
+  it('holds no clock at all', () => {
+    expect(failsafe).not.toContain('Date.now');
+    expect(failsafe).not.toContain('Date.parse');
+    expect(failsafe).not.toContain('setTimeout');
+    expect(failsafe).not.toMatch(/COOLDOWN|_MINUTES|ageMinutes/);
+    expect(failsafe).not.toMatch(/^\s*(run:\s*)?sleep\s/m);
   });
 
   // Naming the jobs and their log URLs is the difference between a fix and a

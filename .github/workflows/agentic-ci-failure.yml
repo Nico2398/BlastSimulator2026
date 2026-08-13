@@ -172,56 +172,19 @@ jobs:
               }
             }
 
-            // Idempotency and the brake, both read off the PR's own comments so
-            // no state is kept anywhere else. The marker carries the commit it
-            // was raised for: one nudge per head, and a bounded number in total.
-            const MARKER = '<!-- agentic-ci-failure -->';
-            const PARKED = '<!-- agentic-ci-failure-parked -->';
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner, repo, issue_number: pr.number, per_page: 100
-            });
-            const nudges = comments.filter((comment) => (comment.body || '').includes(MARKER));
-
-            // One nudge per head SHA, but not *forever* per head SHA. A CI
-            // re-run, a duplicated webhook and the watchdog's hourly re-raise all
-            // arrive on the same commit within minutes, and none of them is a new
-            // failure — the cooldown absorbs those. What it must not absorb is
-            // the session that took the handback and died before pushing
-            // anything: the SHA never moves, so a permanent skip would leave the
-            // PR unattended with attempts still on the clock. Past the cooldown
-            // with no session live, the same commit is asked about again and it
-            // counts against the limit like any other attempt.
-            const COOLDOWN_MINUTES = 60;
-            const forThisHead = nudges
-              .filter((comment) => (comment.body || '').includes(pr.head.sha))
-              .map((comment) => Date.parse(comment.created_at))
-              .filter((at) => !Number.isNaN(at))
-              .sort((a, b) => b - a);
-            if (forThisHead.length > 0) {
-              const ageMinutes = Math.round((Date.now() - forThisHead[0]) / 60_000);
-              if (ageMinutes < COOLDOWN_MINUTES) {
-                core.info(
-                  `#${pr.number}: already asked about ${pr.head.sha.slice(0, 7)} ${ageMinutes}m ago ` +
-                  `(cooldown ${COOLDOWN_MINUTES}m).`
-                );
-                return;
-              }
-              core.info(
-                `#${pr.number}: asked about ${pr.head.sha.slice(0, 7)} ${ageMinutes}m ago and the commit has not ` +
-                'moved — that session ended without pushing a fix. Asking again.'
-              );
-            }
-
             // Anything else falls back to the default rather than disabling the
             // brake — same rule as `AGENTIC_BLOCKED_CHAIN_LIMIT`.
             const configuredLimit = parseInt(process.env.ATTEMPT_LIMIT || '', 10);
             const limit = Number.isInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : 3;
 
-            // On a dispatch — a human, or the watchdog handing back a PR whose
-            // CI reported while a session was live — there is no triggering run
-            // to read, so the head's own latest CI run is found here. It must
-            // actually be red: a dispatch is a request to look, never evidence.
-            if (Number.isNaN(ciRunId)) {
+            // The event this workflow answers, identified. On the `workflow_run`
+            // path it is the run that woke us. On a dispatch — a human, or the
+            // watchdog re-raising a PR whose CI reported while a session was
+            // live — there is no such run, so the head's own latest CI run is
+            // found here, and it must actually be red: a dispatch is a request to
+            // look, never evidence.
+            const dispatchedLookup = Number.isNaN(ciRunId);
+            if (dispatchedLookup) {
               const onHead = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
                 owner, repo, head_sha: pr.head.sha, per_page: 100
               });
@@ -243,21 +206,61 @@ jobs:
               ciRunId = ci.id;
             }
 
+            // ── Idempotency, and the brake ──
+            // Both read off the PR's own comments, so no state is kept anywhere
+            // else and nothing has to be cleaned up. The marker names the commit
+            // and the CI run the handback was raised for.
+            //
+            // **No clock anywhere in here.** Duration thresholds are the wrong
+            // tool for this: a cooldown long enough for today's CI is a stall
+            // tomorrow, and one short enough for tomorrow double-asks today.
+            // What separates a repeated question from a new one is *event
+            // identity*, and GitHub already provides it — a workflow run has an
+            // id, and a redelivered webhook carries the same one.
+            const MARKER = '<!-- agentic-ci-failure -->';
+            const PARKED = '<!-- agentic-ci-failure-parked -->';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr.number, per_page: 100
+            });
+            const nudges = comments.filter((comment) => (comment.body || '').includes(MARKER));
+            const askedAboutThisRun = nudges.some((comment) => (comment.body || '').includes(`run:${ciRunId}`));
+
+            // The `workflow_run` path fires once per CI run. Firing twice for the
+            // same run id means the same event arrived twice — a redelivery, a
+            // re-request — and answering it twice would queue a second session.
+            if (askedAboutThisRun && !dispatchedLookup) {
+              core.info(`#${pr.number}: CI run ${ciRunId} was already handed back. Same event, not a new failure.`);
+              return;
+            }
+
+            // A dispatch deliberately bypasses that, and this is where the
+            // clock-free retry lives. `agentic-watchdog.yml` re-raises a red
+            // pipeline PR whenever it sweeps, so a handback whose session died
+            // before pushing anything — the head never moves, so nothing about
+            // the failure changes — is asked again on the next sweep rather than
+            // skipped forever. It is not free: it counts against the limit below
+            // like any other attempt, so the retry is bounded and ends in a
+            // parked PR with its issue released, never in a silent stall.
+            if (askedAboutThisRun) {
+              core.info(
+                `#${pr.number}: CI run ${ciRunId} was handed back before and the head is still ` +
+                `${pr.head.sha.slice(0, 7)} with no session running — that attempt produced nothing. Asking again.`
+              );
+            }
+
             // What the failure actually was. A comment that says "CI is red"
             // sends the session to go and find out; naming the jobs and their
             // log URLs is the difference between a fix and a re-diagnosis.
             let failures = [];
-            if (!Number.isNaN(ciRunId)) {
-              try {
-                const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
-                  owner, repo, run_id: ciRunId, filter: 'latest', per_page: 100
-                });
-                failures = jobs
-                  .filter((job) => ['failure', 'cancelled', 'timed_out'].includes(job.conclusion))
-                  .map((job) => `- \`${job.name}\` — ${job.conclusion} — ${job.html_url}`);
-              } catch (error) {
-                core.warning(`Could not list the failing jobs of run ${ciRunId}: ${error.message}`);
-              }
+            try {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner, repo, run_id: ciRunId, filter: 'latest', per_page: 100
+              });
+              failures = jobs
+                .filter((job) => ['failure', 'cancelled', 'timed_out'].includes(job.conclusion))
+                .map((job) => `- \`${job.name}\` — ${job.conclusion} — ${job.html_url}`);
+            } catch (error) {
+              core.warning(`Could not list the failing jobs of run ${ciRunId}: ${error.message}`);
             }
             const failureBlock = failures.length
               ? failures.join('\n')
@@ -336,7 +339,7 @@ jobs:
                 '',
                 `The \`READY TO MERGE\` marker on this pull request stays as it is — auto-merge merges it the moment CI reports green, and that is what releases issue #${issueNumber} and starts the next task. If you cannot turn a channel green, say so in a comment, convert this pull request to a draft, and label issue #${issueNumber} \`blocked\`.`,
                 '',
-                `${MARKER} ${pr.head.sha}`
+                `${MARKER} ${pr.head.sha} run:${ciRunId}`
               ].join('\n')
             });
 

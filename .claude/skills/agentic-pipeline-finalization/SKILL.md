@@ -49,10 +49,14 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
                              No material decisions → skip.
  9. [git-verify]         → confirm clean state: git status, branch, last commits
 10. [await-ci]           → `npm run ci:await -- --pr <number>`. Blocks until every workflow
-                             run on the PR head reports. **The run does not end before this
-                             step does.** Exit 0 (GREEN) → the run is finished. Exit 1 (RED)
-                             → the CI-fix loop below. Exit 2 (TIMEOUT) or 3/4 → say so in a
-                             PR comment naming what never reported, then stop.
+                             run on the PR head reports — no deadline, because any deadline
+                             would be a guess about CI that reports "still running" as an
+                             outcome. **The run does not end before this step does.**
+                             Exit 0 (GREEN) → the run is finished. Exit 1 (RED) → the CI-fix
+                             loop below. Exit 3/4 → say so in a PR comment naming what never
+                             reported, then stop. Never pass `--timeout-minutes` in a
+                             pipeline run: the bound is the job's own timeout, and reaching
+                             it hands the PR to `agentic-ci-failure.yml` intact.
                              Skip only when the PR was created `--draft`: a draft already
                              names a channel that stayed red, and its issue is `blocked`.
 ```
@@ -99,6 +103,6 @@ Do NOT re-run skeleton-writer or test-writer — branches and tests already exis
 | After refactorer | `npx vitest run` — PASS → @validator, FAIL → @implementer (big loop) |
 | verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
 | open-pr | `gh pr create --base main --head pipeline/feature-<N> --title "<type>: Resolve #<N>" --body "Closes #<N>\n\n<test_count> tests — all passing\n\n<decisions_block>\n\nREADY TO MERGE"`. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. Count test cases: `npx vitest list --reporter=json 2>$null | ConvertFrom-Json | ForEach-Object { $_.testModules } | Measure-Object`. `<decisions_block>` is the `## Decisions taken` section, omitted when the run defaulted nothing. For draft: add `--draft`, omit `READY TO MERGE` line. Then apply the `full-ci` label if and only if `agentic-pipeline-pr-management`'s test says so: `gh pr edit <number> --add-label "full-ci"`. |
-| await-ci | `npm run ci:await -- --pr <number>` (or `--head pipeline/feature-<N>` before the number is known). Exit codes: `0` GREEN, `1` RED with the failing jobs and their log URLs printed, `2` TIMEOUT (checks still running past the budget — not a verdict), `3` the PR is gone, `4` bad arguments or `gh` could not answer. It listens to the workflow runs on the PR head; it never re-runs a channel, and it never reads the clock as an answer. |
+| await-ci | `npm run ci:await -- --pr <number>` (or `--head pipeline/feature-<N>` before the number is known). Exit codes: `0` GREEN, `1` RED with the failing jobs and their log URLs printed, `2` TIMEOUT (only reachable if you pass `--timeout-minutes`, which a pipeline run never does), `3` the PR is gone, `4` bad arguments or `gh` could not answer. It listens to the workflow runs on the PR head; it never re-runs a channel, and no verdict it reports depends on a duration. |
 | decision-followup | `gh label create decision-review --description "A default the pipeline chose; revisit when convenient" --color ededed --force` then `gh issue create --label decision-review --title "Decision review: <summary> (from #<N>)" --body "<decisions block + PR link>"`. `--force` makes the label step idempotent — it updates an existing label instead of failing the run on every issue after the first. |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |

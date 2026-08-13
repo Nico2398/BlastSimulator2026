@@ -16,16 +16,30 @@
  * run answers a different question anyway (a sandbox without a GPU cannot
  * reproduce the interaction-mode suite CI runs).
  *
+ * **No deadline by default, deliberately.** A duration budget is the wrong shape
+ * for this: one long enough for today's CI is a premature verdict once a shard
+ * count or a scenario suite grows, and every early exit reproduces #581 exactly
+ * — a run ending on a channel nothing read. So the wait ends when the runs end.
+ * Its real bound is the runner's own `timeout-minutes: 360`, and hitting *that*
+ * is safe rather than silent: the job dies, no runner run is live any more, and
+ * `agentic-ci-failure.yml` hands the pull request back. `--timeout-minutes` stays
+ * available for a human at a CLI who wants to stop looking.
+ *
+ * The poll interval is not that kind of clock. It is how often a question is
+ * asked, not a threshold any decision is taken on — GitHub pushes nothing to a
+ * terminal, so something has to ask. No verdict depends on its value.
+ *
  * Usage:
  *   npm run ci:await -- --pr 581
  *   npm run ci:await -- --head pipeline/feature-552
- *   npm run ci:await -- --pr 581 --timeout-minutes 45 --interval-seconds 30
+ *   npm run ci:await -- --pr 581 --interval-seconds 15
+ *   npm run ci:await -- --pr 581 --timeout-minutes 20   # opt-in, for a human
  *
  * Exit codes — the whole point of the script, since the caller branches on them:
  *   0  GREEN    every workflow run on the head reported success (or the PR merged)
  *   1  RED      at least one reported failure. The failing jobs are printed with
  *               their log URLs, which is the input a fix needs
- *   2  TIMEOUT  still running when the budget ran out. Not a verdict
+ *   2  TIMEOUT  only reachable with an explicit `--timeout-minutes`. Not a verdict
  *   3  GONE     the PR is closed unmerged, or no PR exists for that head
  *   4  USAGE    bad arguments, or `gh` could not answer
  *
@@ -109,17 +123,18 @@ export function verdictOf(runs: WorkflowRun[]): Verdict {
 export interface Options {
   pr?: number;
   head?: string;
-  timeoutMinutes: number;
+  /** Undefined means no deadline — the wait ends when the runs do. */
+  timeoutMinutes?: number;
   intervalSeconds: number;
 }
 
 /**
- * The timeout default outlives the slowest reporting channel: the sharded
- * interaction-mode job runs ~12 minutes wall clock, and a queued runner waits
- * behind whatever else the repository is building.
+ * No `timeoutMinutes` default: every value would be a guess about how long CI
+ * takes, and a wrong guess turns "still running" into a reported outcome. See
+ * the module comment.
  */
 export function parseArgs(argv: string[]): Options | { error: string } {
-  const options: Options = { timeoutMinutes: 45, intervalSeconds: 30 };
+  const options: Options = { intervalSeconds: 30 };
 
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -213,7 +228,9 @@ async function main(): Promise<number> {
     return 4;
   }
 
-  const deadline = Date.now() + parsed.timeoutMinutes * 60_000;
+  const deadline = parsed.timeoutMinutes === undefined
+    ? undefined
+    : Date.now() + parsed.timeoutMinutes * 60_000;
 
   for (;;) {
     let pr: PullRequest | undefined;
@@ -261,23 +278,22 @@ async function main(): Promise<number> {
       return 0;
     }
 
-    const left = Math.round((deadline - Date.now()) / 60_000);
-    if (Date.now() >= deadline) {
+    const state = latest.length === 0
+      ? `no workflow run on ${pr.head.sha.slice(0, 7)} yet`
+      : `${pending} of ${latest.length} workflow run(s) still going`;
+
+    if (deadline !== undefined && Date.now() >= deadline) {
       console.log(
-        `CI TIMEOUT — pull request #${pr.number}: ` +
-        (latest.length === 0
-          ? 'no workflow run has reported on this head yet'
-          : `${pending} of ${latest.length} workflow run(s) still going`) +
-        `, budget of ${parsed.timeoutMinutes}m spent. This is not a verdict.`
+        `CI TIMEOUT — pull request #${pr.number}: ${state}, and the ${parsed.timeoutMinutes}m ` +
+        'budget you asked for is spent. This is not a verdict — the channels are still unread.'
       );
       return 2;
     }
 
-    console.log(
-      latest.length === 0
-        ? `waiting — no workflow run on ${pr.head.sha.slice(0, 7)} yet (${left}m of budget left)`
-        : `waiting — ${pending} of ${latest.length} workflow run(s) still going (${left}m of budget left)`
-    );
+    const budget = deadline === undefined
+      ? ''
+      : ` (${Math.round((deadline - Date.now()) / 60_000)}m of the requested budget left)`;
+    console.log(`waiting — ${state}${budget}`);
     await sleep(parsed.intervalSeconds * 1000);
   }
 }
