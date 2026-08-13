@@ -1264,11 +1264,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1280,7 +1280,8 @@
           "activeContractCount": 1,
           "surveyCount": 3
         }
-      }
+      },
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 1 amount:800",
@@ -1309,11 +1310,11 @@
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1325,7 +1326,8 @@
           "activeContractCount": 2,
           "surveyCount": 3
         }
-      }
+      },
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"2\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #2 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 2 amount:600",
@@ -1726,11 +1728,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1742,7 +1744,8 @@
           "activeContractCount": 3,
           "surveyCount": 3
         }
-      }
+      },
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"3\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #3 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 3 amount:1200",
@@ -2105,11 +2108,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -2121,7 +2124,8 @@
           "activeContractCount": 4,
           "surveyCount": 3
         }
-      }
+      },
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"4\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #4 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 4 amount:1500",
@@ -2562,11 +2566,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -2578,7 +2582,8 @@
           "activeContractCount": 5,
           "surveyCount": 3
         }
-      }
+      },
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #5 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 5 amount:2000",

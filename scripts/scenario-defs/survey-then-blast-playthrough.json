@@ -640,7 +640,7 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 4",
       "interaction": [
         {
           "type": "clickSelector",
@@ -648,14 +648,15 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "description": "#581: the command said `contract accept 1`, and contract #1 is not on offer at this point in EITHER mode -- both dump the available pool as ids 4-11, so the command was silently accepting nothing (`activeContractCount` stayed 0 right through it) and the `contract deliver 4` guard below was operating on a contract nothing had accepted. Interaction mode was the half that worked: the unscoped click landed on the first offered card, which IS #4, which is why that guard finds #4's active card and correctly reports its DELIVER disabled. So the click was right and the command text was wrong; the command now names #4 and the click is scoped to it. Nothing downstream is re-baselined -- the three steps after the guard are `observe` and assert nothing."
     },
     {
       "command": "contract deliver 4 amount:500",
