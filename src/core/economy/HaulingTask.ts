@@ -16,8 +16,10 @@ import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFrag
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
- * hauling task already in progress — the shared eligibility gate for
- * findReachableGroundFragment and the UI's Haul button.
+ * hauling task already in progress — the eligibility gate for
+ * findReachableGroundFragment, used by the manual `vehicle haul` console
+ * command and tests. Hauling is otherwise self-dispatching (HaulDispatch.ts,
+ * #552); there is no Haul button on the Fleet panel anymore.
  *
  * requestHaulFragment keeps its own per-condition checks instead of calling
  * this: it reports which specific condition failed (no driver vs. already

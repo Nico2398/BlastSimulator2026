@@ -4,10 +4,18 @@
 // position-gated vehicle tasks that target a fragment: request looks up and
 // validates the vehicle, tick drives it toward the fragment's approach cell
 // one movement tick at a time, and search picks the nearest reachable
-// candidate fragment. This file holds the three steps that are identical
-// between the two workflows so BoulderBreaking.ts and HaulingTask.ts only
-// carry what differs: eligibility rules, phase names, and what happens on
-// arrival.
+// candidate fragment. The first four exports below are those steps, shared
+// so BoulderBreaking.ts and HaulingTask.ts only carry what differs between
+// them: eligibility rules, phase names, and what happens on arrival.
+//
+// startVehicleGatedFragmentWork (#552) is a different kind of sharing: not a
+// step reused by BoulderBreaking.ts/HaulingTask.ts themselves, but the entry
+// point ArrivalGate.ts and VehicleReservation.ts both call to kick a
+// haul_debris/fragment_debris PendingAction's request* function once its
+// vehicle is ready — one fresh-boarding, one same-vehicle-continuity. It
+// lives here rather than in either of those two engine/ modules because it
+// needs to import both request* functions, and importing economy/ from
+// engine/ is the one-way direction the architecture already requires.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
