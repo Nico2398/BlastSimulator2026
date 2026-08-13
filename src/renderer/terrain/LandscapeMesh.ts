@@ -138,11 +138,12 @@ export function rockBlendFor(palette: CompositionPalette, surfCompId: number): {
  * instead of being emitted whole).
  */
 export function classifyQuad(playable: PlayableCut, x0: number, z0: number, x1: number, z1: number): 'outside' | 'inside' | 'boundary' {
+  const claims = playable.meshClaimsColumn ?? playable.ownsColumn;
   const owned = [
-    playable.ownsColumn(x0, z0),
-    playable.ownsColumn(x1, z0),
-    playable.ownsColumn(x0, z1),
-    playable.ownsColumn(x1, z1),
+    claims(x0, z0),
+    claims(x1, z0),
+    claims(x0, z1),
+    claims(x1, z1),
   ];
   if (owned.every(o => o)) return 'inside';
   if (owned.every(o => !o)) return 'outside';
@@ -185,6 +186,7 @@ export function buildBoundaryQuad(
   playable: PlayableCut,
 ): void {
   const subdiv = Math.max(1, Math.round((x1 - x0) / FINE_STEP));
+  const claims = playable.meshClaimsColumn ?? playable.ownsColumn;
 
   // Parent coarse corner heights, read directly (never boundary-adjusted) —
   // the flat-edge rule's whole point is to reproduce exactly what an
@@ -195,13 +197,20 @@ export function buildBoundaryQuad(
   const h11 = sampleColumn(x1, z1).height;
 
   // Slope source for shading: the live/theoretical field, never the
-  // flat-edge-adjusted position (a T-junction fix, not a slope).
+  // flat-edge-adjusted position (a T-junction fix, not a slope). Only trust
+  // the live value at a point the site actually owns, and only when it
+  // isn't NaN — the claim boundary moves, and computeVoxelColumnSurfaceHeight
+  // answers NaN rather than clamping for a column outside the site (#559).
   const heightCache = new Map<string, number>();
   const trueHeightAt = (x: number, z: number): number => {
     const key = `${x},${z}`;
     const cached = heightCache.get(key);
     if (cached !== undefined) return cached;
-    const h = playable.boundaryHeightAt ? playable.boundaryHeightAt(x, z) : sampleColumn(x, z).height;
+    let h = sampleColumn(x, z).height;
+    if (playable.ownsColumn(x, z) && playable.boundaryHeightAt) {
+      const live = playable.boundaryHeightAt(x, z);
+      if (!Number.isNaN(live)) h = live;
+    }
     heightCache.set(key, h);
     return h;
   };
@@ -230,7 +239,7 @@ export function buildBoundaryQuad(
       const t = row / subdiv;
       y = col === 0 ? h00 + t * (h01 - h00) : h10 + t * (h11 - h10);
     } else {
-      y = playable.boundaryHeightAt ? playable.boundaryHeightAt(x, z) : sample.height;
+      y = trueHeightAt(x, z);
     }
 
     const dhdx = (trueHeightAt(x + FINE_STEP, z) - trueHeightAt(x - FINE_STEP, z)) / (2 * FINE_STEP);
@@ -256,8 +265,8 @@ export function buildBoundaryQuad(
       const cx0 = x0 + col * FINE_STEP, cx1 = cx0 + FINE_STEP;
       const cz0 = z0 + row * FINE_STEP, cz1 = cz0 + FINE_STEP;
       const anyUnowned =
-        !playable.ownsColumn(cx0, cz0) || !playable.ownsColumn(cx1, cz0) ||
-        !playable.ownsColumn(cx0, cz1) || !playable.ownsColumn(cx1, cz1);
+        !claims(cx0, cz0) || !claims(cx1, cz0) ||
+        !claims(cx0, cz1) || !claims(cx1, cz1);
       if (!anyUnowned) continue; // fully claimed — the playable mesh owns this cell
 
       const i0 = emitVertex(row, col);
@@ -277,22 +286,79 @@ export function buildBoundaryQuad(
  * unsubdivided coarse neighbours per the existing #491 rule.
  */
 export function subdivideOutsideQuad(
-  _positions: number[],
-  _normals: number[],
-  _rockA: number[],
-  _rockB: number[],
-  _rockWeight: number[],
-  _ore: number[],
-  _indices: number[],
-  _x0: number,
-  _z0: number,
-  _x1: number,
-  _z1: number,
-  _sampleColumn: SampleFn,
-  _palette: CompositionPalette,
-  _step: number,
+  positions: number[],
+  normals: number[],
+  rockA: number[],
+  rockB: number[],
+  rockWeight: number[],
+  ore: number[],
+  indices: number[],
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  sampleColumn: SampleFn,
+  palette: CompositionPalette,
+  step: number,
 ): void {
-  throw new Error('not implemented');
+  const subdiv = Math.max(1, Math.round(step / MID_STEP));
+
+  // Parent coarse corner heights. A plain bilinear interpolation of these
+  // four naturally reduces to the flat-edge rule's linear interpolation
+  // along every side of the quad, so no separate perimeter special-case is
+  // needed here the way buildBoundaryQuad needs one (its interior deviates
+  // from bilinear by using live/theoretical sampled height; this function's
+  // interior never does — it's unconditionally outside the claim).
+  const h00 = sampleColumn(x0, z0).height;
+  const h10 = sampleColumn(x1, z0).height;
+  const h01 = sampleColumn(x0, z1).height;
+  const h11 = sampleColumn(x1, z1).height;
+
+  const bilinearHeight = (x: number, z: number): number => {
+    const u = (x - x0) / (x1 - x0);
+    const v = (z - z0) / (z1 - z0);
+    return (1 - u) * (1 - v) * h00 + u * (1 - v) * h10 + (1 - u) * v * h01 + u * v * h11;
+  };
+
+  const vertexIndex = new Map<number, number>();
+
+  const emitVertex = (row: number, col: number): number => {
+    const key = row * (subdiv + 1) + col;
+    const existing = vertexIndex.get(key);
+    if (existing !== undefined) return existing;
+
+    const x = x0 + col * MID_STEP;
+    const z = z0 + row * MID_STEP;
+    const y = bilinearHeight(x, z);
+
+    const dhdx = (bilinearHeight(x + MID_STEP, z) - bilinearHeight(x - MID_STEP, z)) / (2 * MID_STEP);
+    const dhdz = (bilinearHeight(x, z + MID_STEP) - bilinearHeight(x, z - MID_STEP)) / (2 * MID_STEP);
+    const normal = heightFieldNormal(dhdx, dhdz);
+
+    const idx = positions.length / 3;
+    positions.push(x, y, z);
+    normals.push(normal[0], normal[1], normal[2]);
+
+    const sample = sampleColumn(x, z);
+    const blend = rockBlendFor(palette, sample.surfCompId);
+    rockA.push(blend.rockA);
+    rockB.push(blend.rockB);
+    rockWeight.push(blend.weight);
+    ore.push(-1, 0); // landscape never carries ore (#458 A18)
+
+    vertexIndex.set(key, idx);
+    return idx;
+  };
+
+  for (let row = 0; row < subdiv; row++) {
+    for (let col = 0; col < subdiv; col++) {
+      const i0 = emitVertex(row, col);
+      const i1 = emitVertex(row, col + 1);
+      const i2 = emitVertex(row + 1, col);
+      const i3 = emitVertex(row + 1, col + 1);
+      pushQuad(indices, i0, i1, i2, i3, row + col);
+    }
+  }
 }
 
 export class LandscapeMesh {
@@ -441,18 +507,48 @@ export class LandscapeMesh {
       }
     }
 
+    // Classify every coarse quad up front (only when the tile can possibly
+    // touch the rect) so an 'outside' quad can tell whether it borders a
+    // 'boundary' quad and needs MID_STEP subdivision — otherwise the
+    // FINE_STEP boundary ring meets COARSE_STEP open ground in one
+    // resolution jump, which itself reads as a seam (#559).
+    const quadClass = new Map<number, 'inside' | 'outside' | 'boundary'>();
+    if (touchesRect) {
+      for (let row = 0; row < n - 1; row++) {
+        const z0 = tile.originZ + row * step, z1 = z0 + step;
+        for (let col = 0; col < n - 1; col++) {
+          const x0 = tile.originX + col * step, x1 = x0 + step;
+          quadClass.set(row * (n - 1) + col, classifyQuad(playable, x0, z0, x1, z1));
+        }
+      }
+    }
+    const isBoundaryQuad = (row: number, col: number): boolean => {
+      if (row < 0 || col < 0 || row >= n - 1 || col >= n - 1) return false;
+      return quadClass.get(row * (n - 1) + col) === 'boundary';
+    };
+
     const indices: number[] = [];
     for (let row = 0; row < n - 1; row++) {
       const z0 = tile.originZ + row * step, z1 = z0 + step;
       for (let col = 0; col < n - 1; col++) {
         if (touchesRect) {
           const x0 = tile.originX + col * step, x1 = x0 + step;
-          const cls = classifyQuad(playable, x0, z0, x1, z1);
+          const cls = quadClass.get(row * (n - 1) + col)!;
           if (cls === 'inside') continue;
           if (cls === 'boundary') {
             buildBoundaryQuad(
               positions, normals, rockA, rockB, rockWeight, ore, indices,
               x0, z0, x1, z1, sampleColumn, palette, playable,
+            );
+            continue;
+          }
+          const adjacentToBoundary =
+            isBoundaryQuad(row - 1, col) || isBoundaryQuad(row + 1, col) ||
+            isBoundaryQuad(row, col - 1) || isBoundaryQuad(row, col + 1);
+          if (adjacentToBoundary) {
+            subdivideOutsideQuad(
+              positions, normals, rockA, rockB, rockWeight, ore, indices,
+              x0, z0, x1, z1, sampleColumn, palette, step,
             );
             continue;
           }

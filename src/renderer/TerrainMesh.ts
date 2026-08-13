@@ -42,8 +42,8 @@ export type EdgeHeightSampler = (x: number, z: number) => number;
  *  landscape's theoretical height, so gradient-normal sampling near the
  *  site edge doesn't fall into "air" where the ground actually continues.
  *  Same half-voxel crossing convention as emitVertex/computeVoxelColumnSurfaceHeight. */
-export function virtualEdgeDensity(_surfaceHeight: number, _y: number): number {
-  throw new Error('not implemented');
+export function virtualEdgeDensity(surfaceHeight: number, y: number): number {
+  return Math.max(0, Math.min(1, surfaceHeight + 0.5 - y));
 }
 
 // ---------- Edge vertex lookup: for each of 12 cube edges, which 2 corners ----------
@@ -68,16 +68,31 @@ interface CornerSample {
   oreAmt: number;
 }
 
-// TODO(#559): thread edgeHeightSampler through
+/**
+ * Density at one integer lattice corner, for gradient-normal sampling only.
+ * A column the grid doesn't own reads as air (0) unless an edge height
+ * sampler is installed, in which case it reads as the virtual density of
+ * the landscape's theoretical/live ground there (#559) — this only feeds
+ * densityGradientNormal's finite differences; sampleCorner/cubeIndex (which
+ * decide geometry/topology) always use grid.densityAt directly and are
+ * untouched by this.
+ */
+function cornerDensityForNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): number {
+  if (sampler && !grid.containsColumn(x, z)) {
+    return virtualEdgeDensity(sampler(x, z), y);
+  }
+  return grid.densityAt(x, y, z);
+}
+
 /** Density with trilinear interpolation, so the gradient below is continuous. */
-function densityAtSmooth(grid: VoxelGrid, x: number, y: number, z: number): number {
+function densityAtSmooth(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): number {
   const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
   const fx = x - x0, fy = y - y0, fz = z - z0;
   let acc = 0;
   for (let k = 0; k < 8; k++) {
     const dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
     const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
-    if (w > 0) acc += w * grid.densityAt(x0 + dx, y0 + dy, z0 + dz);
+    if (w > 0) acc += w * cornerDensityForNormal(grid, sampler, x0 + dx, y0 + dy, z0 + dz);
   }
   return acc;
 }
@@ -95,12 +110,11 @@ function densityAtSmooth(grid: VoxelGrid, x: number, y: number, z: number): numb
  * An iso-surface's true normal is the negated gradient of the field it is an
  * iso-surface of, which owes nothing to how the triangles were cut.
  */
-// TODO(#559): thread edgeHeightSampler through
-function densityGradientNormal(grid: VoxelGrid, x: number, y: number, z: number): [number, number, number] {
+function densityGradientNormal(grid: VoxelGrid, sampler: EdgeHeightSampler | null, x: number, y: number, z: number): [number, number, number] {
   const e = 0.85;
-  const gx = densityAtSmooth(grid, x + e, y, z) - densityAtSmooth(grid, x - e, y, z);
-  const gy = densityAtSmooth(grid, x, y + e, z) - densityAtSmooth(grid, x, y - e, z);
-  const gz = densityAtSmooth(grid, x, y, z + e) - densityAtSmooth(grid, x, y, z - e);
+  const gx = densityAtSmooth(grid, sampler, x + e, y, z) - densityAtSmooth(grid, sampler, x - e, y, z);
+  const gy = densityAtSmooth(grid, sampler, x, y + e, z) - densityAtSmooth(grid, sampler, x, y - e, z);
+  const gz = densityAtSmooth(grid, sampler, x, y, z + e) - densityAtSmooth(grid, sampler, x, y, z - e);
   const len = Math.hypot(gx, gy, gz);
   // A vertex in a locally uniform region has no gradient to speak of. Falling
   // back to "up" beats emitting a zero normal, which shades black.
@@ -434,7 +448,7 @@ export class TerrainMesh {
     // Normals from the field, not the triangulation — see densityGradientNormal.
     const normals = new Float32Array(positions.length);
     for (let i = 0; i < positions.length; i += 3) {
-      const n = densityGradientNormal(this.grid, positions[i]!, positions[i + 1]!, positions[i + 2]!);
+      const n = densityGradientNormal(this.grid, this.edgeHeightSampler, positions[i]!, positions[i + 1]!, positions[i + 2]!);
       normals[i] = n[0]; normals[i + 1] = n[1]; normals[i + 2] = n[2];
     }
     geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));

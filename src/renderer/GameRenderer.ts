@@ -727,6 +727,24 @@ export class GameRenderer {
   }
 
   /**
+   * The landscape's theoretical height function, ready to hand to
+   * TerrainMesh.setEdgeHeightSampler() — or null when no landscape can be
+   * built yet (no world/biome). Calls ensureLandscape(), which caches on
+   * ctx.landscape, so calling this before rebuildLandscapeMesh() does not
+   * duplicate the (expensive) structure-set build; rebuildLandscapeMesh()
+   * simply gets the same cached handle back (#559).
+   */
+  private landscapeEdgeHeightSampler(ctx: MiningContext): ((x: number, z: number) => number) | null {
+    if (!ctx.state?.world || !ctx.grid) return null;
+    const biome = getBiome(ctx.state.mineType);
+    if (!biome) return null;
+    const { sizeX, sizeY, sizeZ } = ctx.state.world;
+    const handle = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
+    if (!handle) return null;
+    return (x, z) => handle.sampleColumn(x, z).height;
+  }
+
+  /**
    * Raise the containment field on the frontier between claimable ground and
    * the protected structures beside the site (#473 P4). Nothing is drawn when
    * no protected chunk borders the site — open ground gets no wall, which is
@@ -774,6 +792,11 @@ export class GameRenderer {
 
     // Terrain mesh (marching cubes)
     this.terrain = new TerrainMesh(scene, grid, ctx.state?.mineType);
+    // Wire the landscape's theoretical height into the edge-normal sampler
+    // BEFORE the first buildAll(), so the initial mesh already carries the
+    // boundary-normal fix instead of needing a later remesh to pick it up
+    // (#559).
+    this.terrain.setEdgeHeightSampler(this.landscapeEdgeHeightSampler(ctx));
     this.terrain.buildAll();
     this.terrain.sharedMaterial.attachCSM(csm);
 
@@ -858,6 +881,11 @@ export class GameRenderer {
       this.landscape = new LandscapeMesh(this.sm.scene, this.terrain.sharedMaterial);
     }
     this.landscapeHandle = handle;
+    // Idempotent re-apply: a campaign level swap rebuilds the grid (and
+    // re-marches terrain) before landscape geometry catches up, so the
+    // sampler installed at loadGame() time can go stale — re-set it here
+    // whenever landscape geometry changes (#559).
+    this.terrain.setEdgeHeightSampler((x, z) => handle.sampleColumn(x, z).height);
     // The landscape's StructureSet already carries every river, village and
     // landmark for this seed — hand it to the claim path rather than have it
     // trace them all a second time (#473 D6).
