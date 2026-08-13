@@ -3,11 +3,12 @@
   "description": "Chapter 5: 3-deck charge configuration with varying depths for deep fracture and no surface projection",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Every hole in this pattern must actually land before charging: each of the 4 holes gets a distinct amount/stemming below, so a partially-drilled plan would corrupt the deck-depth physics this file exists to prove.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
@@ -64,9 +65,28 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 130",
+      "description": "#553: drain the ordered plan — every hole must actually land before per-hole charging below (each gets a distinct depth-deck config). Sandbox-measured landing at tick 121.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 130"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 4
         },
-        "note": "2 rows x 2 cols = 4"
+        "note": "All 4 holes have landed — none lost, none left ordered forever."
       }
     },
     {
