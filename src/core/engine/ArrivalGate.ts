@@ -9,8 +9,8 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { assignDriver } from '../entities/Vehicle.js';
-import { tickHaulingProgress } from '../economy/HaulingTask.js';
-import { tickBreakProgress } from '../economy/BoulderBreaking.js';
+import { tickHaulingProgress, requestHaulFragment } from '../economy/HaulingTask.js';
+import { tickBreakProgress, requestBreakBoulder } from '../economy/BoulderBreaking.js';
 import { tickVehicle, tickVehicleTaskState } from './EntityMovementTick.js';
 import { releaseVehicleReservation, reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
@@ -128,6 +128,14 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       const tracked = state.logistics.fragments.find(f => f.fragment.id === prevFragmentId);
       if (tracked?.state === 'stored') {
         emitter?.emit('vehicle:haul_delivered', { vehicleId: vehicle.id, fragmentId: prevFragmentId });
+        // #552: a full deliver cycle just completed for a vehicle-gated
+        // haul_debris action (reservedForActionId survives a successful
+        // haul — see abortHaul's doc comment) — report it so GameLoop's
+        // completion pass (completeVehicleGatedActionIfApplicable) can clear
+        // the PendingAction/ghost and let the employee continue.
+        if (vehicle.reservedForActionId !== null && vehicle.driverId !== null) {
+          result.completedVehicleActions.push({ actionId: vehicle.reservedForActionId, employeeId: vehicle.driverId });
+        }
       }
     }
   }
@@ -142,12 +150,25 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
     // appeared in logistics.fragments during this call.
     const beforeIds = new Set(state.logistics.fragments.map(f => f.fragment.id));
     const vehicleId = vehicle.id;
+    // Captured before tickBreakProgress runs: a successful split leaves
+    // reservedForActionId/driverId alone (see tickBreakProgress's own
+    // doc comment), but reading them up front is what lets this loop report
+    // the completion below regardless of that detail.
+    const reservedActionId = vehicle.reservedForActionId;
+    const driverId = vehicle.driverId;
     const splitFragmentId = tickBreakProgress(state, vehicle);
     if (splitFragmentId !== null) {
       const pieceIds = state.logistics.fragments
         .filter(f => !beforeIds.has(f.fragment.id))
         .map(f => f.fragment.id);
       emitter?.emit('vehicle:boulder_broken', { vehicleId, fragmentId: splitFragmentId, pieceIds });
+      // #552: a fragment_debris action's work completed in this same tick
+      // (breaking is atomic, unlike hauling's two-leg trip) — report it so
+      // GameLoop's completion pass can clear the PendingAction/ghost and let
+      // the employee continue.
+      if (reservedActionId !== null && driverId !== null) {
+        result.completedVehicleActions.push({ actionId: reservedActionId, employeeId: driverId });
+      }
     }
   }
 
@@ -163,13 +184,24 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
   for (const vehicle of state.vehicles.vehicles) {
     if (vehicle.reservedForActionId === null || vehicle.driverId === null) continue;
 
+    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
+    // Hauling/fragment-breaking actions are driven end to end by the
+    // tickHaulingProgress/tickBreakProgress loops above (#552) — including
+    // the very tick they complete, while reservedForActionId still names them
+    // (it survives a successful haul/break specifically so GameLoop's
+    // completion pass can still find the vehicle) — so this generic
+    // single-target arrival loop must skip them by action type, not just by
+    // haulingPhase/breakPhase (which read null again the instant either
+    // finishes). Matches this file's header comment: vehicles ticked in
+    // exactly one place.
+    if (action && (action.type === 'haul_debris' || action.type === 'fragment_debris')) continue;
+
     const alreadyAtTarget = vehicle.x === vehicle.targetX && vehicle.z === vehicle.targetZ;
     if (!alreadyAtTarget) {
       tickVehicle(state, vehicle, emitter);
     }
     if (vehicle.x !== vehicle.targetX || vehicle.z !== vehicle.targetZ) continue;
 
-    const action = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
     if (!action) continue;
 
     const holder = action.holderId !== null ? state.employees.employees.find(e => e.id === action.holderId) : undefined;
@@ -266,10 +298,34 @@ function resolveBoarding(
     // moveVehicle would.
     if (vehicle.reservedForActionId !== null) {
       const reservedAction = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
-      if (reservedAction) {
+
+      // #552: haul_debris/fragment_debris route through the existing
+      // request*/tick* drive machinery (HaulingTask.ts/BoulderBreaking.ts)
+      // instead of the generic single-target drive loop below — starting the
+      // actual haul/break request is what the two-/one-leg workflow needs,
+      // and the request functions stage their own targetX/targetZ (fragment
+      // approach cell) rather than the action's own targetX/targetZ.
+      if (reservedAction && (reservedAction.type === 'haul_debris' || reservedAction.type === 'fragment_debris')) {
+        const fragmentId = reservedAction.payload['fragmentId'] as number;
+        const started = reservedAction.type === 'haul_debris'
+          ? requestHaulFragment(state, vehicle.id, fragmentId)
+          : requestBreakBoulder(state, vehicle.id, fragmentId);
+
+        if (!started.success) {
+          // Fragment/depot/eligibility changed between claim and boarding
+          // (fragment picked clean, no active warehouse, etc.) — release the
+          // action back to the pool instead of leaving the vehicle boarded
+          // with nothing to do; a later dispatch/claim pass retries once the
+          // situation clears (no error, no crash — same contract as the
+          // claim-time isHaulOrFragmentActionClaimable gate).
+          interruptActiveAction(state, emp, reservedAction.id);
+          return;
+        }
+      } else if (reservedAction) {
         vehicle.targetX = reservedAction.targetX;
         vehicle.targetZ = reservedAction.targetZ;
       }
+
       vehicle.task = 'moving';
       vehicle.waitingTicks = 0;
     }

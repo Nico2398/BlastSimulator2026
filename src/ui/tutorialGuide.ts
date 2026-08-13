@@ -168,15 +168,18 @@ function hasOutstandingWork(e: Employee): boolean {
 
 /**
  * True if this vehicle has a live haul or break phase in progress (#552).
- * Not yet wired into hasOutstandingWork/isWorkInProgress/workSignature —
- * that is the implementer's job.
  *
- * Skeleton only — body filled in by the implementer (#552).
+ * The employee driving it carries no per-tick signal of its own once
+ * boarded — hasOutstandingWork(e) only ever reads activeActionId (which
+ * stays at the same haul_debris/fragment_debris action id for the entire
+ * multi-tick round trip) and destinationX/Z (never set while aboard: the
+ * driver's own x/z sit still the whole time). Without this, workSignature's
+ * fingerprint for a hauling driver never changes tick to tick, and the
+ * WORK_GRACE_TICKS window would time out mid-trip and hold the clock on a
+ * haul that is still visibly making progress.
  */
 function hasOutstandingVehicleWork(v: Vehicle): boolean {
-  // TODO: implement
-  void v;
-  return false;
+  return v.haulingPhase !== null || v.breakPhase !== null;
 }
 
 /**
@@ -203,7 +206,21 @@ function workSignature(state: GameState): string {
     ].join(','))
     .join(';');
 
-  return `${pendingIds}|${working}`;
+  // A hauling/breaking vehicle's own id/x/z/phase/target-fragment fields
+  // (#552) — changes every tick the vehicle moves and at every phase
+  // transition, which is what lets a hauling driver's otherwise-static
+  // employee signature above still register as "still working" instead of
+  // reading stuck the instant WORK_GRACE_TICKS elapses.
+  const vehicleWorking = (state.vehicles?.vehicles ?? [])
+    .filter(hasOutstandingVehicleWork)
+    .slice()
+    .sort((a, b) => a.id - b.id)
+    .map((v) => [
+      v.id, v.x, v.z, v.haulingPhase, v.haulingFragmentId, v.breakPhase, v.breakFragmentId,
+    ].join(','))
+    .join(';');
+
+  return `${pendingIds}|${working}|${vehicleWorking}`;
 }
 
 /**
@@ -220,7 +237,8 @@ function workSignature(state: GameState): string {
  */
 function isWorkInProgress(state: GameState): boolean {
   if ((state.pendingActions?.length ?? 0) > 0) return true;
-  return state.employees.employees.some(hasOutstandingWork);
+  if (state.employees.employees.some(hasOutstandingWork)) return true;
+  return (state.vehicles?.vehicles ?? []).some(hasOutstandingVehicleWork);
 }
 
 /**
@@ -248,8 +266,6 @@ export function decideClock(
   waitsOnWork: boolean = false,
   progress: ClockProgress = { signature: null, tick: stepStartTick },
 ): ClockDecision {
-  // hasOutstandingVehicleWork (#552) is not wired in yet — implementer's job.
-  void hasOutstandingVehicleWork;
   const tickCount = state.tickCount ?? 0;
   const spent = Math.max(0, tickCount - stepStartTick);
   if (spent < budget) {

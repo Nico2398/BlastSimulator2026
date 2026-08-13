@@ -4,8 +4,11 @@
 // transition, and releasing it — whether that's on completion, cancellation,
 // needs-interruption, or the vehicle being destroyed underneath it.
 // GameLoop.ts's claim/promotion sites call into this module rather than
-// duplicating any of it. Core-pure: imports only from entities/, state/, and
-// EntityMovementTick.js (one-way, EntityMovementTick.ts never imports back).
+// duplicating any of it. Core-pure: imports only from entities/, state/,
+// EntityMovementTick.js (one-way, EntityMovementTick.ts never imports back),
+// and — for the haul_debris/fragment_debris continuity case (#552) —
+// economy/HaulingTask.js and economy/BoulderBreaking.js, neither of which
+// import anything from engine/ that could cycle back here.
 // Deliberately does NOT import TaskDispatch.ts — TaskDispatch.ts imports
 // releaseVehicleReservation from here, so calling into it back would be a
 // cycle. Where reconciliation needs to interrupt an active action (case (c)
@@ -20,6 +23,8 @@ import { unassignDriver, moveVehicle } from '../entities/Vehicle.js';
 import { ROLE_LICENCE_REQUIRED } from '../entities/VehicleDriverAssignment.js';
 import { requestBoardVehicle } from '../entities/VehicleBoarding.js';
 import { setVehicleIdle } from './EntityMovementTick.js';
+import { requestHaulFragment } from '../economy/HaulingTask.js';
+import { requestBreakBoulder } from '../economy/BoulderBreaking.js';
 
 /** True when `employee` holds the licence a vehicle of `role` requires (ROLE_LICENCE_REQUIRED, VehicleDriverAssignment.ts). */
 export function isLicensedForRole(employee: Employee, role: VehicleRole): boolean {
@@ -102,6 +107,31 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
   if (!vehicle) return;
 
   if (vehicle.driverId === employee.id) {
+    // #552: haul_debris/fragment_debris are driven end to end by their own
+    // request*/tick* phase machinery (HaulingTask.ts/BoulderBreaking.ts),
+    // not a single generic moveVehicle target — the continuity case (already
+    // driving this vehicle, no boarding needed) has to kick that request off
+    // itself, mirroring what ArrivalGate.resolveBoarding does for a fresh
+    // boarding. Any failure here (fragment/depot vanished between claim and
+    // promotion — practically unreachable within one synchronous tick, but
+    // never crashes) just leaves the vehicle idle; reconcileVehicleReservations
+    // (ArrivalGate.ts) is the backstop that interrupts a claim nothing is
+    // actually working.
+    if (action.type === 'haul_debris' || action.type === 'fragment_debris') {
+      const fragmentId = action.payload['fragmentId'] as number;
+      const started = action.type === 'haul_debris'
+        ? requestHaulFragment(state, vehicle.id, fragmentId)
+        : requestBreakBoulder(state, vehicle.id, fragmentId);
+      if (!started.success) {
+        // Conditions changed between claim and promotion (fragment gone, no
+        // active depot) — release the reservation so
+        // reconcileVehicleReservations (ArrivalGate.ts) catches it next tick
+        // and returns the action to the pool instead of leaving it claimed
+        // with nothing actually driving it.
+        releaseVehicleReservation(state, action.id);
+      }
+      return;
+    }
     moveVehicle(state.vehicles, vehicle.id, action.targetX, action.targetZ);
     return;
   }

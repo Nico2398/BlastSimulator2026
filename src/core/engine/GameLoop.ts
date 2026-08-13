@@ -20,7 +20,8 @@ import {
   estimateActionCost, resolveActionCost, selectBestActionForEmployee,
   computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields, type SelectedAction,
 } from './ActionSelection.js';
-import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction } from './VehicleReservation.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, releaseVehicleOnCompletion } from './VehicleReservation.js';
+import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
 
 // ── Config ──
 
@@ -236,7 +237,13 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
  */
 function claimActionsTargetedAtEmployee(state: GameState, employee: Employee, result: TickEmployeesResult): void {
   const targeted = state.pendingActions
-    .filter(a => a.status === 'queued' && a.targetEmployeeId === employee.id)
+    .filter(a => a.status === 'queued' && a.targetEmployeeId === employee.id
+      // #552: a haul_debris/fragment_debris action whose fragment is no
+      // longer on_ground, or (haul_debris only) whose mass no longer fits
+      // remaining storage room, stays queued rather than being claimed and
+      // immediately failing at pickup — mirrors the vehicle-availability
+      // check (findVehicleForClaim) just below.
+      && isHaulOrFragmentActionClaimable(state, a))
     .sort((a, b) => a.id - b.id);
 
   for (const action of targeted) {
@@ -305,7 +312,9 @@ function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAc
   const poolCandidates = state.pendingActions.filter(a =>
     a.status === 'queued' &&
     a.targetEmployeeId === null &&
-    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)),
+    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
+    // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
+    isHaulOrFragmentActionClaimable(state, a),
   );
 
   const selection = selectBestActionForEmployee(state, employee, poolCandidates);
@@ -458,7 +467,11 @@ export function tryContinueVehicleGatedAction(
   const queuedFollowUps = employee.taskQueue
     .map(id => state.pendingActions.find(a => a.id === id))
     .filter((a): a is PendingAction =>
-      a !== undefined && a.status === 'assigned' && a.holderId === employee.id && a.requiredVehicleRole === role)
+      a !== undefined && a.status === 'assigned' && a.holderId === employee.id && a.requiredVehicleRole === role
+      // #552: re-checked here too — conditions (storage room, still
+      // oversized) can drift between the original claim and this same-tick
+      // continuity promotion.
+      && isHaulOrFragmentActionClaimable(state, a))
     .sort((a, b) => a.id - b.id);
 
   if (queuedFollowUps.length > 0) {
@@ -474,7 +487,9 @@ export function tryContinueVehicleGatedAction(
       a.status === 'queued' &&
       (a.targetEmployeeId === null || a.targetEmployeeId === employee.id) &&
       a.requiredVehicleRole === role &&
-      (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)))
+      (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
+      // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
+      isHaulOrFragmentActionClaimable(state, a))
     .sort((a, b) => a.id - b.id);
 
   if (poolFollowUps.length === 0) return false;
@@ -1180,11 +1195,26 @@ function forceShiftRestIfNeeded(
  * tryContinueVehicleGatedAction), else release the vehicle/dismount the
  * employee, then remove the PendingAction record and its ghost preview.
  *
- * Skeleton only — body filled in by the implementer (#552).
+ * Called from events.ts's tick pipeline once per entry in
+ * ArrivalGate.tickArrivalGate's own `completedVehicleActions` — the haul/
+ * break drive loop reports a full deliver/break cycle finishing there, since
+ * a vehicle-gated haul_debris/fragment_debris action never runs through
+ * tickTaskProgress's employee-timer completion path (its work is entirely
+ * vehicle-position/phase-driven, not a counted-down employee task timer).
  */
 export function completeVehicleGatedActionIfApplicable(state: GameState, emp: Employee, actionId: number): void {
-  // TODO: implement
-  void state;
-  void emp;
-  void actionId;
+  const action = state.pendingActions.find(a => a.id === actionId);
+  if (!action || action.requiredVehicleRole === null) return;
+
+  const continued = tryContinueVehicleGatedAction(state, emp, action);
+  if (!continued) {
+    releaseVehicleOnCompletion(state, emp, actionId);
+    // tryContinueVehicleGatedAction already reassigned activeActionId (and
+    // every other task-claim field) to the follow-up when it succeeds — only
+    // clear them here when there was no follow-up to continue onto, so this
+    // employee falls back to normal idle dispatch next tick.
+    clearActiveTaskFields(emp);
+  }
+
+  completePendingAction(state, actionId);
 }

@@ -179,11 +179,22 @@ function resolveDepotApproach(state: GameState, building: Building, vehicle: Veh
   return findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), vehicle.x, vehicle.z);
 }
 
-/** Cancel an in-progress haul and return the vehicle to idle. */
+/**
+ * Cancel an in-progress haul and return the vehicle to idle. Also releases
+ * `reservedForActionId` (#552) — only ever called mid-haul when the fragment
+ * or its depot has vanished out from under a still-claimed haul_debris
+ * action, so without this the vehicle would stay permanently reserved for an
+ * action nothing will ever complete. Never called on a successful delivery
+ * (see tickHaulingProgress's 'to_depot' branch, which inlines its own
+ * cleanup instead) — reservedForActionId deliberately survives a successful
+ * haul so GameLoop's completion pass can still find the vehicle to continue
+ * or release it.
+ */
 function abortHaul(vehicle: Vehicle): void {
   vehicle.haulingFragmentId = null;
   vehicle.haulingPhase = null;
   vehicle.haulingDepotBuildingId = null;
   vehicle.payloadKg = 0;
   vehicle.task = 'idle';
+  vehicle.reservedForActionId = null;
 }
