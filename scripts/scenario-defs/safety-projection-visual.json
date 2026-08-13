@@ -3,17 +3,18 @@
   "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face/sequence, buildings/vehicles in projection path, and post-blast damage assessment.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "new_game seed:42 cash:250000 staffed:true",
+      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill site to matter, and campaign start has no staffed:true equivalent anyway. staffed:true (a driller with blasting + drill_rig licence, plus an unmanned drill_rig, hired/purchased for free) is what #553's automatic drill dispatch needs to ever land an ordered hole. Cash bumped to $250,000 for headroom through the drilling wait (no income anywhere in this file) on top of the freight_warehouse/software-tier spend already here.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "new_game seed:42 cash:250000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 250000
         }
       }
     },
@@ -48,7 +49,7 @@
       "description": "Left unmarked, confirmed not equivalent (not merely unverified): Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using `currentZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)` -- a rectangle derived from the live drill plan, never a player-typed one. At this point in the file state.drillHoles is empty (the file's only drill_plan step runs later), so computeDangerZone returns null, this.currentZone is null, and the horn button is disabled outright (occupants defaults to [] when zone is null, and hornBtn.disabled = occupants.length === 0) -- soundHorn() itself also no-ops on a null zone (`if (!zone) return;`). A player cannot produce this command by clicking here: not a different rectangle, but a control that doesn't work yet at this point in the scenario. (Later in the file, once the 4x4/spacing:3 grid at (20,20) exists, computeDangerZone's own padding would still produce (5,5,44,44), not this step's literal (5,5,35,35) -- so even a same-moment click would diverge from this explicit rectangle.)",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 250000
         },
         "note": "no state field exposes zone bounds/status -- proven instead by the zone status observe step's own text output"
       },
@@ -104,7 +105,7 @@
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing deliberately left at the default 3m rather than tightened like most other files' 9-16-hole grids -- a sandbox-measured trial at 2m produced a drastically more violent CATASTROPHIC blast (1259 affected voxels vs. 3m's much smaller footprint) that destroyed the freight_warehouse this file's own safety-zone premise depends on surviving. Cash bumped further ($250,000) to cover the longer drilling wait at the unmodified 3m spacing instead.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -136,9 +137,98 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 16,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). Sandbox-measured landing at tick 400 (8 chunks) for this 16-hole grid with the staffed roster's single driller.",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Eighth and final chunk — all 16 holes should have landed by now.",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 16
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:1",
@@ -317,7 +407,7 @@
           "cash"
         ],
         "equals": {
-          "cash": 27500
+          "cash": 106830
         },
         "note": "Finding #36: buy_software used to leave state.finances.cash diverged from this flat field by the sum of every tier cost, fixed at the root"
       }
@@ -337,7 +427,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 27500
+          "cash": 106830
         },
         "note": "a preview is read-only -- no cash or hole/charge/sequence count moves"
       }
