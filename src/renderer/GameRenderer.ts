@@ -722,6 +722,7 @@ export class GameRenderer {
       // whatever the playable marching-cubes mesh renders there right now —
       // before or after a blast — instead of the static WorldGen prediction.
       boundaryHeightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
+      meshClaimsColumn: (x, z) => grid.claimsColumnForMeshing(x, z),
     };
   }
 

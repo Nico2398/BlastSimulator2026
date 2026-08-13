@@ -36,6 +36,16 @@ export interface DirtyRegion {
   maxX: number; maxY: number; maxZ: number;
 }
 
+export type EdgeHeightSampler = (x: number, z: number) => number;
+
+/** Virtual density for a column TerrainMesh does not own, using the
+ *  landscape's theoretical height, so gradient-normal sampling near the
+ *  site edge doesn't fall into "air" where the ground actually continues.
+ *  Same half-voxel crossing convention as emitVertex/computeVoxelColumnSurfaceHeight. */
+export function virtualEdgeDensity(_surfaceHeight: number, _y: number): number {
+  throw new Error('not implemented');
+}
+
 // ---------- Edge vertex lookup: for each of 12 cube edges, which 2 corners ----------
 const EDGE_CORNERS: readonly [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 0],
@@ -58,6 +68,7 @@ interface CornerSample {
   oreAmt: number;
 }
 
+// TODO(#559): thread edgeHeightSampler through
 /** Density with trilinear interpolation, so the gradient below is continuous. */
 function densityAtSmooth(grid: VoxelGrid, x: number, y: number, z: number): number {
   const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
@@ -84,6 +95,7 @@ function densityAtSmooth(grid: VoxelGrid, x: number, y: number, z: number): numb
  * An iso-surface's true normal is the negated gradient of the field it is an
  * iso-surface of, which owes nothing to how the triangles were cut.
  */
+// TODO(#559): thread edgeHeightSampler through
 function densityGradientNormal(grid: VoxelGrid, x: number, y: number, z: number): [number, number, number] {
   const e = 0.85;
   const gx = densityAtSmooth(grid, x + e, y, z) - densityAtSmooth(grid, x - e, y, z);
@@ -157,6 +169,7 @@ export class TerrainMesh {
   private readonly chunks = new Map<number, THREE.Mesh | null>();
   /** Vertical chunk count. x/z chunk coordinates come from the grid's own claimed set, and are signed. */
   private ncy = 0;
+  private edgeHeightSampler: EdgeHeightSampler | null = null;
 
   constructor(scene: THREE.Scene, grid: VoxelGrid, biomeId?: string) {
     this.scene = scene;
@@ -194,6 +207,18 @@ export class TerrainMesh {
   /** ID of the currently-bound VoxelGrid, for diagnostics. */
   get gridId(): number {
     return this.grid.id;
+  }
+
+  /** Sets (or clears with null) the sampler used to extend the normal-only
+   *  density field past the site's owned columns for edge-vertex normal
+   *  calculation. Does not affect which triangles are emitted. */
+  setEdgeHeightSampler(sampler: EdgeHeightSampler | null): void {
+    this.edgeHeightSampler = sampler;
+  }
+
+  /** The currently installed edge height sampler, or null — diagnostics and tests. */
+  get currentEdgeHeightSampler(): EdgeHeightSampler | null {
+    return this.edgeHeightSampler;
   }
 
   /** The shared terrain material — reused by LandscapeMesh and FragmentMesh so every zone renders with identical shading (#458 T3.2/T4.1/D9). */

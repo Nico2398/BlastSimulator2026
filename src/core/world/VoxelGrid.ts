@@ -261,6 +261,15 @@ export class VoxelGrid {
     return this.ownerOf(x, 0, z) !== null;
   }
 
+  /** True at an owned column, or at the single-voxel west/north halo column
+   *  TerrainMesh's "march one cube past the site" wall-sealing convention
+   *  actually emits geometry into. #559 root cause 4: LandscapeMesh must
+   *  treat this set, not raw containsColumn, as "already TerrainMesh's
+   *  ground" so the two meshes claim disjoint cells. */
+  claimsColumnForMeshing(_x: number, _z: number): boolean {
+    throw new Error('not implemented');
+  }
+
   /** The chunk covering (x, z) if the site has one, or null. Does not check the chunk's owned sub-rect. */
   private chunkAt(x: number, z: number): VoxelChunk | null {
     const key = chunkKey(chunkIndexOf(x), chunkIndexOf(z));
@@ -696,6 +705,7 @@ export function computeVoxelColumnSurfaceY(grid: VoxelGrid, x: number, z: number
  * column right now, pre- or post-blast. Returns 0 for a column with no
  * solid voxel at all.
  */
+// TODO(#559): implementer fixes clamp → NaN for unowned coords
 export function computeVoxelColumnSurfaceHeight(grid: VoxelGrid, x: number, z: number): number {
   if (grid.sizeX <= 0 || grid.sizeZ <= 0) return 0;
 

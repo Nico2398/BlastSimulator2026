@@ -28,6 +28,11 @@ import { rockIndexOf } from '../../core/world/RockCatalog.js';
 /** Sample spacing of a boundary quad's subdivision, metres — matches the old seam mesh's resolution. */
 const FINE_STEP = 1;
 
+/** Intermediate subdivision step between FINE_STEP boundary quads and the
+ *  coarse open-ground quads, so the resolution jump isn't a one-step cliff
+ *  that itself reads as a seam (#559). */
+export const MID_STEP = 2;
+
 type SampleFn = (x: number, z: number) => { height: number; biomeId: number; surfCompId: number };
 
 /**
@@ -89,6 +94,10 @@ export interface PlayableCut {
    *  so the landscape's edge matches whatever the playable mesh currently
    *  renders there. Falls back to the theoretical WorldGen height when absent. */
   boundaryHeightAt?(x: number, z: number): number;
+  /** Ground TerrainMesh will actually draw into, including its 1-voxel
+   *  outward-march halo — narrower "not mine to draw" test than ownsColumn.
+   *  Falls back to ownsColumn when absent (#559). */
+  meshClaimsColumn?(x: number, z: number): boolean;
 }
 
 /** The pre-expansion behaviour: the site is exactly its rect. */
@@ -258,6 +267,32 @@ export function buildBoundaryQuad(
       pushQuad(indices, i0, i1, i2, i3, row + col);
     }
   }
+}
+
+/**
+ * Subdivides a coarse 'outside' quad adjacent to the boundary at an
+ * intermediate resolution (MID_STEP) so the jump from FINE_STEP boundary
+ * quads to coarse open-ground quads isn't a one-step cliff that itself reads
+ * as a seam. Flat-edge-interpolates its own outer perimeter against
+ * unsubdivided coarse neighbours per the existing #491 rule.
+ */
+export function subdivideOutsideQuad(
+  _positions: number[],
+  _normals: number[],
+  _rockA: number[],
+  _rockB: number[],
+  _rockWeight: number[],
+  _ore: number[],
+  _indices: number[],
+  _x0: number,
+  _z0: number,
+  _x1: number,
+  _z1: number,
+  _sampleColumn: SampleFn,
+  _palette: CompositionPalette,
+  _step: number,
+): void {
+  throw new Error('not implemented');
 }
 
 export class LandscapeMesh {
