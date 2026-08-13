@@ -3,18 +3,18 @@
   "description": "Visual verification of the full core gameplay loop: survey → drill plan → charge → sequence → blast → fragments → contract delivery. Multi-angle screenshots at each phase to confirm smooth transitions and visual feedback.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
-      "description": "campaign start replaces any prior site entirely with dusty_hollow's own fixed 96x96 grid.",
+      "command": "campaign start level:dusty_hollow cash:200000",
+      "description": "campaign start replaces any prior site entirely with dusty_hollow's own fixed 96x96 grid. #553: cash bumped from $50,000 to $200,000 to cover the driller/drill_rig ($36,000) this file now needs on top of its existing surveyor hire, plus payroll/upkeep during the drilling wait.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 200000
         }
       }
     },
@@ -67,7 +67,7 @@
       ],
       "expect": {
         "equals": {
-          "cash": 48800,
+          "cash": 198800,
           "proficiencyTotal": 3
         }
       },
@@ -124,7 +124,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 45800,
+          "cash": 195800,
           "surveyCount": 0
         },
         "note": "confirmed via direct trace: cash stays flat here -- with only 1 employee and no buildings/vehicles yet, payroll doesn't cycle within just 5 ticks"
@@ -151,8 +151,68 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed a driller at all) now needs one. campaign start has no staffed:true equivalent, so this is a manual hire + purchase, same pattern as survey-then-blast.json. Employee #2 -- #1 is the surveyor hired above.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:20,20",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: shrunk from 4x4 (16 holes) to 2x2 (4 holes) -- this file demonstrates the core gameplay loop end to end, not blast density, and a single driller cannot land 16 holes without risking a worker_revolt (sandbox-measured elsewhere in this pass). Drag rectangle correspondingly shrunk to (20,20)-(26,26).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -170,8 +230,8 @@
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
-          "x2": 30,
-          "z2": 30
+          "x2": 26,
+          "z2": 26
         },
         {
           "type": "screenshot"
@@ -184,9 +244,68 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 16
+          "orderedHoleCount": 4,
+          "holeCount": 0
         }
       }
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts).",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Fifth and final chunk — all 4 holes should have landed by now.",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -199,7 +318,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 16
+          "chargedCount": 4
         }
       }
     },
@@ -214,7 +333,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 16
+          "sequencedCount": 4
         }
       }
     },
@@ -244,7 +363,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 45800
+          "cash": 122416
         }
       }
     },
@@ -305,7 +424,7 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 11",
       "interaction": [
         {
           "type": "clickSelector",
@@ -328,21 +447,21 @@
       }
     },
     {
-      "command": "contract deliver 1 amount:500",
+      "command": "contract deliver 11 amount:500",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 1 amount:500"
+          "command": "contract deliver 11 amount:500"
         }
       ],
       "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of dirtite in storage against a 320 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
-          "cash": 45800,
+          "cash": 122416,
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-deliver",
         "note": "the contract stays active/undelivered -- this file's own \"contract delivery\" step in its description is a queued attempt, not a completed one; economy-full-loop.json is the file that actually hauls stock and completes a delivery"
       },
       "role": "guard"
@@ -378,10 +497,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "employeeCount": 1,
+          "employeeCount": 2,
           "activeContractCount": 1,
           "holeCount": 0
-        }
+        },
+        "note": "#553: 2, not 1 -- the surveyor hired at the top of this file, plus the driller this file now needs"
       }
     }
   ],
