@@ -687,7 +687,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "role": "player"
     },
     {
@@ -845,12 +845,8 @@
       "command": "contract deliver 2 amount:260",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-amount"
         },
         {
           "type": "set",
@@ -862,7 +858,7 @@
           "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
         }
       ],
-      "description": "#513 fix landed: ContractsPanel now sets `data-contract-id` on both offered and active cards, so the accept step above (and this deliver step) can scope selectors to the exact contract instead of always resolving to the first card in the DOM. This step converts from a bare `contract deliver` command to a real click -- reopens the Contracts panel first (the intervening `vehicle haul` step switched the toolbar to the Fleet tab, which calls `ContractsPanel.hide()` and sets `display:none` -- without reopening here, the amount/deliver controls exist in the DOM but are hidden and unclickable), then `set` the amount field to 260 on contract #2's own card, then click that card's own `.bs-contract-deliver`. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact. One haul is enough to complete this contract outright (fragment 1208 carries 550kg, the contract needs 260kg) -- no second haul round needed this cycle.",
+      "description": "#513 fix landed: ContractsPanel now sets `data-contract-id` on both offered and active cards, so the accept step above (and this deliver step) can scope selectors to the exact contract instead of always resolving to the first card in the DOM. This step converts from a bare `contract deliver` command to a real click: `set` the amount field to 260 on contract #2's own card, then click that card's own `.bs-contract-deliver`. #552: this step no longer clicks the Contracts rail tab first, and MUST NOT. The rail button is a toggle -- `UIManager.togglePanel` calls `hideAllPanels()` when the panel is already the active one -- and the accept step above leaves Contracts open, with only a `tick` between the two now that hauling dispatches itself. Under the old manual flow the intervening step was `vehicle haul`, which switched to the Fleet tab and hid Contracts, so the click reopened it; with that step gone the same click CLOSED the panel, and the controls went present-but-hidden. `waitForSelector` did not catch it -- it resolves on DOM presence, not visibility (#545), so the wait passed and the `set` failed one action later. `awaitUsable` is the gate that actually states the precondition: the amount input must be genuinely usable, so if a future edit hides this panel again the step fails here, naming this control, instead of at the action after it. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact. One haul is enough to complete this contract outright (fragment 1208 carries 550kg, the contract needs 260kg) -- no second haul round needed this cycle.",
       "expect": {
         "equals": {
           "tickCount": 67,
@@ -986,7 +982,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "role": "player"
     },
     {
@@ -1103,7 +1099,7 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 4",
+      "command": "contract accept 6",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1111,14 +1107,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
         }
       ],
-      "description": "Finding #48: the Fleet panel's Haul button (`.bs-vehicle-haul-btn`) always sends the vehicle to `findReachableGroundFragment` (HaulingTask.ts) -- the NEAREST reachable, non-oversized, storage-fitting fragment -- with no regard for what ore it carries. A player cannot click their way to a SPECIFIC fragment by ore content; only command mode's explicit `fragment:N` can. So the CONTRACT must be picked to match what the vehicle will actually haul next, not the other way around -- every contract accept below is chosen by first checking what `findReachableGroundFragment` returns for this cycle, replaying the file's own exact, complete command sequence to get it (not a hand-abbreviated one -- `contract list`'s own RNG draw depends on exactly how many times it has already been called, so a shortened trace generates a different contract pool than the real file). This cycle's nearest fragment (id 1431) carries dirtite, so contract #4 (Deliver dirtite ore, 60kg) is the match. #513: the selector is now scoped to `[data-contract-id=\"4\"]` so it targets contract #4's own card regardless of DOM order, rather than unscoped `.bs-contract-accept` which always resolved to the first offered card.",
+      "description": "#552: this cycle delivers contract #6 (\"Dispose of rubble\", 260 kg) rather than #4 (\"Deliver dirtite ore\", 60 kg), and the swap is forced by auto-dispatch. The panel gates the amount/DELIVER controls on `maxDeliverable = min(remainingKg, storedOf(materialId))`, and `ContractsPanel.storedOf` reads `state.collectedOre[materialId]` for a NAMED ore but `state.logistics.storedMassKg` for rubble (`materialId === ''`). The old flow guaranteed dirtite in the pile with an explicit `vehicle haul 1 fragment:1431`; #552 retires per-fragment targeting -- `HaulDispatch` claims the cheapest reachable fragment and a player cannot choose one by ore content (the same Finding #48 constraint this file already documents for contract #2). So `collectedOre.dirtite` was 0, the controls were correctly disabled, and the step failed \"present but disabled\". Command mode did not catch it because `deliverMaterials` (Contract.ts) checks no stock at all -- it credits `deliveredKg` and pays -- so `contract deliver 4 amount:60` succeeds there against an empty ore bin. That command/UI disagreement is a real finding and interaction mode is the only channel that can see it; it is not fixed here, because making the core refuse a delivery it currently accepts is a behaviour change far outside #552. What IS fixed is the step: rubble is the one material a player can guarantee after an auto-dispatched haul, since `storedOf('')` reads the whole stored mass whatever the hauler happened to bank -- exactly why contract #2's deliver step above works unchanged.",
       "role": "player"
     },
     {
@@ -1139,27 +1135,23 @@
       "role": "setup"
     },
     {
-      "command": "contract deliver 4 amount:60",
+      "command": "contract deliver 6 amount:260",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+          "type": "awaitUsable",
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-amount"
         },
         {
           "type": "set",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-amount",
-          "value": "60"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-amount",
+          "value": "260"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-deliver"
         }
       ],
-      "description": "#513 fix landed: same as the contract #2 deliver step above -- ContractsPanel now sets `data-contract-id` on both offered and active cards, so this step converts from a bare `contract deliver` command to a real click, scoped to contract #4's own card, instead of the old unscoped `.bs-contract-accept`/`.bs-contract-deliver` that always resolved to the first card in the DOM. Also reopens the Contracts panel first -- the intervening `vehicle haul` step switched to the Fleet tab, hiding it via `ContractsPanel.hide()`, same gap as the contract #2 deliver step. Command mode's own trace here is a clean success (60 kg of dirtite against 575 kg stored, \"Contract #4 COMPLETED\"), and the scoped click now matches it. cash intentionally not asserted from here on: Ground rule #12 -- a real browser's game loop advances on real wall-clock time on top of any scripted `tick N`, and this step follows one. Confirmed directly: an earlier pass hard-asserted cash here and it failed in a real browser run (worked in command mode) purely from the click round-trip's real elapsed time, Finding #12's exact class (`rock-fragmenter-breaking.json`). tickCount/deathCount/employeeCount are unaffected and stay exact.",
+      "description": "#552: this cycle delivers contract #6 (\"Dispose of rubble\", 260 kg) rather than #4 (\"Deliver dirtite ore\", 60 kg), and the swap is forced by auto-dispatch. The panel gates the amount/DELIVER controls on `maxDeliverable = min(remainingKg, storedOf(materialId))`, and `ContractsPanel.storedOf` reads `state.collectedOre[materialId]` for a NAMED ore but `state.logistics.storedMassKg` for rubble (`materialId === ''`). The old flow guaranteed dirtite in the pile with an explicit `vehicle haul 1 fragment:1431`; #552 retires per-fragment targeting -- `HaulDispatch` claims the cheapest reachable fragment and a player cannot choose one by ore content (the same Finding #48 constraint this file already documents for contract #2). So `collectedOre.dirtite` was 0, the controls were correctly disabled, and the step failed \"present but disabled\". Command mode did not catch it because `deliverMaterials` (Contract.ts) checks no stock at all -- it credits `deliveredKg` and pays -- so `contract deliver 4 amount:60` succeeds there against an empty ore bin. That command/UI disagreement is a real finding and interaction mode is the only channel that can see it; it is not fixed here, because making the core refuse a delivery it currently accepts is a behaviour change far outside #552. What IS fixed is the step: rubble is the one material a player can guarantee after an auto-dispatched haul, since `storedOf('')` reads the whole stored mass whatever the hauler happened to bank -- exactly why contract #2's deliver step above works unchanged. The amount is 260 kg, contract #6's full quantity, so one click completes it.",
       "expect": {
         "equals": {
           "tickCount": 96,
