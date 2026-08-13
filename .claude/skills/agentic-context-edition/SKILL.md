@@ -11,6 +11,8 @@ description: >
 
 Create or edit agentic context files duplicated across all agent standard directories.
 
+Files that *run* the pipeline rather than instruct it — `.github/workflows/`, `.github/actions/`, `.github/scripts/` — are not context files and follow different rules: `agentic-workflow-edition`. They are also not mirrored anywhere, so nothing on this page about duplication applies to them.
+
 ## Multi-Agent Duplication
 
 All context files — skills, agent definitions, and slash commands — duplicate with identical body content across all agent directories. Only frontmatter differs between solutions.

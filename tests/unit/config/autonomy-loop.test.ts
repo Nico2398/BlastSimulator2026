@@ -13,7 +13,7 @@
 // in `.github/scripts/assignability.cjs` and tested in `assignability.test.ts`.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = join(import.meta.dirname, '../../..');
@@ -797,6 +797,88 @@ describe('the watchdog re-raises a red CI it would otherwise skip', () => {
     expect(watchdog).toMatch(/PIPELINE_HEAD\.test\(pr\.head\?\.ref \|\| ''\) \|\| pr\.draft/);
     expect(watchdog).toContain("'.github/workflows/ci.yml'");
     expect(watchdog).toContain("ci.status !== 'completed'");
+  });
+});
+
+// Rule 1 of `agentic-workflow-edition`, made executable. Every interval this
+// layer ever held was tuned to the CI of that week and broke when a shard count
+// moved: auto-merge's 10-minute settle poll called PR #499 stuck with 35 minutes
+// of `full-ci` left to run, and a 45-minute wait budget in `await-pr-ci` would
+// have reported "still running" as an outcome — #581's ending exactly.
+//
+// So a clock in this layer is allowlisted, one entry per file, with the reason it
+// is not a verdict. A sixth kind fails here and has to argue for itself in the
+// skill before it can be added.
+describe('no verdict in the Actions layer is decided on a duration', () => {
+  // Written to match the shapes a duration takes, not every mention of time: a
+  // comment explaining why something is *not* timed must stay writable.
+  const CLOCKS = /(Date\.now|Date\.parse|setTimeout|setInterval|^\s*(run:\s*)?sleep\s|_MINUTES|_MS\b|cooldown|COOLDOWN)/;
+
+  /**
+   * Files that legitimately read a clock, and the category that makes each one a
+   * cadence, a bound or a comparison rather than an answer about the work.
+   * `agentic-workflow-edition` holds the full argument for every entry.
+   */
+  const ALLOWED: Record<string, string> = {
+    // Poll cadence (cron) + the clamped last-resort floor that only fires on a
+    // run which left no other trace, and cannot reach a live one.
+    '.github/workflows/agentic-watchdog.yml': 'cadence + clamped stall floor',
+    // The runner's own hard clock: is there job budget left for another attempt.
+    '.github/actions/agentic-run-state/action.yml': 'job budget for a retry',
+    // Backoff between retries of a failed push. The verdict is the push result.
+    '.github/actions/agentic-rescue/action.yml': 'network backoff',
+    // Ordering of two events, and the fallback window when no merge exists to
+    // anchor the cascade brake against.
+    '.github/scripts/issue-api.cjs': 'event ordering',
+    '.github/scripts/assignability.cjs': 'event ordering + brake anchor',
+  };
+
+  const AGENTIC_FILES = [
+    ...readdirSync(join(ROOT, '.github/workflows'))
+      .filter((name) => /^(agentic-|auto-assign-next|handle-failure)/.test(name))
+      .map((name) => `.github/workflows/${name}`),
+    ...readdirSync(join(ROOT, '.github/actions'))
+      .map((name) => `.github/actions/${name}/action.yml`),
+    ...readdirSync(join(ROOT, '.github/scripts'))
+      .filter((name) => name.endsWith('.cjs'))
+      .map((name) => `.github/scripts/${name}`),
+  ];
+
+  it('covers every workflow, action and decision module in the layer', () => {
+    expect(AGENTIC_FILES).toContain('.github/workflows/agentic-ci-failure.yml');
+    expect(AGENTIC_FILES).toContain('.github/actions/agentic-auto-merge/action.yml');
+    expect(AGENTIC_FILES).toContain('.github/scripts/assignability.cjs');
+  });
+
+  it.each(AGENTIC_FILES)('%s holds no clock outside the allowlist', (file) => {
+    // Comments carry the reasoning about why something is not timed, and that
+    // prose must not be what fails the test — only executable lines count.
+    const code = readFileSync(join(ROOT, file), 'utf8')
+      .split('\n')
+      .filter((line) => {
+        const trimmed = line.trim();
+        return trimmed !== '' && !trimmed.startsWith('#') && !trimmed.startsWith('//') && !trimmed.startsWith('*');
+      })
+      .filter((line) => CLOCKS.test(line));
+
+    if (ALLOWED[file]) {
+      expect(code.length, `${file} is allowlisted for ${ALLOWED[file]} but now reads no clock — drop the entry`)
+        .toBeGreaterThan(0);
+      return;
+    }
+
+    expect(
+      code,
+      `${file} decides on a duration. Reach for an event, an identity, readable state, or a counter ` +
+      'with a brake — see the `agentic-workflow-edition` skill. If it genuinely is a cadence, a ' +
+      'backoff, an ordering comparison or the job budget, add it to ALLOWED with that reason.'
+    ).toEqual([]);
+  });
+
+  // The fail-safe is the newest member of the layer and the one whose first cut
+  // held a cooldown. Pinned by name so a revert cannot slip past the sweep above.
+  it('keeps the CI fail-safe clock-free by name', () => {
+    expect(ALLOWED).not.toHaveProperty('.github/workflows/agentic-ci-failure.yml');
   });
 });
 

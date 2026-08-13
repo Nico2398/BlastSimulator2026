@@ -93,3 +93,4 @@ Autonomy is measured by what the pipeline can finish without a human, and every 
 | TDD cycle, finalization, PR status | `agentic-pipeline-tdd`, `agentic-pipeline-finalization`, `agentic-pipeline-pr-management` |
 | Writing an issue the pipeline can consume | `agentic-issue-creation` |
 | Editing any of these context files | `agentic-context-edition` |
+| Editing the workflows, composite actions and decision modules that run all of this | `agentic-workflow-edition` — no timer, which token raises which event, fail closed and loud |
