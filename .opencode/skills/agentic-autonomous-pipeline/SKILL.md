@@ -32,7 +32,9 @@ Both runners are single-shot: the harness sends one message, the agent works unt
 Two rules follow, and they hold under every runtime:
 
 1. **Parallel means several delegations issued in one message and awaited together in that same turn.** Never work launched now and collected later, whatever background or notify-me-when-done mode the runtime offers.
-2. **A turn ends on a pull request, an `ESCALATED:` line, or the `blocked` label** — never on outstanding work.
+2. **A turn ends on a pull request whose CI has reported green, an `ESCALATED:` line, or the `blocked` label** — never on outstanding work.
+
+The single turn is also why the CI verdict has to be read inside it. The channels CI owns report minutes after the pull request opens, and a red one is announced to nobody: `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked pull request. So the run waits for the report — `agentic-pipeline-finalization`'s `[await-ci]` step, which blocks in-turn and returns to the session that called it. Waiting on an event that returns to you is not the outstanding work rule 1 forbids; it is the last verification channel being read. `agentic-ci-failure.yml` covers the session that dies before it returns, and `references/github-loop.md` holds how.
 
 The runtimes disagree on what delegation defaults to, so the same sentence produces opposite behaviour depending on where it is read. Each runtime's own configuration layer enforces the rule; `references/runtime-parity.md` records which layer, and the run that died proving it necessary.
 
@@ -87,7 +89,8 @@ Autonomy is measured by what the pipeline can finish without a human, and every 
 |---------|-------|
 | Issue in, pull request out — intake, assignment, single flight, rescue, watchdog, the tokens the loop depends on | `references/github-loop.md` |
 | Runtime parity — the three config trees, per-runtime delegation defaults, Claude Code prerequisites | `references/runtime-parity.md` |
-| Per-pipeline step sequences | `agentic-pipeline-full`, `agentic-pipeline-fix-bug`, `agentic-pipeline-multi`, `agentic-pipeline-review-pr`, `agentic-pipeline-ask`, `agentic-pipeline-executor` |
+| Per-pipeline step sequences | `agentic-pipeline-full`, `agentic-pipeline-fix-bug`, `agentic-pipeline-multi`, `agentic-pipeline-review-pr`, `agentic-pipeline-ask`, `agentic-pipeline-executor`, `agentic-pipeline-ci-fix` |
 | TDD cycle, finalization, PR status | `agentic-pipeline-tdd`, `agentic-pipeline-finalization`, `agentic-pipeline-pr-management` |
 | Writing an issue the pipeline can consume | `agentic-issue-creation` |
 | Editing any of these context files | `agentic-context-edition` |
+| Editing the workflows, composite actions and decision modules that run all of this | `agentic-workflow-edition` — no timer, which token raises which event, fail closed and loud |

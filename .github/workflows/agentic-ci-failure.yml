@@ -1,0 +1,346 @@
+name: "Pipeline: ask the agent to fix a red CI on its own PR"
+
+# The fail-safe for the one outcome the loop had no answer for: a pipeline run
+# that ends while its own pull request is red.
+#
+# `agentic-auto-merge.yml` skips a failed CI run deliberately — there is nothing
+# to merge, and sweeping it would only restate a red check as a red workflow. But
+# skipping is not reporting, and nothing else was watching either: the PR stays
+# open and marked, no merge fires, `auto-assign-next.yml` never chains, and the
+# watchdog leaves the issue alone precisely because a pull request is linked to
+# it. PR #581 sat exactly there — green on every channel its session ran itself,
+# two interaction-mode shards red in CI, session already exited — holding issue
+# #552 `in-progress` with the whole queue behind it.
+#
+# So this workflow closes that gap from the outside, while
+# `agentic-pipeline-finalization`'s `[await-ci]` step closes it from the inside.
+# Both are needed and neither is redundant: the step is how a live run reads its
+# own verdict, and this workflow is what happens when there is no live run left
+# to read it — a crashed session, the job timeout, a fix pushed by a run that
+# then ran out of budget, a CI run that only reported an hour later.
+#
+# It is not a new entry point into the assignment queue. It assigns nothing and
+# picks nothing: it reacts to one event, on one pull request, and asks the agent
+# to finish the pull request it already owns.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'Pipeline PR number whose red CI should be handed back to the agent.'
+        required: true
+        type: string
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+  actions: read
+
+jobs:
+  nudge:
+    # A green CI needs nothing from this workflow, and a cancelled one is not a
+    # verdict about the code.
+    if: >-
+      vars.AGENTIC_CI_FIX_ENABLED != 'false' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+    steps:
+      # No checkout: everything below is `actions/github-script` and reads
+      # nothing from the workspace.
+      #
+      # The PAT, not GITHUB_TOKEN, and for once the mention is the point. A
+      # comment created with GITHUB_TOKEN is authored by `github-actions[bot]`,
+      # and both runners filter `comment.user.type != 'Bot'` — so the nudge would
+      # be posted and nothing would read it. This is the second comment in the
+      # whole pipeline allowed to carry an agent mention, after the assignment
+      # comment; see `agentic-autonomous-pipeline`'s github-loop reference.
+      - name: Hand the failure back to the agent that owns the PR
+        uses: actions/github-script@v7
+        env:
+          AGENTIC_AGENT: ${{ vars.AGENTIC_AGENT }}
+          ATTEMPT_LIMIT: ${{ vars.AGENTIC_CI_FIX_ATTEMPT_LIMIT }}
+          DISPATCH_PR: ${{ inputs.pr }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Same normalisation as `agentic-assign`: an unrecognised value is
+            // a misconfiguration, and posting a mention nothing answers would
+            // read as "the agent was asked and ignored it".
+            const configured = (process.env.AGENTIC_AGENT || '@opencode').trim().replace(/^@/, '').toLowerCase();
+            if (configured !== 'claude' && configured !== 'opencode') {
+              core.setFailed(`AGENTIC_AGENT is \`${configured}\` — expected @claude or @opencode.`);
+              return;
+            }
+            const mention = `@${configured}`;
+
+            // The pipeline's own branch is the whole scope of this workflow. CI
+            // failing on `main`, on a human's branch, or on a harness branch is
+            // somebody else's problem and must not summon an agent.
+            const PIPELINE_HEAD = /^pipeline\/feature-(\d+)$/;
+
+            const dispatched = parseInt(process.env.DISPATCH_PR || '', 10);
+            let pr;
+            let ciRunId = parseInt(process.env.RUN_ID || '', 10);
+
+            if (!Number.isNaN(dispatched)) {
+              pr = (await github.rest.pulls.get({ owner, repo, pull_number: dispatched })).data;
+            } else {
+              const head = (process.env.HEAD_BRANCH || '').trim();
+              if (!PIPELINE_HEAD.test(head)) {
+                core.info(`CI reported on ${head || '(no branch)'}, which is not a pipeline PR head. Nothing to do.`);
+                return;
+              }
+              const open = await github.rest.pulls.list({
+                owner, repo, state: 'open', head: `${owner}:${head}`, per_page: 10
+              });
+              pr = open.data[0];
+              if (!pr) {
+                core.info(`No open pull request from ${head}. It merged, closed, or was never opened.`);
+                return;
+              }
+              // A run reporting on a commit that is no longer the head has
+              // already been answered: something pushed a fix, and that push's
+              // own CI run is the one whose verdict counts. Nudging on the old
+              // one would ask the agent to fix a failure it may have just fixed.
+              const reported = (process.env.HEAD_SHA || '').trim();
+              if (reported && pr.head.sha !== reported) {
+                core.info(
+                  `#${pr.number}: CI reported on ${reported.slice(0, 7)} but the head is now ` +
+                  `${pr.head.sha.slice(0, 7)} — superseded, its own run decides.`
+                );
+                return;
+              }
+            }
+
+            const match = PIPELINE_HEAD.exec(pr.head?.ref || '');
+            if (!match) {
+              core.info(`#${pr.number}: head ${pr.head?.ref} is not a pipeline feature branch. Nothing to do.`);
+              return;
+            }
+            const issueNumber = parseInt(match[1], 10);
+
+            if (pr.state !== 'open') {
+              core.info(`#${pr.number}: ${pr.state}, nothing to fix.`);
+              return;
+            }
+            // A draft is the pipeline saying a channel is red and stayed red —
+            // it has already been escalated, and its issue has already been
+            // released. Nudging it would restart a conversation a human owns.
+            if (pr.draft) {
+              core.info(`#${pr.number}: draft — the run already reported a channel it could not turn green.`);
+              return;
+            }
+
+            // ── The guard that makes this safe to fire on every red CI ──
+            // A session that is still running is already waiting on this very
+            // verdict: `agentic-pipeline-finalization`'s `[await-ci]` step reads
+            // it and loops. Commenting now would queue a second runner behind
+            // the live one (the runners share a `cancel-in-progress: false`
+            // concurrency group), and two sessions would push to one branch.
+            // The check covers the whole runner job, not just its agent step, so
+            // a run in its rescue or auto-merge-arming steps still counts as live.
+            //
+            // Skipping here is not dropping the failure: `agentic-watchdog.yml`
+            // sweeps open pipeline PRs whose CI is red and dispatches this
+            // workflow again, so a PR whose verdict landed while some session
+            // held the runner is picked up on the next sweep instead of waiting
+            // for a human. That is the only reason the sweep exists here — it
+            // re-raises this event, it never assigns.
+            const RUNNERS = ['claude-runner.yml', 'opencode-runner.yml'];
+            const LIVE = ['queued', 'in_progress', 'waiting', 'requested', 'pending'];
+            for (const workflow of RUNNERS) {
+              for (const status of LIVE) {
+                const { data } = await github.rest.actions.listWorkflowRuns({
+                  owner, repo, workflow_id: workflow, status, per_page: 1
+                });
+                if (data.total_count > 0) {
+                  core.info(
+                    `#${pr.number}: ${workflow} has a ${status} run — an agent session is live and reads this ` +
+                    'verdict itself. Not commenting.'
+                  );
+                  return;
+                }
+              }
+            }
+
+            // Anything else falls back to the default rather than disabling the
+            // brake — same rule as `AGENTIC_BLOCKED_CHAIN_LIMIT`.
+            const configuredLimit = parseInt(process.env.ATTEMPT_LIMIT || '', 10);
+            const limit = Number.isInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : 3;
+
+            // The event this workflow answers, identified. On the `workflow_run`
+            // path it is the run that woke us. On a dispatch — a human, or the
+            // watchdog re-raising a PR whose CI reported while a session was
+            // live — there is no such run, so the head's own latest CI run is
+            // found here, and it must actually be red: a dispatch is a request to
+            // look, never evidence.
+            const dispatchedLookup = Number.isNaN(ciRunId);
+            if (dispatchedLookup) {
+              const onHead = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                owner, repo, head_sha: pr.head.sha, per_page: 100
+              });
+              const ci = onHead
+                .filter((run) => run.path === '.github/workflows/ci.yml')
+                .sort((a, b) => b.id - a.id)[0];
+              if (!ci) {
+                core.info(`#${pr.number}: no CI run on ${pr.head.sha.slice(0, 7)} yet. Nothing to hand back.`);
+                return;
+              }
+              if (ci.status !== 'completed') {
+                core.info(`#${pr.number}: CI is still running on ${pr.head.sha.slice(0, 7)}. Nothing to hand back.`);
+                return;
+              }
+              if (!['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'].includes(ci.conclusion)) {
+                core.info(`#${pr.number}: CI concluded \`${ci.conclusion}\` on ${pr.head.sha.slice(0, 7)}. Nothing to fix.`);
+                return;
+              }
+              ciRunId = ci.id;
+            }
+
+            // ── Idempotency, and the brake ──
+            // Both read off the PR's own comments, so no state is kept anywhere
+            // else and nothing has to be cleaned up. The marker names the commit
+            // and the CI run the handback was raised for.
+            //
+            // **No clock anywhere in here.** Duration thresholds are the wrong
+            // tool for this: a cooldown long enough for today's CI is a stall
+            // tomorrow, and one short enough for tomorrow double-asks today.
+            // What separates a repeated question from a new one is *event
+            // identity*, and GitHub already provides it — a workflow run has an
+            // id, and a redelivered webhook carries the same one.
+            const MARKER = '<!-- agentic-ci-failure -->';
+            const PARKED = '<!-- agentic-ci-failure-parked -->';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr.number, per_page: 100
+            });
+            const nudges = comments.filter((comment) => (comment.body || '').includes(MARKER));
+            const askedAboutThisRun = nudges.some((comment) => (comment.body || '').includes(`run:${ciRunId}`));
+
+            // The `workflow_run` path fires once per CI run. Firing twice for the
+            // same run id means the same event arrived twice — a redelivery, a
+            // re-request — and answering it twice would queue a second session.
+            if (askedAboutThisRun && !dispatchedLookup) {
+              core.info(`#${pr.number}: CI run ${ciRunId} was already handed back. Same event, not a new failure.`);
+              return;
+            }
+
+            // A dispatch deliberately bypasses that, and this is where the
+            // clock-free retry lives. `agentic-watchdog.yml` re-raises a red
+            // pipeline PR whenever it sweeps, so a handback whose session died
+            // before pushing anything — the head never moves, so nothing about
+            // the failure changes — is asked again on the next sweep rather than
+            // skipped forever. It is not free: it counts against the limit below
+            // like any other attempt, so the retry is bounded and ends in a
+            // parked PR with its issue released, never in a silent stall.
+            if (askedAboutThisRun) {
+              core.info(
+                `#${pr.number}: CI run ${ciRunId} was handed back before and the head is still ` +
+                `${pr.head.sha.slice(0, 7)} with no session running — that attempt produced nothing. Asking again.`
+              );
+            }
+
+            // What the failure actually was. A comment that says "CI is red"
+            // sends the session to go and find out; naming the jobs and their
+            // log URLs is the difference between a fix and a re-diagnosis.
+            let failures = [];
+            try {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner, repo, run_id: ciRunId, filter: 'latest', per_page: 100
+              });
+              failures = jobs
+                .filter((job) => ['failure', 'cancelled', 'timed_out'].includes(job.conclusion))
+                .map((job) => `- \`${job.name}\` — ${job.conclusion} — ${job.html_url}`);
+            } catch (error) {
+              core.warning(`Could not list the failing jobs of run ${ciRunId}: ${error.message}`);
+            }
+            const failureBlock = failures.length
+              ? failures.join('\n')
+              : '- (the failing jobs could not be listed — open the PR\'s Checks tab)';
+
+            if (nudges.length >= limit) {
+              // The brake, and it must leave the queue moving. A draft takes the
+              // PR out of auto-merge's selection, and `blocked` on the issue is
+              // what `handle-failure.yml` chains from — without it this PR would
+              // hold its issue exactly as #581 did, which is the bug.
+              core.warning(`#${pr.number}: ${nudges.length} CI-fix attempts already (limit ${limit}). Parking it.`);
+
+              try {
+                await github.graphql(
+                  `mutation($id: ID!) { convertPullRequestToDraft(input: { pullRequestId: $id }) { clientMutationId } }`,
+                  { id: pr.node_id }
+                );
+              } catch (error) {
+                core.warning(`#${pr.number}: could not convert to draft: ${error.message}`);
+              }
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: [
+                  '⛔ **CI is still red after ' + nudges.length + ' agent attempt(s).**',
+                  '',
+                  'What is failing:',
+                  failureBlock,
+                  '',
+                  `The limit is \`AGENTIC_CI_FIX_ATTEMPT_LIMIT\` (${limit}). This pull request is now a draft, so auto-merge no longer considers it, and issue #${issueNumber} is labelled \`blocked\` — the queue moves on rather than waiting on a failure that is not converging.`,
+                  '',
+                  '@Nico2398 — the failures above are the whole record. Fix them and mark the PR ready for review, or close it and put `ready` back on the issue.',
+                  '',
+                  PARKED
+                ].join('\n')
+              });
+
+              // The PAT again: a label applied with GITHUB_TOKEN raises no
+              // `issues: labeled` event, and `handle-failure.yml` — the thing
+              // that releases the queue — would never fire.
+              try {
+                const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: issueNumber });
+                const labels = issue.labels.map((label) => (typeof label === 'string' ? label : label.name));
+                if (issue.state === 'open' && !labels.includes('blocked')) {
+                  await github.rest.issues.addLabels({
+                    owner, repo, issue_number: issueNumber, labels: ['blocked']
+                  });
+                }
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number: issueNumber, name: 'in-progress'
+                }).catch(() => {});
+              } catch (error) {
+                core.warning(`Could not settle issue #${issueNumber}: ${error.message}`);
+              }
+              return;
+            }
+
+            const attempt = nudges.length + 1;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: pr.number,
+              body: [
+                `${mention} — CI is red on this pull request and no agent session is running. Fix it.`,
+                '',
+                `This is CI-fix attempt ${attempt} of ${limit} on PR #${pr.number} (\`${pr.head.ref}\`, commit \`${pr.head.sha.slice(0, 7)}\`), which closes issue #${issueNumber}.`,
+                '',
+                '**What is failing:**',
+                failureBlock,
+                '',
+                '**What to do** — this is the `ci-fix` task type; load `agentic-pipeline-ci-fix` and follow it:',
+                '',
+                `1. Check out the existing \`${pr.head.ref}\`. Do **not** recreate it, and do not start a fresh TDD cycle — the work is already on it and this pull request is built on it.`,
+                '2. Read the failing job logs above before changing anything. A CI-only channel (interaction-mode `visual`, the production `build`) reports things a sandbox without a GPU cannot reproduce, so read the log and the FAIL screenshots in the run artifacts rather than assuming the failure is local.',
+                '3. Decide which side is wrong — the change or the expectation — and fix that side. A baked expectation updated to match broken behaviour is a silent regression.',
+                `4. Verify every channel the fix touches, commit, and push to \`${pr.head.ref}\`. Never \`[skip ci]\`.`,
+                '5. Then **wait for CI to report** before ending the session: `npm run ci:await -- --pr ' + pr.number + '`. Green means done. Red means go back to step 2.',
+                '',
+                `The \`READY TO MERGE\` marker on this pull request stays as it is — auto-merge merges it the moment CI reports green, and that is what releases issue #${issueNumber} and starts the next task. If you cannot turn a channel green, say so in a comment, convert this pull request to a draft, and label issue #${issueNumber} \`blocked\`.`,
+                '',
+                `${MARKER} ${pr.head.sha} run:${ciRunId}`
+              ].join('\n')
+            });
+
+            core.info(`#${pr.number}: asked ${mention} to fix CI (attempt ${attempt}/${limit}).`);

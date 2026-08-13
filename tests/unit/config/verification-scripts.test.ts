@@ -16,6 +16,14 @@ describe('verification channel npm scripts', () => {
     expect(scripts['validate:context']).toContain('scripts/validate-context.ts');
   });
 
+  // The channels CI owns — interaction-mode `visual`, the production `build` —
+  // report after the session that deferred them would otherwise have exited.
+  // Without a named script for reading that report, a run ends on a marked PR
+  // and a red check nothing else announces (PR #581, issue #552).
+  it('exposes a way to read the verdict of the channels CI owns', () => {
+    expect(scripts['ci:await']).toContain('scripts/await-pr-ci.ts');
+  });
+
   it('typechecks both src/ and scripts/', () => {
     const script = scripts['typecheck'];
     expect(script).toContain('tsc --noEmit');

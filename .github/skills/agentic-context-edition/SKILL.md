@@ -1,15 +1,17 @@
 ---
 name: agentic-context-edition
 description: >
-  Create and edit agentic context files (skills, agent definitions, slash commands, data files)
-  across all agent standards (Copilot, Claude Code, OpenCode). Covers file structure,
-  duplication rules, progressive disclosure, and content hygiene.
+  Create and edit agentic context files (skills, agent definitions, path-scoped rules, slash commands,
+  data files) across all agent standards (Copilot, Claude Code, OpenCode). Covers file structure,
+  per-runtime frontmatter schemas, duplication rules, progressive disclosure, and content hygiene.
   Use when writing or editing any file under .opencode/, .claude/, or .github/ agent directories.
 ---
 
 # Context Edition
 
 Create or edit agentic context files duplicated across all agent standard directories.
+
+Files that *run* the pipeline rather than instruct it — `.github/workflows/`, `.github/actions/`, `.github/scripts/` — are not context files and follow different rules: `agentic-workflow-edition`. They are also not mirrored anywhere, so nothing on this page about duplication applies to them.
 
 ## Multi-Agent Duplication
 

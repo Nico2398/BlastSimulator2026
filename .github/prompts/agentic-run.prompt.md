@@ -10,6 +10,8 @@ $ARGUMENTS opens with the entity that triggered the run (`issue <N>` or `pr <N>`
 
 Branch from `main`, never from whatever branch this session happens to start on. A GitHub Actions runner may check out a detached or generated branch before you get control; `pipeline/tests-<N>` must still fork from `main`.
 
+One task type is the exception, and only because its branch already exists: a red CI handed back on an open `pipeline/feature-<N>` pull request. There the work is on that branch and the pull request is built on it, so `agentic-pipeline-ci-fix` checks it out and pushes to it — it creates nothing and rebuilds nothing.
+
 The surrounding system — branch isolation, cherry-pick, verification channels, PR conventions — is described in `agentic-autonomous-pipeline`.
 
 At the end of the run, whatever the outcome, comment on the triggering issue or pull request with: the pipeline that was chosen, the branches produced, every verification channel run and what each showed, and the PR opened. If the run cannot proceed, label the issue `blocked` and state what is missing rather than stopping silently.
