@@ -64,6 +64,24 @@ function requireGame(ctx: MiningContext): string | null {
   return null;
 }
 
+/** Payload carried by a queued `drill_hole` PendingAction (#553). */
+export interface DrillHoleActionPayload {
+  holeId: string;
+  x: number;
+  z: number;
+  depth: number;
+  diameter: number;
+  durationTicks: number;
+}
+
+// TODO(#553): wire into drillPlanCommand's `clear` branch once drill_hole
+// action queueing lands — clears both plannedDrillHoles and any queued
+// drill_hole actions still pending for them. Exported (rather than kept
+// module-private) so the skeleton stays lint/typecheck-clean while unused.
+export function clearDrillPlan(_ctx: MiningContext): number {
+  throw new Error('not implemented');
+}
+
 // ── Drill plan commands ──
 
 export function drillPlanCommand(

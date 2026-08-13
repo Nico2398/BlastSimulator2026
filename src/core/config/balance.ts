@@ -230,6 +230,13 @@ export const TRANSMISSION_LOSS_POROSITY_SCALE = 0.40;
  *  of pushing harder on the same voxel. */
 export const CHARGE_KG_PER_METRE = 2.0;
 
+/** Ticks to drill one hole at the reference depth/diameter (#553). */
+export const DRILL_HOLE_BASE_DURATION_TICKS = 6;
+/** Reference hole depth (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */
+export const DRILL_HOLE_REFERENCE_DEPTH_M = 8;
+/** Reference hole diameter (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */
+export const DRILL_HOLE_REFERENCE_DIAMETER_M = 0.15;
+
 /** Minimum stemming column (m) a charge can carry. Matches the Charge
  *  panel's own floor (Charge.ts adjustStemming) so a console charge can
  *  never under-stem what a player could ever click. */

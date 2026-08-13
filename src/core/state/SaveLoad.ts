@@ -66,6 +66,18 @@ function migrateV9ToV10(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * v10 -> v11: GameState gained a `plannedDrillHoles: PlannedHole[]` field
+ * (#553 drilling becomes work — a drill plan queues one `drill_hole` action
+ * per hole instead of writing holes into state instantly). A pre-v11 save
+ * has no holes in flight — the field defaults to an empty array. Mutates
+ * `obj` in place, matching every other migration block in `deserialize`
+ * below.
+ */
+function migrateV10ToV11(_obj: Record<string, unknown>): Record<string, unknown> {
+  throw new Error('not implemented');
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -272,6 +284,11 @@ export function deserialize(json: string): GameState {
   // v9 -> v10: Vehicle.reservedForActionId (#550).
   if ((obj['version'] as number) < 10) {
     migrateV9ToV10(obj);
+  }
+
+  // v10 -> v11: GameState.plannedDrillHoles (#553).
+  if ((obj['version'] as number) < 11) {
+    migrateV10ToV11(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

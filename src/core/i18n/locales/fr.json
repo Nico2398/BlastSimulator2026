@@ -3139,6 +3139,7 @@
   "ui.blast_workshop.drill.status_tubed": "TUBÉ",
   "ui.blast_workshop.drill.status_wet": "MOUILLÉ",
   "ui.blast_workshop.drill.status_dry": "SEC",
+  "ui.blast_workshop.drill.status_ordered": "COMMANDÉ",
   "ui.blast_workshop.drill.clear_confirm": "Effacer les {count} trous ? Cela supprime aussi leurs charges et leur séquence.",
   "ui.blast_workshop.drill.clear_confirm_yes": "Oui, effacer",
   "ui.blast_workshop.drill.clear_confirm_no": "Annuler",

@@ -3139,6 +3139,7 @@
   "ui.blast_workshop.drill.status_tubed": "TUBED",
   "ui.blast_workshop.drill.status_wet": "WET",
   "ui.blast_workshop.drill.status_dry": "DRY",
+  "ui.blast_workshop.drill.status_ordered": "ORDERED",
   "ui.blast_workshop.drill.clear_confirm": "Clear all {count} holes? This also drops their charges and sequence.",
   "ui.blast_workshop.drill.clear_confirm_yes": "Yes, Clear",
   "ui.blast_workshop.drill.clear_confirm_no": "Cancel",

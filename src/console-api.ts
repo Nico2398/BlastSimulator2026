@@ -34,6 +34,8 @@ export interface SerializableGameState {
   sequenceDelays: Record<string, unknown>;
   finances: { cash: number };
   holeCount: number;
+  /** Holes ordered but not yet drilled (state.plannedDrillHoles.length) — proves a drill plan queues work instead of writing holes into state instantly (#553). */
+  orderedHoleCount: number;
   chargedCount: number;
   sequencedCount: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
@@ -97,6 +99,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     sequenceDelays: s.sequenceDelays as Record<string, unknown>,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
+    orderedHoleCount: s.plannedDrillHoles.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
     surveyCount: s.surveyResults.length,

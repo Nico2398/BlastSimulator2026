@@ -46,6 +46,8 @@ export interface HoleOverlayData {
   hole: DrillHole;
   charge?: HoleCharge;
   delayMs: number;
+  /** True once this hole's `drill_hole` action has completed and it lives in `state.drillHoles`; false while still in `state.plannedDrillHoles` awaiting its turn (#553). */
+  drilled: boolean;
   /** Terrain surface Y at this hole's (x,z) position. Markers are placed relative to this. */
   surfaceY: number;
   /** Predicted average fragment size for this hole (cm) — for tier-2 overlay. */

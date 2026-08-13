@@ -16,6 +16,15 @@ export interface DrillHole {
   diameter: number;
 }
 
+/**
+ * A hole that has been ordered but not yet drilled — lives in
+ * `state.plannedDrillHoles` until its `drill_hole` action completes and it
+ * lands in `state.drillHoles` (#553). The split is which state array a hole
+ * lives in, not the value shape: `PlannedHole` and `DrillHole` are the same
+ * fields.
+ */
+export type PlannedHole = DrillHole;
+
 let nextHoleId = 1;
 
 /** Reset hole ID counter (for tests). */
@@ -31,7 +40,7 @@ export function createGridPlan(
   spacing: number,
   depth: number,
   diameter: number,
-): DrillHole[] {
+): PlannedHole[] {
   const holes: DrillHole[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -54,7 +63,7 @@ export function addHole(
   z: number,
   depth: number,
   diameter: number,
-): DrillHole {
+): PlannedHole {
   const hole: DrillHole = { id: `H${nextHoleId++}`, x, z, depth, diameter };
   holes.push(hole);
   return hole;
@@ -77,6 +86,20 @@ export function removeHole(holes: DrillHole[], holeId: string): boolean {
  */
 export function holeNumericId(holeId: string): number {
   return parseInt(holeId.slice(1), 10);
+}
+
+/**
+ * Move a hole from the ordered pool to the drilled pool once its `drill_hole`
+ * action completes (#553). Same value shape, different state array — see
+ * `PlannedHole`.
+ */
+export function landDrilledHole(_planned: PlannedHole): DrillHole {
+  throw new Error('not implemented');
+}
+
+/** Ticks required to drill one hole, scaled from the reference depth/diameter (#553). */
+export function computeDrillHoleDurationTicks(_depth: number, _diameter: number): number {
+  throw new Error('not implemented');
 }
 
 export interface DigVoxelResult {

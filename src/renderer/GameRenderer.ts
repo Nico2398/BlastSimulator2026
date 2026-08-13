@@ -370,6 +370,10 @@ export class GameRenderer {
           hole: h,
           delayMs: sequenceDelays[h.id] ?? 0,
           surfaceY: this.getTerrainSurfaceY(h.x, h.z),
+          // state.drillHoles only ever holds already-drilled holes today; #553's
+          // plannedDrillHoles split (still ordered, not yet drilled) isn't wired
+          // into this overlay's data source yet.
+          drilled: true,
         };
         const charge = chargesByHole[h.id];
         if (charge) hd.charge = charge;
