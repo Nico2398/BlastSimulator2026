@@ -9,13 +9,15 @@
 // carry what differs: eligibility rules, phase names, and what happens on
 // arrival.
 
-import type { GameState } from '../state/GameState.js';
+import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
 import { tickVehicle } from '../engine/EntityMovementTick.js';
 import { NavGrid } from '../nav/NavGrid.js';
+import { requestHaulFragment } from './HaulingTask.js';
+import { requestBreakBoulder } from './BoulderBreaking.js';
 
 /**
  * Look up `vehicleId` for a request-phase task entry point (requestBreakBoulder,
@@ -100,4 +102,34 @@ export function findNearestReachableFragment(
   }
 
   return bestId;
+}
+
+/**
+ * Start a haul_debris/fragment_debris action's actual haul/break work for
+ * `vehicle` once its driver is in place (#552) — shared by ArrivalGate.ts's
+ * resolveBoarding (fresh boarding) and VehicleReservation.ts's
+ * promoteVehicleGatedAction (continuity: employee already driving this exact
+ * vehicle). Both sites independently extracted payload.fragmentId and
+ * dispatched to requestHaulFragment/requestBreakBoulder via the same
+ * type-ternary; this is that shared step.
+ *
+ * Returns `null` for any action type other than haul_debris/fragment_debris —
+ * the caller falls back to its own generic single-target drive in that case.
+ * Returns the request's own `success` flag for a fragment-gated action;
+ * `false` means the caller should release the vehicle back (each call site
+ * uses its own release-call variant — keeping the driver seated is common to
+ * both, but the exact API differs, so that stays with the caller).
+ */
+export function startVehicleGatedFragmentWork(
+  state: GameState,
+  vehicle: Vehicle,
+  action: PendingAction,
+): boolean | null {
+  if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return null;
+
+  const fragmentId = action.payload['fragmentId'] as number;
+  const started = action.type === 'haul_debris'
+    ? requestHaulFragment(state, vehicle.id, fragmentId)
+    : requestBreakBoulder(state, vehicle.id, fragmentId);
+  return started.success;
 }

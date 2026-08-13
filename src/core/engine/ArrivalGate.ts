@@ -9,8 +9,9 @@ import type { GameState } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { assignDriver } from '../entities/Vehicle.js';
-import { tickHaulingProgress, requestHaulFragment } from '../economy/HaulingTask.js';
-import { tickBreakProgress, requestBreakBoulder } from '../economy/BoulderBreaking.js';
+import { tickHaulingProgress } from '../economy/HaulingTask.js';
+import { tickBreakProgress } from '../economy/BoulderBreaking.js';
+import { startVehicleGatedFragmentWork } from '../economy/FragmentTaskLifecycle.js';
 import { tickVehicle, tickVehicleTaskState } from './EntityMovementTick.js';
 import { releaseVehicleReservation, reconcileVehicleReservations } from './VehicleReservation.js';
 import { interruptActiveAction } from './TaskDispatch.js';
@@ -299,19 +300,19 @@ function resolveBoarding(
     if (vehicle.reservedForActionId !== null) {
       const reservedAction = state.pendingActions.find(a => a.id === vehicle.reservedForActionId);
 
-      // #552: haul_debris/fragment_debris route through the existing
-      // request*/tick* drive machinery (HaulingTask.ts/BoulderBreaking.ts)
-      // instead of the generic single-target drive loop below — starting the
-      // actual haul/break request is what the two-/one-leg workflow needs,
-      // and the request functions stage their own targetX/targetZ (fragment
-      // approach cell) rather than the action's own targetX/targetZ.
-      if (reservedAction && (reservedAction.type === 'haul_debris' || reservedAction.type === 'fragment_debris')) {
-        const fragmentId = reservedAction.payload['fragmentId'] as number;
-        const started = reservedAction.type === 'haul_debris'
-          ? requestHaulFragment(state, vehicle.id, fragmentId)
-          : requestBreakBoulder(state, vehicle.id, fragmentId);
+      if (reservedAction) {
+        // #552: haul_debris/fragment_debris route through the existing
+        // request*/tick* drive machinery (HaulingTask.ts/BoulderBreaking.ts)
+        // instead of the generic single-target drive loop below — starting
+        // the actual haul/break request is what the two-/one-leg workflow
+        // needs, and the request functions stage their own targetX/targetZ
+        // (fragment approach cell) rather than the action's own
+        // targetX/targetZ. startVehicleGatedFragmentWork returns null for any
+        // other action type, in which case the generic single-target drive
+        // below applies as before.
+        const started = startVehicleGatedFragmentWork(state, vehicle, reservedAction);
 
-        if (!started.success) {
+        if (started === false) {
           // Fragment/depot/eligibility changed between claim and boarding
           // (fragment picked clean, no active warehouse, etc.) — release the
           // action back to the pool instead of leaving the vehicle boarded
@@ -325,9 +326,10 @@ function resolveBoarding(
           interruptActiveAction(state, emp, reservedAction.id, { keepVehicleDriver: true });
           return;
         }
-      } else if (reservedAction) {
-        vehicle.targetX = reservedAction.targetX;
-        vehicle.targetZ = reservedAction.targetZ;
+        if (started === null) {
+          vehicle.targetX = reservedAction.targetX;
+          vehicle.targetZ = reservedAction.targetZ;
+        }
       }
 
       vehicle.task = 'moving';

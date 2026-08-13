@@ -74,22 +74,30 @@ export type DispatchRejectionReason = 'target-not-found' | 'target-unqualified' 
 export function dispatchPendingAction(
   state: GameState,
   action: Omit<PendingAction, 'status' | 'holderId'>,
+  options?: { skipQualificationCheck?: boolean },
 ): { success: boolean; error?: string; reason?: DispatchRejectionReason } {
   const targetId = action.targetEmployeeId;
   const isQualified = (emp: { alive: boolean; qualifications: { category: string }[] }): boolean =>
     emp.alive && (action.requiredSkill === null
       || emp.qualifications.some(q => q.category === action.requiredSkill));
 
-  if (targetId !== null && targetId !== undefined) {
-    const target = state.employees.employees.find(emp => emp.id === targetId);
-    if (target === undefined) {
-      return { success: false, error: 'unqualified', reason: 'target-not-found' };
+  // skipQualificationCheck (#552): HaulDispatch.ts's syncHaulDispatch needs a
+  // haul_debris/fragment_debris action to sit queued silently even when the
+  // roster currently has nobody qualified (a fresh site with no hauler/driver
+  // yet) — the actual qualification these action types need is enforced at
+  // claim time via requiredVehicleRole/findVehicleForClaim instead, not here.
+  if (!options?.skipQualificationCheck) {
+    if (targetId !== null && targetId !== undefined) {
+      const target = state.employees.employees.find(emp => emp.id === targetId);
+      if (target === undefined) {
+        return { success: false, error: 'unqualified', reason: 'target-not-found' };
+      }
+      if (!isQualified(target)) {
+        return { success: false, error: 'unqualified', reason: 'target-unqualified' };
+      }
+    } else if (!state.employees.employees.some(isQualified)) {
+      return { success: false, error: 'unqualified', reason: 'roster-unqualified' };
     }
-    if (!isQualified(target)) {
-      return { success: false, error: 'unqualified', reason: 'target-unqualified' };
-    }
-  } else if (!state.employees.employees.some(isQualified)) {
-    return { success: false, error: 'unqualified', reason: 'roster-unqualified' };
   }
   // Full record constructed here — every dispatch starts life queued and
   // unheld (#547); callers no longer supply status/holderId themselves.

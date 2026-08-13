@@ -259,6 +259,58 @@ describe('selectBestActionForEmployee', () => {
     expect(result).toBeNull();
   });
 
+  // ── isClaimable fallthrough (#552) ─────────────────────────────────────
+  //
+  // hauling-gate scenario stall: the nearest debris item needed a vehicle
+  // role nobody had free. Without this fallthrough, selectBestActionForEmployee
+  // returned null (idle) the moment the top-ranked candidate failed the
+  // caller's isClaimable gate, instead of trying the next-cheapest one.
+
+  it('an unclaimable nearer candidate is skipped in favor of a claimable farther one (#552 fallthrough)', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+
+    const nearUnclaimable = makeAction({ id: 1, targetX: 2, targetZ: 0 });
+    const farClaimable = makeAction({ id: 2, targetX: 15, targetZ: 0 });
+
+    // Simulates "no free vehicle of the right role" for the nearer candidate.
+    const isClaimable = (action: PendingAction): boolean => action.id !== nearUnclaimable.id;
+
+    const result = selectBestActionForEmployee(state, emp, [nearUnclaimable, farClaimable], isClaimable);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(farClaimable.id);
+  });
+
+  it('does not skip past a claimable top-ranked candidate just because isClaimable is supplied', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+
+    const near = makeAction({ id: 1, targetX: 2, targetZ: 0 });
+    const far = makeAction({ id: 2, targetX: 15, targetZ: 0 });
+
+    // Both claimable — the predicate must not cause a needless fallthrough
+    // past a perfectly fine, cheaper top candidate.
+    const isClaimable = (): boolean => true;
+
+    const result = selectBestActionForEmployee(state, emp, [near, far], isClaimable);
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(near.id);
+  });
+
+  it('returns null when every candidate within budget is unclaimable, even though all are reachable', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+
+    const a = makeAction({ id: 1, targetX: 2, targetZ: 0 });
+    const b = makeAction({ id: 2, targetX: 15, targetZ: 0 });
+
+    const result = selectBestActionForEmployee(state, emp, [a, b], () => false);
+
+    expect(result).toBeNull();
+  });
+
   it('never resolves a real path for more than ACTION_SELECTION_MAX_PATH_ATTEMPTS candidates — a reachable candidate ranked beyond the budget is never chosen', () => {
     const state = makeState(30, 40);
     blockColumn(state.navGrid!, 1); // isolates x >= 2 from the employee at x = 0

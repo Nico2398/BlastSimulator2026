@@ -8,6 +8,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import { isOversized } from '../mining/BlastCalc.js';
+import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
 export interface HaulActionPayload {
@@ -47,7 +48,13 @@ export function syncHaulDispatch(state: GameState): void {
     const targetX = Math.round(tracked.fragment.position.x);
     const targetZ = Math.round(tracked.fragment.position.z);
 
-    const action: PendingAction = {
+    // Routed through dispatchPendingAction (shared with every other dispatch
+    // path, e.g. SurveyCalc.ts's runSurvey) rather than a hand-built literal,
+    // so PendingAction/GhostPreview construction stays in exactly one place.
+    // skipQualificationCheck: true because these must be able to sit queued
+    // silently with no hauler/driver/depot available yet and pick up later
+    // once the situation changes, never rejected outright.
+    dispatchPendingAction(state, {
       id: actionId,
       type: oversized ? 'fragment_debris' : 'haul_debris',
       requiredSkill: null,
@@ -57,23 +64,7 @@ export function syncHaulDispatch(state: GameState): void {
       targetY: 0,
       payload: { fragmentId: tracked.fragment.id } satisfies HaulActionPayload,
       targetEmployeeId: null,
-      status: 'queued',
-      holderId: null,
-    };
-
-    // Pushed directly (bypassing dispatchPendingAction's "does anyone
-    // qualify" gate, TaskDispatch.ts) — these must be able to sit queued
-    // silently with no hauler/driver/depot available yet and pick up later
-    // once the situation changes, never rejected outright.
-    state.pendingActions.push(action);
-    state.ghostPreviews.push({
-      id: actionId,
-      type: action.type,
-      targetX,
-      targetZ,
-      targetY: 0,
-      claimed: false,
-    });
+    }, { skipQualificationCheck: true });
 
     coveredFragmentIds.add(tracked.fragment.id);
   }
