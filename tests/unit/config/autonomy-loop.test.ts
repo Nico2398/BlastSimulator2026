@@ -683,6 +683,19 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
     expect(failsafe).toContain('if (pr.draft)');
   });
 
+  // The live-session guard below can only see the two runner workflows, so a
+  // session driven from the web app, the desktop app, or a human terminal is
+  // invisible to it and would get a second worker pushed onto its branch.
+  // "Is a human working on this" is not observable from the Actions API, so it
+  // is declared rather than detected.
+  it('honours a hands-off label for work no guard can detect', () => {
+    expect(failsafe).toContain("const HOLD_LABEL = 'ci-fix-hold'");
+    expect(failsafe).toContain('labels.includes(HOLD_LABEL)');
+    // Checked before the handback is composed, not after.
+    const hold = failsafe.indexOf('HOLD_LABEL');
+    expect(hold).toBeLessThan(failsafe.indexOf('const MARKER'));
+  });
+
   // A run reporting on a commit that is no longer the head has already been
   // answered by whatever pushed the fix.
   it('ignores a verdict superseded by a newer push', () => {
