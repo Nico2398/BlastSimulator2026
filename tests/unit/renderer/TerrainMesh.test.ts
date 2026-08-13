@@ -7,6 +7,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
   TerrainMesh,
   SurveyConfidenceOverlay,
+  virtualEdgeDensity,
   type SurveyConfidencePoint,
   type SurveyConfidenceOverlayOptions,
 } from '../../../src/renderer/TerrainMesh.js';
@@ -377,6 +378,211 @@ describe('TerrainMesh', () => {
         expect(v1!.normal[1]).toBeCloseTo(v0.normal[1], 6);
         expect(v1!.normal[2]).toBeCloseTo(v0.normal[2], 6);
       }
+      tm.dispose();
+    });
+  });
+
+  describe('virtualEdgeDensity (#559)', () => {
+    // Same half-voxel crossing convention as emitVertex/
+    // computeVoxelColumnSurfaceHeight: solid (1) a half-voxel below the
+    // surface, air (0) a half-voxel above, linear in between.
+    it('is 1 well below surfaceHeight - 0.5 (fully solid)', () => {
+      expect(virtualEdgeDensity(5, 2)).toBe(1);
+      expect(virtualEdgeDensity(5, 4)).toBe(1);
+    });
+
+    it('is 0 well above surfaceHeight + 0.5 (fully air)', () => {
+      expect(virtualEdgeDensity(5, 6)).toBe(0);
+      expect(virtualEdgeDensity(5, 8)).toBe(0);
+    });
+
+    it('is exactly 0.5 at the crossing height itself', () => {
+      expect(virtualEdgeDensity(5, 5)).toBeCloseTo(0.5, 6);
+    });
+
+    it('interpolates linearly across the one-voxel transition band', () => {
+      expect(virtualEdgeDensity(5, 4.5)).toBeCloseTo(1, 6);
+      expect(virtualEdgeDensity(5, 4.75)).toBeCloseTo(0.75, 6);
+      expect(virtualEdgeDensity(5, 5.25)).toBeCloseTo(0.25, 6);
+      expect(virtualEdgeDensity(5, 5.5)).toBeCloseTo(0, 6);
+    });
+
+    it('is stable across different surfaceHeight values (translation invariant)', () => {
+      expect(virtualEdgeDensity(10, 10)).toBeCloseTo(virtualEdgeDensity(5, 5), 6);
+      expect(virtualEdgeDensity(10, 10.25)).toBeCloseTo(virtualEdgeDensity(5, 5.25), 6);
+    });
+  });
+
+  describe('edge vertex normals honor an installed EdgeHeightSampler (#559)', () => {
+    const SURFACE_Y = 4; // flat terrain: solid y < 4, air y >= 4 -> crossing at y = 3.5
+    const SIZE = 8;
+
+    function flatGrid(): VoxelGrid {
+      const grid = new VoxelGrid(SIZE, 8, SIZE);
+      for (let x = 0; x < SIZE; x++)
+        for (let y = 0; y < SURFACE_Y; y++)
+          for (let z = 0; z < SIZE; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    /** Normal at the outermost owned top-surface vertex on the +X edge, for a given z. */
+    function edgeNormalAt(tm: TerrainMesh, z: number): [number, number, number] | undefined {
+      for (const mesh of tm.meshes) {
+        const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+        const nrm = mesh.geometry.getAttribute('normal').array as Float32Array;
+        for (let i = 0; i < pos.length; i += 3) {
+          if (
+            Math.abs(pos[i]! - (SIZE - 1)) < 1e-6 &&
+            Math.abs(pos[i + 2]! - z) < 1e-6 &&
+            Math.abs(pos[i + 1]! - (SURFACE_Y - 0.5)) < 1e-6
+          ) {
+            return [nrm[i]!, nrm[i + 1]!, nrm[i + 2]!];
+          }
+        }
+      }
+      return undefined;
+    }
+
+    it('without a sampler, the outermost vertex normal tilts away from up (false-cliff regression, #559 root cause 2)', () => {
+      const scene = makeScene();
+      const grid = flatGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      const n = edgeNormalAt(tm, 4);
+      expect(n).toBeDefined();
+      // A pure "up" normal has ny === 1. The unowned neighbour column reads
+      // as air, so the gradient tilts the normal away from up.
+      expect(n![1]).toBeLessThan(0.999);
+      tm.dispose();
+    });
+
+    it('with a sampler reporting the same flat height past the edge, the outermost vertex normal is close to up (#559 fix)', () => {
+      const scene = makeScene();
+      const grid = flatGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.setEdgeHeightSampler(() => SURFACE_Y - 0.5);
+      tm.buildAll();
+      const n = edgeNormalAt(tm, 4);
+      expect(n).toBeDefined();
+      // ~pure up, within a couple of degrees (cos(2.5deg) ~= 0.999).
+      expect(n![1]).toBeGreaterThan(0.999);
+      expect(Math.abs(n![0])).toBeLessThan(0.05);
+      tm.dispose();
+    });
+  });
+
+  describe('EdgeHeightSampler is opt-in — null (default) leaves mesh output unchanged (#559 regression safety net)', () => {
+    it('setEdgeHeightSampler(null) produces byte-identical geometry to never calling it, for the two-chunk seam fixture', () => {
+      // Reuses the exact fixture from "adjacent chunks share exact boundary
+      // geometry" above — a non-flat surface across a chunk seam, the case
+      // most likely to be perturbed if a sampler were threaded unconditionally.
+      function buildSeamGrid(): VoxelGrid {
+        const grid = new VoxelGrid(32, 16, 16);
+        for (let x = 0; x < 32; x++) {
+          for (let z = 0; z < 16; z++) {
+            const surfaceY = 4 + (z % 5);
+            for (let y = 0; y < surfaceY; y++) grid.setVoxel(x, y, z, makeSolidVoxel());
+          }
+        }
+        return grid;
+      }
+
+      function collectAllAttributes(tm: TerrainMesh): { pos: number[]; nrm: number[] } {
+        const pos: number[] = [];
+        const nrm: number[] = [];
+        for (const mesh of tm.meshes) {
+          pos.push(...(mesh.geometry.getAttribute('position').array as Float32Array));
+          nrm.push(...(mesh.geometry.getAttribute('normal').array as Float32Array));
+        }
+        return { pos, nrm };
+      }
+
+      const sceneA = makeScene();
+      const tmA = new TerrainMesh(sceneA, buildSeamGrid());
+      tmA.buildAll(); // never touches setEdgeHeightSampler — default null
+      const baseline = collectAllAttributes(tmA);
+      tmA.dispose();
+
+      const sceneB = makeScene();
+      const tmB = new TerrainMesh(sceneB, buildSeamGrid());
+      tmB.setEdgeHeightSampler(null); // explicit null — must behave identically
+      tmB.buildAll();
+      const explicit = collectAllAttributes(tmB);
+      tmB.dispose();
+
+      expect(explicit.pos).toEqual(baseline.pos);
+      expect(explicit.nrm).toEqual(baseline.nrm);
+    });
+  });
+
+  describe('a blast adjacent to the site edge still produces a closed shell (#559)', () => {
+    /**
+     * True when every triangle edge in the scene's chunk meshes is shared by
+     * exactly two triangles — the discrete stand-in for "the surface is a
+     * closed 2-manifold with no holes". Positions are rounded to fold
+     * floating-point noise into a shared key; geometry here has no index
+     * buffer (each chunk's triangle list is a flat, duplicated soup), so
+     * matching by position is the only option.
+     */
+    function isWatertight(scene: THREE.Scene): boolean {
+      const edgeCounts = new Map<string, number>();
+      const key = (arr: Float32Array, i: number): string =>
+        `${arr[i]!.toFixed(3)},${arr[i + 1]!.toFixed(3)},${arr[i + 2]!.toFixed(3)}`;
+      for (const child of scene.children) {
+        if (!(child instanceof THREE.Mesh)) continue;
+        const pos = child.geometry.getAttribute('position').array as Float32Array;
+        for (let t = 0; t < pos.length; t += 9) {
+          const v = [key(pos, t), key(pos, t + 3), key(pos, t + 6)];
+          for (let e = 0; e < 3; e++) {
+            const a = v[e]!, b = v[(e + 1) % 3]!;
+            const edgeKey = a < b ? `${a}|${b}` : `${b}|${a}`;
+            edgeCounts.set(edgeKey, (edgeCounts.get(edgeKey) ?? 0) + 1);
+          }
+        }
+      }
+      for (const count of edgeCounts.values()) {
+        if (count !== 2) return false;
+      }
+      return edgeCounts.size > 0;
+    }
+
+    it('a flat site with no blast is watertight to begin with (sanity baseline)', () => {
+      const scene = makeScene();
+      const size = 8;
+      const grid = new VoxelGrid(size, size, size);
+      for (let x = 0; x < size; x++)
+        for (let y = 0; y < 4; y++)
+          for (let z = 0; z < size; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      expect(isWatertight(scene)).toBe(true);
+      tm.dispose();
+    });
+
+    it('stays watertight after a blast carves a crater right at the site edge', () => {
+      const scene = makeScene();
+      const size = 8;
+      const grid = new VoxelGrid(size, size, size);
+      for (let x = 0; x < size; x++)
+        for (let y = 0; y < 4; y++)
+          for (let z = 0; z < size; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      // Blow a hole through the whole depth of the boundary column, exactly
+      // the "blast at the edge of the site" scenario #559 is concerned with.
+      for (let y = 0; y < 4; y++) {
+        for (let z = 2; z < 5; z++) {
+          grid.clearVoxel(size - 1, y, z);
+          grid.clearVoxel(size - 2, y, z);
+        }
+      }
+      tm.remeshRegion({ minX: size - 2, minY: 0, minZ: 2, maxX: size - 1, maxY: 3, maxZ: 4 });
+
+      expect(isWatertight(scene)).toBe(true);
       tm.dispose();
     });
   });

@@ -413,15 +413,119 @@ describe('computeVoxelColumnSurfaceHeight (#491)', () => {
     expect(computeVoxelColumnSurfaceHeight(grid, 3, 3)).toBeCloseTo(4 + 5 / 7, 6);
   });
 
-  it('clamps to the site edge rather than the origin once the site has grown west, like computeVoxelColumnSurfaceY', () => {
+  // #559: an out-of-grid column used to clamp to the nearest edge column,
+  // which handed LandscapeMesh a plausible-looking but wrong height for a
+  // column the site doesn't actually own — the false "answers honestly"
+  // requirement in #559's root cause 3. NaN is the honest answer: "this
+  // column has no data", distinguishable from a real (possibly zero) height.
+  it('#559: answers NaN for a column outside every owned chunk, rather than clamping to the site edge', () => {
     const grid = new VoxelGrid(16, 8, 16);
     grid.addChunk(-1, 0);
     grid.fillVoxel(-16, 2, 0, 0, undefined, 1);
-    expect(computeVoxelColumnSurfaceHeight(grid, -99, 0)).toBeCloseTo(2.5, 6);
+    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(grid, -99, 0))).toBe(true);
+  });
+
+  it('#559: still answers NaN for an out-of-grid column even when sizeX/sizeZ are non-empty (not just the empty-grid early return)', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.fillVoxel(3, 4, 3, 0, undefined, 1);
+    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(grid, 99, 3))).toBe(true);
+    expect(Number.isNaN(computeVoxelColumnSurfaceHeight(grid, 3, -99))).toBe(true);
+  });
+
+  it('#559: an in-bounds column right at the site edge still answers a real (non-NaN) height', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    grid.fillVoxel(15, 4, 15, 0, undefined, 1);
+    expect(computeVoxelColumnSurfaceHeight(grid, 15, 15)).toBeCloseTo(4.5, 6);
   });
 
   it('returns 0 for a column with no solid voxel at all', () => {
     expect(computeVoxelColumnSurfaceHeight(new VoxelGrid(16, 8, 16), 3, 3)).toBe(0);
+  });
+});
+
+describe('VoxelGrid.claimsColumnForMeshing (#559 root cause 4)', () => {
+  it('is true for every column the site owns', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.claimsColumnForMeshing(0, 0)).toBe(true);
+    expect(grid.claimsColumnForMeshing(15, 15)).toBe(true);
+    expect(grid.claimsColumnForMeshing(8, 3)).toBe(true);
+  });
+
+  it('is true for the single-voxel west halo column TerrainMesh marches into when nothing owns the chunk to the west', () => {
+    const grid = new VoxelGrid(16, 8, 16); // one chunk, (0,0); no chunk at (-1,0)
+    expect(grid.claimsColumnForMeshing(-1, 5)).toBe(true);
+  });
+
+  it('is true for the single-voxel north halo column, symmetrically', () => {
+    const grid = new VoxelGrid(16, 8, 16); // no chunk at (0,-1)
+    expect(grid.claimsColumnForMeshing(5, -1)).toBe(true);
+  });
+
+  it('is false two columns west of the site edge — the halo is exactly one voxel wide', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.claimsColumnForMeshing(-2, 5)).toBe(false);
+  });
+
+  it('is false diagonally past the corner — the halo never extends diagonally', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.claimsColumnForMeshing(-1, -1)).toBe(false);
+  });
+
+  it('is false just past the east edge — TerrainMesh seals that side from its own last owned cube, no halo needed', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.claimsColumnForMeshing(16, 5)).toBe(false);
+  });
+
+  it('is false just past the south edge, symmetrically with east', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    expect(grid.claimsColumnForMeshing(5, 16)).toBe(false);
+  });
+
+  describe('on an irregular (L-shaped) grid, the halo is per-chunk, not just at the whole grid\'s bounding box', () => {
+    // Chunk (0,0) at x:0..15/z:0..15 and chunk (1,1) at x:16..31/z:16..31 are
+    // owned; chunk (1,0) (x:16..31/z:0..15) is not — the same L shape the
+    // existing "a bounding-box column the site does not own reads as air"
+    // VoxelGrid test above builds.
+    function lShapedGrid(): VoxelGrid {
+      const grid = new VoxelGrid(16, 8, 16);
+      grid.addChunk(1, 1);
+      return grid;
+    }
+
+    it('is true for a column owned by either chunk', () => {
+      const grid = lShapedGrid();
+      expect(grid.claimsColumnForMeshing(5, 5)).toBe(true); // chunk (0,0)
+      expect(grid.claimsColumnForMeshing(20, 20)).toBe(true); // chunk (1,1)
+    });
+
+    it('is true for chunk (0,0)\'s own west/north halo', () => {
+      const grid = lShapedGrid();
+      expect(grid.claimsColumnForMeshing(-1, 5)).toBe(true);
+      expect(grid.claimsColumnForMeshing(5, -1)).toBe(true);
+    });
+
+    it('is true for chunk (1,1)\'s own west/north halo, one voxel outside its own rect — even though that halo sits inside the grid\'s overall bounding box', () => {
+      const grid = lShapedGrid();
+      // Chunk (0,1) (the neighbour west of (1,1)) is not owned, so (1,1)
+      // marches its own west halo at x=15, within z:16..31 — a column no
+      // owned chunk actually covers (chunk (0,0) only owns z:0..15 at x=15).
+      expect(grid.claimsColumnForMeshing(15, 20)).toBe(true);
+      // Chunk (1,0) (the neighbour north of (1,1)) is not owned, so (1,1)
+      // marches its own north halo at z=15, within x:16..31.
+      expect(grid.claimsColumnForMeshing(20, 15)).toBe(true);
+    });
+
+    it('is false just past the unowned notch\'s own outer edges — no chunk owns them and no halo reaches them', () => {
+      const grid = lShapedGrid();
+      expect(grid.claimsColumnForMeshing(16, 5)).toBe(false); // east of chunk (0,0), inside the unowned notch
+      expect(grid.claimsColumnForMeshing(5, 16)).toBe(false); // south of chunk (0,0), inside the unowned notch
+    });
+
+    it('is false past chunk (1,1)\'s own east/south edges — self-sealed, no halo', () => {
+      const grid = lShapedGrid();
+      expect(grid.claimsColumnForMeshing(32, 20)).toBe(false);
+      expect(grid.claimsColumnForMeshing(20, 32)).toBe(false);
+    });
   });
 });
 
