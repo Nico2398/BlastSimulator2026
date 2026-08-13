@@ -1010,7 +1010,7 @@ describe('LandscapeMesh — dense boundary sample walk against a known height fi
 });
 
 describe('LandscapeMesh — classifyQuad/buildBoundaryQuad must honor meshClaimsColumn, not raw ownsColumn (#559 root cause 4)', () => {
-  it('emits no vertex inside the west halo column TerrainMesh now claims via meshClaimsColumn', () => {
+  it('emits no triangle inside the west halo column TerrainMesh now claims via meshClaimsColumn', () => {
     const scene = makeScene();
     const { palette, compId } = makePalette();
     const rect: Rect = { minX: 0, minZ: 0, maxX: 32, maxZ: 32 };
@@ -1030,21 +1030,39 @@ describe('LandscapeMesh — classifyQuad/buildBoundaryQuad must honor meshClaims
     const lm = new LandscapeMesh(scene, makeMaterial());
     lm.build(handle, palette, playable);
 
-    // x === -1 exactly is the halo column's own west edge -- the shared seam
-    // vertex both LandscapeMesh and TerrainMesh must emit for a watertight
-    // join (mirrors the sibling test below, which treats x < -1 as "west of
-    // the halo" and x === -1 as already inside it). Only x strictly greater
-    // than -1 is actually inside the column TerrainMesh claims.
-    let violations = 0;
+    // With FINE_STEP === 1 every emitted vertex sits at an integer x whether
+    // or not the halo cell is skipped, so a vertex-position range check (the
+    // bug this test used to guard: `-1 < x < 0` can never contain an
+    // integer) can never fail regardless of what classifyQuad/buildBoundaryQuad
+    // do. Check the index buffer instead: the fine cell whose 4 corners are
+    // (x=-1,z)/(x=0,z)/(x=-1,z+1)/(x=0,z+1) is exactly the halo column
+    // TerrainMesh now claims via meshClaimsColumn, so buildBoundaryQuad must
+    // never push either of that cell's 2 triangles. A triangle belongs to
+    // that cell iff all 3 of its vertices sit at x === -1 or x === 0 AND at
+    // least one vertex sits at each (ruling out a triangle that merely
+    // touches the x=-1 or x=0 seam from its own neighbouring, legitimately
+    // emitted cell without spanning the halo column itself), restricted to z
+    // strictly inside the rect's own [minZ, maxZ) span -- meshClaimsColumn's
+    // own z upper bound is exclusive (z < 32), so the one fine cell touching
+    // z === maxZ has a genuinely unclaimed NE corner and is legitimately
+    // still emitted, same as the tile's SW/NW corner quads outside z >= minZ.
+    let haloColumnTriangles = 0;
     for (const child of scene.children) {
       const mesh = child as THREE.Mesh;
       const pos = mesh.geometry.getAttribute('position').array as Float32Array;
-      for (let i = 0; i < pos.length; i += 3) {
-        const x = pos[i]!;
-        if (x > -1 + 1e-6 && x < 0 - 1e-6) violations++;
+      const index = mesh.geometry.getIndex();
+      if (!index) continue;
+      const idx = index.array;
+      for (let t = 0; t < idx.length; t += 3) {
+        const xs = [0, 1, 2].map(k => pos[idx[t + k]! * 3]!);
+        const zs = [0, 1, 2].map(k => pos[idx[t + k]! * 3 + 2]!);
+        const allOnHaloEdges = xs.every(x => Math.abs(x + 1) < 1e-6 || Math.abs(x) < 1e-6);
+        const spansBothEdges = xs.some(x => Math.abs(x + 1) < 1e-6) && xs.some(x => Math.abs(x) < 1e-6);
+        const strictlyInsideRectZ = zs.every(z => z >= rect.minZ - 1e-6 && z < rect.maxZ - 1e-6);
+        if (allOnHaloEdges && spansBothEdges && strictlyInsideRectZ) haloColumnTriangles++;
       }
     }
-    expect(violations).toBe(0);
+    expect(haloColumnTriangles).toBe(0);
     lm.dispose();
   });
 
