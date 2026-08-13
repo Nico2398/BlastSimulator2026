@@ -1,27 +1,29 @@
 {
   "name": "blast-drill-plan-ui",
-  "description": "Visual verification of drill plan UI: grid creation, hole markers, camera orbit, replace grid",
+  "description": "Visual verification of drill plan UI: grid creation, hole markers, camera orbit, replace grid. #553: confirming a grid queues one drill_hole PendingAction per hole instead of writing holes instantly — holes sit ordered (ghosts) in plannedDrillHoles until a staffed driller/drill_rig actually drills each one, landing it in drillHoles.",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 staffed:true",
       "timeout": 10,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — exactly what #553's automatic drill dispatch needs.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
           "cash": 50000,
-          "holeCount": 0
+          "holeCount": 0,
+          "orderedHoleCount": 0
         }
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:12,12",
-      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts) — dragging this rectangle at that default would compute a different rows/cols than this command declares (round(15/3)+1=6 cols, round(10/3)+1=4 rows, not 4x3). Two increment clicks on the strip's own spacing stepper (data-field=\"spacing\", added so this is reachable at all) raise it 3->5 before dragging, so the click reaches the exact grid the command names.",
+      "command": "drill_plan grid rows:2 cols:3 spacing:5 depth:6 start:12,12",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts) — dragging this rectangle at that default would compute a different rows/cols than this command declares. Two increment clicks on the strip's own spacing stepper (data-field=\"spacing\", added so this is reachable at all) raise it 3->5 before dragging (round(10/5)+1=3 cols, round(5/5)+1=2 rows), so the click reaches the exact grid the command names. #553: confirming the grid queues 6 drill_hole PendingActions and pushes 6 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. Hole count kept modest (6, not the larger patterns used pre-#553) so the staffed roster's ongoing maintenance/fuel costs (no income in this scenario) don't run the site into BANKRUPTCY_GRACE_TICKS territory before the plan finishes draining below.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -47,8 +49,8 @@
           "type": "dragTiles",
           "x1": 12,
           "z1": 12,
-          "x2": 27,
-          "z2": 22
+          "x2": 22,
+          "z2": 17
         },
         {
           "type": "screenshot"
@@ -61,9 +63,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 12
+          "orderedHoleCount": 6,
+          "holeCount": 0
         },
-        "note": "3 rows x 4 cols = 12, matching the command's declared pattern now that the click actually uses spacing:5"
+        "note": "2 rows x 3 cols = 6 holes ordered (ghosts), matching the command's declared pattern now that the click actually uses spacing:5 — none drilled yet (#553)."
       }
     },
     {
@@ -75,6 +78,43 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "tick 40",
+      "description": "#553: partial drilling — the staffed driller/drill_rig has had time to land some, but not all, of the 6 ordered holes (40 ticks covers travel from the staffed spawn near the origin plus a couple of holes' drill duration, with several holes still left to go — see computeDrillHoleDurationTicks/DRILL_HOLE_BASE_DURATION_TICKS). Mid-drilling screenshot for the visual channel to inspect the ghost/drilled split (undrilled holes still shown as ghosts, drilled ones as real holes). Tick counts here are a first estimate from the spec's own duration formula and staffed spawn offsets — tune once real timing is observed running against the implementation, same as any other scenario's tick padding.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": ["holeCount"],
+        "decreased": ["orderedHoleCount"],
+        "note": "Some holes have landed in drillHoles (real) while others remain in plannedDrillHoles (ghosts) — proves the split actually works, not just that ticking doesn't crash."
+      }
+    },
+    {
+      "command": "tick 110",
+      "description": "#553: drain the rest of the plan — every ordered hole eventually lands. Kept well under the staffed site's own bankruptcy-grace window (observed ~259 ticks with no income) since this is a single unconditional tick command, not a loop that stops once the plan finishes.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 110"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 6
+        },
+        "note": "All 6 holes have landed — none lost, none left ordered forever."
+      }
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20",
@@ -123,10 +163,11 @@
         }
       ],
       "role": "player",
-      "description": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 BlastWorkshop auto-advances Drill -> Charge once holes exist, so re-using the grid tool needs an explicit click back to the Drill tab ([data-step=\"1\"]) first. The spacing stepper also carries its value over from the first grid above (now 5, not the 3m default) — 3 more increments reach this step's declared spacing:8 (round(8/8)+1=2 cols/rows, matching rows:2 cols:2) before dragging. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. Only holeCount is asserted here (depth-insensitive), so this is a metadata-only correction.",
+      "description": "drill_plan grid rows:2 cols:2 spacing:8 depth:6 start:20,20 BlastWorkshop auto-advances Drill -> Charge once holes exist, so re-using the grid tool needs an explicit click back to the Drill tab ([data-step=\"1\"]) first. The spacing stepper also carries its value over from the first grid above (now 5, not the 3m default) — 3 more increments reach this step's declared spacing:8 (round(8/8)+1=2 cols/rows, matching rows:2 cols:2) before dragging. depth corrected from 10 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. #553: confirming a new grid cancels/wipes the fully-drilled previous plan (drillHoles) and the fresh 4 holes start out ordered, not drilled — holeCount drops back to 0.",
       "expect": {
         "equals": {
-          "holeCount": 4
+          "orderedHoleCount": 4,
+          "holeCount": 0
         }
       }
     },

@@ -25,6 +25,7 @@ import {
 } from '../../src/core/mining/EnergyPropagation.js';
 import { identifyFragmentedVoxels } from '../../src/core/mining/VoxelFragmentation.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
+import { createRunner } from '../../src/console/createRunner.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -327,5 +328,31 @@ describe('Blast enhanced', () => {
       }
     }
     expect(clearedCount).toBeGreaterThan(0);
+  });
+
+  // ── 10. Confirmed-but-undrilled holes are not blastable (#553) ──────────
+  //
+  // Every test above operates on PlannedHole[] fed straight into
+  // assembleBlastPlan/executeBlast — the pure pipeline doesn't know about
+  // state.drillHoles/plannedDrillHoles at all (same shape either way), so it
+  // needs no changes here. This one instead drives the console/state layer,
+  // where drill_plan/blast actually read state.drillHoles.
+
+  it('a plan still sitting in plannedDrillHoles blasts nothing — drillHoles empty until each hole lands', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:14,14').success).toBe(true);
+    const state = ctx.state!;
+
+    expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
+    expect(state.drillHoles).toHaveLength(0);
+
+    // Charging a specific ordered-but-undrilled hole must not succeed either
+    // — it has no record in state.drillHoles for the charge to attach to.
+    const orderedId = state.plannedDrillHoles[0]!.id;
+    const chargeResult = run(`charge hole:${orderedId} explosive:boomite amount:6 stemming:1.5`);
+    expect(chargeResult.success).toBe(false);
   });
 });

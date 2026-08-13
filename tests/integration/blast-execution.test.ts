@@ -7,6 +7,7 @@ import { assembleBlastPlan } from '../../src/core/mining/BlastPlan.js';
 import { executeBlast } from '../../src/core/mining/BlastExecution.js';
 import type { VillagePosition } from '../../src/core/mining/BlastExecution.js';
 import { vec3 } from '../../src/core/math/Vec3.js';
+import { createRunner } from '../../src/console/createRunner.js';
 
 // Helper: fill a region of the grid with a rock type
 function fillRegion(
@@ -171,5 +172,57 @@ describe('Blast execution — integration', () => {
     const plan = assembleBlastPlan(holes, {}, {});
     const result = executeBlast(plan, grid, []);
     expect(result).toBeNull();
+  });
+});
+
+// ── #553: a confirmed drill plan is not blastable until every hole has
+// actually landed in state.drillHoles ──────────────────────────────────────
+//
+// The tests above operate on PlannedHole[] fed straight into
+// assembleBlastPlan/executeBlast, bypassing state.drillHoles/
+// plannedDrillHoles entirely — that pure pipeline doesn't know about the
+// split (PlannedHole and DrillHole share a shape). blastCommand/
+// blastPreviewCommand (console/commands/mining.ts), however, read only
+// state.drillHoles, so these drive the console/state layer end to end to
+// prove a plan still sitting in plannedDrillHoles is refused, and a fully
+// drilled one blasts exactly as before.
+
+describe('Blast execution — confirmed-but-undrilled holes are not blastable (#553)', () => {
+  it('a confirmed plan whose holes are still ordered (plannedDrillHoles, not yet drilled) is refused by blast_preview, and state.drillHoles stays empty', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    const state = ctx.state!;
+
+    expect(state.plannedDrillHoles.length).toBeGreaterThan(0);
+    expect(state.drillHoles).toHaveLength(0);
+
+    const preview = run('blast_preview');
+    expect(preview.success).toBe(false);
+    expect(preview.output).toContain('No drill plan');
+    expect(state.drillHoles).toHaveLength(0);
+  });
+
+  it('once every hole has landed (ticked to completion), blast executes exactly as before', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:14,14').success).toBe(true);
+    const state = ctx.state!;
+
+    for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.drillHoles.length).toBeGreaterThan(0);
+
+    expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    expect(run('sequence auto delay_step:25').success).toBe(true);
+
+    const result = run('blast');
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('BLAST REPORT');
   });
 });

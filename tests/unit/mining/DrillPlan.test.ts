@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGridPlan, addHole, removeHole, holeNumericId, resetHoleIds, digVoxel } from '../../../src/core/mining/DrillPlan.js';
-import type { DigVoxelResult } from '../../../src/core/mining/DrillPlan.js';
+import {
+  createGridPlan, addHole, removeHole, holeNumericId, resetHoleIds, digVoxel,
+  landDrilledHole, computeDrillHoleDurationTicks,
+} from '../../../src/core/mining/DrillPlan.js';
+import type { DigVoxelResult, PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import {
+  DRILL_HOLE_BASE_DURATION_TICKS,
+  DRILL_HOLE_REFERENCE_DEPTH_M,
+  DRILL_HOLE_REFERENCE_DIAMETER_M,
+} from '../../../src/core/config/balance.js';
 
 beforeEach(() => resetHoleIds());
 
@@ -79,6 +87,87 @@ describe('DrillPlan', () => {
     expect(holeNumericId(holes[0]!.id)).toBe(1);
     expect(holeNumericId(holes[1]!.id)).toBe(2);
     expect(holeNumericId(added.id)).toBe(3);
+  });
+
+  // ── #553: createGridPlan/addHole still produce stable, sequential ids ──────
+  // (type-only skeleton change — PlannedHole = DrillHole — must not disturb
+  // id generation).
+
+  it('createGridPlan produces stable, sequential ids across a full grid', () => {
+    const holes = createGridPlan({ x: 0, z: 0 }, 2, 2, 3, 8, 0.15);
+    expect(holes.map(h => h.id)).toEqual(['H1', 'H2', 'H3', 'H4']);
+  });
+
+  it('addHole continues the sequential id counter after a grid plan', () => {
+    const holes = createGridPlan({ x: 0, z: 0 }, 1, 2, 3, 8, 0.15);
+    const added = addHole(holes, 9, 9, 8, 0.15);
+    expect(added.id).toBe('H3');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// landDrilledHole tests (#553)
+// ---------------------------------------------------------------------------
+
+describe('landDrilledHole', () => {
+  it('preserves id/x/z/depth/diameter exactly from the planned hole', () => {
+    const planned: PlannedHole = { id: 'H7', x: 12.5, z: -3, depth: 9, diameter: 0.2 };
+
+    const drilled = landDrilledHole(planned);
+
+    expect(drilled).toEqual({ id: 'H7', x: 12.5, z: -3, depth: 9, diameter: 0.2 });
+  });
+
+  it('returns a hole usable as a DrillHole (same shape, not a reference copy issue)', () => {
+    const planned: PlannedHole = { id: 'H1', x: 0, z: 0, depth: 8, diameter: 0.15 };
+
+    const drilled = landDrilledHole(planned);
+
+    expect(drilled.id).toBe(planned.id);
+    expect(drilled.x).toBe(planned.x);
+    expect(drilled.z).toBe(planned.z);
+    expect(drilled.depth).toBe(planned.depth);
+    expect(drilled.diameter).toBe(planned.diameter);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeDrillHoleDurationTicks tests (#553)
+// ---------------------------------------------------------------------------
+
+describe('computeDrillHoleDurationTicks', () => {
+  it('reference depth/diameter costs exactly DRILL_HOLE_BASE_DURATION_TICKS', () => {
+    const ticks = computeDrillHoleDurationTicks(DRILL_HOLE_REFERENCE_DEPTH_M, DRILL_HOLE_REFERENCE_DIAMETER_M);
+    expect(ticks).toBe(DRILL_HOLE_BASE_DURATION_TICKS);
+  });
+
+  it('double depth doubles the duration', () => {
+    const base = computeDrillHoleDurationTicks(DRILL_HOLE_REFERENCE_DEPTH_M, DRILL_HOLE_REFERENCE_DIAMETER_M);
+    const doubled = computeDrillHoleDurationTicks(DRILL_HOLE_REFERENCE_DEPTH_M * 2, DRILL_HOLE_REFERENCE_DIAMETER_M);
+    expect(doubled).toBe(base * 2);
+  });
+
+  it('double diameter doubles the duration', () => {
+    const base = computeDrillHoleDurationTicks(DRILL_HOLE_REFERENCE_DEPTH_M, DRILL_HOLE_REFERENCE_DIAMETER_M);
+    const doubled = computeDrillHoleDurationTicks(DRILL_HOLE_REFERENCE_DEPTH_M, DRILL_HOLE_REFERENCE_DIAMETER_M * 2);
+    expect(doubled).toBe(base * 2);
+  });
+
+  it('a very small depth/diameter clamps to a minimum of 1 tick, never 0 or negative', () => {
+    const ticks = computeDrillHoleDurationTicks(0.001, 0.001);
+    expect(ticks).toBe(1);
+  });
+
+  it('zero depth/diameter clamps to a minimum of 1 tick', () => {
+    const ticks = computeDrillHoleDurationTicks(0, 0);
+    expect(ticks).toBe(1);
+    expect(ticks).toBeGreaterThan(0);
+  });
+
+  it('scales roughly linearly with depth for two arbitrary depths at reference diameter', () => {
+    const shallow = computeDrillHoleDurationTicks(4, DRILL_HOLE_REFERENCE_DIAMETER_M);
+    const deep = computeDrillHoleDurationTicks(16, DRILL_HOLE_REFERENCE_DIAMETER_M);
+    expect(deep).toBeGreaterThan(shallow);
   });
 });
 

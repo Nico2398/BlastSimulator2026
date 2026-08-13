@@ -34,9 +34,13 @@ import {
   // ── ArrivalGate (#437): claim only queues pendingRestDuration/pendingTaskDuration —
   // the timer itself starts once the employee has arrived at targetX/targetZ.
   tickArrivalGate,
+  // ── #550/#553: vehicle-continuity promotion on completion of a
+  // vehicle-gated action (used to keep a driller mounted between holes).
+  tryContinueVehicleGatedAction,
 } from '../../../src/core/engine/GameLoop.js';
 import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
-import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import { completePendingAction, dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
+import { releaseVehicleOnCompletion } from '../../../src/core/engine/VehicleReservation.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import {
   hireEmployee, assignSkill, checkCollapse, getNeedMultiplier, computeTaskDuration,
@@ -45,6 +49,7 @@ import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
+import { landDrilledHole, type PlannedHole } from '../../../src/core/mining/DrillPlan.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -974,6 +979,171 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
     expect(state.pendingActions.find(a => a.id === 1)!.status).toBe('queued');
     expect(state.pendingActions.find(a => a.id === 2)!.holderId).toBe(employee.id);
     expect(employee.activeActionId).toBe(2);
+  });
+});
+
+// ── Issue #553: drilling becomes work — drill_hole PendingActions ───────────
+//
+// The action-lifecycle engine (#547-#552) is already fully generic — a
+// drill_hole PendingAction (requiredSkill:'blasting', requiredVehicleRole:
+// 'drill_rig') drives through claim -> walk -> board -> drive -> tick ->
+// complete with no engine changes. What #553 actually adds is the landing
+// step: moving a completed hole's PlannedHole out of state.plannedDrillHoles
+// and into state.drillHoles via landDrilledHole (mirrors how a completed
+// 'survey' action resolves in events.ts's tick pipeline, not in GameLoop.ts
+// itself — see tickTaskProgress's actionType/actionPayload/actionId result
+// fields). These tests drive the real dispatch/claim/arrival machinery for
+// drill_hole specifically and perform that landing step inline the same way
+// the console tick pipeline is expected to, so they are Red today only
+// because landDrilledHole (DrillPlan.ts) throws 'not implemented' — the
+// claim/ordering machinery itself is exercised, not re-specified.
+//
+// Full end-to-end coverage of the console-level pipeline (drill_plan
+// dispatching these actions, and the tick command performing this same
+// landing step) lives in tests/integration/drill-plan-queueing.test.ts.
+
+describe('drill_hole actions — dispatch and landing (#553)', () => {
+  const SEED = 42;
+
+  function makeFlatNavGrid(width: number, height: number): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(width, height, cells);
+  }
+
+  function makeDriller(state: GameState, rng: Random, x: number, z: number) {
+    const { employee } = hireEmployee(state.employees, 'driller', rng, x, z);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    return employee;
+  }
+
+  function queueDrillHoleAction(state: GameState, hole: PlannedHole, durationTicks = 3): void {
+    dispatchPendingAction(state, {
+      id: state.nextPendingActionId++,
+      type: 'drill_hole',
+      requiredSkill: 'blasting',
+      requiredVehicleRole: 'drill_rig',
+      targetX: hole.x,
+      targetZ: hole.z,
+      targetY: 0,
+      payload: { holeId: hole.id, x: hole.x, z: hole.z, depth: hole.depth, diameter: hole.diameter, durationTicks },
+      targetEmployeeId: null,
+    }, { skipQualificationCheck: true });
+  }
+
+  /**
+   * One full dispatch -> movement -> arrival -> work-tick pass, mirroring the
+   * real tick command (events.ts) but trimmed to what this suite exercises.
+   * On completion of a drill_hole action, performs the same landing step the
+   * console tick pipeline is expected to: continuity-promote the vehicle to a
+   * follow-up hole if one is available, else release it, then move the
+   * completed hole from plannedDrillHoles into drillHoles via
+   * landDrilledHole. Returns the ids of holes that landed this tick, in
+   * completion order.
+   */
+  function runFullTickAndLandDrilledHoles(state: GameState): string[] {
+    tickEmployees(state);
+    tickEmployeeMovement(state);
+    tickArrivalGate(state);
+
+    const landed: string[] = [];
+    for (const emp of state.employees.employees) {
+      if (!emp.alive) continue;
+      const progress = tickTaskProgress(state, emp);
+      if (!progress?.completed || progress.actionId === undefined) continue;
+
+      const completingAction = state.pendingActions.find(a => a.id === progress.actionId);
+      const holeId = completingAction?.payload['holeId'] as string | undefined;
+
+      if (completingAction && completingAction.requiredVehicleRole !== null) {
+        const continued = tryContinueVehicleGatedAction(state, emp, completingAction);
+        if (!continued) releaseVehicleOnCompletion(state, emp, progress.actionId);
+      }
+      completePendingAction(state, progress.actionId);
+
+      if (holeId !== undefined) {
+        const idx = state.plannedDrillHoles.findIndex(h => h.id === holeId);
+        if (idx !== -1) {
+          const [planned] = state.plannedDrillHoles.splice(idx, 1);
+          state.drillHoles.push(landDrilledHole(planned!));
+          landed.push(holeId);
+        }
+      }
+    }
+    return landed;
+  }
+
+  it('two drillers with drill_rigs each land a distinct nearest hole out of three — no double-claim, none drilled twice', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 5);
+    const rng = new Random(SEED);
+
+    makeDriller(state, rng, 0, 0);
+    makeDriller(state, rng, 30, 0);
+    purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    purchaseVehicle(state.vehicles, 'drill_rig', 30, 0);
+
+    const planned: PlannedHole[] = [
+      { id: 'H1', x: 2, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 28, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H3', x: 15, z: 0, depth: 8, diameter: 0.15 },
+    ];
+    state.plannedDrillHoles.push(...planned);
+    for (const hole of planned) queueDrillHoleAction(state, hole);
+
+    const landed: string[] = [];
+    for (let i = 0; i < 400 && landed.length < 3; i++) {
+      landed.push(...runFullTickAndLandDrilledHoles(state));
+    }
+
+    expect(landed).toHaveLength(3);
+    expect(new Set(landed).size).toBe(3);
+    expect(state.drillHoles.map(h => h.id).sort()).toEqual(['H1', 'H2', 'H3']);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+  });
+
+  it('a single driller with one drill_rig lands three holes one at a time, nearest-first — not simultaneously', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 5);
+    const rng = new Random(SEED);
+
+    makeDriller(state, rng, 0, 0);
+    purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+
+    // Distances from (0,0): H3 (5) nearest, H1 (20) middle, H2 (30) farthest.
+    const planned: PlannedHole[] = [
+      { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 30, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H3', x: 5, z: 0, depth: 8, diameter: 0.15 },
+    ];
+    state.plannedDrillHoles.push(...planned);
+    for (const hole of planned) queueDrillHoleAction(state, hole);
+
+    const landedOrder: string[] = [];
+    let sawSimultaneousInProgress = false;
+    for (let i = 0; i < 400 && landedOrder.length < 3; i++) {
+      const inProgressCount = state.pendingActions.filter(
+        a => a.type === 'drill_hole' && a.status === 'in_progress',
+      ).length;
+      if (inProgressCount > 1) sawSimultaneousInProgress = true;
+
+      landedOrder.push(...runFullTickAndLandDrilledHoles(state));
+    }
+
+    expect(sawSimultaneousInProgress).toBe(false);
+    // Landed one at a time (never more than one per tick call above), and
+    // nearest-first, recomputed from wherever the rig actually ends up after
+    // each hole — not fixed at initial dispatch time (mirrors #549's own
+    // "queue advances ... recomputed from where the previous task actually
+    // ended" behavior, exercised here for drill_hole specifically).
+    expect(landedOrder).toEqual(['H3', 'H1', 'H2']);
   });
 });
 
