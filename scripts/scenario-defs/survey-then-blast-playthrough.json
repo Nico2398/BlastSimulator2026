@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
@@ -83,7 +83,7 @@
       "expect": {
         "equals": {
           "employeeCount": 1,
-          "cash": 48800
+          "cash": 198800
         }
       }
     },
@@ -103,7 +103,7 @@
       "expect": {
         "equals": {
           "employeeCount": 2,
-          "cash": 47800
+          "cash": 197800
         }
       }
     },
@@ -123,7 +123,7 @@
       "expect": {
         "equals": {
           "employeeCount": 3,
-          "cash": 46300
+          "cash": 196300
         }
       }
     },
@@ -471,7 +471,43 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:25,25",
+      "command": "vehicle buy drill_rig",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so the driller this file already hires (employee #2) needs a drill_rig to ever staff. campaign start has no staffed:true equivalent, so this is a manual purchase, same pattern as weather-flood.json/vibration-budget.json.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it employee #2 (the driller) could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file's own driller-training beat is elsewhere.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:25,25",
       "interaction": [
         {
           "type": "clickSelector",
@@ -487,18 +523,14 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
           "x1": 25,
           "z1": 25,
-          "x2": 35,
-          "z2": 35
+          "x2": 29,
+          "z2": 29
         },
         {
           "type": "screenshot"
@@ -511,10 +543,79 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
+          "orderedHoleCount": 9,
+          "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable for a single driller/drill_rig (no staffed:true near-origin spawn on a campaign map)."
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts).",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Sixth and final chunk — all 9 holes should have landed by now.",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
