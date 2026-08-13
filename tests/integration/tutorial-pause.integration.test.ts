@@ -134,6 +134,19 @@ describe('Tutorial pause behaviour (#371)', () => {
     expect(runner.run('new_game seed:42 size:32 staffed:true').success).toBe(true);
     expect(runner.run('build freight_warehouse at:6,6').success).toBe(true);
     expect(runner.run('drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:14,14').success).toBe(true);
+    // drill_plan grid now queues one drill_hole PendingAction per hole
+    // instead of writing them straight into state.drillHoles (#553) — the
+    // staffed driller/drill_rig above land them same as any other queued
+    // action. Tops up needs each tick so this solo multi-hole drive can't be
+    // derailed by an unrelated needs collapse mid-drive.
+    for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      runner.run('tick 1');
+    }
     expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
     expect(runner.run('sequence auto delay_step:25').success).toBe(true);
     expect(runner.run('blast').success).toBe(true);

@@ -96,10 +96,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // now-dead ui.vehicles.haul key from both locales. tutorial.stage.vehicle_haul
     // was renamed to tutorial.stage.vehicle_watch in the same change, a 1-for-1
     // swap that leaves the count unaffected.
+    // Baseline is now 3254 (up from 3253): #553 added
+    // ui.blast_workshop.drill.status_ordered — the ORDERED status chip for a
+    // hole still in state.plannedDrillHoles, awaiting its drill_hole action —
+    // both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3253);
+    expect(Object.keys(en).length).toBe(3254);
   });
 });
 

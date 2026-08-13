@@ -3,6 +3,11 @@
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import {
+  DRILL_HOLE_BASE_DURATION_TICKS,
+  DRILL_HOLE_REFERENCE_DEPTH_M,
+  DRILL_HOLE_REFERENCE_DIAMETER_M,
+} from '../config/balance.js';
 
 export interface DrillHole {
   id: string;
@@ -93,13 +98,26 @@ export function holeNumericId(holeId: string): number {
  * action completes (#553). Same value shape, different state array — see
  * `PlannedHole`.
  */
-export function landDrilledHole(_planned: PlannedHole): DrillHole {
-  throw new Error('not implemented');
+export function landDrilledHole(planned: PlannedHole): DrillHole {
+  return {
+    id: planned.id,
+    x: planned.x,
+    z: planned.z,
+    depth: planned.depth,
+    diameter: planned.diameter,
+  };
 }
 
 /** Ticks required to drill one hole, scaled from the reference depth/diameter (#553). */
-export function computeDrillHoleDurationTicks(_depth: number, _diameter: number): number {
-  throw new Error('not implemented');
+export function computeDrillHoleDurationTicks(depth: number, diameter: number): number {
+  return Math.max(
+    1,
+    Math.round(
+      DRILL_HOLE_BASE_DURATION_TICKS
+      * (depth / DRILL_HOLE_REFERENCE_DEPTH_M)
+      * (diameter / DRILL_HOLE_REFERENCE_DIAMETER_M),
+    ),
+  );
 }
 
 export interface DigVoxelResult {

@@ -105,6 +105,38 @@ function makeCtx(): GameContext {
   return ctx;
 }
 
+/**
+ * Hires one driller (qualified 'blasting' by default, ROLE_STARTING_QUALIFICATION)
+ * and buys one drill_rig vehicle, so drill_plan grid's queued drill_hole
+ * actions (#553) can actually land.
+ */
+function hireDrillerAndRig(ctx: GameContext): void {
+  const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
+  expect(hireResult.success).toBe(true);
+  const drillerId = ctx.state!.employees.employees.find(e => e.role === 'driller')!.id;
+  employeeCommand(ctx, ['assign_skill', String(drillerId)], { skill: 'driving.drill_rig', level: '5' });
+  const buyRig = vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+  expect(buyRig.success).toBe(true);
+}
+
+/**
+ * Ticks until every hole ordered by the last drill_plan grid has landed in
+ * state.drillHoles (#553). Tops up employee need gauges each tick — a solo
+ * drill_rig/driller multi-hole drive can otherwise run long enough for
+ * hunger/fatigue/breakNeed to cross a collapse threshold mid-drive, an
+ * unrelated needs mechanic this test isn't exercising.
+ */
+function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 // ── Economy ──────────────────────────────────────────────────────────────────
 
 describe('Economy', () => {
@@ -551,6 +583,12 @@ describe('Economy', () => {
   // failed assertion rather than a thrown stub error.
 
   it('completes the full economy loop: blast, findReachableGroundFragment, haul, store, and deliver against a contract', () => {
+    // Raised above the $50,000 default (#553): this test now crews a
+    // drill_rig ($35,000) on top of the debris_hauler ($25,000) it already
+    // crewed — the default balance cannot cover both once the driller's
+    // hiring cost is deducted too. Nothing here asserts anything about money.
+    ctx.state!.cash = 200_000;
+
     // 1. Blast a small grid so fragments land on the ground.
     //
     // Origin (18,19) rather than (10,10): the fragments have to land on ground
@@ -559,6 +597,8 @@ describe('Economy', () => {
     // findReachableGroundFragment correctly returns null there and the test
     // would be asserting against a fixture the game cannot satisfy. (18,19) is
     // on the same flat bench as the vehicle spawn and the warehouse.
+    hireDrillerAndRig(ctx);
+
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
       origin: '18,19',
       rows: '2',
@@ -567,6 +607,7 @@ describe('Economy', () => {
       depth: '8',
     });
     expect(drillResult.success).toBe(true);
+    driveDrillPlanToCompletion(ctx);
 
     const chargeResult = chargeCommand(ctx as any, [], {
       hole: '*',
@@ -595,7 +636,8 @@ describe('Economy', () => {
 
     const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     expect(buyResult.success).toBe(true);
-    const vehicleId = ctx.state!.vehicles.vehicles[0]!.id;
+    // find (not [0]) — hireDrillerAndRig already purchased a drill_rig above.
+    const vehicleId = ctx.state!.vehicles.vehicles.find(v => v.type === 'debris_hauler')!.id;
 
     const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
     expect(assignResult.success).toBe(true);

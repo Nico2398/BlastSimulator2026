@@ -17,6 +17,7 @@ import {
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
+import { tickCommand } from '../../../src/console/commands/events.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -26,11 +27,33 @@ function makeCtx(): MiningContext {
     grid: null,
     emitter: new EventEmitter(),
   };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
+  // Staffed (#553): the "NavGrid patching — blast" describe below drills a
+  // hole through drill_plan add, which now queues a drill_hole PendingAction
+  // instead of writing the hole straight into state.drillHoles — it needs a
+  // 'blasting'-qualified employee and a drill_rig vehicle to ever land.
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', staffed: 'true' });
   // These tests exercise NavGrid patching on placement/upgrade, not the
   // research gate — pre-unlock every tier so placement isn't blocked.
   ctx.state!.buildings.unlockedTiers.management_office = 3;
   return ctx;
+}
+
+/**
+ * Ticks until every hole ordered by the last drill_plan add/grid has landed
+ * in state.drillHoles (#553). Tops up employee need gauges each tick so an
+ * unrelated needs collapse mid-drive can't derail a test of NavGrid patching
+ * — see the equivalent helper in mining-commands.test.ts for the full
+ * rationale.
+ */
+function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
 }
 
 beforeEach(() => resetHoleIds());
@@ -307,6 +330,7 @@ describe('NavGrid patching — blast', () => {
 
     resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
@@ -358,6 +382,7 @@ describe('NavGrid patching — blast', () => {
 
     resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
@@ -375,6 +400,7 @@ describe('NavGrid patching — blast', () => {
     // Create a drill hole but don't charge it — validation should fail
     resetHoleIds();
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
 
     const result = blastCommand(ctx, [], {});
     expect(result.success).toBe(false);

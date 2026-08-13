@@ -29,6 +29,8 @@ import { completePendingAction } from '../../core/engine/TaskDispatch.js';
 import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
+import { landDrilledHole } from '../../core/mining/DrillPlan.js';
+import { NavGrid } from '../../core/nav/NavGrid.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
 import { updateEcology } from '../../core/campaign/EcologicalDisaster.js';
@@ -295,6 +297,28 @@ export function tickCommand(
             state.damage.accidents.push(...seismicAccidents);
           }
           lines.push(`[tick ${state.tickCount}] ${method} survey complete at (${centerX}, ${centerZ}).`);
+        }
+
+        // A completed 'drill_hole' task lands here — the hole moves from
+        // plannedDrillHoles into drillHoles only once the drill rig has
+        // actually finished it, not the instant the plan was confirmed
+        // (#553, mirrors the 'survey' branch above).
+        if (progress.actionType === 'drill_hole' && progress.actionPayload) {
+          const holeId = progress.actionPayload['holeId'] as string;
+          const plannedIdx = state.plannedDrillHoles.findIndex(h => h.id === holeId);
+          if (plannedIdx !== -1) {
+            const [planned] = state.plannedDrillHoles.splice(plannedIdx, 1);
+            const drilled = landDrilledHole(planned!);
+            state.drillHoles.push(drilled);
+            if (state.navGrid && ctx.grid) {
+              const cx = Math.floor(drilled.x);
+              const cz = Math.floor(drilled.z);
+              NavGrid.patchNavGrid(state.navGrid, ctx.grid, state.buildings.buildings, state.drillHoles, {
+                minX: cx, maxX: cx, minZ: cz, maxZ: cz,
+              });
+            }
+            lines.push(`[tick ${state.tickCount}] Hole ${drilled.id} drilled at (${drilled.x}, ${drilled.z}).`);
+          }
         }
       }
       if (progress.leveledUp) {

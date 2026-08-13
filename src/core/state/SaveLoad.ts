@@ -73,8 +73,11 @@ function migrateV9ToV10(obj: Record<string, unknown>): Record<string, unknown> {
  * `obj` in place, matching every other migration block in `deserialize`
  * below.
  */
-function migrateV10ToV11(_obj: Record<string, unknown>): Record<string, unknown> {
-  throw new Error('not implemented');
+function migrateV10ToV11(obj: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(obj['plannedDrillHoles'])) {
+    obj['plannedDrillHoles'] = [];
+  }
+  return obj;
 }
 
 /**

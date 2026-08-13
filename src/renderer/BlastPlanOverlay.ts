@@ -15,6 +15,12 @@ const HOLE_HEIGHT   = 1.0;    // above-surface marker cap height
 const HOLE_COLOR    = 0xffffff;
 const HOLE_SEGMENTS = 8;      // low-poly cylinder
 
+// Ordered-but-undrilled ghost marker (#553) — a single translucent, dashed-look
+// wireframe stand-in instead of the full drilled-hole rendering (shaft fill,
+// charge indicators, bottom disc): there is nothing to show yet.
+const GHOST_HOLE_COLOR = 0x8899aa;
+const GHOST_HOLE_OPACITY = 0.35;
+
 // Charge color scale (empty → max charge)
 const CHARGE_COLORS: readonly number[] = [
   0x888888, // no charge
@@ -141,10 +147,17 @@ export class BlastPlanOverlay {
   // ---------- Per-hole markers ----------
 
   private addHoleMarker(hd: HoleOverlayData): void {
-    const { hole, charge, delayMs, surfaceY: base } = hd;
+    const { hole, delayMs, surfaceY: base } = hd;
     const x = hole.x, z = hole.z, depth = hole.depth;
     const pickId = holeNumericId(hole.id);
     this.holePositions.set(pickId, new THREE.Vector3(x, base, z));
+
+    if (!hd.drilled) {
+      this.addGhostHoleMarker(hd, pickId);
+      return;
+    }
+
+    const { charge } = hd;
 
     // Surface cap — wireframe ring at terrain surface (X-ray: depthTest off)
     this.addXrayMesh(
@@ -192,6 +205,21 @@ export class BlastPlanOverlay {
       tagPickable(label, 'hole', pickId);
       this.group.add(label);
     }
+  }
+
+  /**
+   * Ghost marker for an ordered-but-undrilled hole (#553) — a single
+   * low-opacity wireframe surface ring, no shaft, no charge fill, no bottom
+   * disc: none of that exists yet for a hole still waiting on its
+   * `drill_hole` action. Still pickable/tagged like a drilled hole's marker.
+   */
+  private addGhostHoleMarker(hd: HoleOverlayData, pickId: number): void {
+    const { hole, surfaceY: base } = hd;
+    this.addXrayMesh(
+      new THREE.CylinderGeometry(HOLE_RADIUS, HOLE_RADIUS, HOLE_HEIGHT, HOLE_SEGMENTS, 1, true),
+      { color: GHOST_HOLE_COLOR, wireframe: true, transparent: true, opacity: GHOST_HOLE_OPACITY, side: THREE.DoubleSide },
+      10, hole.x, base + HOLE_HEIGHT / 2, hole.z, pickId,
+    );
   }
 
   /** Helper: create a mesh with depthTest:false (X-ray) and add to group. `pickId`, when given, tags the mesh as that hole for scene picking. */
