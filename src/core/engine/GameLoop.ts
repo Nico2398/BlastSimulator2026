@@ -319,9 +319,23 @@ function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, r
  * action (promote to active vs. push onto taskQueue), which each leaves to
  * the caller rather than this helper.
  *
- * Returns null when nothing in the pool is reachable within budget, or
- * (defensively — never happens single-threaded) if the top candidate was
- * claimed by someone else between the filter and the claim itself.
+ * Returns null when nothing in the pool is both reachable and claimable
+ * within budget, or (defensively — never happens single-threaded) if the
+ * selected candidate was claimed by someone else between the filter and the
+ * claim itself.
+ *
+ * Vehicle availability (findVehicleForClaim) is threaded into
+ * selectBestActionForEmployee's own isClaimable gate (#552) rather than
+ * checked only after ranking picks a single winner — the previous shape
+ * ranked by cost/distance alone, then applied the vehicle check to just that
+ * top candidate; when it failed (e.g. the nearest debris item needs a
+ * rock_fragmenter but only a debris_hauler driver is free), the employee
+ * gave up for the tick instead of falling through to the next-cheapest
+ * candidate they could actually perform. Folding the check into selection
+ * lets it fall through to the next-ranked candidate (bounded by
+ * ACTION_SELECTION_MAX_PATH_ATTEMPTS, same as the reachability check) —
+ * generalizes to any action type whose claim can fail this gate, not just
+ * haul/fragment ones.
  */
 function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAction | null {
   const poolCandidates = state.pendingActions.filter(a =>
@@ -332,11 +346,17 @@ function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAc
     isHaulOrFragmentActionClaimable(state, a),
   );
 
-  const selection = selectBestActionForEmployee(state, employee, poolCandidates);
+  const selection = selectBestActionForEmployee(
+    state, employee, poolCandidates,
+    candidate => findVehicleForClaim(state, candidate, employee).ok,
+  );
   if (selection === null) return null;
 
+  // Re-resolve to get the actual vehicle to reserve — selectBestActionForEmployee's
+  // isClaimable gate above only reports ok/not-ok, not which vehicle. Guaranteed
+  // to still succeed (single-threaded, nothing else ran between the two calls).
   const vehicleCheck = findVehicleForClaim(state, selection.action, employee);
-  if (!vehicleCheck.ok) return null; // vehicle-gated, none free right now — stays queued, retries next tick
+  if (!vehicleCheck.ok) return null;
 
   const claimed = claimPendingAction(state, selection.action.id, employee.id);
   if (!claimed) return null;

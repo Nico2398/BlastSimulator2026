@@ -140,10 +140,31 @@ export interface SelectedAction {
  * Picks the best action for `employee` out of `candidates`. Ranks by
  * `estimateActionCost`, ties broken by lowest `action.id`, then resolves the
  * real cost (via `resolveActionCost`) only for the top candidates up to
- * `ACTION_SELECTION_MAX_PATH_ATTEMPTS`, returning the first reachable one.
- * Returns `null` when `candidates` is empty or none are reachable.
+ * `ACTION_SELECTION_MAX_PATH_ATTEMPTS`, returning the first reachable one for
+ * which the optional `isClaimable` predicate also passes.
+ *
+ * `isClaimable` (default: always true) lets a caller apply a claim-time gate
+ * — e.g. GameLoop.ts's vehicle-availability check (`findVehicleForClaim`) —
+ * without this module importing that gate itself (would cycle back into the
+ * tick orchestrator, see header). Checked before the (pricier) real-cost
+ * resolution so a candidate that can never be claimed right now doesn't
+ * spend a `findPath` call. Bounded by the same
+ * `ACTION_SELECTION_MAX_PATH_ATTEMPTS` budget as reachability — a nearest
+ * candidate that keeps failing this gate (#552: e.g. an oversized fragment
+ * with no rock_fragmenter driver free) is skipped in favor of the next-
+ * cheapest one the employee can actually perform this tick, instead of
+ * leaving them idle, but only within that bounded top-N window rather than
+ * scanning the whole candidate list.
+ *
+ * Returns `null` when `candidates` is empty or none of the top-ranked ones
+ * are both reachable and claimable.
  */
-export function selectBestActionForEmployee(state: GameState, employee: Employee, candidates: PendingAction[]): SelectedAction | null {
+export function selectBestActionForEmployee(
+  state: GameState,
+  employee: Employee,
+  candidates: PendingAction[],
+  isClaimable: (action: PendingAction) => boolean = () => true,
+): SelectedAction | null {
   if (candidates.length === 0) return null;
 
   const ranked = [...candidates].sort((a, b) => {
@@ -154,6 +175,7 @@ export function selectBestActionForEmployee(state: GameState, employee: Employee
   const attempts = Math.min(ranked.length, ACTION_SELECTION_MAX_PATH_ATTEMPTS);
   for (let i = 0; i < attempts; i++) {
     const candidate = ranked[i]!;
+    if (!isClaimable(candidate)) continue;
     const resolved = resolveActionCost(state, employee, candidate);
     if (resolved !== null) {
       return { action: candidate, totalTicks: resolved.totalTicks };
