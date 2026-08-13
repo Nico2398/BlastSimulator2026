@@ -600,19 +600,28 @@ describe('Economy', () => {
     const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
     expect(assignResult.success).toBe(true);
 
-    // 3. Build an active Freight Warehouse. (13,13), near the drill site
-    // rather than (5,5): bigger levels (#458 T6.1/D13) carry far more
-    // natural terrain relief than the old ones, fragmenting NavGrid bench
-    // levels into small pockets more often — (5,5) sat on a different bench
-    // than the drill/fragment area with no nearby ramp connecting them, so
-    // a loaded hauler could never findPath there (confirmed via direct
-    // reproduction). Keeping pickup and drop-off on the same bench
-    // sidesteps that pathfinding gap; a deeper general fix belongs to T6.2.
+    // Let the driver walk to and board the vehicle. No Freight Warehouse
+    // exists yet at this point — deliberately: self-dispatch (#552) can only
+    // ever start a haul_debris workflow once an active depot exists
+    // (requestHaulFragment's own depot check), so with no depot the hauler
+    // simply stays idle/seated across this wait instead of racing the manual
+    // haul below with an automatic one.
+    for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
+
+    // 3. Build an active Freight Warehouse now — immediately before the
+    // manual reachability probe/haul below, with no tick in between, so
+    // self-dispatch has no opportunity to claim this same vehicle first
+    // (syncHaulDispatch/tickEmployees only run inside tickCommand). (13,13),
+    // near the drill site rather than (5,5): bigger levels (#458 T6.1/D13)
+    // carry far more natural terrain relief than the old ones, fragmenting
+    // NavGrid bench levels into small pockets more often — (5,5) sat on a
+    // different bench than the drill/fragment area with no nearby ramp
+    // connecting them, so a loaded hauler could never findPath there
+    // (confirmed via direct reproduction). Keeping pickup and drop-off on
+    // the same bench sidesteps that pathfinding gap; a deeper general fix
+    // belongs to T6.2.
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
     expect(buildResult.success).toBe(true);
-
-    // Let the driver walk to and board the vehicle.
-    for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
 
     // 4. Reachability-aware fragment selection — the fix under test.
     const fragmentId = findReachableGroundFragment(ctx.state!, vehicleId);

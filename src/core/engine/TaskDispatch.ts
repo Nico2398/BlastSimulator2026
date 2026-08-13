@@ -6,7 +6,7 @@ import { SURVEY_COSTS } from '../config/balance.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
-import { releaseVehicleReservation } from './VehicleReservation.js';
+import { releaseVehicleReservation, releaseVehicleReservationKeepDriver } from './VehicleReservation.js';
 
 export type { PendingAction };
 
@@ -255,7 +255,12 @@ function actionOrderCost(action: PendingAction): number {
  * needs-driven interruption on a long task could silently double its total
  * completion time.
  */
-export function interruptActiveAction(state: GameState, employee: Employee, actionId: number | null): void {
+export function interruptActiveAction(
+  state: GameState,
+  employee: Employee,
+  actionId: number | null,
+  options?: { keepVehicleDriver?: boolean },
+): void {
   if (actionId !== null) {
     const action = state.pendingActions.find(a => a.id === actionId);
     if (action) {
@@ -273,7 +278,15 @@ export function interruptActiveAction(state: GameState, employee: Employee, acti
 
       // releaseVehicleReservation no-ops on its own when nothing is reserved
       // for this action id, so no need to gate the call on requiredVehicleRole.
-      releaseVehicleReservation(state, action.id);
+      // options.keepVehicleDriver (#552) skips the dismount for the one
+      // caller (ArrivalGate.ts's resolveBoarding) interrupting an action
+      // whose driver had *just* boarded this same tick for it — every other
+      // caller keeps the full dismount-and-idle release.
+      if (options?.keepVehicleDriver) {
+        releaseVehicleReservationKeepDriver(state, action.id);
+      } else {
+        releaseVehicleReservation(state, action.id);
+      }
     }
   }
 

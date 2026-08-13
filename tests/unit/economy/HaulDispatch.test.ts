@@ -81,7 +81,16 @@ describe('syncHaulDispatch — creates haul_debris actions', () => {
       expect(action.holderId).toBeNull();
       expect(action.targetEmployeeId).toBeNull();
       expect(action.requiredVehicleRole).toBe('debris_hauler');
-      expect(action.requiredSkill).toBe('driving.truck');
+      // requiredSkill is deliberately null, not 'driving.truck' — the real
+      // licence check happens at claim time via requiredVehicleRole/
+      // findVehicleForClaim (VehicleReservation.ts's isLicensedForRole), not
+      // via requiredSkill. Setting it here would make tickEmployees'
+      // roster-wide "does anyone qualify" scan (GameLoop.ts) flag this action
+      // unqualified — auto-pausing the game with an unqualified_task_error
+      // event — the instant it's queued on a fresh site with no licensed
+      // driver hired yet, instead of letting it sit queued silently (see
+      // HaulDispatch.ts's own header comment on syncHaulDispatch).
+      expect(action.requiredSkill).toBeNull();
 
       const fragment = state.logistics.fragments.find(
         f => f.fragment.id === (action.payload as { fragmentId: number }).fragmentId,
@@ -155,7 +164,8 @@ describe('syncHaulDispatch — oversized fragments', () => {
     const action = state.pendingActions[0]!;
     expect(action.type).toBe('fragment_debris');
     expect(action.requiredVehicleRole).toBe('rock_fragmenter');
-    expect(action.requiredSkill).toBe('driving.excavator');
+    // requiredSkill deliberately null — see the same-shaped assertion above.
+    expect(action.requiredSkill).toBeNull();
     expect((action.payload as { fragmentId: number }).fragmentId).toBe(1);
   });
 

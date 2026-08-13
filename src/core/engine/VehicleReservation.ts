@@ -127,8 +127,12 @@ export function promoteVehicleGatedAction(state: GameState, employee: Employee, 
         // active depot) — release the reservation so
         // reconcileVehicleReservations (ArrivalGate.ts) catches it next tick
         // and returns the action to the pool instead of leaving it claimed
-        // with nothing actually driving it.
-        releaseVehicleReservation(state, action.id);
+        // with nothing actually driving it. Keeps the driver seated (#552,
+        // see releaseVehicleReservationKeepDriver) — they are already
+        // aboard this exact vehicle via the continuity tie-break, so
+        // dismounting them here would only force a needless walk-back-and-
+        // reboard the moment a depot appears.
+        releaseVehicleReservationKeepDriver(state, action.id);
       }
       return;
     }
@@ -160,6 +164,26 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
     unassignDriver(state.vehicles, vehicle.id);
     setVehicleIdle(vehicle);
   }
+}
+
+/**
+ * Lighter release for the one case where dismounting is actively harmful:
+ * a haul_debris/fragment_debris workflow (HaulingTask.ts/BoulderBreaking.ts's
+ * request*) that could not start this tick — no active depot yet, fragment
+ * picked clean between claim and promotion — right after the driver had
+ * *just* boarded (or was already driving) this exact vehicle for it. Clears
+ * only reservedForActionId, leaving the driver seated and the vehicle idle:
+ * next tick's claim reads them as idle again and findFreeVehicleForRole's own
+ * continuity tie-break (driverId === employee.id) hands the same vehicle
+ * straight back, instead of forcing a dismount-then-walk-back-and-reboard
+ * cycle every single tick nothing can start yet (#552). No-op if no vehicle
+ * is reserved for `actionId`.
+ */
+export function releaseVehicleReservationKeepDriver(state: GameState, actionId: number): void {
+  const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === actionId);
+  if (!vehicle) return;
+
+  vehicle.reservedForActionId = null;
 }
 
 /**

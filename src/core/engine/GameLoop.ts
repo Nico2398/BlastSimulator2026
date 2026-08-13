@@ -210,6 +210,21 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
 
   const orderedEmployees = [...eligible].sort((a, b) => a.id - b.id);
   for (const employee of orderedEmployees) {
+    // An employee mid-walk to board a vehicle from a manual `vehicle driver`
+    // command (pendingDriverVehicleId set, VehicleBoarding.ts) has not yet
+    // gone through claim/promotion at all — activeActionId is still null, so
+    // without this guard they read as idle and fillIdleEmployeeFromQueueOrPool
+    // would happily claim them a pool haul_debris/fragment_debris action on
+    // the very same vehicle they are about to board. resolveBoarding
+    // (ArrivalGate.ts) then reserves the vehicle for that new action and, if
+    // the workflow can't start yet (no depot, fragment moved on), calls
+    // interruptActiveAction -> releaseVehicleReservation, which unassigns
+    // the driver it had just seated moments earlier in that same tick — the
+    // manual command silently loses its boarding underneath the player.
+    // Skipping the whole claim sequence while a boarding walk is in flight
+    // leaves it to resolve on its own first; dispatch resumes for this
+    // employee the very next tick either way (#552).
+    if (employee.pendingDriverVehicleId !== null) continue;
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);

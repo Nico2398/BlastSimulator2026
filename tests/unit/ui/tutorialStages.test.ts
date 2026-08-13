@@ -169,17 +169,22 @@ describe('haul-debris stage list (#552 — self-dispatching, no manual Haul butt
   // Hauling is fully automatic now: on-ground fragments spawn their own
   // PendingActions and a qualified employee claims/drives/delivers them with
   // no player click. The step has nothing left to walk the player through
-  // stage by stage — it teaches watching, not clicking — so it carries no
-  // keyed TUTORIAL_STAGES entry and falls back to a single generic stage
-  // built from its own highlightTarget (stagesFor's documented fallback).
+  // stage by stage — it teaches watching, not clicking — so TUTORIAL_STAGES
+  // carries one explicit watch-only stage (matching every other step's
+  // convention of a keyed entry) pointing at the same Fleet toolbar target
+  // as the step's own highlightTarget, rather than relying on stagesFor's
+  // generic fallback.
 
-  it('has no keyed TUTORIAL_STAGES entry', () => {
-    expect(TUTORIAL_STAGES['haul-debris']).toBeUndefined();
-  });
-
-  it('falls back to a single stage pointing at the step\'s own highlightTarget', () => {
+  it('has a single keyed TUTORIAL_STAGES entry pointing at the Fleet toolbar', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris')!;
     expect(step.highlightTarget).toBeDefined();
+
+    expect(TUTORIAL_STAGES['haul-debris']).toHaveLength(1);
+    expect(TUTORIAL_STAGES['haul-debris']![0]!.target).toBe(step.highlightTarget);
+  });
+
+  it('agrees with stagesFor when the step\'s own highlightTarget is passed', () => {
+    const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris')!;
 
     const stages = stagesFor('haul-debris', step.highlightTarget);
 

@@ -317,8 +317,12 @@ function resolveBoarding(
           // action back to the pool instead of leaving the vehicle boarded
           // with nothing to do; a later dispatch/claim pass retries once the
           // situation clears (no error, no crash — same contract as the
-          // claim-time isHaulOrFragmentActionClaimable gate).
-          interruptActiveAction(state, emp, reservedAction.id);
+          // claim-time isHaulOrFragmentActionClaimable gate). keepVehicleDriver
+          // (#552) leaves `emp` seated — they just boarded this exact vehicle
+          // moments ago in this same tick (a few lines up), so dismounting
+          // them immediately would only force a needless walk-back-and-reboard
+          // the instant the situation clears.
+          interruptActiveAction(state, emp, reservedAction.id, { keepVehicleDriver: true });
           return;
         }
       } else if (reservedAction) {
