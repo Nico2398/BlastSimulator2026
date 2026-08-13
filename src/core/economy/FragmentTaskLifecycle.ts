@@ -10,7 +10,7 @@
 // arrival.
 
 import type { GameState } from '../state/GameState.js';
-import type { Vehicle } from '../entities/Vehicle.js';
+import type { Vehicle, VehicleRole } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import type { TrackedFragment } from './Logistics.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
@@ -30,6 +30,25 @@ export function findRequestVehicle(
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: 'Vehicle not found' };
   return { success: true, vehicle };
+}
+
+/**
+ * Look up `vehicleId` and confirm it is a `expectedRole` vehicle, in one step
+ * — the first two checks requestBreakBoulder and requestHaulFragment both
+ * run before diverging into their own role-specific conditions (driver
+ * assigned, not already busy). `wrongRoleError` carries the caller's own
+ * wording so the two request entry points keep their distinct error messages.
+ */
+export function findRequestVehicleOfRole(
+  state: GameState,
+  vehicleId: number,
+  expectedRole: VehicleRole,
+  wrongRoleError: string,
+): { success: true; vehicle: Vehicle } | { success: false; error: string } {
+  const found = findRequestVehicle(state, vehicleId);
+  if (!found.success) return found;
+  if (found.vehicle.type !== expectedRole) return { success: false, error: wrongRoleError };
+  return found;
 }
 
 /**

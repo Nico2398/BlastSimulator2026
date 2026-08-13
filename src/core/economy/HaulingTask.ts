@@ -12,7 +12,7 @@ import { tickVehicle, tickVehicleTaskState } from '../engine/EntityMovementTick.
 import { pickupFragment, deliverToDepot } from './Logistics.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
-import { findRequestVehicle, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
 
 /**
  * True when `vehicle` is a debris_hauler with a driver assigned and no
@@ -39,10 +39,9 @@ export function requestHaulFragment(
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  const found = findRequestVehicle(state, vehicleId);
+  const found = findRequestVehicleOfRole(state, vehicleId, 'debris_hauler', 'Vehicle is not a debris hauler');
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicle.type !== 'debris_hauler') return { success: false, error: 'Vehicle is not a debris hauler' };
   if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.haulingPhase !== null) return { success: false, error: 'Vehicle is already hauling' };
 

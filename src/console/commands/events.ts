@@ -4,7 +4,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
-import { getEventById } from '../../core/events/EventPool.js';
+import { getEventById, type EventDef } from '../../core/events/EventPool.js';
 import { tickEventSystem, clearLastOutcome } from '../../core/events/EventSystem.js';
 import { resolveEvent } from '../../core/events/EventResolver.js';
 import type { EventContext } from '../../core/events/EventPool.js';
@@ -79,6 +79,18 @@ function buildEventContext(ctx: GameContext): EventContext {
     activeContractCount: s.contracts.active.length,
     weatherId: 'clear', // TODO: wire actual weather when available
   };
+}
+
+/**
+ * Appends the numbered option list and the "how to decide" hint shared by
+ * every place a pending event gets reported to the player (auto-fired mid-tick
+ * and the "event fire" debug command) — mutates `lines` in place.
+ */
+function pushEventOptionLines(lines: string[], def: EventDef): void {
+  for (let j = 0; j < def.options.length; j++) {
+    lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
+  }
+  lines.push('  → Use "event choose <index>" to decide.');
 }
 
 // ── tick command ──
@@ -384,10 +396,7 @@ export function tickCommand(
       if (def) {
         lines.push(`[tick ${state.tickCount}] EVENT: ${t(def.titleKey)}`);
         lines.push(`  ${t(def.descKey)}`);
-        for (let j = 0; j < def.options.length; j++) {
-          lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
-        }
-        lines.push('  → Use "event choose <index>" to decide.');
+        pushEventOptionLines(lines, def);
       }
       state.isPaused = true;
       break;
@@ -502,10 +511,7 @@ export function eventCommand(
         `EVENT: ${t(def.titleKey)}`,
         `  ${t(def.descKey)}`,
       ];
-      for (let j = 0; j < def.options.length; j++) {
-        lines.push(`  [${j}] ${t(def.options[j]!.labelKey)}`);
-      }
-      lines.push('  → Use "event choose <index>" to decide.');
+      pushEventOptionLines(lines, def);
       return { success: true, output: lines.join('\n') };
     }
 

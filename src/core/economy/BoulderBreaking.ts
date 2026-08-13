@@ -12,7 +12,7 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { isOversized, fragmentBoulder, type Boulder } from '../mining/BlastCalc.js';
 import { fragmentApproachCell } from './FragmentApproach.js';
-import { findRequestVehicle, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
+import { findRequestVehicleOfRole, driveTowardFragment, findNearestReachableFragment } from './FragmentTaskLifecycle.js';
 import { tickVehicleTaskState } from '../engine/EntityMovementTick.js';
 import { Random } from '../math/Random.js';
 import { scale, vec3, ZERO } from '../math/Vec3.js';
@@ -37,10 +37,9 @@ export function requestBreakBoulder(
   vehicleId: number,
   fragmentId: number,
 ): { success: boolean; error?: string } {
-  const found = findRequestVehicle(state, vehicleId);
+  const found = findRequestVehicleOfRole(state, vehicleId, 'rock_fragmenter', 'Vehicle is not a rock fragmenter');
   if (!found.success) return found;
   const vehicle = found.vehicle;
-  if (vehicle.type !== 'rock_fragmenter') return { success: false, error: 'Vehicle is not a rock fragmenter' };
   if (vehicle.driverId === null) return { success: false, error: 'Vehicle has no driver' };
   if (vehicle.breakPhase !== null) return { success: false, error: 'Vehicle is already breaking a fragment' };
 
