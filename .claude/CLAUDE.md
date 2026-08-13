@@ -98,6 +98,8 @@ Push, then read the CI job — its result *is* the channel's result, and its art
 
 A channel that belongs to CI is **covered**, never pending: an autonomous run marks its PR `READY TO MERGE` and the merge machinery waits for the job and decides on its result. Handing a channel to CI is not a reason to withhold the marker — `agentic-pipeline-pr-management` again.
 
+**Covered means the report gets read, not that you may leave before it arrives.** A red CI is announced to nobody: `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked PR. So an autonomous run's last step is `npm run ci:await -- --pr <number>`, which blocks until every workflow run on the PR head reports — green ends the run, red is work on the same branch. PR #581 is what skipping it costs: green on every channel its session ran, marked, two interaction shards red, and issue #552 held the queue until a human looked. `agentic-pipeline-finalization` holds the step and its bounded fix loop; `agentic-pipeline-ci-fix` is the pipeline for a red CI handed back to a later session.
+
 **While any browser-driven run is in flight: change no file** (Vite reloads the page and kills the run with `Execution context was destroyed`, which looks like a game bug and is not), **start no second browser harness**, and **wait for the run's own terminal line**. Slow is not stuck. A run you interrupted produced no result — report the channel as pending CI, never as passed.
 
 ## ▶ Capability Gate

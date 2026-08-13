@@ -32,6 +32,7 @@ Classify the task, then load the relevant skill. After loading, execute that ski
 | New feature / Visual/rendering change | `agentic-pipeline-full` |
 | Bug fix | `agentic-pipeline-fix-bug` |
 | PR review | `agentic-pipeline-review-pr` |
+| Red CI on an existing pipeline PR | `agentic-pipeline-ci-fix` |
 | Question/analysis | `agentic-pipeline-ask` |
 | Imperative command | `agentic-pipeline-executor` |
 | Complex/mixed prompt | `agentic-pipeline-multi` |
@@ -44,6 +45,7 @@ When selecting a pipeline, apply these heuristics in order. First match wins —
 
 | If task... | Then pipeline |
 |------------|---------------|
+| Names a red CI on an open `pipeline/feature-<N>` PR — a handback from `agentic-ci-failure.yml`, or a failing check on a PR that already exists | `agentic-pipeline-ci-fix` (checked first: it reads as a bug report, and the fix-bug pipeline would rebuild a branch that already carries the work) |
 | Is a bug report, mentions "bug", "fix", "broken", "regression", "error", "unexpected behavior" | `agentic-pipeline-fix-bug` |
 | Requests a new feature, component, mechanic, or enhancement | `agentic-pipeline-full` |
 | Changes rendering, canvas, Three.js, UI, visuals | `agentic-pipeline-full` |
@@ -102,8 +104,9 @@ These are absolute. Violating any of these = orchestrator failure.
 - **Never wait for a human** — a GitHub Actions run has nobody to answer mid-run. When blocked, label the issue `blocked`, comment what is missing, and stop with `ESCALATED: human intervention required`. Never idle, never guess past a hard blocker.
 - **Never end a run with its issue still held** — an assignment labels the issue `in-progress`, and only a merged PR or the stall sweep takes that label off. Single flight reads that label as a live run, so an issue left holding it defers every later assignment until the sweep ages it out and reports a finished run as a lost one. Every run leaves its issue in a terminal state: a PR that closes it, `blocked` naming what is missing, or — when the deliverable was an answer or a command rather than a diff — closed and labelled `done`.
 - **Default every open requirement, escalate only a genuine blocker** — `agentic-decision-autonomy` holds the whole list of blockers and the default-and-record rule. An issue that leaves a choice open is an ordinary issue: pick the default the spec and the surrounding code already imply, write it into the skill that owns the rule, record it in the PR body under `## Decisions taken`, and finish the run. A defaulted decision never turns a PR into a draft, never removes `READY TO MERGE`, and never becomes an escalation.
+- **Never end a run before its PR's CI has reported** — `READY TO MERGE` hands the PR to the merge machinery; it does not hand off the verdict on the channels this run deferred to CI. Run `agentic-pipeline-finalization`'s `[await-ci]` step and stay until it returns: GREEN ends the run, RED is work. A red CI is reported to nobody — `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked PR — so a run that leaves on one leaves its issue held and the queue stalled behind it, which is what PR #581 did to issue #552. Waiting is not idling for a human: the wait ends on an event, and every round of it is this run's own work.
 - **Never hold a verified PR for churn** — retries, review findings, visual iterations and implementer do-overs are how a run converges, not evidence that it failed. PR status follows the verification channels alone; when they all report PASS, the PR ships `READY TO MERGE` no matter how many rounds it took.
-- **Never end a turn with work outstanding** — a runner session is headless and single-shot: ending your turn ends the process, and every branch on the runner's disk dies with it unpushed. "Launched, waiting for completion notifications" is not a pipeline state — there is no later turn in which to receive one. A turn ends only on a PR, an `ESCALATED:` line, or the `blocked` label. If you have delegated something, you are still mid-turn until it has returned.
+- **Never end a turn with work outstanding** — a runner session is headless and single-shot: ending your turn ends the process, and every branch on the runner's disk dies with it unpushed. "Launched, waiting for completion notifications" is not a pipeline state — there is no later turn in which to receive one. A turn ends only on a PR whose CI has reported green, an `ESCALATED:` line, or the `blocked` label. If you have delegated something, you are still mid-turn until it has returned. Blocking on CI inside your own turn is the opposite case and is required: `[await-ci]` returns to *you*, so its result does arrive.
 - **Context to pass to each agent:**
   - All agents: issue description, plan, current branch, files modified so far
   - **@implementer (standard TDD):** pass planner's acceptance criteria + stub signatures. Focus on the contract: inputs, outputs, edge cases, return types. Do not reference test file paths or use the word "test" in context. Branch isolation (impl branch has no test files) is the enforcement — verbal description is supplementary.

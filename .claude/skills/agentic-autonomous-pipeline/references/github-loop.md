@@ -28,6 +28,19 @@ How a filed issue becomes a merged pull request with nobody watching, and every 
                                      │  label `done`               │  then chain unless the
                                      └─ [agentic-assign] ──────────┴─ cascade brake is tripped
                                               next `ready` issue → back to the top
+
+   the branch off that path: the PR opened, CI reported, and CI was red
+            │
+            ▼
+   agentic-ci-failure.yml  ── on `workflow_run` CI completed + failure
+            │  the run that opened the PR is normally still here, waiting on this
+            │  very verdict through `[await-ci]` — so the workflow declines while
+            │  any runner run is live, and `agentic-watchdog.yml` re-raises it later
+            ▼
+   "<mention> — CI is red on this pull request …"  → the runner, on the same PR
+            │  fix on `pipeline/feature-<N>`, push, CI again
+            └─ green → auto-merge → back into the loop above
+               limit spent → PR to draft, issue `blocked` → handle-failure.yml
 ```
 
 ## Three ways in, and nothing else
@@ -38,7 +51,9 @@ How a filed issue becomes a merged pull request with nobody watching, and every 
 | `auto-assign-next.yml` | `pull_request: closed` with `merged == true` | Chain from the merge to the next issue. This is how a run begins from the previous one succeeding |
 | `handle-failure.yml` | `issues: labeled` with `blocked` | Chain past a run that ended blocked, and report the failure. This is how a run begins from the previous one *failing* |
 
-**Nothing else may start a session.** Filing an issue, labelling one `ready`, reopening one, and the passage of time all leave the queue exactly where it was. `agentic-intake.yml` still reacts to `issues: opened, reopened`, but only to keep the label definitions present and to drop a stale `done` from a reopened issue — it assigns nothing. `agentic-watchdog.yml` still sweeps hourly, but only to release issues whose runs died; it does not restart the queue itself — the `blocked` label it applies does, through `handle-failure.yml`, which is why that label must be applied with the PAT.
+**Nothing else may start a session on a new issue.** Filing an issue, labelling one `ready`, reopening one, and the passage of time all leave the queue exactly where it was.
+
+There is one path that starts a session without assigning anything, and the distinction is the whole of why it is allowed: `agentic-ci-failure.yml` hands a **pull request that already exists** back to the agent that already owns it. It selects no issue, reads no queue, and changes no label on the happy path — see "A red CI is nobody's report" below. `agentic-intake.yml` still reacts to `issues: opened, reopened`, but only to keep the label definitions present and to drop a stale `done` from a reopened issue — it assigns nothing. `agentic-watchdog.yml` still sweeps hourly, but only to release issues whose runs died; it does not restart the queue itself — the `blocked` label it applies does, through `handle-failure.yml`, which is why that label must be applied with the PAT.
 
 **The third entry is what makes the loop closed.** A blocked run is terminal exactly as a merge is, and both outcomes have to release the queue: with only the first two entries, every failure parked the pipeline until a human dispatched the trigger, which on a repository with nobody watching means until somebody noticed. The chain from a failure is bounded rather than unconditional — see the cascade brake below.
 
@@ -67,7 +82,7 @@ Intake never applies `agent-task` or `ready` itself — that would take label as
 
    **The agent step needs the PAT stated twice.** `claude-code-action` exports its own `github_token` input into the session environment, overriding the step-level `GH_TOKEN` — so that input is the identity `gh pr create` actually runs under. Left as `GITHUB_TOKEN`, the PR is authored by `github-actions[bot]`, and GitHub creates its `pull_request` workflow runs already parked as `action_required`: "N workflows awaiting approval", no CI, no `auto-assign-next.yml`. Both `claude-code-action` steps in `claude-runner.yml` therefore pass `PAT_TOKEN_COPILOT_AUTOMATION` as `github_token`. `opencode-runner.yml` needs no equivalent — opencode reads `GH_TOKEN` from the step environment and overrides nothing.
 
-   **A consequence to respect:** under the PAT, everything the session posts is authored by a real user rather than a bot, and the runners' trigger guard filters on `comment.user.type != 'Bot'`. An agent-authored comment containing the agent's own mention would therefore wake a new run. No pipeline comment may contain `@claude` or `@opencode` — the assignment comment is the only comment allowed to carry a mention.
+   **A consequence to respect:** under the PAT, everything the session posts is authored by a real user rather than a bot, and the runners' trigger guard filters on `comment.user.type != 'Bot'`. An agent-authored comment containing the agent's own mention would therefore wake a new run. **No comment written by an agent session may contain `@claude` or `@opencode`.** Exactly two comments in the whole system carry a mention, and both are written by a workflow rather than by a session: the assignment comment from `agentic-assign`, and the CI handback from `agentic-ci-failure.yml`. Each is a deliberate trigger, each is bounded, and each must be posted with the PAT for the same reason — under `GITHUB_TOKEN` the author is a bot and the runners filter it out, so the trigger would be written and never read.
 2. **The assignment comment carries the whole assignment.** It names the issue, mandates orchestrator-first delegation, states the branch names, the verification expectation, and the PR conventions. Its text is identical for every agent apart from the mention on the first line — the runtimes read the same instructions.
 
 An issue the agent closes without opening a PR raises no `pull_request` event either, so nothing chains from it. The runners used to carry their own step for that case; it was removed, because a run starting the next run is the pipeline deciding to run again on its own. Such a run still *releases* its issue — closes it, labels it `done`, drops `in-progress` — so the queue is free the moment somebody asks for the next one.
@@ -87,6 +102,8 @@ The loop stops while an issue is still `in-progress` (single flight), when no as
 Resuming a blocked issue is still a human act: add `ready` to put it back in the queue. The label alone starts nothing, and if a rescued draft PR is still open against the issue it will not be selected at all until that PR is closed or merged.
 
 A run that dies without labelling anything — OOM, a hung tool call, the job timeout, a revoked token, a turn ended on outstanding work — would otherwise leave its issue `in-progress` forever and halt the chain silently. `agentic-watchdog.yml` sweeps hourly: an issue `in-progress` past `AGENTIC_STALL_MINUTES` with no linked PR is commented on, labelled `blocked`, and stripped of `in-progress`. That labelling is what surfaces the failure, so the watchdog must use the PAT — a label applied with `GITHUB_TOKEN` raises no `issues: labeled` event and `handle-failure.yml` would never fire.
+
+The linked-PR skip in that sweep has a blind spot of its own, and the watchdog carries a second sweep for it: an open, non-draft `pipeline/feature-<N>` PR whose latest CI run failed is handed to `agentic-ci-failure.yml` by dispatch. It decides nothing itself — every guard stays in the fail-safe — so this is the same event raised again, not a second opinion about it. See "A red CI is nobody's report".
 
 **Only a step that can see the run end may declare it lost.** That is a rule about evidence, not about seniority. `agentic-assign` sees labels alone, where a run 40 seconds old and one that died hours ago are indistinguishable, so it defers and never diagnoses. The watchdog ages the run against a threshold, which is inference — correct, but hours late. The runners' own post-agent steps have the one thing neither has: they run *after* the session is over, in the same job, so "this run finished and produced nothing" is an observation. They are allowed to settle the issue for that reason, and the watchdog remains the floor for the runs that never got that far — a job killed before its post-steps, a dropped webhook.
 
@@ -161,6 +178,8 @@ Everywhere the loop asks "does this issue have its PR" — the single-flight def
 | `AGENTIC_AUTO_MERGE_ENABLED` | `true` / anything else | Whether a `READY TO MERGE` PR gets GitHub native auto-merge |
 | `AGENTIC_STALL_MINUTES` | minutes, default `420`; a value below the runners' 360-minute job timeout is clamped up to it | How long an issue may stay `in-progress` without a linked PR before the watchdog marks it `blocked`. Below the job timeout it would sweep live runs |
 | `AGENTIC_BLOCKED_CHAIN_LIMIT` | positive integer, default `3`; anything else falls back to the default rather than disabling the brake | How many runs may end `blocked` since the last merged pipeline PR before the chain from a failure parks the queue |
+| `AGENTIC_CI_FIX_ENABLED` | anything but `false`, default on | Whether a red CI on a pipeline PR is handed back to the agent. Off, a red CI reports to nobody again — the state PR #581 was left in |
+| `AGENTIC_CI_FIX_ATTEMPT_LIMIT` | positive integer, default `3`; anything else falls back to the default rather than disabling the brake | How many times the same pull request may be handed back for a red CI before it is parked as a draft with its issue `blocked` |
 
 Switching agents is a one-value change: set `AGENTIC_AGENT` to `@claude` and every subsequent assignment comment mentions `@claude`, waking `claude-runner.yml` instead of `opencode-runner.yml`. Both runners stay enabled either way, so a human can still summon the other runtime by commenting its mention by hand. An unrecognised value fails the assignment step loudly rather than silently picking a default.
 
@@ -179,6 +198,8 @@ The fix is not a poller. It is that **the run which opens the PR arms it, in the
 | `agentic-auto-merge.yml` | `workflow_run` on CI completing | The moment the PR actually becomes mergeable. Every other entry fires while the checks are still running, and CI finishing raises no `pull_request` event, so without this the last word on a PR is always spoken before its last check reports |
 | `agentic-auto-merge.yml` | manual dispatch | A PR stranded by an older run, or by a job cancelled before its arming step. Still not a clock: both triggers react to something |
 
+A fifth entry does the opposite and belongs in the same list for that reason: `agentic-ci-failure.yml` fires on the same `workflow_run` event with the opposite conclusion, and hands the PR back to the agent instead of merging it. Between them the two workflows cover both verdicts, which is what the CI-completion event is worth reacting to at all.
+
 All four call the same composite action, so they cannot disagree about what "ready to merge" means. Selection is the marker on a line of its own plus a non-draft PR; the author is logged and never branched on. The action also releases any workflow run parked as `action_required` on the PR head, which is what makes CI start at all on a bot-authored PR — that needs `actions: write` on the PAT, and without it the step still enables auto-merge, warns naming the missing scope, and the PR waits on checks that never start.
 
 **Every refusal is decided on the PR's state, never on the wording of the error.** GitHub declines native auto-merge on a PR that has nothing left to wait for and on a repository with the feature switched off, so the action falls back to merging the PR itself.
@@ -192,6 +213,29 @@ All four call the same composite action, so they cannot disagree about what "rea
 `unknown` — mergeability GitHub has not finished computing — used to be polled out. It no longer is: **the merge request is the authority on whether a PR merges**, so once every run has reported the action asks GitHub to merge and reads the answer, instead of polling a state until it looks like the answer would be yes. One request replaces the loop, and a refusal names what stopped it.
 
 Two traps in that reading, both load-bearing. A head with *no* runs is `pending`, never a merge: a PR read in the second before its CI run is created has nothing failing and nothing running, and treating that as green ships code no channel ever saw. And a run belonging to the workflow hosting the action is skipped — otherwise the sweep counts itself as a check in flight and waits on itself forever, on a PR whose real checks all passed. A marked PR that ends neither armed nor merged **fails the step**: it holds its issue and every assignment queued behind it, and a warning in a job log is not somewhere anyone is watching. PR #434 was that PR — verified, marked, green, and never merged, because the `enablePullRequestAutoMerge` mutation named its variable `$method`, which @octokit/graphql rejects before the request leaves the runner (`method`, `url`, `baseUrl`, `headers`, `query`, `request` and `mediaType` are its own request options). Both arming paths threw on every call and both reported success.
+
+## A red CI is nobody's report
+
+Every path above ends at a merge or at `blocked`. There was a third ending nothing owned: **the pull request opened, marked, and its CI came back red.**
+
+`agentic-auto-merge.yml` declines to run at all when the CI run that woke it concluded `failure` — correct on its own terms, since a failed run has nothing to merge and sweeping it would restate a red check as a red workflow. But declining is not reporting. No merge fires, so `auto-assign-next.yml` never chains. The watchdog leaves the issue alone precisely because a pull request *is* linked to it. And the session that could have read the verdict exited minutes before it arrived. PR #581 sat there — green on every channel its own session ran, two interaction-mode shards red in CI — holding issue #552 `in-progress` with the whole queue behind it, until a human noticed.
+
+Two mechanisms close it, at different distances, and neither replaces the other:
+
+| Mechanism | Owns | Reaches |
+|-----------|------|---------|
+| `[await-ci]`, the last step of `agentic-pipeline-finalization` | The run reads its own verdict, in the turn that opened the PR. `npm run ci:await` listens to the workflow runs on the head; RED is work, GREEN ends the run | Every run that is still alive when CI reports — which is the normal case, because the wait is what keeps it alive |
+| `agentic-ci-failure.yml`, on `workflow_run` CI completed + `failure` | Posting the failure back to the agent as a fresh task on the same PR, with the failing jobs and their log URLs named | The crashed session, the job timeout, the run that pushed a fix and ran out of budget, the CI run that reported an hour later |
+
+The fail-safe is guarded so it cannot fight the step:
+
+- **Only `pipeline/feature-<N>`.** CI failing on `main`, on a human's branch or on a harness branch summons nobody.
+- **Never while a runner run is live.** A live session is already waiting on this verdict, and a second comment would queue a second runner behind it (`cancel-in-progress: false`) with two sessions pushing to one branch. The check covers the whole runner job, so a run in its rescue or arming steps still counts. `agentic-watchdog.yml` sweeps open pipeline PRs with a red CI and dispatches this workflow again, so a verdict that landed while the runner was busy is picked up on the next sweep rather than by a human. The sweep re-raises the event; every decision stays in the fail-safe, made once, on current state.
+- **Never a draft.** A draft has already said a channel stayed red, and its issue is already released.
+- **Once per head commit, within a cooldown.** The SHA is written into the comment's marker, so a CI re-run, a duplicated webhook and the hourly re-raise all read as the same request. The cooldown is what keeps it from being permanent: a session that took the handback and died before pushing never moves the SHA, and a skip with no expiry would leave that PR unattended with attempts still on the clock. Past the cooldown with no session live, the same commit is asked about again and it counts against the limit.
+- **Bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`.** When it is spent the workflow converts the PR to a draft — which takes it out of auto-merge's selection before the unmarked-PR check can see it — labels the issue `blocked` with the PAT, and drops `in-progress`. That is the same terminal shape every other failure ends in, so `handle-failure.yml` chains the queue past it. A CI failure that is not converging must not become a new way to stall.
+
+The handback lands as an `issue_comment` on a pull request, where `agentic-prompt` resolves `entity` to `pr <n>` and leaves `issue` empty — so the runner's `agentic-run-state`, `agentic-rescue` and arming steps all skip. That is right rather than unfortunate: the branch is already pushed and the PR already exists, so there is nothing to rescue, and arming is covered twice over by `auto-assign-next.yml` on `synchronize` and by the CI-completion sweep. What the session owes is a green CI on a branch that already exists — `agentic-pipeline-ci-fix`.
 
 ## Shared composite actions
 

@@ -36,6 +36,7 @@ const ASSIGNING_WORKFLOWS = [
 const NON_ASSIGNING_WORKFLOWS = [
   'agentic-intake.yml',
   'agentic-watchdog.yml',
+  'agentic-ci-failure.yml',
   'claude-runner.yml',
   'opencode-runner.yml',
 ];
@@ -609,7 +610,9 @@ describe('the sweep that runs when the checks come in', () => {
   });
 
   // A red CI run has nothing to merge, and sweeping it only restates a red
-  // check as a red workflow.
+  // check as a red workflow. What it must not do is stay the last word:
+  // `agentic-ci-failure.yml` reacts to the same event with the opposite
+  // conclusion — see the block below.
   it('skips the sweep when CI failed', () => {
     expect(sweep).toContain("github.event.workflow_run.conclusion == 'success'");
   });
@@ -617,6 +620,168 @@ describe('the sweep that runs when the checks come in', () => {
   it('stays off a clock', () => {
     expect(triggers).not.toContain('schedule:');
     expect(triggers).not.toContain('cron:');
+  });
+});
+
+// The third ending nothing owned: the PR opened, marked, and its CI came back
+// red. `agentic-auto-merge.yml` declines a failed CI run, no merge fires so
+// `auto-assign-next.yml` never chains, the watchdog skips any issue with a
+// linked PR, and the session that could have read the verdict exited minutes
+// before it arrived. PR #581 held issue #552 and the whole queue that way.
+describe('a red CI on a pipeline PR is handed back to the agent', () => {
+  const failsafe = workflow('agentic-ci-failure.yml');
+  const triggers = failsafe.slice(failsafe.indexOf('\non:'), failsafe.indexOf('\npermissions:'));
+
+  it('reacts to the same CI-completion event auto-merge reacts to', () => {
+    expect(triggers).toMatch(/workflow_run:\s*\n\s*workflows:\s*\["CI"\]/);
+    expect(triggers).toMatch(/types:\s*\[completed\]/);
+  });
+
+  it('fires on the failure auto-merge declines, and on nothing else', () => {
+    expect(failsafe).toContain("github.event.workflow_run.conclusion == 'failure'");
+  });
+
+  it('stays off a clock of its own', () => {
+    expect(triggers).not.toContain('schedule:');
+    expect(triggers).not.toContain('cron:');
+  });
+
+  // CI failing on `main`, on a human's branch, or on a harness branch summons
+  // nobody. The pipeline's own branch is the entire scope.
+  it('acts only on the pipeline\'s own feature branch', () => {
+    expect(failsafe).toMatch(/PIPELINE_HEAD = \/\^pipeline\\\/feature-\(\\d\+\)\$\//);
+  });
+
+  // Under GITHUB_TOKEN the comment is authored by `github-actions[bot]` and both
+  // runners filter `comment.user.type != 'Bot'` — the trigger would be written
+  // and never read.
+  it('comments with the PAT, so a runner actually answers', () => {
+    expect(failsafe).toContain('github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}');
+    expect(failsafe).not.toContain('github-token: ${{ secrets.GITHUB_TOKEN }}');
+  });
+
+  // The one comment besides the assignment comment that is allowed a mention,
+  // and it is useless without one.
+  it('carries the configured agent mention', () => {
+    expect(failsafe).toContain('AGENTIC_AGENT: ${{ vars.AGENTIC_AGENT }}');
+    expect(failsafe).toContain('const mention = `@${configured}`');
+    expect(failsafe).toContain('${mention} — CI is red');
+  });
+
+  // The guard that keeps the fail-safe from fighting `[await-ci]`: a live
+  // session is already waiting on this verdict, and a second comment would queue
+  // a second runner onto one branch.
+  it('declines while any agent session is live', () => {
+    expect(failsafe).toContain("const RUNNERS = ['claude-runner.yml', 'opencode-runner.yml']");
+    for (const status of ['queued', 'in_progress']) {
+      expect(failsafe).toContain(`'${status}'`);
+    }
+    expect(failsafe).toContain('listWorkflowRuns');
+  });
+
+  it('leaves a draft alone — its channel was already reported red', () => {
+    expect(failsafe).toContain('if (pr.draft)');
+  });
+
+  // A run reporting on a commit that is no longer the head has already been
+  // answered by whatever pushed the fix.
+  it('ignores a verdict superseded by a newer push', () => {
+    expect(failsafe).toContain('pr.head.sha !== reported');
+  });
+
+  // The marker carries the SHA, so a CI re-run, a duplicated webhook and the
+  // watchdog's hourly re-raise cannot stack requests for the same commit.
+  it('asks once per head commit within the cooldown', () => {
+    expect(failsafe).toContain("const MARKER = '<!-- agentic-ci-failure -->'");
+    expect(failsafe).toContain('const COOLDOWN_MINUTES = 60');
+    expect(failsafe).toContain('ageMinutes < COOLDOWN_MINUTES');
+  });
+
+  // The hole a permanent per-SHA skip would leave: a session that took the
+  // handback and died before pushing anything never moves the SHA, so the PR
+  // would sit unattended with attempts still on the clock.
+  it('asks again past the cooldown when the commit never moved', () => {
+    const skip = failsafe.slice(failsafe.indexOf('const COOLDOWN_MINUTES'));
+    expect(skip).toContain('that session ended without pushing a fix. Asking again.');
+  });
+
+  // Naming the jobs and their log URLs is the difference between a fix and a
+  // re-diagnosis paid for out of the next session's budget.
+  it('names the failing jobs in the handback', () => {
+    expect(failsafe).toContain('listJobsForWorkflowRun');
+    expect(failsafe).toContain('job.html_url');
+  });
+
+  // A CI failure that is not converging must not become a new way to stall the
+  // queue: the brake ends in the same terminal shape as every other failure.
+  it('bounds the attempts and parks the PR when the limit is spent', () => {
+    expect(failsafe).toContain('ATTEMPT_LIMIT: ${{ vars.AGENTIC_CI_FIX_ATTEMPT_LIMIT }}');
+    expect(failsafe).toContain('nudges.length >= limit');
+    expect(failsafe).toContain('convertPullRequestToDraft');
+    expect(failsafe).toMatch(/labels: \['blocked'\]/);
+    expect(failsafe).toContain("name: 'in-progress'");
+  });
+
+  it('falls back to a default limit rather than disabling the brake', () => {
+    expect(failsafe).toContain('Number.isInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : 3');
+  });
+});
+
+// Only two comments in the system may carry a mention, and both are written by
+// a workflow rather than by a session. Anything else that comments would wake a
+// run nobody asked for.
+describe('what may carry an agent mention', () => {
+  it.each(['agentic-watchdog.yml', 'agentic-auto-merge.yml', 'agentic-intake.yml', 'auto-assign-next.yml'])(
+    '%s carries none',
+    (name) => {
+      const text = workflow(name);
+      expect(text).not.toContain('@claude');
+      expect(text).not.toContain('@opencode');
+    }
+  );
+
+  it.each([
+    ['.github/actions/agentic-assign/action.yml', 'the assignment comment'],
+    ['.github/workflows/agentic-ci-failure.yml', 'the CI handback'],
+  ])('%s carries one, and it is %s', (file) => {
+    const text = readFileSync(join(ROOT, file), 'utf8');
+    expect(text).toMatch(/@\$\{configured\}|mention/);
+  });
+});
+
+// The watchdog's linked-PR skip is what made #581 invisible: a PR means the run
+// produced something, so the issue is left alone — including when the PR's CI is
+// red and no session is left to read it. The fail-safe covers that on the CI
+// event; this sweep covers the case where the fail-safe declined because a
+// session was live, and the case of a dropped webhook.
+describe('the watchdog re-raises a red CI it would otherwise skip', () => {
+  const watchdog = workflow('agentic-watchdog.yml');
+
+  // Every guard — is a session live, was this commit already asked about, is the
+  // attempt limit spent — stays in the fail-safe, decided once on current state.
+  // A sweep that commented itself would be a second opinion drifting from the
+  // first, and it would carry a mention on a schedule.
+  const reRaise = watchdog.slice(watchdog.indexOf('- name: Re-raise a red CI'));
+
+  it('dispatches the fail-safe instead of deciding anything itself', () => {
+    expect(reRaise).toContain('createWorkflowDispatch');
+    expect(reRaise).toContain("workflow_id: 'agentic-ci-failure.yml'");
+    expect(reRaise).not.toContain('createComment');
+    expect(reRaise).not.toContain('addLabels');
+  });
+
+  it('still assigns nothing', () => {
+    expect(watchdog).not.toContain(ASSIGN_ACTION);
+  });
+
+  it('needs the scope a dispatch requires', () => {
+    expect(watchdog.slice(0, watchdog.indexOf('jobs:'))).toMatch(/actions: write/);
+  });
+
+  it('scopes the sweep to non-draft pipeline PRs whose latest CI run failed', () => {
+    expect(watchdog).toMatch(/PIPELINE_HEAD\.test\(pr\.head\?\.ref \|\| ''\) \|\| pr\.draft/);
+    expect(watchdog).toContain("'.github/workflows/ci.yml'");
+    expect(watchdog).toContain("ci.status !== 'completed'");
   });
 });
 
