@@ -92,7 +92,9 @@ export type VehicleState =
 
 ## Hauling
 
-`vehicle haul <vehicleId> fragment:<fragmentId>` (Debris Hauler only, must already have a driver): sets intent to haul a fragment to the nearest active Freight Warehouse. Resolves in phases, each arrival-gated: drive to fragment → load on arrival → drive to depot → unload on arrival. A destination targeting the depot building resolves through the building-approach-cell lookup (`gameplay-navmesh`), not the building's raw coordinates.
+Self-dispatching, no player button involved: each tick, `HaulDispatch.ts` queues one `haul_debris` PendingAction per on-ground fragment not already covered by an existing action (an oversized fragment queues `fragment_debris` instead, claimed by a Rock Fragmenter). A licensed-but-idle employee auto-claims the action through the standard pending-action pool (`gameplay-employee-skills`), then walks to and boards a qualifying Debris Hauler — driven or not, as long as unreserved — same as any other vehicle-gated action. Once underway it resolves in phases, each arrival-gated (`dev-architecture`'s arrival-gated-actions convention): drive to fragment → load on arrival → drive to depot → unload on arrival. A destination targeting the depot building resolves through the building-approach-cell lookup (`gameplay-navmesh`), not the building's raw coordinates.
+
+`vehicle haul <vehicleId> fragment:<fragmentId>` (Debris Hauler only, must already have a driver) remains as a manual/debug primitive: sets the same intent directly on an already-crewed vehicle, bypassing the queue.
 
 ## Traffic & Routing
 
