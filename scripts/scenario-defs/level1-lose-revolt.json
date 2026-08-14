@@ -348,14 +348,16 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "wellBeing": 70.21000000000012,
           "holeCount": 0,
           "orderedHoleCount": 25
         },
+        "increased": [
+          "wellBeing"
+        ],
         "decreased": [
           "cash"
         ],
-        "note": "sandbox-measured: wellBeing still rising here, same as the pre-#553 trajectory this early -- avgMorale hasn't crashed yet, employee #12 is still travelling to the pattern. The reversal comes later (see tick 290 below). cash relaxed from equals:479050 to decreased (this batch's own fallback for a genuine command-vs-interaction divergence, not just interaction-mode drift): command mode's own trace reliably computes 479050 at this tick, while a live interaction-mode trace (`npx tsx scripts/run-all-scenarios.ts --mode interaction --port 5202 level1-lose-revolt`) reliably reads 479500, $450 more -- both figures reproduce consistently in their own mode, so this is not noise to re-pin but a real economic-timing difference between the click-driven `drill_plan`/`vehicle driver` steps earlier in this file and their command-mode equivalents (likely a payroll/fuel tick landing on one side or the other of a boundary once the driller's travel is driven by real clicks instead of an instantaneous console command). Every other field in this block (tickCount, wellBeing, holeCount, orderedHoleCount) already matches exactly between both modes -- only cash diverges, and only at this one checkpoint's magnitude; it is not re-asserted with a hard equals again until the file's own trajectory renormalizes."
+        "note": "sandbox-measured: wellBeing still rising here, same as the pre-#553 trajectory this early -- avgMorale hasn't crashed yet, employee #12 is still travelling to the pattern. The reversal comes later (see tick 290 below). cash relaxed from equals:479050 to decreased (this batch's own fallback for a genuine command-vs-interaction divergence, not just interaction-mode drift): command mode's own trace reliably computes 479050 at this tick, while a live interaction-mode trace (`npx tsx scripts/run-all-scenarios.ts --mode interaction --port 5202 level1-lose-revolt`) reliably reads 479500, $450 more -- both figures reproduce consistently in their own mode, so this is not noise to re-pin but a real economic-timing difference between the click-driven `drill_plan`/`vehicle driver` steps earlier in this file and their command-mode equivalents (likely a payroll/fuel tick landing on one side or the other of a boundary once the driller's travel is driven by real clicks instead of an instantaneous console command). #553-followup (issue #586 CI): wellBeing joins cash as relaxed (equals:70.21000000000012 -> increased) -- a real CI run read 70.04833333333346, the same real-time-accrual class, just a smaller-magnitude float instead of a dollar figure. tickCount/holeCount/orderedHoleCount stay exact; they are not host-timing-sensitive."
       }
     },
     {

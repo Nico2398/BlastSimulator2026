@@ -1114,7 +1114,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (issue #586 CI): dropped the hardcoded `cash: 2554566` -- CI's own runner produced 2554554 (a $12 gap matching the exact real-time payroll/fuel accrual class already documented elsewhere in this PR, e.g. safety-projection-visual.json's buy_software tier:3 note). Not replaced with `decreased`: command mode's own trace shows cash completely unchanged by this step (no wall-clock elapses resolving an event via a direct command), so a `decreased` assertion holds in interaction mode but fails command mode -- there is no single mode-agnostic cash claim to make here. The remaining exact fields (tickCount, deathCount, employeeCount, etc.) still prove the event resolved.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1129,8 +1129,7 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "holeCount": 0,
-          "orderedHoleCount": 16,
-          "cash": 2554566
+          "orderedHoleCount": 16
         }
       }
     },

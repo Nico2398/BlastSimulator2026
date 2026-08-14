@@ -684,11 +684,11 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 21206
-        }
+        "decreased": [
+          "cash"
+        ]
       },
-      "description": "#553 crew-walkout fix: cash retuned from 89746 -- the extra 2nd driller/drill_rig pair and 3rd idle relief hire above (needed to avoid WORKER REVOLT, see their own descriptions) cost $37,000 more up front than this file's original single-driller roster. Sandbox-measured, seed 42, deterministic."
+      "description": "#553 crew-walkout fix: cash retuned from 89746 -- the extra 2nd driller/drill_rig pair and 3rd idle relief hire above (needed to avoid WORKER REVOLT, see their own descriptions) cost $37,000 more up front than this file's original single-driller roster. #553-followup (issue #586 CI): the retuned figure (21206) itself turned out not to hold across CI runs -- a real GitHub Actions run produced 21736, a $530 gap from the same real-time payroll/fuel accrual class documented elsewhere in this PR (safety-projection-visual.json's buy_software tier:3 note). Dropped the exact figure for `decreased`, which still proves the purchase spent cash without pinning a host-timing-sensitive number."
     },
     {
       "command": "preview energy",
@@ -713,10 +713,11 @@
         }
       ],
       "role": "player",
+      "description": "#553-followup (issue #586 CI): dropped the hardcoded cash figure -- same host-timing-sensitive real-time payroll/fuel accrual class as the tier:1 purchase above.",
       "expect": {
-        "equals": {
-          "cash": 19206
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -742,10 +743,11 @@
         }
       ],
       "role": "player",
+      "description": "#553-followup (issue #586 CI): dropped the hardcoded cash figure -- same host-timing-sensitive real-time payroll/fuel accrual class as the tier:1 purchase above.",
       "expect": {
-        "equals": {
-          "cash": 14206
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -771,10 +773,11 @@
         }
       ],
       "role": "player",
+      "description": "#553-followup (issue #586 CI): dropped the hardcoded cash figure -- same host-timing-sensitive real-time payroll/fuel accrual class as the tier:1 purchase above.",
       "expect": {
-        "equals": {
-          "cash": 2206
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {

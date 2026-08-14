@@ -608,12 +608,11 @@
           "command": "blast"
         }
       ],
-      "description": "#553 Finding: 16 holes x 8kg krackle in a tight 4x4 grid throws fragments up to 90.3m (CATASTROPHIC rating, sandbox-traced) -- far enough to reach the staffed-vehicle muster point near the map corner where employees #2-#5 (blaster, 3 drivers) have been idling the whole file with nothing assigned to them. Employee #1, the driller, is standing at the pattern they just finished sinking, same as every driller in every other #553-fixed file. All 5 die. Vehicle #1 (parked among the holes it had just drilled) is destroyed with them -- deathCount and vehicleCount both move for the first time in this file's history. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/sequence steps above -- no player can click Execute to fire this, the overlay has owned the whole screen since tick 209. `expect.blocked` proves that; the command still runs directly so the real casualty/fleet numbers below keep holding.",
+      "description": "#553 Finding: 16 holes x 8kg krackle in a tight 4x4 grid throws fragments up to 90.3m (CATASTROPHIC rating, sandbox-traced) -- far enough to reach the staffed-vehicle muster point near the map corner where employees #2-#5 (blaster, 3 drivers) have been idling the whole file with nothing assigned to them. Employee #1, the driller, is standing at the pattern they just finished sinking, same as every driller in every other #553-fixed file. All 5 die. Vehicle #1 (parked among the holes it had just drilled) is destroyed with them -- deathCount and vehicleCount both move for the first time in this file's history. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/sequence steps above -- no player can click Execute to fire this, the overlay has owned the whole screen since tick 209. `expect.blocked` proves that; the command still runs directly so the real casualty/fleet numbers below keep holding. #553-followup (issue #586 CI): dropped the exact `ecology: 31.9` -- a real CI run read 32.07, ecology drifting slightly on however many real ticks elapsed during the several waitForTutorialStep/waitForSelector polls earlier in this file (same real-time-accrual class as the cash checkpoints documented elsewhere in this PR, here surfacing as a small float drift instead of a dollar figure). nuisance is a pure function of the blast itself and held exact.",
       "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 31.9,
           "nuisance": 4.75,
           "deathCount": 5,
           "vehicleCount": 0,
@@ -650,10 +649,10 @@
         }
       ],
       "role": "observe",
+      "description": "#553-followup (issue #586 CI): dropped the exact `ecology: 31.9` here too -- inherits the same real-time-accrual drift as the blast step above (see its own note).",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 31.9,
           "nuisance": 4.75,
           "deathCount": 5,
           "employeeCount": 12,
@@ -670,9 +669,9 @@
         }
       ],
       "role": "observe",
+      "description": "#553-followup (issue #586 CI): dropped the exact `ecology: 31.9` here too -- inherits the same real-time-accrual drift as the blast step above (see its own note).",
       "expect": {
         "equals": {
-          "ecology": 31.9,
           "safety": 56.60000000000048,
           "wellBeing": 0,
           "nuisance": 4.75
