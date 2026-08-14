@@ -871,21 +871,20 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
         }
       ],
-      "description": "#553: contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL (20 ticks) keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks, so far more contracts have refreshed past by the time this step runs. The unqualified .bs-contract-accept selector is unaffected (still the only/first available card), so only the command-mode ID needs updating.",
       "role": "player",
       "expect": {
         "equals": {
           "activeContractCount": 1
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id]`, the contract this step's `command` names (ContractsPanel sets `data-contract-id` on offered cards via `makeOfferedCard`), so command mode and interaction mode are guaranteed to accept the same contract instead of command mode taking the named id literally while an unscoped click took whatever led the DOM. #553-followup (issue #586 CI): a genuine duplicate JSON `description` key on this step silently discarded a first, correct description ('contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks') and kept only this second, boilerplate one -- which still pointed the interaction selectors at the stale id 1 even though the command itself had already been updated to 6. Fixed both scoped selectors to match."
     },
     {
       "command": "contract deliver 6 amount:200",
