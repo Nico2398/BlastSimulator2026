@@ -1715,10 +1715,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 400,
@@ -1727,9 +1728,10 @@
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
-        }
+        },
+        "blocked": "#bs-event-dialog .bs-event-choice"
       },
-      "description": "Resolves lucky_strike (+$10,000, a fixed cash bonus -- same event type noted in level1-win-efficient.json/level2-playthrough-win.json)."
+      "description": "Resolves lucky_strike (+$10,000, a fixed cash bonus -- same event type noted in level1-win-efficient.json/level2-playthrough-win.json). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 139 (261 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast steps above, just on a dialog instead of a panel. Every earlier 'event choose 0' step in this drilling wait stays role:player safely because `resolveEventIfPending` no-ops (no click at all) when nothing is genuinely pending; this is the one step in the file where an event (lucky_strike) really is pending at the moment it runs, so it is the one step that actually reaches `resolveEventIfPending`'s bare `page.click('#bs-event-dialog .bs-event-choice')` -- which has no `describeUnclickable` wrapper, so Puppeteer's own unnamed 'Node is either not clickable or not an Element' surfaced instead of a diagnosis. Converted to guard + expect.blocked, command run directly so the $10,000 still lands."
     },
     {
       "command": "contract list",

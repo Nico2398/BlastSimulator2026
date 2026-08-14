@@ -1085,15 +1085,17 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "description": "#553: resolves the Explosive Tariff event that cut this tick call short at tick 140 (108 of 150 requested) -- politics_explosive_tariff option 0 pays the $20,000 tariff in full (fixed, RNG-free delta).",
-      "role": "player",
+      "description": "#553: resolves the Explosive Tariff event that cut this tick call short at tick 140 (108 of 150 requested) -- politics_explosive_tariff option 0 pays the $20,000 tariff in full (fixed, RNG-free delta). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 132 (8 ticks before this event pends), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since tick 132 -- same class of bug as the Charge/Sequence/blast steps further down this file, just on a dialog instead of a panel, and reached earlier because this event happens to pend this late. Every other 'event choose 0' step in this drilling wait stays role:player safely because `resolveEventIfPending` no-ops (no click at all) when nothing is genuinely pending; this is the one step in the wait where an event really is pending at the moment it runs, so it is the one that actually reaches `resolveEventIfPending`'s bare `page.click('#bs-event-dialog .bs-event-choice')` -- which has no `describeUnclickable` wrapper, so Puppeteer's own unnamed 'Node is either not clickable or not an Element' surfaced instead of a diagnosis. Converted to guard + expect.blocked, command run directly so cash still drops by the tariff.",
+      "role": "guard",
       "expect": {
         "decreased": [
           "cash"
-        ]
+        ],
+        "blocked": "#bs-event-dialog .bs-event-choice"
       }
     },
     {
@@ -1329,10 +1331,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 440,
@@ -1340,8 +1343,10 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
-        }
-      }
+        },
+        "blocked": "#bs-event-dialog .bs-event-choice"
+      },
+      "description": "#553-followup (issue #586 CI): the preceding `tick 6` makes zero progress (\"Pending event! Resolve it first\", tickCount stays 440, sandbox-confirmed) -- a lucky_strike event (+$10,000, same fixed-bonus type as level1-win-efficient.json/level3-playthrough-win.json) genuinely pends the instant this step runs, unlike the file's other post-blast tick/event pairs which are harmless no-ops. Was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast/tariff-event steps elsewhere in this file. `resolveEventIfPending`'s own `page.click('#bs-event-dialog .bs-event-choice')` has no `describeUnclickable` wrapper, so Puppeteer's bare 'Node is either not clickable or not an Element' surfaced with no selector named. Converted to guard + expect.blocked; the command still runs directly so cash still gains the $10,000 (-$340,052 → -$330,052, sandbox-confirmed)."
     },
     {
       "command": "tick 6",
@@ -1416,9 +1421,9 @@
           "activeContractCount": 1,
           "surveyCount": 3
         },
-        "blocked": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
+        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
-      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #20 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as the charge step at tick 440 above -- accept is genuinely unreachable by tick 446, `expect.blocked` proves it, and the command runs directly so activeContractCount still moves the way a console-only operator's would."
+      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #20 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as the charge step at tick 440 above -- accept is genuinely unreachable by tick 446, `expect.blocked` proves it, and the command runs directly so activeContractCount still moves the way a console-only operator's would. #553-followup (issue #586 CI): the guard target was `#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept` -- wrong selector, not just a stale one: that row only exists in the AVAILABLE section, and the `command` action in this very step's own interaction array accepts contract 20 before `expect.blocked` is ever checked, moving it into ACTIVE and making that specific accept button vanish from the DOM for the correct, unrelated reason that it was just accepted, not because the overlay blocks it. `#bs-toolbar [data-panel=\"contracts\"]` (matching level3-playthrough-win.json's own identical fix) is the toolbar button, always present regardless of contract state, so `expect.blocked` proves the real overlay block instead of a false 'not in the DOM'."
     },
     {
       "command": "contract deliver 20 amount:100",
@@ -1451,9 +1456,9 @@
           "activeContractCount": 2,
           "surveyCount": 3
         },
-        "blocked": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-accept"
+        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
-      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #21 is what `contract list` actually offers at this point in the run. Same bankruptcy-overlay finding as contract 20 above."
+      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #21 is what `contract list` actually offers at this point in the run. Same bankruptcy-overlay finding as contract 20 above. #553-followup (issue #586 CI): same wrong-selector fix as contract 20's own accept step above -- the row-specific accept selector vanishes once this step's own `command` action accepts it, so the guard target moved to the toolbar button (matching level3-playthrough-win.json's own fix)."
     },
     {
       "command": "contract deliver 21 amount:40",
@@ -1537,10 +1542,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 450,
@@ -1548,8 +1554,10 @@
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
-        }
-      }
+        },
+        "blocked": "#bs-event-dialog .bs-event-choice"
+      },
+      "description": "#553-followup (issue #586 CI): a union_anthem event genuinely pends here (-$3,000, wellBeing +7, nuisance +4, sandbox-confirmed: cash -334915 -> -337915) -- same class as the lucky_strike/tariff findings above, not the harmless no-op the file's other post-blast tick/event pairs are. Was role:player driving `resolveEventIfPending`'s real click; converted to guard + expect.blocked for the same bankruptcy-overlay reason (levelEndReason has read 'bankruptcy' since tick 132) -- the command still runs directly so the event still resolves."
     },
     {
       "command": "tick 150",
@@ -1897,10 +1905,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 901,
@@ -1908,8 +1917,10 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
-        }
-      }
+        },
+        "blocked": "#bs-event-dialog .bs-event-choice"
+      },
+      "description": "#553-followup (issue #586 CI): a politics_ambassador_faint event genuinely pends here (-$12,000, nuisance -6, wellBeing +4, sandbox-confirmed: cash -554724 -> -566724) -- same class as the lucky_strike/tariff/union_anthem findings above. Was role:player driving `resolveEventIfPending`'s real click; converted to guard + expect.blocked for the same bankruptcy-overlay reason (levelEndReason has read 'bankruptcy' since tick 132) -- the command still runs directly so the event still resolves."
     },
     {
       "command": "tick 6",
@@ -1984,9 +1995,9 @@
           "activeContractCount": 1,
           "surveyCount": 3
         },
-        "blocked": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-accept"
+        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
-      "description": "#553: contract id renumbered -- by tick 1048 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #50 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
+      "description": "#553: contract id renumbered -- by tick 1048 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #50 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly. #553-followup (issue #586 CI): same wrong-selector fix as contract 20's own accept step -- the row-specific accept selector vanishes once this step's own `command` action accepts it, so the guard target moved to the toolbar button (matching level3-playthrough-win.json's own fix)."
     },
     {
       "command": "contract deliver 50 amount:100",
@@ -2406,11 +2417,14 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player",
+      "role": "guard",
+      "description": "#553-followup (issue #586 CI): a union_merch event genuinely pends here (-$2,500, wellBeing +6, sandbox-confirmed: cash -855029 -> -857529) -- same class as the lucky_strike/tariff/union_anthem/politics_ambassador_faint findings above. Was role:player driving `resolveEventIfPending`'s real click; converted to guard + expect.blocked for the same bankruptcy-overlay reason (levelEndReason has read 'bankruptcy' since tick 132) -- the command still runs directly so the event still resolves.",
       "expect": {
+        "blocked": "#bs-event-dialog .bs-event-choice",
         "equals": {
           "tickCount": 1508,
           "deathCount": 4,
@@ -2493,9 +2507,9 @@
           "activeContractCount": 1,
           "surveyCount": 3
         },
-        "blocked": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-accept"
+        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
-      "description": "#553: contract id renumbered -- by tick 1656 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #80 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
+      "description": "#553: contract id renumbered -- by tick 1656 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #80 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly. #553-followup (issue #586 CI): same wrong-selector fix as contract 20's own accept step -- the row-specific accept selector vanishes once this step's own `command` action accepts it, so the guard target moved to the toolbar button (matching level3-playthrough-win.json's own fix)."
     },
     {
       "command": "contract deliver 80 amount:300",
@@ -2680,10 +2694,11 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 1637,
@@ -2691,8 +2706,10 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
-        }
-      }
+        },
+        "blocked": "#bs-event-dialog .bs-event-choice"
+      },
+      "description": "#553-followup (issue #586 CI): a politics_safety_summit event genuinely pends here (-$15,000, safety +12, sandbox-confirmed: cash -920072 -> -935072) -- same class as the lucky_strike/tariff/union_anthem/politics_ambassador_faint/union_merch findings above. Was role:player driving `resolveEventIfPending`'s real click; converted to guard + expect.blocked for the same bankruptcy-overlay reason (levelEndReason has read 'bankruptcy' since tick 132) -- the command still runs directly so the event still resolves."
     },
     {
       "command": "tick 150",
@@ -3159,9 +3176,9 @@
           "activeContractCount": 1,
           "surveyCount": 3
         },
-        "blocked": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-accept"
+        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
-      "description": "#553: contract id renumbered -- by tick 2549 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #125 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
+      "description": "#553: contract id renumbered -- by tick 2549 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #125 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly. #553-followup (issue #586 CI): same wrong-selector fix as contract 20's own accept step -- the row-specific accept selector vanishes once this step's own `command` action accepts it, so the guard target moved to the toolbar button (matching level3-playthrough-win.json's own fix)."
     },
     {
       "command": "contract deliver 125 amount:350",
