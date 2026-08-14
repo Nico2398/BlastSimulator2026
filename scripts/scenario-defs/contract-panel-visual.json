@@ -96,7 +96,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -121,7 +122,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -188,7 +190,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract deliver 2 amount:300",
@@ -208,7 +211,8 @@
         "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver",
         "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "contract status",

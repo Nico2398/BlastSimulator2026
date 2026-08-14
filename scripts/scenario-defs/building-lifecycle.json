@@ -79,7 +79,8 @@
         },
         "note": "rejected: Tier 2 management_office is not researched — confirms this is a genuine no-op, not a silent success"
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "refused"
     },
     {
       "command": "build list",
@@ -106,7 +107,8 @@
         },
         "note": "rejected: Building #2 not found — only building #1 was ever placed"
       },
-      "role": "bootstrap"
+      "role": "bootstrap",
+      "commandOutcome": "refused"
     },
     {
       "command": "build list",
@@ -133,7 +135,8 @@
         },
         "note": "rejected: Building #2 not found — the real building #1 is still standing"
       },
-      "role": "bootstrap"
+      "role": "bootstrap",
+      "commandOutcome": "refused"
     },
     {
       "command": "build list",

@@ -104,17 +104,17 @@
       }
     },
     {
-      "command": "employee assign_skill 2 skill:driving level:3",
+      "command": "employee assign_skill 2 skill:driving.truck level:3",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 2 skill:driving level:3"
+          "command": "employee assign_skill 2 skill:driving.truck level:3"
         }
       ],
-      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
+      "description": "Test-only bootstrap — see the assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too. Category fixed from the bare 'driving' typo (not a valid SkillCategory — VALID_SKILL_CATEGORIES only has 'driving.truck'/'driving.digger'/etc.) to 'driving.truck', matching the driver role's own default qualification (issue #585).",
       "expect": {
         "equals": {
-          "proficiencyTotal": 6
+          "proficiencyTotal": 8
         }
       },
       "role": "bootstrap"
@@ -258,7 +258,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 4",
@@ -278,7 +279,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 4",
@@ -298,7 +300,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 4",
@@ -318,7 +321,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",
@@ -364,7 +368,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -384,7 +389,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -404,7 +410,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -424,7 +431,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",

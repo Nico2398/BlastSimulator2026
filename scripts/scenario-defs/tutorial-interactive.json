@@ -435,7 +435,8 @@
       ],
       "expect": {
         "tutorialStep": "hire-manager"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "employee hire role:manager",
@@ -627,9 +628,31 @@
       }
     },
     {
-      "command": "contract deliver 1 amount:5000",
+      "command": "time resume",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "description": "Command-mode-only unpause (issue #585): the tutorial keeps `isPaused` true (tutorial_start, step 1), and `tick N`'s own loop stops after exactly one real tick while paused regardless of N (events.ts's tickCommand breaks on `state.isPaused`) -- a single command-mode `tick 14` below needs this first, or it would silently advance only 1 tick like every other tick call in this file. Interaction mode's own haul-debris step above already waits for the real thing via `waitForTutorialStep`, driving its own real clock independent of pause state, so this resume has no effect there."
+    },
+    {
+      "command": "tick 14",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 14"
+        }
+      ],
+      "description": "14 real ticks (confirmed via direct trace) land the first haul's ~263kg fragment in the warehouse before the delivery attempt below."
+    },
+    {
+      "command": "contract deliver 1 amount:250",
       "timeout": 90,
-      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Left unmarked: command mode's own `contract deliver` fails synchronously here (\"Not enough stored material\" -- command mode's automatic dispatch (#552) needs real ticks to actually drive/load/deliver, and the haul-debris step above only advances a single tick, so nothing is ever in storage there), while interaction mode's identical click genuinely succeeds because the tutorial's own waitForTutorialStep gate only advances once delivery truly completes -- activeContractCount would drop to 0 there but stay 1 in command mode, so it is not safely checkable across both modes (same class as Findings #21/#22/#31).",
+      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Command mode's own `amount:` lowered 5000 -> 250 (issue #585): the self-dispatching hauler (#552) reliably delivers only its first fragment (~263kg, confirmed via direct trace) onto a fresh 3x3 blast before its second dispatch stalls on an unreachable target (a separate, deeper HaulDispatch defect, tracked apart from this scenario fix) -- 250kg is a real amount that storage genuinely holds by this point, so the command succeeds honestly with a partial delivery (contract stays active, short of its full 430kg) rather than requesting more than was ever going to be there. Interaction mode's identical click still waits for full completion via its own `waitForTutorialStep` gate and is unaffected by this command-mode-only amount.",
       "role": "player",
       "interaction": [
         {

@@ -64,46 +64,6 @@
       }
     },
     {
-      "command": "build medical_bay at:5,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build medical_bay at:5,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build office at:8,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build office at:8,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
       "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:10,10",
       "interaction": [
         {
@@ -353,7 +313,8 @@
           "activeContractCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -391,7 +352,8 @@
           "activeContractCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -460,7 +422,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "drill_plan grid rows:2 cols:4 spacing:3 depth:6 diameter:0.089 start:15,15",
@@ -689,7 +652,8 @@
           "activeContractCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -727,7 +691,8 @@
           "activeContractCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -796,7 +761,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:20,20",
@@ -1028,7 +994,8 @@
           "activeContractCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -1066,7 +1033,8 @@
           "activeContractCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1135,7 +1103,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:8,8",
@@ -1376,7 +1345,8 @@
           "activeContractCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -1414,7 +1384,8 @@
           "activeContractCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "finances",

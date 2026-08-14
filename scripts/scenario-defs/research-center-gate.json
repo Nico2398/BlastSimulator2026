@@ -39,7 +39,8 @@
       "expect": {
         "equals": { "buildingCount": 1, "cash": 70000 },
         "note": "Cash unchanged and no research queued proves the click was rejected (#442's prerequisite gate), not silently swallowed."
-      }
+      },
+      "commandOutcome": "refused"
     },
     {
       "command": "build research_center at:14,14",

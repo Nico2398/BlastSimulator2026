@@ -54,7 +54,7 @@
         }
       ],
       "role": "setup",
-      "description": "tutorial_start is registered only in src/main.ts (the browser boot path), not in the shared console command table console-api.ts's createRunner() uses -- command mode reports \"Unknown command\" here and never actually starts the tutorial overlay, while interaction mode's `command` action reaches the real registered handler and does start it (arming TutorialOverlay's rails and setting state.isPaused = true). The added waitForSelector/waitForTutorialStep only run in interaction mode (command mode never starts the overlay to wait on) and gate every real click below on the rail actually being armed, mirroring tutorial-interactive.json.",
+      "description": "tutorial_start now has a base registration in createRunner() (issue #585) alongside its richer, DOM/overlay-driven override in src/main.ts (last-write-wins on the same runner, so the browser path is unaffected) -- command mode genuinely sets `isPaused = true` here too, same as interaction mode's real handler. The added waitForSelector/waitForTutorialStep only run in interaction mode (command mode has no overlay to wait on) and gate every real click below on the rail actually being armed, mirroring tutorial-interactive.json. Because command mode now really pauses here, every `tick N` step below only ever advances one real tick per call regardless of N (tickCommand's own loop breaks on `state.isPaused`, events.ts) -- the cash figures on the pre-blast tick steps are calibrated for that real, single-tick-per-call behavior, not the N the command text names.",
       "expect": {
         "tutorialStep": "time-speed"
       }
@@ -174,9 +174,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 74980
+          "cash": 75800
         },
-        "note": "seismic survey completes mid-tick (tick 9 of this 10-tick block)"
+        "note": "cash recalibrated (issue #585): tutorial_start (step 1) now genuinely sets isPaused, and tickCommand's own loop stops after one real tick while paused (events.ts) -- `tick 10` here always only ever advanced 1 real tick, the same as the other three in this block, not the full 10 the old figure assumed."
       }
     },
     {
@@ -213,8 +213,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 72520
-        }
+          "cash": 75800
+        },
+        "note": "cash recalibrated (issue #585): see step 6's own note -- `tick 10` only ever advances 1 real tick while the tutorial keeps isPaused true."
       }
     },
     {
@@ -238,7 +239,7 @@
       "description": "hire-driller complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "equals": {
-          "cash": 71520,
+          "cash": 74800,
           "employeeCount": 2
         },
         "tutorialStep": "box-cut"
@@ -295,10 +296,10 @@
       "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "equals": {
-          "cash": 70320
+          "cash": 73600
         },
         "tutorialStep": "drill-plan",
-        "note": "ramp build cost $1,200 (buildRampCommand, mining.ts), verified live"
+        "note": "ramp build cost $1,200 (buildRampCommand, mining.ts), verified live; cash recalibrated (issue #585) per step 6's own note"
       }
     },
     {
@@ -437,7 +438,7 @@
           "chargedCount": 0,
           "sequencedCount": 0,
           "deathCount": 2,
-          "cash": 70320
+          "cash": 73600
         }
       }
     },
@@ -465,7 +466,7 @@
       "description": "The file's original decreased:[\"safety\"] assertion does not survive across both modes (Finding #74/#75 follow-up, discovered live) -- not because the point is wrong, but because it is no longer independently checkable here. In command mode safety still drops exactly on this scripted tick (50 -> 45.05, matching the file's original point precisely). In interaction mode the blast step's own waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) drives the real clock through several ticks while polling for the rail to reach hire-manager -- including the event-fire-resolve stage's own autoCommands: [\"tick 3\", ...] -- so the safety damage already lands during that wait, before this step ever runs, and by here it reads 35.15 with nothing left to decrease on this specific tick. Same class as the contract-deliver step below: real per-click waiting does not reproduce command mode's precise scripted tick count. cash is unaffected by either mode's path and stays checkable.",
       "expect": {
         "equals": {
-          "cash": 70320
+          "cash": 73600
         }
       }
     },
@@ -502,7 +503,8 @@
       "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, then dismissed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "tutorialStep": "hire-manager"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "employee hire role:manager",
@@ -724,6 +726,28 @@
       "expect": {
         "tutorialStep": "contract-deliver"
       }
+    },
+    {
+      "command": "time resume",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "description": "Command-mode-only unpause (issue #585): the tutorial keeps `isPaused` true (tutorial_start, step 1), and `tick N`'s own loop stops after exactly one real tick while paused regardless of N (events.ts's tickCommand breaks on `state.isPaused`) -- a single command-mode `tick 15` below needs this first, or it would silently advance only 1 tick like every other tick call before the blast in this file. Interaction mode's own haul-debris step above already waits for the real thing via `waitForTutorialStep`, driving its own real clock independent of pause state, so this resume has no effect there."
+    },
+    {
+      "command": "tick 15",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ],
+      "description": "15 real ticks (confirmed via direct trace) land the first haul's ~525kg fragment in the warehouse -- enough to clear the contract's full 430kg need -- before the delivery attempt below."
     },
     {
       "command": "contract deliver 1 amount:5000",

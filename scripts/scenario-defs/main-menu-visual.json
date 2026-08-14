@@ -39,7 +39,8 @@
         "usable": "#bs-world-map-back",
         "blocked": "#bs-main-menu #bs-menu-new-campaign",
         "note": "the world map genuinely replaced the main menu -- Back is now reachable, New Campaign is not"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "state",
@@ -59,7 +60,8 @@
         "usable": "#bs-main-menu #bs-menu-new-campaign",
         "blocked": "#bs-world-map-back",
         "note": "the round trip genuinely returns to the main menu, not a leftover world map still in the DOM"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "new_game seed:42",
@@ -128,7 +130,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",

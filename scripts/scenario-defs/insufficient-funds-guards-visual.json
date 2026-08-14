@@ -107,7 +107,8 @@
         "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-demolish-btn",
         "note": "issue #511 — build destroy funds guard"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "build upgrade 1",
@@ -120,7 +121,8 @@
         "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-upgrade-btn",
         "note": "issue #511 — build upgrade funds guard"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "build move 1 to:10,10",
@@ -133,7 +135,8 @@
         "blocked": "#bs-build-panel [data-building-id=\"1\"] .bs-build-move-btn",
         "note": "issue #511 — build move funds guard"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "state",
@@ -155,7 +158,8 @@
         "blocked": "#bs-shady-panel [data-target=\"witness\"] [data-action=\"corrupt\"]",
         "note": "issue #511 — corrupt funds guard"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "mafia accident employee:1",
@@ -168,7 +172,8 @@
         "blocked": "#bs-shady-panel [data-action=\"mafia-accident\"]",
         "note": "issue #511 — mafia accident funds guard"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "mafia frame employee:1",
@@ -181,7 +186,8 @@
         "blocked": "#bs-shady-panel [data-action=\"mafia-frame-start\"]",
         "note": "issue #511 — mafia frame funds guard"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "state",

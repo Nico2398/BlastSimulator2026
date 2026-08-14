@@ -42,7 +42,8 @@
           "surveyCount": 0
         }
       },
-      "description": "No `cash:` here on purpose: this command fails (level locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it."
+      "description": "No `cash:` here on purpose: this command fails (level locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it.",
+      "commandOutcome": "refused"
     },
     {
       "command": "time resume",
@@ -636,7 +637,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -676,7 +678,8 @@
           "surveyCount": 2
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -716,7 +719,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -756,7 +760,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",
@@ -797,132 +802,6 @@
           "surveyCount": 3
         }
       }
-    },
-    {
-      "command": "build office at:5,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build office at:5,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 181250,
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 10,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build storage_depot at:10,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build storage_depot at:10,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"storage_depot\" maps to the real freight_warehouse building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 181250,
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 10,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build canteen at:5,10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build canteen at:5,10"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"canteen\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 181250,
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 10,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build break_room at:10,10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build break_room at:10,10"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 181250,
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 10,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build medical_bay at:15,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build medical_bay at:15,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 181250,
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 10,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build bunkhouse at:15,10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build bunkhouse at:15,10"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"bunkhouse\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 181250,
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 10,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "role": "bootstrap"
     },
     {
       "command": "build list",
@@ -1402,7 +1281,8 @@
           "activeContractCount": 0,
           "surveyCount": 3
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -1422,7 +1302,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 6",
@@ -1462,7 +1343,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1534,7 +1416,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -1814,7 +1697,8 @@
           "activeContractCount": 1,
           "surveyCount": 3
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -1834,7 +1718,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 6",
@@ -1874,7 +1759,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1946,7 +1832,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "contract status",
@@ -2232,7 +2119,8 @@
           "activeContractCount": 2,
           "surveyCount": 3
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -2252,7 +2140,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 6",
@@ -2292,7 +2181,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -2364,7 +2254,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -2670,7 +2561,8 @@
           "activeContractCount": 3,
           "surveyCount": 3
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -2690,7 +2582,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 6",
@@ -2730,7 +2623,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -2802,7 +2696,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -3088,7 +2983,8 @@
           "activeContractCount": 4,
           "surveyCount": 3
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -3108,7 +3004,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 6",
@@ -3148,7 +3045,8 @@
           "surveyCount": 3
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -3220,7 +3118,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",

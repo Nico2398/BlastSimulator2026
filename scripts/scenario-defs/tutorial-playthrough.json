@@ -458,7 +458,8 @@
         "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
         "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery."
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -631,7 +632,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -753,7 +755,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",

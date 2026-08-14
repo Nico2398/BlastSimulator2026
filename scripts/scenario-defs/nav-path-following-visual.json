@@ -112,7 +112,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "build management_office at:2,0",
@@ -250,7 +251,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "state full",
@@ -288,7 +290,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "build destroy 1",

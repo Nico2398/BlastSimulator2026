@@ -73,7 +73,8 @@
         "blocked": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not yet researched"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "research queue type:research_center tier:2",
@@ -124,7 +125,8 @@
           "buildingCount": 1
         },
         "note": "rejected: tier 2 research is only queued, not yet completed"
-      }
+      },
+      "commandOutcome": "refused"
     },
     {
       "command": "tick 50",

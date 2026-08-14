@@ -3,17 +3,18 @@
   "description": "Visual check: assign qualified driver to vehicle, verify driver info, enforce one driver per vehicle",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:75000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:75000"
         }
       ],
+      "description": "cash:75000 (dusty_hollow's own $50,000 + one extra debris_hauler's $25,000) funds the second vehicle bought below (issue #585) -- it is spent in full at that step, so every cash figure from there through the rest of the file is unchanged from before this override.",
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 75000,
           "vehicleCount": 0
         }
       }
@@ -37,7 +38,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 25000,
+          "cash": 50000,
           "vehicleCount": 1
         }
       }
@@ -61,7 +62,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 24200,
+          "cash": 49200,
           "employeeCount": 1
         }
       }
@@ -113,7 +114,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 24200,
+          "cash": 49200,
           "vehicleCount": 1
         },
         "note": "arrival-gated like surveys — the driver walks to the vehicle before boarding, `vehicle list` still shows driver:none right after this click"
@@ -158,28 +159,70 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 22685,
+          "cash": 47685,
           "employeeCount": 2
         }
       }
     },
     {
-      "command": "vehicle driver 1 2",
+      "command": "vehicle buy debris_hauler",
+      "description": "Second vehicle, bought so employee #2 can be assigned a driver seat that isn't already taken (issue #585) -- vehicle #1 already has employee #1 as its driver, and canAssignDriver (VehicleDriverAssignment.ts) checks the target vehicle's own driver slot, not employee #1's assignment, so this needs its own free vehicle rather than a second attempt on #1.",
       "interaction": [
         {
-          "type": "command",
-          "command": "vehicle driver 1 2"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Left unmarked: vehicle #1 already has a driver, so FleetPanel shows only an Unassign control here, not the assign picker -- and even that picker would never have listed employee #2 (a blaster has no driving.truck licence). Confirmed by the console command itself failing with \"Employee lacks licence for this role\": genuinely unreachable by a click, not a conversion gap.",
+      "role": "player",
       "expect": {
         "equals": {
           "cash": 22685,
-          "employeeCount": 2
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.truck level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.truck level:1"
+        }
+      ],
+      "description": "Left unmarked: no UI control drives this exact command and none should exist -- grants employee #2 (a blaster) the driving.truck licence needed to crew the second vehicle below; the player-facing path is `employee train` (issue #585, mirrors the assign_skill step above for employee #1).",
+      "expect": {
+        "equals": {
+          "proficiencyTotal": 3
         },
-        "note": "rejected: Employee lacks licence for this role"
+        "note": "employee #1's driving.truck(1) + employee #2's own starting blasting(1) + this grant's driving.truck(1) = 3"
       },
       "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 2 2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "description": "Retargeted to vehicle #2 (issue #585): the original `vehicle driver 1 2` failed no matter what, because canAssignDriver checks the requested employee's licence before it ever checks whether the target vehicle already has a driver -- vehicle #1 keeps the assignment proven above untouched, and employee #2, now licenced, genuinely takes vehicle #2's open seat. Real click (mirrors step 5's `vehicle driver 1 1`), not a bootstrap command -- the panel opened at step 4 stays open (#411), so vehicle #2's own assign button is already reachable.",
+      "expect": {
+        "equals": {
+          "cash": 22685,
+          "employeeCount": 2,
+          "vehicleCount": 2
+        }
+      },
+      "role": "player"
     },
     {
       "command": "tick 5",

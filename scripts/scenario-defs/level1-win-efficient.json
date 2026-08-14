@@ -337,7 +337,8 @@
           "surveyCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -377,7 +378,8 @@
           "surveyCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -417,7 +419,8 @@
           "surveyCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -457,7 +460,8 @@
           "surveyCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",
@@ -537,7 +541,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -577,7 +582,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -617,7 +623,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -657,7 +664,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",
@@ -971,7 +979,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 5",
@@ -1011,7 +1020,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1108,7 +1118,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "contract deliver 4 amount:450",
@@ -1131,7 +1142,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",
@@ -1479,7 +1491,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 5",
@@ -1519,7 +1532,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1591,7 +1605,8 @@
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "contract status",
@@ -1914,7 +1929,8 @@
           "activeContractCount": 3,
           "surveyCount": 1
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -1934,7 +1950,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 5",
@@ -1974,7 +1991,8 @@
           "surveyCount": 1
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "finances",
