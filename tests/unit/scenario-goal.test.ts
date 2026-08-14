@@ -7,7 +7,7 @@
 // check the fields they can; neither is a no-op channel.
 
 import { describe, it, expect } from 'vitest';
-import { checkGoalAgainstState } from '../../scripts/shared/scenario-goal.js';
+import { checkGoalAgainstState, checkCommandOutcome } from '../../scripts/shared/scenario-goal.js';
 
 describe('checkGoalAgainstState — equals', () => {
   it('passes when every field matches exactly', () => {
@@ -145,5 +145,67 @@ describe('checkGoalAgainstState — combined and empty goals', () => {
       {},
     );
     expect(violation).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────
+// checkCommandOutcome (issue #585) — judges a step's commandOutcome
+// declaration against the console's own CommandResult, independent of the
+// state-based expect checks above.
+//
+//   - undefined (default) — the command must succeed; success:false violates.
+//   - 'refused'            — the command must fail; success:true violates
+//     (the "guard stopped guarding" case — a step that used to prove a
+//     refusal and silently started succeeding must itself start failing).
+//   - 'either'              — always null, no matter which way it went.
+// ──────────────────────────────────────────────
+describe('checkCommandOutcome — undefined (default): the command must succeed', () => {
+  it('passes when the command succeeded', () => {
+    const violation = checkCommandOutcome(undefined, { success: true, output: 'OK' }, 'new_game seed:42');
+    expect(violation).toBeNull();
+  });
+
+  it('fails, naming the command and the console\'s own refusal text, when the command was refused', () => {
+    const violation = checkCommandOutcome(
+      undefined,
+      { success: false, output: 'Unknown command: "foo". Type "help" for available commands.' },
+      'foo',
+    );
+    expect(violation).not.toBeNull();
+    expect(violation).toContain('foo');
+    expect(violation).toContain('Unknown command: "foo". Type "help" for available commands.');
+  });
+});
+
+describe("checkCommandOutcome — 'refused': refusal is the expected outcome", () => {
+  it('passes when the command was refused', () => {
+    const violation = checkCommandOutcome(
+      'refused',
+      { success: false, output: 'No game loaded. Use new_game first.' },
+      'employee list',
+    );
+    expect(violation).toBeNull();
+  });
+
+  it('fails, naming the command, when the command unexpectedly succeeded', () => {
+    const violation = checkCommandOutcome(
+      'refused',
+      { success: true, output: 'Hired driller #1.' },
+      'employee hire role:driller',
+    );
+    expect(violation).not.toBeNull();
+    expect(violation).toContain('employee hire role:driller');
+  });
+});
+
+describe("checkCommandOutcome — 'either': no check, always null", () => {
+  it('passes when the command succeeded', () => {
+    expect(checkCommandOutcome('either', { success: true, output: 'Choice applied.' }, 'event choose 0')).toBeNull();
+  });
+
+  it('passes when the command was refused', () => {
+    expect(
+      checkCommandOutcome('either', { success: false, output: 'No pending event or invalid option.' }, 'event choose 0'),
+    ).toBeNull();
   });
 });
