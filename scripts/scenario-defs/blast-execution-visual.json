@@ -1186,8 +1186,12 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix.",
+      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #553-followup (issue #586 CI): added the toolbar blast-panel click grid 1/2/3's own charge step never needed -- grid 4's tick-150 wait plus its own `event choose 0` step immediately before this one is the one place in the file where an event dialog resolves between the drill_plan step (which already reopens the blast panel) and this charge step, and CI showed `#bs-blast-panel [data-step=\"2\"]` covered by a div afterward, the same panel-active-elsewhere symptom already fixed at the drill_plan steps above.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
