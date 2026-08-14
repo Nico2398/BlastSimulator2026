@@ -70,13 +70,19 @@ export function checkGoalAgainstState(
  * - undefined — the command must succeed; `success:false` is a violation.
  * - 'refused' — the command must fail; `success:true` is a violation.
  * - 'either' — no check, always `null`.
- *
- * TODO: implement.
  */
 export function checkCommandOutcome(
-  _commandOutcome: 'refused' | 'either' | undefined,
-  _result: { success: boolean; output: string },
-  _command: string,
+  commandOutcome: 'refused' | 'either' | undefined,
+  result: { success: boolean; output: string },
+  command: string,
 ): string | null {
-  return null;
+  if (commandOutcome === 'either') return null;
+
+  if (commandOutcome === 'refused') {
+    if (result.success === false) return null;
+    return `command "${command}" was declared commandOutcome:'refused' but succeeded — the guard it was meant to prove no longer blocks it`;
+  }
+
+  if (result.success === true) return null;
+  return `command "${command}" was refused by the console: ${result.output}`;
 }

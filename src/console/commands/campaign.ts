@@ -149,12 +149,15 @@ export function campaignStartCommand(
 // ── tutorial start ──
 
 export function tutorialStartCommand(
-  _ctx: GameContext,
+  ctx: GameContext,
   _args: string[],
   _named: Record<string, string>,
 ): CommandResult {
-  // TODO: implement — pause the game and confirm the tutorial started.
-  return { success: false, output: '' };
+  if (!ctx.state) {
+    return { success: false, output: 'No game loaded. Use new_game first.' };
+  }
+  ctx.state.isPaused = true;
+  return { success: true, output: 'Tutorial started' };
 }
 
 // ── stats ──

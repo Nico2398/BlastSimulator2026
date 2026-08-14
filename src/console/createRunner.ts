@@ -52,6 +52,7 @@ import {
   campaignCompleteCommand,
   campaignStartCommand,
   statsCommand,
+  tutorialStartCommand,
 } from './commands/campaign.js';
 import { sandboxCommand } from './commands/sandbox.js';
 import { stateCommand } from './commands/state.js';
@@ -258,6 +259,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('stats', 'Show per-level success stats and star rating', (args, named) =>
     statsCommand(ctx, args, named),
+  );
+  runner.register('tutorial_start', 'Start the tutorial (pauses the game)', (args, named) =>
+    tutorialStartCommand(ctx, args, named),
   );
 
   // --- State inspection (agent-friendly) ---

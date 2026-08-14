@@ -26,7 +26,7 @@ The layers surface as four independent channels. Each catches what the others mi
 |---------|---------|--------|--------|
 | `static` | `npm run typecheck` | Types line up across `src/` and `scripts/` | Anything about runtime behaviour |
 | `logic` | `npm run test` | Unit + integration behaviour matches expectations | Whether the game renders |
-| `scenario` | `npm run scenarios` | Full command sequences produce the expected game state | Whether the UI is reachable |
+| `scenario` | `npm run scenarios` | Full command sequences produce the expected game state — a command the console refuses now fails the step unless the step declares `commandOutcome: 'refused'`/`'either'` | Whether the UI is reachable |
 | `visual` | `npm run scenarios:interaction`, `npm run screenshot` | The game renders, the UI responds to real clicks, and a player can reach the goal by clicking alone | Numeric correctness — that is `logic` |
 
 The first three all drive the simulation through `src/console/`, whose commands are a superset of what the UI exposes. That is why they can be green on an unplayable game, and why a `role: 'player'` scenario step forbids console commands for anything a player would have to do (`checkStepActionAllowed`, `scripts/shared/interaction-executor.ts`). Procedures: `dev-visual-testing` skill; step roles: `.claude/rules/scenario-defs.md`.
@@ -133,7 +133,7 @@ JSON files in `scripts/scenario-defs/`. Runner captures screenshot + state JSON 
 
 Scenario steps can define an `interaction` array of `InteractionStepAction` objects for UI-level testing. Steps without `interaction` fall back to command execution. Type definitions in `scripts/shared/scenario-types.ts`.
 
-Steps also carry `role: 'player' | 'setup' | 'observe'` and `expect` (`ScenarioStepGoal`) — `role` constrains which commands an interaction array may reach for, `expect` proves the step's actions actually moved game state rather than merely not throwing. Full field list and current tagging state: `scripts/shared/scenario-types.ts`'s doc comments (Claude Code sessions also have the narrative version in `.claude/rules/scenario-defs.md`).
+Steps also carry `role: 'player' | 'setup' | 'observe'`, `expect` (`ScenarioStepGoal`), and `commandOutcome: 'refused' | 'either'` — `role` constrains which commands an interaction array may reach for, `expect` proves the step's actions actually moved game state rather than merely not throwing, `commandOutcome` declares when a step's command is expected to be refused by the console (default: the command must succeed, or the step fails, naming the command and the console's refusal text). Full field list and current tagging state: `scripts/shared/scenario-types.ts`'s doc comments (Claude Code sessions also have the narrative version in `.claude/rules/scenario-defs.md`).
 
 **Async commands need tick padding.** A command that queues async work (e.g. `survey seismic`) must be followed by enough `tick` steps to let it resolve before a dependent step runs, or the dependent step reads stale state. Insert several `tick 10` steps after the async command, matching `survey-then-blast.json`.
 

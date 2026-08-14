@@ -8,7 +8,7 @@ paths:
 
 # Scenario Definitions
 
-Scenario JSON drives two verification channels from one file: `scenario` (command mode, pure Node.js) and `visual` (interaction mode, real Puppeteer clicks).
+Scenario JSON drives two verification channels from one file: `scenario` (command mode, pure Node.js) and `visual` (interaction mode, real Puppeteer clicks). In command mode, a step whose command the console refuses (`success: false`) fails the scenario unless the step declares `commandOutcome`.
 
 - Every step carries a `command`. Steps that also carry an `interaction` array run through the UI in interaction mode; steps without one fall back to the command.
 - Both modes must pass. `npm run scenarios` covers command mode; `npm run scenarios:interaction` covers the browser path.
@@ -41,6 +41,16 @@ A step's `command` or clicks prove only that nothing threw, not that the game ac
 - `note` — free text shown in a failure report.
 
 `increased`/`decreased`/`equals` are checked in **both** modes (`checkGoalAgainstState`, `scripts/shared/scenario-goal.ts`, wired into command mode's `runSteps`). `usable`/`blocked`/`tutorialStep` need a live page and check only in interaction mode, reusing `interaction-driver.ts`'s own `checkGoal` — command mode has no DOM. A scenario with no `expect` anywhere only proves the sequence ran, not that it did anything.
+
+## Step outcome (`commandOutcome`)
+
+Command mode has a `success: boolean` on every command result, and a step's own claim depends on which way that went — a step recorded as "ran" whether the console accepted or refused its command was silently proving nothing (issue #585 audited 412 such silently-refused commands across 63 files). `commandOutcome` (`ScenarioStepDef`, `scripts/shared/scenario-types.ts`, checked by `checkCommandOutcome` in `scripts/shared/scenario-goal.ts`) states which outcome the step expects, command-mode only:
+
+- Absent (the default) — the command must succeed. `success: false` fails the step, naming the command and the console's own refusal text.
+- `'refused'` — the command must be refused; the step fails if it unexpectedly succeeds (a guard step whose guard stopped guarding). Independent of `role: 'guard'` — a guard-role step still states this explicitly, and it composes with `expect.equals`/`expect.blocked` proving state didn't change.
+- `'either'` — either outcome passes. Reserved for genuinely nondeterministic beats (e.g. `event choose 0` after a bare `tick`, where an event may or may not be pending that beat) — never a blanket silencer for a step whose own claim is actually broken.
+
+A step whose command throws a real exception still fails regardless of `commandOutcome` — only a `success: false` return is a "refusal" this field can declare expected.
 
 ## Interaction actions
 
