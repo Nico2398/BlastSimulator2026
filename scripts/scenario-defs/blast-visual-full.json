@@ -48,6 +48,52 @@
       }
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix (issue #586 CI): a single driller working a 3x4=12-hole pattern unattended for the hundreds of real ticks drilling now takes runs well-being to 0 (no Living Quarters anywhere in this file) long before the pattern finishes -- WORKER REVOLT fires and its full-screen game-over overlay blocks every subsequent panel click, which is exactly the `clickSelector \"#bs-blast-panel [data-step=\\\"2\\\"]\" failed: element is covered by div` CI failure. Command-mode traces (sandbox-measured) confirmed a single driller only lands 9 of 12 holes before the revolt fires at tick ~235, and even a second driller alone still revolts right as hole #12 lands (razor-thin, confirmed on this exact seed). A `living_quarters` was tried too and made things strictly worse: it doesn't slow the well-being crash meaningfully at this crew size, and it introduces a genuine rest/re-collapse thrash that permanently stalls drilling a few holes in (reproduced with 1 and 2 drillers, holeCount frozen through 2000+ ticks) -- not something this scenario file can route around, so it's left out. What works: a second driller/drill_rig pair for parallel drilling (this employee, #2) plus one more, unrigged, purely idle driller (employee #3 below) whose fresh, untouched needs pull the average morale that feeds the well-being score up for as long as it stays idle -- both employees are cheap ($1000 each) next to a third drill_rig ($35,000), and the combination keeps well-being comfortably above 0 until the pattern is nearly done instead of pinned at 0 for hundreds of ticks.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix: employee #3, deliberately left unrigged and unskilled -- it never drives, never drills, never leaves the office. Its only job is to sit on a full needs bar so the roster's average morale (and therefore the well-being score, ScoreManager.ts) doesn't collapse to 0 as fast as it would with only the two working drillers on site. Sandbox-measured: with this employee in the roster, well-being is still 69.6 at tick 50 and doesn't hit 0 until tick ~250-300, instead of tick ~150 with just two working drillers -- enough margin that the 120-tick WORKER REVOLT countdown (REVOLT_TICKS, balance.ts) never matures before the pattern finishes drilling.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "description": "#553: vehicle #1.",
       "interaction": [
@@ -75,6 +121,29 @@
       }
     },
     {
+      "command": "vehicle buy drill_rig",
+      "description": "#553 crew-walkout fix: vehicle #2, for the second driller (employee #2) -- see the employee-hire steps above for why. Two drillers working the pattern concurrently roughly halves the ticks needed to land all 12 holes versus one alone (sandbox-measured: 12/12 by tick ~285-300 instead of stalling at 9/12 past the revolt point).",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
       "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
       "description": "Grants the driller (employee #1) the licence to drive the drill_rig just purchased -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow); left as a test-only bootstrap since this file's focus is blast execution, not re-proving vehicle licensing.",
       "interaction": [
@@ -84,6 +153,47 @@
         }
       ],
       "role": "bootstrap"
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Same bootstrap licence grant as employee #1, above, for the second driller. Employee #3 (the idle relief hire) deliberately gets no skill and no vehicle -- see its own hire step.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "description": "#553 crew-walkout fix: crews drill_rig #1 with driller #1 explicitly. Sandbox-measured: with two rigs and three employees (only two of them qualified), the auto-board dispatch that a single lone driller/rig pair could rely on picks an inconsistent pairing and one hole is permanently left undrilled -- explicit `vehicle driver` assignment (same convention as level3-playthrough-win.json's own two-driller crewing) removes the ambiguity. Does NOT re-click the vehicles toolbar tab: the panel is already open, left that way by the preceding `vehicle buy drill_rig` (vehicle #2) step -- the two `employee assign_skill` bootstrap steps in between use `command` type, not a click, so panel state is unchanged. UIManager.togglePanel closes an ALREADY-active panel on re-click instead of leaving it open (same class of bug already fixed elsewhere in this PR), which is what made this step's own assign button resolve to zero size.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "vehicle driver 2 2",
+      "description": "Crews drill_rig #2 with driller #2, same reasoning as the step above.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:20,20",
@@ -139,7 +249,7 @@
     },
     {
       "command": "tick 50",
-      "description": "#553: waits for the driller to drive the drill_rig to all 12 ordered holes and drill them (sandbox-measured: lands around tick 350). Seven rounds of tick 50 (with a defensive event-resolve after each) cover that.",
+      "description": "#553: waits for the two drillers to drive their drill_rigs to all 12 ordered holes and drill them (sandbox-measured: lands around tick 285-300 with two concurrent driller/drill_rig pairs). Six rounds of tick 50 (with a defensive event-resolve after each) cover that -- deliberately not more: with a lone driller this used to run seven rounds (350 ticks), but every extra round past the sixth pushes well-being's already-flat 0 streak (no Living Quarters in this file, see the employee-hire steps above) past the 120-tick WORKER REVOLT threshold (REVOLT_TICKS, balance.ts) with all 12 holes already drilled and nothing left to wait for -- sandbox-confirmed: a seventh round here does trigger the revolt's blocking game-over overlay.",
       "interaction": [
         {
           "type": "command",
@@ -260,31 +370,7 @@
     },
     {
       "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "description": "Long enough for the driller to land the last of the 12 ordered holes.",
+      "description": "Long enough for the two drillers to land the last of the 12 ordered holes.",
       "interaction": [
         {
           "type": "command",
@@ -599,9 +685,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 89746
+          "cash": 21206
         }
-      }
+      },
+      "description": "#553 crew-walkout fix: cash retuned from 89746 -- the extra 2nd driller/drill_rig pair and 3rd idle relief hire above (needed to avoid WORKER REVOLT, see their own descriptions) cost $37,000 more up front than this file's original single-driller roster. Sandbox-measured, seed 42, deterministic."
     },
     {
       "command": "preview energy",
@@ -628,7 +715,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 87746
+          "cash": 19206
         }
       }
     },
@@ -657,7 +744,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 82746
+          "cash": 14206
         }
       }
     },
@@ -686,7 +773,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 70746
+          "cash": 2206
         }
       }
     },

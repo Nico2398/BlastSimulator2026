@@ -173,12 +173,8 @@
     },
     {
       "command": "employee train 1 skill:driving.drill_rig",
-      "description": "#553: driving.drill_rig belongs to no hiring role either (ROLE_STARTING_QUALIFICATION) -- same parity gap as driving.excavator above, and now load-bearing: without this licence the driller can never staff the drill_rig bought above, so drill_hole's vehicle gate (#550) never claims.",
+      "description": "#553: driving.drill_rig belongs to no hiring role either (ROLE_STARTING_QUALIFICATION) -- same parity gap as driving.excavator above, and now load-bearing: without this licence the driller can never staff the drill_rig bought above, so drill_hole's vehicle gate (#550) never claims. No toolbar click here (unlike the excavator step above): the employees panel is already open and employee #1's row already expanded from that step (CrewPanel's `expandedId` is a plain instance field, untouched by the intervening `tick`/`event choose` steps), and ToolRail's tab button is a toggle (UIManager.togglePanel: clicking the tab for the panel that is already active calls hideAllPanels() instead of reopening it) -- re-clicking `[data-panel=\"employees\"]` here closed the panel outright (display:none on #bs-employee-panel), leaving the train button attached to the DOM but zero-sized, which is what `clickSelector \"...bs-train-btn[data-skill=\\\"driving.drill_rig\\\"]\" failed: element has zero size (0x0)` actually meant.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"

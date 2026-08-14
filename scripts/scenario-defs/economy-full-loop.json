@@ -234,7 +234,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:10,10 diameter:0.089",
       "interaction": [
         {
           "type": "clickSelector",
@@ -270,7 +270,7 @@
           "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below. spacing corrected from 4 to 3 (same Finding #42 class as the depth fix just above, found while chasing issue #553's diameter mismatch): this step never clicks the grid tool's spacing stepper either, so the real drag always used the panel's own DEFAULT_SPACING_M=3 (Drill.ts) -- the declared spacing:4 was never what the real click sent, and with rows/cols landing the same 2x2 either way (round(4/3)+1 == round(4/4)+1 == 2), it only silently shifted where the 4 holes actually sit, not how many -- a small amount of extra/less driller travel between real hole positions that the diameter fix alone didn't account for. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent."
     },
     {
       "command": "tick 50",
@@ -483,7 +483,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 196734,
+          "cash": 196794,
           "proficiencyTotal": 16
         }
       },
@@ -568,7 +568,7 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 180934,
+          "cash": 180994,
           "proficiencyTotal": 22
         }
       }
@@ -615,7 +615,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 148934
+          "cash": 148994
         }
       }
     },
@@ -639,10 +639,6 @@
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
@@ -651,7 +647,7 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "#553: vehicle #3 -- #1 was the drill_rig (destroyed by the blast), #2 the rock_fragmenter bought above.",
+      "description": "#553: vehicle #3 -- #1 was the drill_rig (destroyed by the blast), #2 the rock_fragmenter bought above. No toolbar re-click here (unlike the rock_fragmenter buy above): the Vehicles panel toggles closed on a repeat click of its own already-active toolbar button (UIManager.togglePanel, `this.activePanel === name` branch) -- it's still open from that same purchase, with only a non-UI `tick 5` and an in-panel `vehicle driver 2 4` assign-button click in between, neither of which touches the toolbar. Re-clicking it here closed the panel instead of leaving it open, so the very next click (on the still-present-but-hidden debris_hauler tier button) failed with a real, reproducible \"element has zero size (0x0)\" in interaction mode -- the same toggle-button class of bug as the one tracked separately for blast-visual-full.json's vehicle panel.",
       "role": "player",
       "expect": {
         "decreased": [
@@ -677,7 +673,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 123857
+          "cash": 123924
         }
       }
     },
