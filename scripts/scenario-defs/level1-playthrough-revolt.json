@@ -100,11 +100,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "#553 sandbox-measured finding: staffed:true parks its 4 vehicles in a row at (0,2)/(2,2)/(4,2)/(6,2), and on dusty_hollow's terrain that row sits inside the map's only ramp corridor out of the spawn corner -- tickVehicleOnNavGrid recomputes the same A* path every tick (avoidVehicles:false) and only refuses the immediate next cell if another vehicle already occupies it (isCellOccupiedByOtherVehicle), so the drill_rig (vehicle #1) advances exactly one cell to (1,2) and then waits forever behind the unmanned debris_hauler parked at (2,2) -- confirmed by direct trace: 40+ ticks stuck at (1,2), waitingTicks climbing, holeCount never leaving 0. This file never uses a debris_hauler, rock_digger or rock_fragmenter (zero hauling/fragment-breaking anywhere in its script), so scrapping the blocker -- and the other two idle vehicles that would otherwise just draw maintenance upkeep for nothing -- clears the corridor and turns dead weight into cash.",
@@ -131,11 +131,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "rock_digger #3 was never in the drill_rig's path, but this file has no use for it either -- scrapped for the same reason as #2: pure upkeep with nothing to show for it.",
@@ -162,11 +162,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "rock_fragmenter #4, same reasoning. Sandbox-measured residual proceeds across all three scraps ($10,000 + $20,000 + $12,800 = $42,800) fund the 7 hires below without touching the $50,000 opening balance.",

@@ -281,11 +281,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player"
@@ -549,11 +549,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player"
@@ -900,11 +900,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player"
@@ -1354,11 +1354,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "role": "player"

@@ -60,11 +60,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "Finding: this file is pure blast-only (no contracts, no hauling, no rock clearing anywhere in it, per the pre-#553 pass's own note) -- the debris_hauler/rock_digger/rock_fragmenter staffed:true grants are dead weight the moment the game opens, and under #553 that weight is no longer free: drill_hole is now a queued action a driller spends real ticks on, and this file's 6 patterns (156 holes total, the largest in this batch) need a very long drilling window before their first blast can even fire. VEHICLE_SCRAP_RESIDUAL_FRACTION is 0.4 (balance.ts) and these three are still at full HP, so scrapping them back for $10,000 + $20,000 + $12,800 = $42,800 turns three idle maintenance drains into the cash cushion that keeps the mine solvent through that window -- explored and required; see the tick-block notes below for the arithmetic.",
@@ -89,11 +89,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "Same finding as the debris_hauler scrap above -- rock_digger never does anything in this file either.",
@@ -118,11 +118,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
         }
       ],
       "description": "Same finding -- rock_fragmenter is the third and last unused staffed vehicle; only the drill_rig (vehicle #1) is ever driven in this file.",
