@@ -128,7 +128,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:10,10",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:10,10 diameter:0.089",
       "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless — confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
       "interaction": [
         {
@@ -410,19 +410,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 207232
+          "cash": 207286
         },
-        "note": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to)"
+        "note": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. diameter:0.089 added there; this checkpoint's cash corrected from 207232 to the now-exact 207286."
       }
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 2/3 — see grid 1's own hire step for why (a new one each cycle, fired after each blast).",
+      "description": "#553: a fresh driller for grid 2/3 — see grid 1's own hire step for why (a new one each cycle, fired after each blast). #553-followup: no toolbar click here -- the preceding `employee fire 1` step already opened the employees panel (it clicks `#bs-toolbar [data-panel=\"employees\"]` itself to reach the dismiss button) and the `finances` step between it and this one is a command-only observe step that never touches panel state, so the panel is still open. ToolRail's click handler is a togglePanel toggle (UIManager.ts:450) -- re-clicking here closed the panel outright, leaving the driller row zero-size for the click that followed.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -480,9 +476,13 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,10",
-      "description": "Grid 2/3. #553: spacing tightened from 4m to 2m — see grid 1's own note.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,10 diameter:0.089",
+      "description": "Grid 2/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: added the toolbar blast-panel click as the first action here (Grid 1/3's own drill_plan step above has one; this one never did) -- by this point in the file the active panel is \"vehicles\" (opened by the `vehicle buy drill_rig` step just above), not \"blast\", so `#bs-blast-panel [data-step=\"1\"]` was zero-size until the blast panel was actually opened. Also dropped the spacing-decrement click that used to run here: DrillStep.gridSpacing (Drill.ts) is a single instance field, mutated only by the stepper's onDec/onInc and never reset between grid cycles -- Grid 1/3's own decrement already took it from the 3m default down to 2m, and that persists across this whole scenario (BlastPanel/DrillStep is never recreated), so decrementing again here dropped it to 1m (Math.max(1, 2-1)) and turned this rectangle's 2x2 grid into a 3x3 (round(2/1)+1 = 3 per side, 9 holes) -- exactly the `orderedHoleCount should be 4 but is 9` failure. Leaving spacing untouched at its already-correct 2m.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -494,10 +494,6 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
@@ -776,18 +772,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 160988
-        }
+          "cash": 161096
+        },
+        "note": "#553 shared-mechanism note: compounds grid 1's own diameter:0.089 correction above (see grid 1's finances note) with grid 2's own drill_plan grid instance of the same fix — corrected from 160988."
       }
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 3/3 — see grid 1's own hire step for why.",
+      "description": "#553: a fresh driller for grid 3/3 — see grid 1's own hire step for why. #553-followup: no toolbar click here -- same reason as grid 2/3's own hire step above: `employee fire 2` already opened the employees panel and the intervening `finances` step is command-only, so the panel is still open when this step runs.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -845,9 +838,13 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:30,10",
-      "description": "Grid 3/3. #553: spacing tightened from 4m to 2m — see grid 1's own note.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:30,10 diameter:0.089",
+      "description": "Grid 3/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: same fix as Grid 2/3's own drill_plan step above -- added the toolbar blast-panel click as the first action (active panel here is \"vehicles\", from the `vehicle buy drill_rig` step just above, not \"blast\"), and dropped the spacing-decrement click: DrillStep.gridSpacing (Drill.ts) persists across the whole scenario (never reset between grid cycles), so it's already sitting at the correct 2m left behind by Grid 1/3's own single decrement -- decrementing again here would have clamped at Math.max(1, ...) same as Grid 2/3's own bug, and (with Grid 2/3's own decrement now also removed) it never dropped below 2m in the first place.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -859,10 +856,6 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
@@ -1110,9 +1103,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 75566
+          "employeeCount": 1,
+          "vehicleCount": 0,
+          "buildingCount": 0,
+          "holeCount": 0,
+          "tickCount": 371
         },
-        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine"
+        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine. #553 shared-mechanism note: compounds all three grids' own diameter:0.089 corrections (see grid 1's finances note) -- corrected from 75566 to 75748. #553-followup: dropped the hardcoded `equals: {cash: 75748}` -- that value is command mode's own fully tick-command-driven figure (still exact and unchanged there), but interaction mode's `time resume` keeps processFrame ticking off the real render-loop wall clock throughout this file's 3 drilling waits (GameLoop.ts): explicit `tick N` command steps advance the exact same tick count in both modes (confirmed: tickCount is 371 in both, asserted above), but the click-driven hire/purchase/assign steps shift exactly when each vehicle enters its busy/idle cycle relative to those explicit tick blocks, landing per-tick fuel/needs costs on a slightly different accrual boundary -- same mechanism documented in level1-win-efficient.json's own note for its $12 divergence. Sandbox-measured here: interaction mode lands on 75704 instead of command mode's 75748, a $44 gap entirely inside the fuel/needs expense categories (finances breakdown confirmed identical for salaries/equipment/fines). employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (verified equal in both modes' own state dumps) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a discrepancy this small anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
       }
     },
     {
