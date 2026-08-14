@@ -165,6 +165,14 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
 
   'train-driller': [
     { target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.open_crew' },
+    // CrewPanel is single-expansion (expandedId) -- .bs-train-btn only
+    // renders once the driller's own row is expanded, so this stage cannot
+    // skip straight to it. The driller hired by 'hire-driller' is always
+    // employee #2 at this point in the campaign's own tutorial script.
+    {
+      target: '#bs-employee-panel [data-employee-id="2"] .bs-detail-toggle',
+      hintKey: 'tutorial.stage.expand_driller',
+    },
     {
       target: '#bs-employee-panel .bs-train-btn[data-skill="driving.drill_rig"]',
       hintKey: 'tutorial.stage.train_drill_rig',

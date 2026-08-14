@@ -105,10 +105,16 @@ describe('en.json / fr.json — key-set parity', () => {
     // closing the deadlock where drill_hole's vehicle gate left the driller
     // hired but never licensed/equipped to drive a drill_rig — 9 new keys
     // (3 step text + 3 step title + 3 stage hint), both locales translated.
+    // Baseline is now 3264 (up from 3263): train-driller's own stage sequence
+    // jumped straight from opening the Crew panel to .bs-train-btn, but that
+    // control only renders once CrewPanel's single-expansion model has the
+    // driller's own row open -- an unreachable gate, not a difficulty setting.
+    // tutorial.stage.expand_driller names the real intermediate click, in
+    // both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3263);
+    expect(Object.keys(en).length).toBe(3264);
   });
 });
 

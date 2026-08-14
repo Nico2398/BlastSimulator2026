@@ -2993,6 +2993,7 @@
   "tutorial.stage.build_warehouse": "Press Place next to Freight Warehouse.",
   "tutorial.stage.build_driving_center": "Press Place next to Driving Center.",
   "tutorial.stage.build_site": "Click the blue tile outlined in the scene to site the building.",
+  "tutorial.stage.expand_driller": "Click the driller's card to open their details.",
   "tutorial.stage.train_drill_rig": "Press Train next to the Drill Rig licence.",
   "tutorial.stage.ramp_tool": "Press Build Ramp in the Terrain section.",
   "tutorial.stage.boxcut_area": "Click anywhere along the blue strip outlined in the scene. The ramp snaps to it.",
