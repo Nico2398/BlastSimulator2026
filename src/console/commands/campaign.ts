@@ -146,6 +146,17 @@ export function campaignStartCommand(
   };
 }
 
+// ── tutorial start ──
+
+export function tutorialStartCommand(
+  _ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  // TODO: implement — pause the game and confirm the tutorial started.
+  return { success: false, output: '' };
+}
+
 // ── stats ──
 
 export function statsCommand(
