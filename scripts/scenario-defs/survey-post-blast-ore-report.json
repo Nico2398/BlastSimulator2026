@@ -506,6 +506,73 @@
       "role": "bootstrap"
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix (sandbox-measured): a lone continuously-busy driller's own morale collapses to 0 well before this 9-hole grid finishes drilling, and avgMorale (ScoreManager.ts) is a straight average across the roster -- 3 extra idle hires here (never assigned a skill, never given a task, so they simply idle the whole file) dilute that average enough to keep state.scores.wellBeing off the floor long enough that state.revolt.revolted (WorkerRevolt.ts, 120-tick countdown once well-being hits 0) never flips true before charging. No living_quarters/building fix works here -- confirmed by trace: a continuously-busy solo employee's need-driven rest action never wins selectBestActionForEmployee's cost ranking against the next queued drill_hole, so buildings alone can't rescue this, only idle headcount can. Employee #3.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix, same rationale as above -- Employee #4, also left idle for the rest of the file. #553-followup: no toolbar click here -- the preceding Employee #3 hire step already opened the employees panel and nothing since closed it (ToolRail's click handler is a togglePanel toggle, UIManager.ts:450), so re-clicking `#bs-toolbar [data-panel=\"employees\"]` here closed the panel outright, leaving the driller row zero-size for the click that followed. Same class of bug documented in employee-training.json's own driving.drill_rig training step.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 4
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix, same rationale as above -- Employee #5, also left idle for the rest of the file. #553-followup: no toolbar click here either -- same reason as Employee #4 above, the panel is still open from Employee #3's own opening click.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 5
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:20,20",
       "interaction": [
         {
