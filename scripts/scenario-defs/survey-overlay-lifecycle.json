@@ -662,7 +662,7 @@
     },
     {
       "command": "tick 50",
-      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). No staffed:true near-origin spawn here (campaign start), so this single driller/drill_rig takes longer than the usual 4-hole recipe -- sandbox-measured landing at tick 250.",
+      "description": "#553: drain the ordered plan in bounded tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). No staffed:true near-origin spawn here (campaign start), so this single driller/drill_rig takes longer than the usual 4-hole recipe. Sandbox-measured: all 4 holes land by cumulative +130 ticks post-drill_plan (50+50+30) -- trimmed from an earlier 5x50=250 padding that ran well-being (already at 6.2 before this block, with no Living Quarters anywhere in this file) to a sustained 0 long enough to trigger the #553-unrelated WORKER REVOLT game-over during the since-removed 4th chunk. `revolted` stays false through the trimmed sequence (command-mode traced).",
       "interaction": [{"type": "command", "command": "tick 50"}],
       "role": "setup"
     },
@@ -682,29 +682,9 @@
       "role": "player"
     },
     {
-      "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "description": "Fifth and final chunk — all 4 holes should have landed by now.",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "command": "tick 30",
+      "description": "Third and final chunk — all 4 holes have landed by cumulative +130 ticks post-drill_plan (command-mode traced).",
+      "interaction": [{"type": "command", "command": "tick 30"}],
       "role": "setup",
       "expect": {
         "equals": {
