@@ -554,6 +554,12 @@ window.__gameState = () => {
     sequenceDelays: s.sequenceDelays,
     finances: { cash: s.finances.cash },
     holeCount: s.drillHoles.length,
+    // Holes ordered but not yet drilled (state.plannedDrillHoles.length) --
+    // mirrors serializeGameState's own field (console-api.ts). Missing here
+    // made every interaction-mode scenario asserting orderedHoleCount fail
+    // with "undefined" rather than a real mismatch (#553's original
+    // implementation added the field to command mode only).
+    orderedHoleCount: s.plannedDrillHoles.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
     surveyCount: s.surveyResults.length,
