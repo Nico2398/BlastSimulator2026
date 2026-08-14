@@ -1554,55 +1554,11 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:3"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 400,
@@ -1614,23 +1570,20 @@
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-step=\"2\"]"
       },
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls -- this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed."
+      "description": "CI finding, this PR (#586): was role: player (issue #515) driving real clicks through the Charge step. It can't be -- `state.bankrupt` flipped true (and levelEndReason to 'bankruptcy') two tick-blocks back, and `LevelEndScreen.update()` (src/main.ts:526, called after every command whenever `!tutorial.isActive`) shows its full-screen `#bs-level-end-screen` overlay -- `position:fixed;inset:0` at `--bsx-z-menu` -- the instant `levelEndReason` goes non-null, for EVERY defeat reason, not just worker_revolt. It stays up: `update()` only clears `rendered` (and re-hides) when `levelEndReason` goes back to null, which a defeated level never does. So `#bs-blast-panel [data-step=\"2\"]` is exactly the covered-by-div failure this PR's other broken scenario files hit for a different reason (crew walkout) -- same overlay class, different trigger. The command still runs (nothing in the engine gates a command on `levelEndReason`, matching this file's own established 'nothing halts a tick or a blast once levelEnded flips' narrative below) and chargedCount still reaches 24 -- only the UI path to get there is gone. `role: guard` + `expect.blocked` proves that honestly instead of asserting a click no real player could make."
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:25"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 400,
@@ -1642,38 +1595,20 @@
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 24
-        }
-      }
+        },
+        "blocked": "#bs-blast-panel [data-step=\"3\"]"
+      },
+      "description": "Same #bs-level-end-screen overlay as the Charge step above -- see its description. Was role: player driving a click through the Sequence step; converted to guard for the same reason."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 400,
@@ -1685,9 +1620,10 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-step=\"5\"]"
       },
-      "description": "#553: this file's real 24-hole pattern (the pre-#553 file's own already-corrected grid, Finding #52) is violent enough (PERFECT rating, 1,507 m3 cleared) to kill 11 of the 15 employees on site -- a direct trace shows all 10 of this file's own hand-hires (employees #6-15) dead, plus employee #1 (Gus Rubble, the free staffed driller who spent hundreds of ticks physically working this pattern). The only 4 survivors are staffed:true's other free hires (#2-5: the staffed blaster and 3 staffed drivers), who never went anywhere near the pattern. 6 of the file's 9 vehicles are destroyed too: the free staffed drill_rig (#1) and all 5 of this file's own hand-bought vehicles (#5-9), which were parked squarely inside the drill pattern's footprint the whole time."
+      "description": "#553: this file's real 24-hole pattern (the pre-#553 file's own already-corrected grid, Finding #52) is violent enough (PERFECT rating, 1,507 m3 cleared) to kill 11 of the 15 employees on site -- a direct trace shows all 10 of this file's own hand-hires (employees #6-15) dead, plus employee #1 (Gus Rubble, the free staffed driller who spent hundreds of ticks physically working this pattern). The only 4 survivors are staffed:true's other free hires (#2-5: the staffed blaster and 3 staffed drivers), who never went anywhere near the pattern. 6 of the file's 9 vehicles are destroyed too: the free staffed drill_rig (#1) and all 5 of this file's own hand-bought vehicles (#5-9), which were parked squarely inside the drill pattern's footprint the whole time. CI finding, this PR (#586): was role: player driving the execute/confirm/report-close click sequence -- same `#bs-level-end-screen` overlay as the Charge and Sequence steps above blocks `#bs-blast-panel [data-step=\"5\"]` (and everything downstream of it) from the moment bankruptcy fires. The blast still detonates for real (command mode and this guard step's own `command` interaction agree on every number above) -- the automated systems, not a player's click, are what fire it, matching this file's own 'legally seized, crew still working' framing. Converted to guard rather than pretending a confirm dialog could be clicked through a full-screen game-over overlay."
     },
     {
       "command": "state full",
@@ -1819,19 +1755,11 @@
       "command": "contract accept 19",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"19\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"19\"] .bs-contract-accept"
+          "type": "command",
+          "command": "contract accept 19"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 400,
@@ -1840,9 +1768,10 @@
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
-        }
+        },
+        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
-      "description": "#553: contract id renumbered from the pre-#553 file's own id 1 -- the pool refreshes on its own clock (REFRESH_INTERVAL, Contract.ts) and the 400-tick drilling wait pushes it well past that file's original pool. Contract #19 (Dispose of rubble, 190kg) is what the pool actually holds at this point, verified via `contract list` above. #513/#581: the accept click is scoped to `[data-contract-id=\"19\"]`, the contract this step's `command` names -- unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode and interaction mode could accept different contracts while both report pass."
+      "description": "#553: contract id renumbered from the pre-#553 file's own id 1 -- the pool refreshes on its own clock (REFRESH_INTERVAL, Contract.ts) and the 400-tick drilling wait pushes it well past that file's original pool. Contract #19 (Dispose of rubble, 190kg) is what the pool actually holds at this point, verified via `contract list` above. CI finding, this PR (#586): was role: player, scoped to `[data-contract-id=\"19\"] .bs-contract-accept` (#513/#581, so command mode and interaction mode couldn't silently accept different contracts) -- converted to guard for the same `#bs-level-end-screen` reason as the Charge/Sequence/blast steps above: `#bs-toolbar [data-panel=\"contracts\"]` itself is covered by the full-screen bankruptcy overlay, so not even opening the panel is reachable, let alone the accept button inside it. The command still runs and activeContractCount still reaches 1 -- the pool refresh and the auto-negotiation systems that make this contract exist don't care about the UI any more than the blast does."
     },
     {
       "command": "contract deliver 19 amount:190",
@@ -1862,10 +1791,9 @@
           "activeContractCount": 1,
           "surveyCount": 3
         },
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"19\"] .bs-contract-deliver"
       },
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled -- ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace shows 0.0 kg stored (storedMassKg never leaves 0 anywhere in this file -- both debris_haulers this file buys are destroyed in the blast above, and the free staffed debris_hauler (#2) is never driven either). The console command returns success:false (\"Not enough stored material: 0.0 kg available, 190.0 kg requested.\") and command mode only fails a step on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` pins it down instead of asserting something the game correctly forbids."
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled -- ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace shows 0.0 kg stored (storedMassKg never leaves 0 anywhere in this file -- both debris_haulers this file buys are destroyed in the blast above, and the free staffed debris_hauler (#2) is never driven either). The console command returns success:false (\"Not enough stored material: 0.0 kg available, 190.0 kg requested.\") and command mode only fails a step on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` pins it down instead of asserting something the game correctly forbids. CI finding, this PR (#586): originally also asserted `usable: \"#bs-contract-panel [data-action=\\\"goto-ops\\\"]\"` -- dropped, because that control is covered by the same `#bs-level-end-screen` bankruptcy overlay as everything else on this page from the Charge step onward (see its description); nothing on the page is usable once levelEndReason goes non-null, so that assertion could never have passed and the original 'BLOCKED, deliberately not converted to a click' framing already had the right instinct without knowing why the panel itself was gone too."
     },
     {
       "command": "finances",

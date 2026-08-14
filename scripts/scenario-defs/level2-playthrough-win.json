@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 1 real blast and 3 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory.",
+  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 1 real blast and 3 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory. Interaction-mode finding, this file's own: once levelEndReason turns non-null at tick 132, LevelEndScreen's full-viewport overlay (z-index 9999, every panel/toolbar control sits at z 100-200) covers the whole screen for the rest of the run and never clears -- no player click reaches ANY panel again after that tick, including blast 1's own charge/sequence/execute and every contract-accept/drill-plan-grid step that follows. Every step past tick 132 that mutates state now runs its command directly (role:'guard' + expect.blocked, same convention this file already used for its 3 phantom blasts) instead of pretending a click still lands -- the state trajectory (1 real blast, 4 deaths, 3 phantom patterns, 5 contract cycles, final -$1,299,912) is unchanged from before; only the UI-reachability half of each assertion was wrong.",
   "steps": [
     {
       "command": "new_game seed:2277 cash:150000 staffed:true",
@@ -1176,15 +1176,11 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 440,
@@ -1195,22 +1191,20 @@
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 0
-        }
-      }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
+      },
+      "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update/renderForState, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel and toolbar control here sits at z-panel/z-rail (100-200, tokens.ts) -- once that screen shows, it covers literally everything underneath for the rest of the run, including charge-all. This is not a padding mistake to trim around: a real player genuinely cannot reach this button again after tick 132. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 24 holes really do charge and the rest of this file's own trajectory (4 deaths at blast 1, destroyed fleet, -$1.3M) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong."
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:25"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 440,
@@ -1221,38 +1215,20 @@
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 24
-        }
-      }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      },
+      "description": "#553: same class as the charge step above -- the full-viewport bankruptcy overlay has covered auto-sequence since tick 132 too."
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 440,
@@ -1263,9 +1239,10 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
-      "description": "#553: this 24-hole pattern kills 4 -- both driller/drill_rig pairs (Bob Quartzman #1, Otto McBoom #8) standing at the holes they had just finished sinking, plus both surveyors (Jake Stoneface #6, Earl Boulder #7), confirmed via direct trace of `employee list` after the blast (4 entries read DEAD, the other 8 read OK). Both drill_rigs (vehicle #1 and #7) are destroyed alongside their drivers -- the same fate as tutorial-playthrough's single rig, just twice over. The mine is already legally seized (bankrupt since tick 132, see the wait step above) when this fires; the blast report and the deaths are real regardless."
+      "description": "#553: this 24-hole pattern kills 4 -- both driller/drill_rig pairs (Bob Quartzman #1, Otto McBoom #8) standing at the holes they had just finished sinking, plus both surveyors (Jake Stoneface #6, Earl Boulder #7), confirmed via direct trace of `employee list` after the blast (4 entries read DEAD, the other 8 read OK). Both drill_rigs (vehicle #1 and #7) are destroyed alongside their drivers -- the same fate as tutorial-playthrough's single rig, just twice over. The mine is already legally seized (bankrupt since tick 132, see the wait step above) when this fires; the blast report and the deaths are real regardless -- but, per the charge step's finding above, no player can click Execute to fire it: the bankruptcy overlay has owned the whole screen since tick 132. `expect.blocked` proves that; the command still runs so the real casualty/fleet numbers below keep holding."
     },
     {
       "command": "state full",
@@ -1426,19 +1403,11 @@
       "command": "contract accept 20",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
+          "type": "command",
+          "command": "contract accept 20"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 446,
@@ -1446,9 +1415,10 @@
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
-        }
+        },
+        "blocked": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
       },
-      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #20 is what `contract list` actually offers at this point in the run."
+      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #20 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as the charge step at tick 440 above -- accept is genuinely unreachable by tick 446, `expect.blocked` proves it, and the command runs directly so activeContractCount still moves the way a console-only operator's would."
     },
     {
       "command": "contract deliver 20 amount:100",
@@ -1458,9 +1428,8 @@
           "command": "contract deliver 20 amount:100"
         }
       ],
-      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- that control is covered by the same full-screen bankruptcy overlay as everything else past tick 132, not usable either.",
       "expect": {
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-deliver"
       },
       "role": "guard"
@@ -1469,19 +1438,11 @@
       "command": "contract accept 21",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-accept"
+          "type": "command",
+          "command": "contract accept 21"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 446,
@@ -1489,9 +1450,10 @@
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
-        }
+        },
+        "blocked": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-accept"
       },
-      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #21 is what `contract list` actually offers at this point in the run."
+      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #21 is what `contract list` actually offers at this point in the run. Same bankruptcy-overlay finding as contract 20 above."
     },
     {
       "command": "contract deliver 21 amount:40",
@@ -1501,9 +1463,8 @@
           "command": "contract deliver 21 amount:40"
         }
       ],
-      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
       "expect": {
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-deliver"
       },
       "role": "guard"
@@ -1531,37 +1492,11 @@
       "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:25,15",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 25,
-          "z1": 15,
-          "x2": 37,
-          "z2": 27
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 diameter:0.089 start:25,15"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 446,
@@ -1574,7 +1509,8 @@
           "chargedCount": 0,
           "sequencedCount": 0
         },
-        "note": "#553: ordering only -- but with both drill_rigs destroyed in blast 1, these 25 holes are ghosts that will never be claimed. See the tick-wait steps below."
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: ordering only -- but with both drill_rigs destroyed in blast 1, these 25 holes are ghosts that will never be claimed. See the tick-wait steps below. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/accept steps above -- grid-tool is covered by tick 446, so `expect.blocked` proves the real block while the command still runs directly to order the ghost pattern."
       }
     },
     {
@@ -2035,19 +1971,11 @@
       "command": "contract accept 50",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-accept"
+          "type": "command",
+          "command": "contract accept 50"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 907,
@@ -2055,9 +1983,10 @@
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
-        }
+        },
+        "blocked": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-accept"
       },
-      "description": "#553: contract id renumbered -- by tick 1048 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #50 is what `contract list` actually offers at this point in the run."
+      "description": "#553: contract id renumbered -- by tick 1048 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #50 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
     },
     {
       "command": "contract deliver 50 amount:100",
@@ -2067,9 +1996,8 @@
           "command": "contract deliver 50 amount:100"
         }
       ],
-      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
       "expect": {
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-deliver"
       },
       "role": "guard"
@@ -2116,37 +2044,11 @@
       "command": "drill_plan grid rows:5 cols:6 spacing:3 depth:6 diameter:0.089 start:15,25",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 15,
-          "z1": 25,
-          "x2": 31,
-          "z2": 37
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:6 spacing:3 depth:6 diameter:0.089 start:15,25"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 907,
@@ -2159,7 +2061,8 @@
           "chargedCount": 0,
           "sequencedCount": 0
         },
-        "note": "#553: ordering only -- these 30 holes are ghosts that will never be claimed, same as pattern 2's."
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: ordering only -- these 30 holes are ghosts that will never be claimed, same as pattern 2's. Interaction-mode finding: same bankruptcy full-screen overlay -- grid-tool covered by tick 907."
       }
     },
     {
@@ -2577,19 +2480,11 @@
       "command": "contract accept 80",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-accept"
+          "type": "command",
+          "command": "contract accept 80"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 1514,
@@ -2597,9 +2492,10 @@
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
-        }
+        },
+        "blocked": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-accept"
       },
-      "description": "#553: contract id renumbered -- by tick 1656 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #80 is what `contract list` actually offers at this point in the run."
+      "description": "#553: contract id renumbered -- by tick 1656 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #80 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
     },
     {
       "command": "contract deliver 80 amount:300",
@@ -2609,9 +2505,8 @@
           "command": "contract deliver 80 amount:300"
         }
       ],
-      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
       "expect": {
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-deliver"
       },
       "role": "guard"
@@ -2740,37 +2635,11 @@
       "command": "drill_plan grid rows:8 cols:6 spacing:3 depth:6 diameter:0.089 start:10,25",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 10,
-          "z1": 25,
-          "x2": 25,
-          "z2": 45
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:8 cols:6 spacing:3 depth:6 diameter:0.089 start:10,25"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 1514,
@@ -2783,7 +2652,8 @@
           "chargedCount": 0,
           "sequencedCount": 0
         },
-        "note": "#553: ordering only -- these 48 holes (the largest pattern in this file) are ghosts that will never be claimed, same as patterns 2 and 3's."
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: ordering only -- these 48 holes (the largest pattern in this file) are ghosts that will never be claimed, same as patterns 2 and 3's. Interaction-mode finding: same bankruptcy full-screen overlay -- grid-tool covered by tick 1514."
       }
     },
     {
@@ -3276,19 +3146,11 @@
       "command": "contract accept 125",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-accept"
+          "type": "command",
+          "command": "contract accept 125"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 2399,
@@ -3296,9 +3158,10 @@
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
-        }
+        },
+        "blocked": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-accept"
       },
-      "description": "#553: contract id renumbered -- by tick 2549 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #125 is what `contract list` actually offers at this point in the run."
+      "description": "#553: contract id renumbered -- by tick 2549 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #125 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
     },
     {
       "command": "contract deliver 125 amount:350",
@@ -3308,9 +3171,8 @@
           "command": "contract deliver 125 amount:350"
         }
       ],
-      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
       "expect": {
-        "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-deliver"
       },
       "role": "guard"

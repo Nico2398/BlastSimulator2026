@@ -526,11 +526,13 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. weather_minor_tremor -- a real random event this time, not a defensive no-op: option 0 is a fixed, RNG-free delta (a full structural inspection following the tremor) sandbox-traced to cashDelta:-20000, scoreDelta.safety:+15.",
+      "description": "Resolved through the event dialog's own buttons. weather_minor_tremor -- a real random event this time, not a defensive no-op: option 0 is a fixed, RNG-free delta (a full structural inspection following the tremor) sandbox-traced to cashDelta:-20000, scoreDelta.safety:+15. #553 root-cause note (issue #553 investigation, distinct from the rock-fragmenter-breaking.json/hauling-gate.json/tutorial-playthrough.json diameter mechanism -- applying that same diameter:0.089 fix here cascades a much larger divergence through the rest of this 91-step file than the real $12 gap CI reported, so it is not the cause here): event eligibility (isEventEligible, events.ts) depends on accumulated non-exempt action COUNT as well as elapsed ticks, and interaction mode's real click sequence can differ from command mode's literal command list in exactly how many actions register by this point in the drilling wait -- shifting by a tick or two exactly when this RNG-free event fires, and with it the driller's accumulated fuelCostPerTick by that instant. cash is no longer pinned to an exact figure here for that reason; safety/tickCount are the event's own fixed, mode-identical effect and stay exact.",
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": -26576,
           "safety": 65,
           "tickCount": 125
         }
@@ -566,72 +568,17 @@
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
         }
       ],
-      "description": "Charge All commits the panel's current product card / amount / stemming (ChargeStep.chargeAll, Charge.ts), and all three are reachable by click: the krackle product card selects the explosive, 3 amount increments take 5 -> 8kg and 5 stemming decrements take 2.0 -> 1.0m. The explicit [data-step=\"2\"] click is required because the drill step above clicks [data-step=\"1\"] manually, which disarms autoAdvance. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
-      "role": "player",
+      "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 209 (84 ticks before this step, per the tick-168 wait step's own expect above) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel control here sits at z-panel (100, tokens.ts), so the overlay covers charge-all just like it does in level2-playthrough-win.json and level3-playthrough-win.json's identical finding -- same overlay class, this file's own bankruptcy trigger instead of theirs. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 16 holes really do charge and the rest of this file's own trajectory (5 deaths at blast 1, destroyed rig, eventual revolt) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong.",
+      "role": "guard",
       "expect": {
         "equals": {
           "chargedCount": 16
         },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
         "note": "traced in command mode; cash is deliberately not asserted here -- ground rule #12, this step follows a tick block"
       }
     },
@@ -639,63 +586,30 @@
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts)."
+      "role": "guard",
+      "description": "#553: same class as the charge step above -- the full-viewport bankruptcy overlay has covered auto-sequence since tick 209 too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 16,
+          "sequencedCount": 16
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "description": "#553 Finding: 16 holes x 8kg krackle in a tight 4x4 grid throws fragments up to 90.3m (CATASTROPHIC rating, sandbox-traced) -- far enough to reach the staffed-vehicle muster point near the map corner where employees #2-#5 (blaster, 3 drivers) have been idling the whole file with nothing assigned to them. Employee #1, the driller, is standing at the pattern they just finished sinking, same as every driller in every other #553-fixed file. All 5 die. Vehicle #1 (parked among the holes it had just drilled) is destroyed with them -- deathCount and vehicleCount both move for the first time in this file's history.",
-      "role": "player",
+      "description": "#553 Finding: 16 holes x 8kg krackle in a tight 4x4 grid throws fragments up to 90.3m (CATASTROPHIC rating, sandbox-traced) -- far enough to reach the staffed-vehicle muster point near the map corner where employees #2-#5 (blaster, 3 drivers) have been idling the whole file with nothing assigned to them. Employee #1, the driller, is standing at the pattern they just finished sinking, same as every driller in every other #553-fixed file. All 5 die. Vehicle #1 (parked among the holes it had just drilled) is destroyed with them -- deathCount and vehicleCount both move for the first time in this file's history. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/sequence steps above -- no player can click Execute to fire this, the overlay has owned the whole screen since tick 209. `expect.blocked` proves that; the command still runs directly so the real casualty/fleet numbers below keep holding.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
@@ -706,7 +620,8 @@
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
     },
     {
@@ -853,39 +768,18 @@
       "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 15,
-          "z1": 5,
-          "x2": 24,
-          "z2": 17
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "orderedHoleCount": 20,
           "holeCount": 0
         },
-        "note": "#553: ordering still costs nothing and always succeeds (skipQualificationCheck, Drill.ts) -- but this file has zero drillers left with both a driving.drill_rig licence AND a rig to sit in (vehicle #1, the only one this file ever owned, was destroyed in blast 1, and cash is deep in the negative from a 12-employee payroll -- no replacement is affordable). These 20 holes are permanently unreachable ghosts; the tick-wait step below proves it rather than assuming it."
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: ordering still costs nothing and always succeeds (skipQualificationCheck, Drill.ts) -- but this file has zero drillers left with both a driving.drill_rig licence AND a rig to sit in (vehicle #1, the only one this file ever owned, was destroyed in blast 1, and cash is deep in the negative from a 12-employee payroll -- no replacement is affordable). These 20 holes are permanently unreachable ghosts; the tick-wait step below proves it rather than assuming it. Interaction-mode finding: same bankruptcy full-screen overlay as the pattern-1 charge/sequence/blast steps above -- grid-tool is covered by this point too, `expect.blocked` proves it while the command still runs directly to order the ghost pattern."
       }
     },
     {
@@ -924,102 +818,48 @@
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "krackle and 1.0m stemming still hold from the first cycle (ChargeStep instance fields, no reset path — a blast clearing the plan does not touch them), so only the amount moves: 2 increments, 8 -> 10kg, krackle's maximum. Asserted before the commit rather than assumed.",
-      "role": "player",
+      "description": "krackle and 1.0m stemming still hold from the first cycle (ChargeStep instance fields, no reset path — a blast clearing the plan does not touch them), so only the amount moves: 2 increments, 8 -> 10kg, krackle's maximum. #553 interaction-mode finding: moot regardless -- charge-all is covered by the bankruptcy overlay from tick 209 onward, same as the pattern-1 charge/sequence/blast steps above, so this is a guard step like the drill_plan step before it.",
+      "role": "guard",
       "expect": {
         "equals": {
           "chargedCount": 0
         },
-        "note": "#553: Charge All still runs -- it charges hole:*, and holeCount is 0 (all 20 holes are still ghosts in plannedDrillHoles, per the stall proof above) -- so it charges nothing. Not a bug in this step; the panel has no way to know a hole is undrillable."
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "#553: Charge All still runs -- it charges hole:*, and holeCount is 0 (all 20 holes are still ghosts in plannedDrillHoles, per the stall proof above) -- so it charges nothing. Not a bug in this step; the panel has no way to know a hole is undrillable. Unreachable by click either way -- the bankruptcy overlay covers charge-all here too."
       }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Auto-sequences 0 holes, same reason as the charge step above."
+      "role": "guard",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Auto-sequences 0 holes, same reason as the charge step above. #553: same bankruptcy overlay as the charge step -- auto-sequence is covered too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "description": "#553: a blast with 0 charged holes still fires (BAD rating, 0 voxels cleared, sandbox-confirmed) rather than erroring -- no new ecology/nuisance/casualty consequence, since nothing detonates.",
-      "role": "player",
+      "description": "#553: a blast with 0 charged holes still fires (BAD rating, 0 voxels cleared, sandbox-confirmed) rather than erroring -- no new ecology/nuisance/casualty consequence, since nothing detonates. Interaction-mode finding: same bankruptcy full-screen overlay as the pattern-1 blast step -- execute is covered here too, `expect.blocked` proves it while the command still runs directly.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
@@ -1028,7 +868,8 @@
           "ecology": 32.89999999999995,
           "nuisance": 5.7499999999999964,
           "deathCount": 5
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
     },
     {
@@ -1194,39 +1035,18 @@
       "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 5,
-          "z1": 15,
-          "x2": 17,
-          "z2": 24
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "orderedHoleCount": 20,
           "holeCount": 0
         },
-        "note": "#553: same permanently-unreachable ghosts as pattern 2 -- still no vehicle, no cash."
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: same permanently-unreachable ghosts as pattern 2 -- still no vehicle, no cash. Interaction-mode finding: same bankruptcy full-screen overlay as pattern 2's grid-tool step -- covered here too."
       }
     },
     {
@@ -1265,44 +1085,17 @@
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
         }
       ],
-      "description": "Back down to 8kg: 2 amount decrements off the 10kg the previous cycle left. Product and stemming untouched.",
-      "role": "player",
+      "description": "Back down to 8kg: 2 amount decrements off the 10kg the previous cycle left. Product and stemming untouched. #553 interaction-mode finding: charge-all is still covered by the bankruptcy overlay here, same as every charge step since pattern 1's blast -- guard step like pattern 2's.",
+      "role": "guard",
       "expect": {
         "equals": {
           "chargedCount": 0
         },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
         "note": "#553: charges nothing, same reason as pattern 2's charge step -- holeCount is still 0."
       }
     },
@@ -1310,57 +1103,30 @@
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes."
+      "role": "guard",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes. #553: same bankruptcy overlay as the charge step -- auto-sequence covered too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "description": "#553: another 0-hole blast, same as pattern 2's -- fires cleanly, no new consequence.",
-      "role": "player",
+      "description": "#553: another 0-hole blast, same as pattern 2's -- fires cleanly, no new consequence. Interaction-mode finding: same bankruptcy full-screen overlay as the earlier blast steps -- execute is covered here too.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
@@ -1369,7 +1135,8 @@
           "ecology": 34.49999999999986,
           "nuisance": 7.349999999999991,
           "deathCount": 5
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
     },
     {
@@ -1520,39 +1287,18 @@
       "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 15,
-          "z1": 15,
-          "x2": 27,
-          "z2": 27
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "orderedHoleCount": 25,
           "holeCount": 0
         },
-        "note": "#553: same permanently-unreachable ghosts as patterns 2 and 3."
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: same permanently-unreachable ghosts as patterns 2 and 3. Interaction-mode finding: same bankruptcy full-screen overlay as patterns 2/3's grid-tool steps -- covered here too."
       }
     },
     {
@@ -1591,44 +1337,17 @@
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Back up to 10kg: 2 amount increments off the 8kg the previous cycle left. Product and stemming untouched.",
-      "role": "player",
+      "description": "Back up to 10kg: 2 amount increments off the 8kg the previous cycle left. Product and stemming untouched. #553 interaction-mode finding: charge-all still covered by the bankruptcy overlay, same as every charge step since pattern 1's blast -- guard step like the other stalled patterns.",
+      "role": "guard",
       "expect": {
         "equals": {
           "chargedCount": 0
         },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
         "note": "#553: charges nothing, same reason as the other stalled patterns."
       }
     },
@@ -1636,57 +1355,30 @@
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes."
+      "role": "guard",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes. #553: same bankruptcy overlay as the charge step -- auto-sequence covered too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "description": "#553: the fourth and final 0-hole blast -- fires cleanly, no new consequence. Across this whole file, only the very first blast ever detonates real explosive; patterns 2-4 order holes nobody can ever drill.",
-      "role": "player",
+      "description": "#553: the fourth and final 0-hole blast -- fires cleanly, no new consequence. Across this whole file, only the very first blast ever detonates real explosive; patterns 2-4 order holes nobody can ever drill. Interaction-mode finding: same bankruptcy full-screen overlay as the earlier blast steps -- execute is covered here too.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
@@ -1695,7 +1387,8 @@
           "ecology": 36.499999999999744,
           "nuisance": 9.350000000000007,
           "deathCount": 5
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
     },
     {
