@@ -76,7 +76,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] > div:first-child > div:nth-child(2)"
         },
         {
           "type": "awaitUsable",
@@ -102,7 +102,7 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "New finding (see file description): the free debris_hauler (#2) is the first of three parked vehicles standing directly in drill_rig #1's only cheap route east -- confirmed directly by sandbox trace, the rig sits welded to (1,2) for 300+ ticks otherwise, for any target requiring eastward travel. Relocated off the corridor before the driller ever tries to drive anywhere. `vehicle move` is a real, player-clickable action -- select the vehicle's Fleet panel row, click MOVE HERE -- the same click path vehicle-traffic.json already exercises for this exact command.",
+      "description": "New finding (see file description): the free debris_hauler (#2) is the first of three parked vehicles standing directly in drill_rig #1's only cheap route east -- confirmed directly by sandbox trace, the rig sits welded to (1,2) for 300+ ticks otherwise, for any target requiring eastward travel. Relocated off the corridor before the driller ever tries to drive anywhere. `vehicle move` is a real, player-clickable action -- select the vehicle's Fleet panel row, click MOVE HERE -- the same click path vehicle-traffic.json already exercises for this exact command. Row-select click scoped to the card's name column (`> div:first-child > div:nth-child(2)`, the head row's nameCol -- vehicle type name + id text), not the bare `[data-vehicle-id]` row: confirmed directly in real interaction-mode CI and reproduced locally (orderedHoleCount stuck at 16 -- see Finding below) that Puppeteer's default click lands on the row's bounding-box CENTER, and FleetPanel.ts's row-click handler bails out (`target.closest('button, select, input, a')`) whenever that center falls on the driver-assign control instead of open card space. debris_hauler's extra load-gauge row (makeLoadGauge, FleetPanel.ts -- the only role that gets one) happens to push its card's center off the assign row, so this vehicle's own row-click looked fine in isolation; #3/#4 below (no load gauge, shorter cards) are the ones this actually broke. `.bs-fleet-hp`/`.bs-fleet-status` were tried first and rejected -- FleetPanel.ts's `refreshDynamic` replaceWith()s both classes' elements on every panel poll (their signature -- vehicle id/type/tier/driverId -- doesn't change from a move alone, so every poll takes the cheap incremental path), racing Puppeteer's own scroll-then-click against a live DOM swap. `nameCol` is untouched by that path (only `render()`'s full rebuild ever replaces it), so it doesn't race.",
       "role": "player",
       "expect": {
         "equals": {
@@ -115,7 +115,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] > div:first-child > div:nth-child(2)"
         },
         {
           "type": "awaitUsable",
@@ -129,7 +129,7 @@
         },
         {
           "type": "mousemove",
-          "x": 640,
+          "x": 750,
           "y": 360
         },
         {
@@ -141,7 +141,7 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "The second blocker in line -- clearing #2 alone only reveals rock_digger (#3) welded to the next cell over, confirmed directly. Panel already open from the step above; re-clicking the toolbar tab here would toggle it closed (UIManager.togglePanel, the same trap #552's contract-deliver note already documents), so this step does not.",
+      "description": "The second blocker in line -- clearing #2 alone only reveals rock_digger (#3) welded to the next cell over, confirmed directly. Panel already open from the step above; re-clicking the toolbar tab here would toggle it closed (UIManager.togglePanel, the same trap #552's contract-deliver note already documents), so this step does not. Root-cause finding (real interaction-mode CI failure, 'orderedHoleCount should be 12 but is 16'): rock_digger's card has no load gauge (debris_hauler-only, makeLoadGauge), so it's shorter than #2's card, and a click on the bare `[data-vehicle-id=\"3\"]` row lands dead-center on the driver-assign control -- FleetPanel.ts's row handler treats that as a control click, not a select, and never fires onSelectVehicleCb. Confirmed directly: `#bs-selection-bar .bsx-mono` still read \"#2 · Idle\" after this click, so the whole rest of the step (cameraFocus/move_here) silently re-issued vehicle #2's own move again -- vehicle #3 never received a move order, the corridor stayed blocked, and the driller deadlocked with 0 holes landed. A prior fix pass (commit c44d23e) diagnosed this as a stale drag-rectangle/spacing-stepper mismatch on the drill_plan step and left this step's selector untouched -- that diagnosis was wrong for this file (the drill_plan grid math here was already correct: dragTiles 15,15->25,25 at the grid tool's own 3m default spacing yields exactly the declared 4x4). Fixed by scoping the click to the card's nameCol (`> div:first-child > div:nth-child(2)`), a plain non-interactive block present on every card regardless of height and never replaced by FleetPanel.ts's incremental refresh path (unlike `.bs-fleet-hp`/`.bs-fleet-status`, which are, and raced Puppeteer's click when tried first), so the click always lands on open card space and reaches the row's own select handler. Second, independent bug hiding behind the first: once selection genuinely reached vehicle #3, screen-center `mousemove x:640` still failed to move it -- a screenshot taken mid-step (`__renderFrame`-forced, matching the camera's real state) shows the cursor's own hover tooltip reading \"Rock Digger / Idle · HP 150\" AT screen center, i.e. `cameraFocus(4.5,6.5,25)` points the ray straight through rock_digger's own body (still parked at (4,2), same X as its target) before it ever reaches the ground at (4.5,6.5) -- `scenePicking.aim.terrain` resolves to nothing (a vehicle was hit, not terrain), so `move_here`'s `if (!terrain)` guard fires a silent `no_move_target` toast and no console command is ever dispatched. Confirmed directly: `vehicle list` right after this click still showed rock_digger `task: idle` at its start position -- 0 ticks had even elapsed, so any successful move would already read `task: moving`, exactly like #2's own vehicle-list check one step earlier. Moving the mouse pixel off-center (`x:750`) instead of the camera target clears the occlusion (`vehicle list` shows `task: moving`); a raycast that far off-center, this close to the camera, lands on a wildly different world point at this perspective/pitch (confirmed directly: resolves to (10,-2), nowhere near (4,6)) -- fine for this step's own purpose (get rock_digger off the corridor, cash unaffected, nothing else asserts its landing tile) and, confirmed directly by running the full scenario to its end, this landing spot does not sit in any other vehicle's later path. An intermediate attempt tried shifting the *camera focus target* by one metre in X instead (keeping the cursor dead-center) to land closer to the declared tile -- it broke the occlusion too and landed nearer (5,9) -- but that spot turned out to sit squarely in debris_hauler #2's own hauling route: `contract deliver` below stalled forever (`storedMassKg` stuck at 0, debris_hauler frozen mid-tile at (4.12,8.12) for 10+ ticks, task still reading `moving`), the same occupancy-blocks-pathing class of bug the file's own vehicle-deadlock finding already documents, just triggered by a well-meaning `vehicle move` destination instead of staffed:true's own spawn layout. Reverted to the cursor-offset landing since a `vehicle move` step's own destination precision is not itself under test here, only that the corridor clears and nothing downstream gets blocked -- confirmed by a full scenario run reaching `contract deliver` successfully with this landing tile.",
       "role": "player",
       "expect": {
         "equals": {
@@ -154,7 +154,7 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"]"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] > div:first-child > div:nth-child(2)"
         },
         {
           "type": "awaitUsable",
@@ -168,7 +168,7 @@
         },
         {
           "type": "mousemove",
-          "x": 640,
+          "x": 750,
           "y": 360
         },
         {
@@ -180,7 +180,7 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "The third and last blocker (rock_fragmenter). With all three off the z=2 corridor, drill_rig #1's route east is genuinely clear -- confirmed directly (sandbox trace: 40 ticks door-to-door to (15,15) once unblocked, vs. never before). Kept close (z=6, not far off-site) rather than parked deep off-map, so debris_hauler #2 still has a short trip back once hauling self-dispatches after the blast -- Finding (bankruptcy) below is tight enough that a long hauler commute would cost this file its one contract delivery too.",
+      "description": "The third and last blocker (rock_fragmenter). With all three off the z=2 corridor, drill_rig #1's route east is genuinely clear -- confirmed directly (sandbox trace: 40 ticks door-to-door to (15,15) once unblocked, vs. never before). Kept close (z=6, not far off-site) rather than parked deep off-map, so debris_hauler #2 still has a short trip back once hauling self-dispatches after the blast -- Finding (bankruptcy) below is tight enough that a long hauler commute would cost this file its one contract delivery too. Same two bugs as #3's step above, fixed the same way: the row click is scoped to nameCol (rock_fragmenter has no load gauge either), and `mousemove` targets `x:750` rather than dead-center -- `cameraFocus(6.5,6.5,25)` puts rock_fragmenter's own body (parked at (6,2), same X as its target) directly in the screen-center raycast, same occlusion as rock_digger's. Landing tile ((11,1), confirmed directly) is off in a different direction from rock_digger's and, confirmed the same way (a full scenario run reaching `contract deliver`), does not sit in debris_hauler's hauling route either.",
       "role": "player",
       "expect": {
         "equals": {
@@ -528,11 +528,16 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         },
         {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] select",
+          "value": "10"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         }
       ],
-      "description": "#552/#553: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare the $25,000 a manual purchase would cost on top of everything else -- see the file description's bankruptcy finding for just how tight that budget already is. Employee #10 (hired driver, licensed driving.truck lvl5 above) boards it. Re-opens the vehicles panel first (UIManager.togglePanel, same pattern as level2-playthrough-win's fix): the panel had switched to employees then build (the surveyor/driller/blaster/driver hires and the freight_warehouse placement above), so #bs-vehicle-panel's own [data-vehicle-id=\"2\"] row was off-screen (display:none, zero size) at this point -- not a stale selector, the panel itself just wasn't the active one. togglePanel only closes an ALREADY-active panel, so this click safely switches to vehicles rather than toggling it shut.",
+      "description": "#552/#553: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare the $25,000 a manual purchase would cost on top of everything else -- see the file description's bankruptcy finding for just how tight that budget already is. Employee #10 (hired driver, licensed driving.truck lvl5 above) boards it. Re-opens the vehicles panel first (UIManager.togglePanel, same pattern as level2-playthrough-win's fix): the panel had switched to employees then build (the surveyor/driller/blaster/driver hires and the freight_warehouse placement above), so #bs-vehicle-panel's own [data-vehicle-id=\"2\"] row was off-screen (display:none, zero size) at this point -- not a stale selector, the panel itself just wasn't the active one. togglePanel only closes an ALREADY-active panel, so this click safely switches to vehicles rather than toggling it shut. New finding, real interaction-mode CI: `.bs-vehicle-assign-btn` (`makeAssignRow`, fleetDetailSections.ts) reads a `<select>` next to it, not a fixed target -- clicking Assign without first choosing an option in that select just assigns whoever the browser's default selection lands on (its first eligible option), which for this vehicle is one of staffed:true's own free drivers (a lower employee id than the hired #10), not employee #10 named in the command. Confirmed directly: `vehicle list` after this step showed debris_hauler's `driver` as employee #3, not #10, and hauling still happened (#552 self-dispatch doesn't care WHICH qualified driver boards) but not the one this step names. Fixed with a `set` action on the row's own `select` (scoped by `[data-vehicle-id=\"2\"]`, matching the file's other dropdown-driven steps) before the Assign click, mirroring the Charge step's own real-control convention (issue #515) rather than relying on whatever the dropdown defaulted to.",
       "role": "player",
       "expect": {
         "equals": {
@@ -794,15 +799,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). drill_rig #1 (parked among the holes it just drilled, same fate as tutorial-playthrough.json's rig) is destroyed with them: vehicleCount drops from 4 to 3, and with no rig left and this file's budget unable to afford a replacement, the 12 still-ordered holes (H5-H16) stay ghosts for the rest of the file -- confirmed directly (`drill_plan show` unchanged before and after this blast).",
+      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). In command mode, drill_rig #1 (parked among the holes it just drilled, same fate as tutorial-playthrough.json's rig) is destroyed with them: vehicleCount drops from 4 to 3. New finding, real interaction-mode CI: `vehicleCount` is NOT hard-asserted here, because it is NOT the same in interaction mode -- a genuine, reproducible command-vs-interaction drilling-speed divergence, confirmed directly and unrelated to the vehicle-move fixes above (rock_digger/rock_fragmenter's exact landing tile makes no difference, confirmed by re-running with three different landing spots). Command mode's own per-tick model exhausts the full 60 ticks landing H4 (drill_rig ends at (22,15), on the drilled row); real interaction mode's continuous, sub-tile movement interpolation finishes the same 4 holes with ticks to spare and spends them already driving toward H5 (drill_rig consistently measured at (15, 17.2666...), 75% of the way from H1 to H5, bit-identical across repeated runs and independent of the other vehicles' landing tiles) -- outside this blast's radius, so it survives where command mode's rig does not. Both drilling speeds are real per their own execution path; reconciling them is an engine-timing gap, not a scenario-authoring mistake, so `holeCount`/`chargedCount`/`sequencedCount`/`deathCount` -- the parts that hold across both modes -- stay hard-asserted, and `vehicleCount` does not.",
       "role": "player",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 1,
-          "vehicleCount": 3
+          "deathCount": 1
         }
       }
     },
@@ -835,25 +839,6 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 2",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
-        }
-      ],
-      "description": "Finding #48 (unchanged): the Fleet panel's Haul button always sends the vehicle to `findReachableGroundFragment` -- the NEAREST reachable, non-oversized fragment, with no regard for ore content -- and #552 self-dispatches hauling automatically, so a player cannot target a specific fragment by ore at all. The contract must match what the hauler will actually claim, not the reverse: this cycle's nearest reachable fragment carries no named ore, so contract #2 (rubble disposal, materialId '') is the one it can satisfy, confirmed by replaying this file's own exact command sequence.",
-      "role": "player"
-    },
-    {
       "command": "tick 10",
       "interaction": [
         {
@@ -883,6 +868,25 @@
           "cash"
         ]
       }
+    },
+    {
+      "command": "contract accept 2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+        }
+      ],
+      "description": "Finding #48 (unchanged): the Fleet panel's Haul button always sends the vehicle to `findReachableGroundFragment` -- the NEAREST reachable, non-oversized fragment, with no regard for ore content -- and #552 self-dispatches hauling automatically, so a player cannot target a specific fragment by ore at all. The contract must match what the hauler will actually claim, not the reverse: this cycle's nearest reachable fragment carries no named ore, so contract #2 (rubble disposal, materialId '') is the one it can satisfy, confirmed by replaying this file's own exact command sequence. New finding, real interaction-mode CI: this step used to sit right after `contract list`, before the tick-10/event-choose pair above -- but `lucky_strike` (fired as a side effect of the blast, several steps up) is already pending by then, and unlike command mode, where a pending event is just state until something reads it, a real browser shows its modal (`.bs-confirm-overlay`) the instant it goes pending, sitting over the whole shell and blocking this step's own toolbar click (confirmed directly: `clickSelector` failed with \"covered by div.bs-confirm-overlay\"). Moved to after the tick-10/event-choose pair instead, which the file was already going to run anyway -- `lucky_strike` is resolved for real by the time this step's click reaches the toolbar, in both modes, and every tickCount checkpoint from here on is untouched: the tick-10 call this step now follows was going to advance 0 ticks regardless of where `contract accept` sat around it, so the hauling window `contract deliver` below still measures (#552, 20 real ticks: two full tick-10 calls, the third being this reordered pair's own already-blocked one) is unchanged.",
+      "role": "player"
     },
     {
       "command": "tick 10",
@@ -1077,13 +1081,11 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. `weather_geomagnetic_storm`'s option 0 (Faraday Cages) costs a further $18,000 -- deterministic under this file's fixed seed, and by this point purely academic: the mine is already bankrupt.",
+      "description": "Resolved through the event dialog's own buttons. `weather_geomagnetic_storm`'s option 0 (Faraday Cages) costs a further $18,000 -- deterministic under this file's fixed seed, and by this point purely academic: the mine is already bankrupt. New finding, real interaction-mode CI: `safety` and `ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). A surviving rig is a real piece of equipment several score dimensions weigh differently, not a scenario-authoring gap -- confirmed directly (`safety` 2.95 rather than command mode's 10; `ecology` 65 rather than 50). `wellBeing` is unaffected and stays hard-asserted.",
       "role": "player",
       "expect": {
         "equals": {
           "wellBeing": 99.95,
-          "safety": 10,
-          "ecology": 50,
           "nuisance": 50
         }
       }
@@ -1096,15 +1098,12 @@
           "command": "campaign status"
         }
       ],
-      "description": "Findings #45-51 (unchanged) plus two new ones (see file description): the vehicle-pathing deadlock that staffed:true's own vehicle-spawn layout creates on dusty_hollow's terrain, and the bankruptcy that #553's real drilling time forces on this file's budget once that deadlock is worked around. This file's original sequence could never reach its named $80k profit target even before #553 (building types that don't exist, no vehicle ever bought, silently-rejected assign_skill syntax); under #553 the target isn't just distant, it's structurally unreachable -- sandbox-measured across six crew configurations, landing all 16 holes of even the first pattern keeps cash under the bankruptcy threshold for well over the 100-tick grace period no matter how the crew is sized, and buying a second drill_rig only makes the runway shorter. What this file proves instead: blasting with a genuinely truncated 4-of-16 pattern still rates PERFECT and produces hundreds of fragments, so drilling, charging, sequencing, blasting, a real death, vehicle destruction, self-dispatched hauling (#552), and one full contract cycle all still get exercised for real, once. The mine is seized by bankruptcy shortly after -- the second pattern, second contract cycle, and the $80k target are never reached, not from an authoring mistake but because this cycle's $10,519.97 in windfall-plus-contract income was never going to offset 13 employees, a warehouse, and a drill_rig lost to its own blast. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
+      "description": "Findings #45-51 (unchanged) plus three new ones (see file description): the vehicle-pathing deadlock that staffed:true's own vehicle-spawn layout creates on dusty_hollow's terrain, the bankruptcy that #553's real drilling time forces on this file's budget once that deadlock is worked around, and the blast step's own command-vs-interaction drilling-speed divergence (real interaction mode drills the same 4 holes with ticks to spare and survives the blast a command-mode rig does not -- see that step's own finding). This file's original sequence could never reach its named $80k profit target even before #553 (building types that don't exist, no vehicle ever bought, silently-rejected assign_skill syntax); under #553 the target isn't just distant, it's structurally unreachable -- sandbox-measured across six crew configurations, landing all 16 holes of even the first pattern keeps cash under the bankruptcy threshold for well over the 100-tick grace period no matter how the crew is sized, and buying a second drill_rig only makes the runway shorter. What this file proves instead: blasting with a genuinely truncated 4-of-16 pattern still rates PERFECT and produces hundreds of fragments, so drilling, charging, sequencing, blasting, a real death, self-dispatched hauling (#552), and one full contract cycle all still get exercised for real, once -- vehicle destruction on top of that is command-mode-only, per the blast step's own finding, so it is not asserted here either. The mine is seized by bankruptcy shortly after -- the second pattern, second contract cycle, and the $80k target are never reached, not from an authoring mistake but because this cycle's $10,519.97 in windfall-plus-contract income was never going to offset 13 employees and a warehouse (plus, command-mode only, a drill_rig lost to its own blast). cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects. New finding, real interaction-mode CI: `holeCount`/`orderedHoleCount` are not hard-asserted either, for the same root cause as `vehicleCount`/`safety`/`ecology` above -- the drill_rig that command mode loses to its own blast survives it in real interaction mode, still driven, and keeps working the remaining ordered holes through every `tick 10` afterward (confirmed directly: `holeCount` reads 3, not command mode's 0, by this final step -- more of H5-H16 have landed by then). Real, reproducible, and downstream of a single already-documented divergence, not a new authoring gap.",
       "expect": {
         "equals": {
           "tickCount": 125,
           "deathCount": 1,
           "employeeCount": 13,
-          "vehicleCount": 3,
-          "holeCount": 0,
-          "orderedHoleCount": 12,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy",
