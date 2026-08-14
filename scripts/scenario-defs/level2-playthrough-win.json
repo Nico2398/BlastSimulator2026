@@ -1,13 +1,13 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 4 blasts, and 5 contract attempts with a debris_hauler bought but never driven -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and no delivery ever succeeds; see Findings #59-#60 for the real trajectory asserted instead.",
+  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 1 real blast and 3 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory.",
   "steps": [
     {
-      "command": "new_game seed:2277 cash:150000",
+      "command": "new_game seed:2277 cash:150000 staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:2277 cash:150000"
+          "command": "new_game seed:2277 cash:150000 staffed:true"
         }
       ],
       "role": "setup",
@@ -15,13 +15,38 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 0,
+          "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 150000
         }
       },
-      "description": "cash:150000 sits on `new_game`, not on the `campaign start` below, because that `campaign start` fails outright -- grumpstone_ridge is tier-2 and locked on a fresh campaign (Finding #59) -- so it never replaces this state and a `cash:` on it would be discarded with the rest of the command. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs: by then hiring, surveys and 32 ticks of payroll have spent the level down, and $110,000 of vehicles (rock_digger $50,000 + debris_hauler $25,000 + drill_rig $35,000) has to fit inside what is left, on enabled dealership rows, instead of being overdrawn."
+      "description": "#553: staffed:true added -- cash:150000 sits on this new_game, not on the campaign start below, because that command fails outright (grumpstone_ridge is tier-2, locked on a fresh campaign, Finding #59), so it never replaces this state and a cash: on it would be discarded with the rest of the command. staffed:true hires and equips its own free crew before any assertion here: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster, #3-5 drivers, vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter -- free, not deducted from cash, which is why employeeCount is already 5 here instead of 0. All four vehicles come unmanned (driverId: null); vehicle driver 1 1 immediately below crews the free rig with the free driller, since drill_hole is now a queued, vehicle-gated action and nothing drills without a driver aboard. The extra $100,000 over the sandbox default is what the three-vehicle fleet at step 36 needs, same as before -- but see the pattern-1 drill-wait step further down for what that budget can no longer survive once drilling takes hundreds of ticks instead of zero."
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "description": "#553: crews the free drill_rig (vehicle #1) with the free driller (employee #1) staffed:true just hired -- unmanned, the rig is a mesh no queued drill_hole action can ever start against.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "activeContractCount": 0,
+          "surveyCount": 0,
+          "cash": 150000
+        }
+      }
     },
     {
       "command": "campaign start level:grumpstone_ridge",
@@ -36,7 +61,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 0,
+          "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 150000
@@ -57,7 +82,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 0,
+          "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 150000
@@ -77,7 +102,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 0,
+          "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 150000,
@@ -101,7 +126,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 0,
+          "employeeCount": 5,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 150000
@@ -129,7 +154,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 1,
+          "employeeCount": 6,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 148800
@@ -153,7 +178,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 2,
+          "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 147600
@@ -177,7 +202,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 3,
+          "employeeCount": 8,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 146600
@@ -201,7 +226,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 4,
+          "employeeCount": 9,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 145600
@@ -225,7 +250,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 5,
+          "employeeCount": 10,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 144100
@@ -249,7 +274,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 6,
+          "employeeCount": 11,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 142600
@@ -273,7 +298,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 141800
@@ -281,11 +306,11 @@
       }
     },
     {
-      "command": "employee assign_skill 1 skill:geology level:4",
+      "command": "employee assign_skill 6 skill:geology level:4",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 skill:geology level:4"
+          "command": "employee assign_skill 6 skill:geology level:4"
         }
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
@@ -293,7 +318,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 141800
@@ -302,11 +327,11 @@
       "role": "bootstrap"
     },
     {
-      "command": "employee assign_skill 2 skill:geology level:3",
+      "command": "employee assign_skill 7 skill:geology level:3",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 2 skill:geology level:3"
+          "command": "employee assign_skill 7 skill:geology level:3"
         }
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
@@ -314,7 +339,28 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 0,
+          "cash": 141800
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee assign_skill 8 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 8 skill:driving.drill_rig level:1"
+        }
+      ],
+      "description": "#553: driller #8 (this file's own first hired driller, renumbered from the pre-#553 file's #3 -- staffed's free crew claims #1-5) needs the drill_rig licence before any drill_hole action can be assigned to them -- hiring grants only the role's own starting qualification (blasting), never a driving licence. Left unmarked for the same reason as the other assign_skill steps in this file: the player-facing path is `employee train` at a driving_center. Driller #9 (this file's second hired driller) is deliberately left unlicensed, matching this file's own original design -- it never licensed either driller for driving.drill_rig, and #9 is not needed to crew the second rig bought below.",
+      "expect": {
+        "equals": {
+          "tickCount": 0,
+          "deathCount": 0,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 141800
@@ -335,7 +381,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 141800
@@ -355,7 +401,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 141800
@@ -399,7 +445,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 138800
@@ -439,7 +485,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 138000
@@ -479,7 +525,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 136500
@@ -499,7 +545,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 136500
@@ -519,7 +565,7 @@
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 0,
           "cash": 136500
@@ -539,10 +585,9 @@
         "equals": {
           "tickCount": 8,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 0,
-          "cash": 136500
+          "surveyCount": 0
         }
       }
     },
@@ -558,10 +603,9 @@
         "equals": {
           "tickCount": 8,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 0,
-          "cash": 136500
+          "surveyCount": 0
         }
       },
       "role": "player"
@@ -579,10 +623,9 @@
         "equals": {
           "tickCount": 16,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 0,
-          "cash": 131680
+          "surveyCount": 0
         }
       }
     },
@@ -598,10 +641,9 @@
         "equals": {
           "tickCount": 16,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 0,
-          "cash": 131680
+          "surveyCount": 0
         }
       },
       "role": "player"
@@ -619,10 +661,9 @@
         "equals": {
           "tickCount": 24,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "cash": 126860
+          "surveyCount": 2
         }
       }
     },
@@ -638,10 +679,9 @@
         "equals": {
           "tickCount": 24,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "cash": 126860
+          "surveyCount": 2
         }
       },
       "role": "player"
@@ -659,12 +699,15 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
-        }
-      }
+          "surveyCount": 3
+        },
+        "decreased": [
+          "cash"
+        ]
+      },
+      "description": "#553: sandbox-measured -- 12-person payroll (staffed's 5 extra plus this file's own 7) now drains cash noticeably faster than the pre-#553 7-person roster did over the same 32 ticks."
     },
     {
       "command": "event choose 0",
@@ -678,10 +721,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       },
       "role": "player"
@@ -699,10 +741,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       }
     },
@@ -719,10 +760,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       }
     },
@@ -739,10 +779,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       },
       "role": "bootstrap"
@@ -760,10 +799,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       },
       "role": "bootstrap"
@@ -781,10 +819,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       },
       "role": "bootstrap"
@@ -802,10 +839,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       }
     },
@@ -822,10 +858,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 122040
+          "surveyCount": 3
         }
       }
     },
@@ -850,11 +885,13 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 72040
-        }
+          "surveyCount": 3
+        },
+        "decreased": [
+          "cash"
+        ]
       },
       "role": "player"
     },
@@ -875,11 +912,13 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 47040
-        }
+          "surveyCount": 3
+        },
+        "decreased": [
+          "cash"
+        ]
       },
       "role": "player"
     },
@@ -895,18 +934,44 @@
           "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the fleet, so this is a real click on the drill_rig tier-1 row ($35,000). awaitUsable is the affordability assertion.",
+      "description": "#553: vehicle #7 (staffed claims #1-4; rock_digger and debris_hauler above claim #5-6). This is the driller's-second-rig this file already needed under the old semantics (Finding #59 -- bought but its own driller never licensed) -- now driller #8, licensed above, crews it via vehicle driver 7 8 below, giving this file 2 concurrent driller/drill_rig pairs for the drilling wait that follows.",
       "expect": {
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 12040
-        }
+          "surveyCount": 3
+        },
+        "decreased": [
+          "cash"
+        ]
       },
       "role": "player"
+    },
+    {
+      "command": "vehicle driver 7 8",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "description": "#553: driller #8 crews the second drill_rig (vehicle #7) -- 2 concurrent driller/drill_rig pairs (staffed's #1/#1 and this pair) for the drilling wait below.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 32,
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
     },
     {
       "command": "vehicle list",
@@ -921,10 +986,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 12040
+          "surveyCount": 3
         }
       }
     },
@@ -941,10 +1005,9 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 12040
+          "surveyCount": 3
         }
       }
     },
@@ -987,13 +1050,121 @@
         "equals": {
           "tickCount": 32,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 12040,
-          "holeCount": 24,
+          "orderedHoleCount": 24,
+          "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "note": "#553: confirming the grid only orders the 24 holes -- they are ghosts until the 2 driller/drill_rig pairs drive out to each one, so holeCount is 0 here and the wait is the 3 tick steps below."
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "description": "#553: sandbox-measured -- this is where the mine's math actually breaks. staffed:true's free composition adds 5 more salaried employees on top of this file's own 7 hires -- a 12-person roster costing ~$7,570 per payroll cycle (Payroll transaction, every ~10 ticks, Finance.ts) against a $150,000 budget that used to only have to fund 7. After hiring, surveying and the 3-vehicle fleet, cash sits at $3,278 -- already under BANKRUPTCY_THRESHOLD ($5,000, balance.ts) before a single tick of this wait runs. BANKRUPTCY_GRACE_TICKS (100) later, 'BANKRUPTCY! The mine is seized.' fires at tick 132 (state.bankruptcy.bankrupt / state.levelEnded flip to true, state.levelEndReason to 'bankruptcy', Bankruptcy.ts) -- inside this very first tick chunk, 205 ticks before the 2 driller/drill_rig pairs actually finish sinking this 24-hole pattern (tick 337) and long before blast 1 ever fires. Nothing in the engine stops a `tick` command from continuing to run a level after levelEnded flips (a genuinely pending EVENT, like the Explosive Tariff below, is the only thing that ever halts one), so the mine keeps operating -- legally seized, crew still working -- for the rest of this file.",
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "#553: resolves the Explosive Tariff event that cut this tick call short at tick 140 (108 of 150 requested) -- politics_explosive_tariff option 0 pays the $20,000 tariff in full (fixed, RNG-free delta).",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 290
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "description": "#553: sandbox-measured -- both driller/drill_rig pairs land all 24 holes of this pattern by tick 337, well inside this third chunk (the pad running to tick 440 is what the 2 earlier chunks' event interruption cost).",
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 440,
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 0,
+          "holeCount": 24,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        },
+        "decreased": [
+          "cash"
+        ],
+        "note": "levelEnded/levelEndReason/bankrupt flipped true back at tick 132, mid-chunk-1 -- this step is the first one in the file positioned to observe it now that the fields are in scope."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 440,
+          "deathCount": 0,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
         }
       }
     },
@@ -1012,12 +1183,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 32,
+          "tickCount": 440,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 12040,
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 0
@@ -1039,12 +1209,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 32,
+          "tickCount": 440,
           "deathCount": 0,
-          "employeeCount": 7,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 12040,
           "holeCount": 24,
           "chargedCount": 24,
           "sequencedCount": 24
@@ -1082,17 +1251,17 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 32,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 440,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 12040,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
         }
-      }
+      },
+      "description": "#553: this 24-hole pattern kills 4 -- both driller/drill_rig pairs (Bob Quartzman #1, Otto McBoom #8) standing at the holes they had just finished sinking, plus both surveyors (Jake Stoneface #6, Earl Boulder #7), confirmed via direct trace of `employee list` after the blast (4 entries read DEAD, the other 8 read OK). Both drill_rigs (vehicle #1 and #7) are destroyed alongside their drivers -- the same fate as tutorial-playthrough's single rig, just twice over. The mine is already legally seized (bankrupt since tick 132, see the wait step above) when this fires; the blast report and the deaths are real regardless."
     },
     {
       "command": "state full",
@@ -1105,12 +1274,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 32,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 440,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 12040
+          "surveyCount": 3
         }
       }
     },
@@ -1125,12 +1293,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 32,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 440,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 12040
+          "surveyCount": 3
         }
       }
     },
@@ -1145,17 +1312,54 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 32,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 440,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": 12040,
-          "wellBeing": 63.37857142857152,
+          "wellBeing": 0.0,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
         }
+      },
+      "description": "#553: wellBeing craters to 0 -- 4 deaths this run instead of the pre-#553 file's 2, plus every surviving employee's morale sits at 0 (sandbox-measured `employee list`, no living_quarters anywhere in this file to recover it)."
+    },
+    {
+      "command": "tick 6",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 6"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 440,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 440,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
       }
     },
     {
@@ -1169,49 +1373,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 32,
-          "deathCount": 2,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 12040
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "expect": {
-        "equals": {
-          "tickCount": 32,
-          "deathCount": 2,
-          "employeeCount": 7,
-          "activeContractCount": 0,
-          "surveyCount": 3,
-          "cash": 22040
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "tick 6",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 6"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 446,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
         }
@@ -1224,17 +1388,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 446,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "contract list",
@@ -1247,16 +1410,16 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 446,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
         }
       }
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1264,90 +1427,80 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 446,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #20 is what `contract list` actually offers at this point in the run."
     },
     {
-      "command": "contract deliver 1 amount:800",
+      "command": "contract deliver 20 amount:100",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 1 amount:800"
+          "command": "contract deliver 20 amount:100"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of blingite in storage against a 360 kg contract -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 1 amount:800` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
-        "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
-          "activeContractCount": 1,
-          "surveyCount": 3
-        },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
     {
-      "command": "contract accept 2",
+      "command": "contract accept 21",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 446,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"2\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #2 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #21 is what `contract list` actually offers at this point in the run."
     },
     {
-      "command": "contract deliver 2 amount:600",
+      "command": "contract deliver 21 amount:40",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 2 amount:600"
+          "command": "contract deliver 21 amount:40"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows both active cards at 0.0 kg stored (blingite #1, rubble #2) -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 2 amount:600` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
-        "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 3
-        },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"21\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -1362,9 +1515,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 446,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
         }
@@ -1407,159 +1560,188 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
+          "tickCount": 446,
+          "deathCount": 4,
+          "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3,
-          "holeCount": 25,
-          "chargedCount": 0,
-          "sequencedCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:5 stemming:3",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "5 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-      "expect": {
-        "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 3,
-          "holeCount": 25,
-          "chargedCount": 25,
-          "sequencedCount": 0
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 1 decrement click: 25ms default -> 20 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
-      "expect": {
-        "equals": {
-          "tickCount": 38,
-          "deathCount": 2,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 3,
-          "holeCount": 25,
-          "chargedCount": 25,
-          "sequencedCount": 25
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "role": "player",
-      "description": "deathCount corrected for #552: an employee auto-dispatched onto a haul_debris action from the previous blast's debris (syncHaulDispatch, HaulDispatch.ts) is still walking/working near this blast's site when it fires and is killed by a projectile fragment (accidents log: entityId 7, fragmentId 994) -- a 3rd death this run instead of the pre-auto-dispatch 2. Deterministic, reconfirmed via direct trace; every deathCount read for the rest of this file (through step 107) carries the same +1.",
-      "expect": {
-        "equals": {
-          "tickCount": 38,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
-          "surveyCount": 3,
+          "orderedHoleCount": 25,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "note": "#553: ordering only -- but with both drill_rigs destroyed in blast 1, these 25 holes are ghosts that will never be claimed. See the tick-wait steps below."
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 450,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 2,
+          "surveyCount": 3
+        }
+      },
+      "description": "#553: this pattern never lands a single hole -- both drill_rigs (vehicle #1 and #7) were destroyed alongside their drivers in blast 1, and this file never buys a replacement (its $150,000 budget, already overrun into bankruptcy since tick 132, has no room left for another $35,000 rig). Driller #9, this file's second hired driller, is deliberately unlicensed (see the opening's crew note) and couldn't crew a rig that doesn't exist regardless. Sandbox-measured: orderedHoleCount stays 25 across all 4 of these tick chunks."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 450,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 2,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 600,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 600,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 750,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 750,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 25,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 25,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan show"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
         }
       }
     },
@@ -1574,10 +1756,135 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:5 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:5 stemming:3"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "description": "#553: 0 holes charged -- state.drillHoles is empty (no drill_rig survives to claim any of this pattern's 25 ordered ghosts). A real, honest no-op, not a scenario-authoring shortcut."
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:20"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies (deathCount stays 4, from blast 1). The mine has been legally seized since tick 132; this is the operator going through the motions of a blast cycle with no explosives to fire."
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -1593,10 +1900,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -1612,15 +1919,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 900,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 67.52428571428581,
-          "safety": 0,
-          "ecology": 39.22,
-          "nuisance": 23.049999999999997
+          "wellBeing": 0.0,
+          "safety": 0.0,
+          "ecology": 50,
+          "nuisance": 50
         }
       }
     },
@@ -1635,10 +1942,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 901,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -1650,17 +1957,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 38,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 901,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "tick 6",
@@ -1673,10 +1979,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 907,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -1688,17 +1994,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 907,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "contract list",
@@ -1711,16 +2016,16 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 2,
+          "tickCount": 907,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
     },
     {
-      "command": "contract accept 3",
+      "command": "contract accept 50",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1728,44 +2033,37 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 907,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"3\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #3 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#553: contract id renumbered -- by tick 1048 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #50 is what `contract list` actually offers at this point in the run."
     },
     {
-      "command": "contract deliver 3 amount:1200",
+      "command": "contract deliver 50 amount:100",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 3 amount:1200"
+          "command": "contract deliver 50 amount:100"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all three active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 3 amount:1200` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
-        "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
-          "surveyCount": 3
-        },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"50\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -1780,10 +2078,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 907,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       }
@@ -1799,10 +2097,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 907,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       }
@@ -1844,144 +2142,187 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 907,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "holeCount": 30,
-          "chargedCount": 0,
-          "sequencedCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:boomite amount:6 stemming:3",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "6 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-      "expect": {
-        "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
-          "surveyCount": 3,
-          "holeCount": 30,
-          "chargedCount": 30,
-          "sequencedCount": 0
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "20 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
-      "expect": {
-        "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
-          "surveyCount": 3,
-          "holeCount": 30,
-          "chargedCount": 30,
-          "sequencedCount": 30
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
-          "surveyCount": 3,
+          "orderedHoleCount": 30,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "note": "#553: ordering only -- these 30 holes are ghosts that will never be claimed, same as pattern 2's."
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 1057,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1057,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 1207,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1207,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 1357,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1357,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 30,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 30,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan show"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
         }
       }
     },
@@ -1996,10 +2337,135 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:boomite amount:6 stemming:3"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "description": "#553: 0 holes charged -- state.drillHoles is empty (no drill_rig survives to claim any of this pattern's 30 ordered ghosts). A real, honest no-op, not a scenario-authoring shortcut."
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:20"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies (deathCount stays 4, from blast 1). The mine has been legally seized since tick 132; this is the operator going through the motions of a blast cycle with no explosives to fire."
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 1507,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -2015,10 +2481,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 1508,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -2030,17 +2496,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 44,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 1508,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "tick 6",
@@ -2053,10 +2518,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -2068,17 +2533,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "contract list",
@@ -2091,16 +2555,16 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 3,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
     },
     {
-      "command": "contract accept 4",
+      "command": "contract accept 80",
       "interaction": [
         {
           "type": "clickSelector",
@@ -2108,44 +2572,37 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"4\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #4 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#553: contract id renumbered -- by tick 1656 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #80 is what `contract list` actually offers at this point in the run."
     },
     {
-      "command": "contract deliver 4 amount:1500",
+      "command": "contract deliver 80 amount:300",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 4 amount:1500"
+          "command": "contract deliver 80 amount:300"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all four active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 4 amount:1500` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
-        "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
-          "surveyCount": 3
-        },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"80\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -2160,10 +2617,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       }
@@ -2179,15 +2636,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 76.59285714285726,
+          "wellBeing": 0.2999999999999993,
           "safety": 0,
-          "ecology": 30.039999999999985,
-          "nuisance": 0
+          "ecology": 50,
+          "nuisance": 50
         }
       }
     },
@@ -2202,10 +2659,10 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       },
@@ -2222,10 +2679,10 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       },
@@ -2242,10 +2699,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       }
@@ -2261,10 +2718,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       }
@@ -2306,140 +2763,262 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 1514,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "holeCount": 48,
-          "chargedCount": 0,
-          "sequencedCount": 0
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:6 stemming:3",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "6 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "3.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
-      "expect": {
-        "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
-          "surveyCount": 3,
-          "holeCount": 48,
-          "chargedCount": 48,
-          "sequencedCount": 0
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "sequence auto delay_step:20",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "20 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 20ms from the delay_step:20 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
-      "expect": {
-        "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
-          "surveyCount": 3,
-          "holeCount": 48,
-          "chargedCount": 48,
-          "sequencedCount": 48
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
-          "surveyCount": 3,
+          "orderedHoleCount": 48,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "note": "#553: ordering only -- these 48 holes (the largest pattern in this file) are ghosts that will never be claimed, same as patterns 2 and 3's."
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 1637,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      },
+      "description": "#553: still no drill_rig anywhere in the fleet (both were destroyed in blast 1, tick 440, and this file never buys a replacement) -- sandbox-measured: orderedHoleCount stays 48 across all 6 of these tick chunks, the largest pattern in this file drilling exactly as much as patterns 2 and 3 did: nothing."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1637,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 1787,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1787,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 1937,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 1937,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 2087,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 2087,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 2237,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 2237,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "tick 150",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 150"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 48,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "orderedHoleCount": 48,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan show",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "drill_plan show"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
         }
       }
     },
@@ -2454,10 +3033,135 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle amount:6 stemming:3",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:6 stemming:3"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "description": "#553: 0 holes charged -- state.drillHoles is empty (no drill_rig survives to claim any of this pattern's 48 ordered ghosts). A real, honest no-op, not a scenario-authoring shortcut."
+    },
+    {
+      "command": "sequence auto delay_step:20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sequence auto delay_step:20"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "blast"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        }
+      },
+      "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies. The mine has been legally seized since tick 132; this is the operator going through the motions with no explosives to fire."
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "tickCount": 2387,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -2473,10 +3177,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 56,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 2393,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -2488,17 +3192,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 56,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 2393,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "tick 6",
@@ -2511,10 +3214,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
@@ -2526,17 +3229,16 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "contract list",
@@ -2549,16 +3251,16 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 4,
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 0,
           "surveyCount": 3
         }
       }
     },
     {
-      "command": "contract accept 5",
+      "command": "contract accept 125",
       "interaction": [
         {
           "type": "clickSelector",
@@ -2566,44 +3268,37 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 5,
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #5 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#553: contract id renumbered -- by tick 2549 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #125 is what `contract list` actually offers at this point in the run."
     },
     {
-      "command": "contract deliver 5 amount:2000",
+      "command": "contract deliver 125 amount:350",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 5 amount:2000"
+          "command": "contract deliver 125 amount:350"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows all five active cards at 0.0 kg stored -- nothing in this scenario ever hauls material into storage. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 5 amount:2000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Forcing a click here would be asserting something the game correctly forbids.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
-        "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 5,
-          "surveyCount": 3
-        },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"125\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -2618,13 +3313,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 5,
-          "surveyCount": 3
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
+          "surveyCount": 3,
+          "cash": -1299912
         }
-      }
+      },
+      "description": "#553: this file's real conclusion. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). The pre-#553 substitute trajectory reached a modest $32,530 profit -- still short of $250k, but a going concern. Under queued, vehicle-gated drilling, the same $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait: the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, and by the time this file's own 4 blasts and 5 contract cycles have played out -- 2 real drill_rigs destroyed in blast 1 and never replaced, patterns 2-4 drilling nothing at all -- cash sits at -$1,299,912. Sandbox-measured, command mode; the number is exact and does not change run to run (fixed seed, no dependency on wall-clock timing)."
     },
     {
       "command": "scores",
@@ -2637,15 +3334,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 5,
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 85.6957142857144,
-          "safety": 0,
-          "ecology": 14.749999999999993,
-          "nuisance": 0
+          "wellBeing": 0.0,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
         }
       }
     },
@@ -2660,15 +3357,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 5,
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 85.6957142857144,
-          "safety": 0,
-          "ecology": 14.749999999999993,
-          "nuisance": 0
+          "wellBeing": 0.0,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50
         }
       }
     },
@@ -2683,20 +3380,20 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 62,
-          "deathCount": 3,
-          "employeeCount": 7,
-          "activeContractCount": 5,
+          "tickCount": 2399,
+          "deathCount": 4,
+          "employeeCount": 12,
+          "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 85.6957142857144,
-          "safety": 0,
-          "ecology": 14.749999999999993,
-          "nuisance": 0,
-          "bankrupt": false,
-          "levelEnded": false,
-          "levelEndReason": null
+          "wellBeing": 0.0,
+          "safety": 50,
+          "ecology": 50,
+          "nuisance": 50,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
-        "note": "Findings #59-#60: `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default -- same class as Finding #58/the already-documented treranium_depths issue), so this file runs against the substitute new_game world throughout; not fixed here for the same reason. `employee assign_skill` used the same rejected positional syntax as Finding #45/#54 -- fixed to `skill:geology level:N`. All 5 of the `build` commands (`office`/`storage_depot`/`canteen`/`medical_bay`/`break_room`) name nonexistent building types, matching the established Finding #5/#47/#58 no-op pattern -- left unmarked rather than fixed, consistent with precedent. A `debris_hauler` is bought (along with a rock_digger and drill_rig); #552 makes hauling self-dispatching, so a driver no longer has to be assigned or a haul manually ordered for the fleet to try -- but this file's own 5 `build` commands all name nonexistent building types (the no-op pattern above), so no real freight_warehouse ever gets placed, `getStorageCapacity` stays 0, and every auto-created haul_debris PendingAction is claimable-but-never-completable for lack of anywhere to deliver to. Despite 4 real blasts, `storedMassKg` still stays 0 for the whole file and all 5 contract deliveries still fail honestly for lack of storage -- the same bottom line as before #552, now for a storage-capacity reason instead of a never-dispatched one; not fixed here either, since the hauling mechanism is already proven end-to-end by `level1-playthrough-win.json` and re-proving it here would cost the same again for no new verification value (Finding #59). Unusually for this batch, the file's own hardcoded contract IDs (1, 2, 3, 4, 5) all happened to match the real, currently-available pool at every listing -- no ID-mismatch fix was needed here, unlike every other multi-cycle-contract file this session. Finding #52's drill-grid class recurred a 4th time across all 4 of this file's grids (declared 12/16/20/20 holes vs. real 24/25/30/48) -- fixed the same way. The corrected, far larger grids are violent enough to kill 2 employees during the very first blast (deathCount 0\u21922, tick 32) -- a real, reproducible consequence, not a scenario bug. Discovered while investigating an unexplained $10,000-per-cycle income jump in `finances` output despite every delivery failing: some random events (at least `lucky_strike`) resolve silently and instantly inside a `tick` call -- the tick command's own output says 'No events fired' even as the event's transaction (`category:'contracts', description:'Event: lucky_strike'`) is added to the finance log -- a materially different mechanic from every other file's pending-choice events (`[tick N] EVENT: Name` + a required `event choose`). Because this file has real (if silent) events firing, `cash` is hard-asserted only through tick 32 (the first such event) and left unasserted after that, per Ground rule #12/Finding #34's established treatment, rather than assumed safe just because no `event choose` step was ever needed (Finding #60). No bankruptcy, revolt, or ecological shutdown within this file's 62-tick budget; safety and nuisance both bottom out at 0 from the accumulated real blast violence, matching the pattern from `level1-win-efficient.json`. \u25b8 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The three vehicle buys used to overdraw to -$87,960 and stay there; the run is now funded with `new_game seed:2277 cash:150000` and they are `role: 'player'` clicks on enabled dealership rows, so cash never goes negative at all and ends at $32,530. Bankruptcy was never in play here before and still is not. Verified in both command mode and a real browser (interaction mode re-run twice for determinism, both clean), 108/108 steps."
+        "note": "Findings #59-#60 (unchanged): `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default), so this file runs against the substitute new_game world throughout. #553: bankrupt/levelEnded/levelEndReason are this file's new real conclusion -- the mine was formally seized at tick 132 (Bankruptcy.ts's BANKRUPTCY_GRACE_TICKS after cash first fell under the $5,000 threshold, straight after the 3-vehicle fleet purchase), and nothing after that point un-seizes it. The pre-#553 file reached bankrupt:false, levelEnded:false here; a 12-person staffed+hired roster against a $150,000 budget that now also has to survive hundreds of ticks of real drilling time no longer can."
       }
     }
   ]
