@@ -20,7 +20,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:1 cols:3 spacing:4 depth:6 start:5,5",
+      "command": "drill_plan grid rows:1 cols:3 spacing:4 depth:6 start:5,5 diameter:0.089",
+      "description": "diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -109,7 +110,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 46092,
+          "cash": 46128,
           "buildingCount": 1
         }
       }
@@ -134,7 +135,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 21092,
+          "cash": 21128,
           "vehicleCount": 5
         }
       }
@@ -175,7 +176,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 21092
+          "cash": 21128
         }
       }
     },

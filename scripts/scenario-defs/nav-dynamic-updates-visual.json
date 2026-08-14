@@ -20,7 +20,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 start:10,10",
+      "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 diameter:0.089 start:10,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -201,7 +201,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper. #553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st — and the blast above left only 3 of the original 4 alive (the drill_rig that had just drilled H1 sat inside its own blast radius), so this new debris_hauler becomes #5 and brings the count to 4.",
+      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper. #553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st — and the blast above left only 3 of the original 4 alive (the drill_rig that had just drilled H1 sat inside its own blast radius), so this new debris_hauler becomes #5 and brings the count to 4. cash is 16318, not 16306: the drill_plan command above now passes diameter:0.089, matching the Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) that the click always used for H1 — computeDrillHoleDurationTicks (DrillPlan.ts) scales duration by diameter, so the console text used to drill H1 ~2 ticks slower than the click's real hole (0.15m default vs 0.089m), leaving the drill_rig busy (fuelCostPerTick+maintenanceCostPerTick, balance.ts) 2 ticks longer and draining $12 more than the real click ever did.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -219,7 +219,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16306,
+          "cash": 16318,
           "vehicleCount": 4
         }
       }
@@ -260,7 +260,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 16306,
+          "cash": 16318,
           "vehicleCount": 4
         }
       }

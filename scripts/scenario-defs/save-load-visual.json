@@ -231,8 +231,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15",
-      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about. depth corrected from 4 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15 diameter:0.089",
+      "description": "Drill a small plan after slot 1 was saved, so the blast below craters terrain the saved slot does not know about. depth corrected from 4 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below. diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission kept the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent, a $48 divergence at the charge step below. Confirmed exact: adding the real default reproduces interaction mode's own $77,994 figure precisely.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -310,7 +310,7 @@
       "expect": {
         "equals": {
           "chargedCount": 4,
-          "cash": 77946
+          "cash": 77994
         }
       }
     },

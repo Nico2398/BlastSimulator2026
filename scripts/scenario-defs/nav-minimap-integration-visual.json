@@ -25,7 +25,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:5,5",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 diameter:0.089 start:5,5",
       "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (5,5)-(10,10) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle — the command and the click were silently testing two different grids. Caught by adding expect.equals.holeCount (issue #479 follow-up); fixed by describing what the click actually produces instead of an unverified guess. #553: confirming the grid queues 9 drill_hole PendingActions and pushes 9 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
@@ -113,9 +113,9 @@
       "expect": {
         "increased": ["buildingCount"],
         "equals": {
-          "cash": 21356
+          "cash": 21544
         },
-        "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost) off the $29,356 the site had left after the #553 drilling wait"
+        "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost) off the $29,544 the site had left after the #553 drilling wait. $29,544, not $29,356: the drill_plan command above now passes diameter:0.089, matching the Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) that the click always used — computeDrillHoleDurationTicks (DrillPlan.ts) scales duration by diameter, so the console text used to drill each hole ~2 ticks slower than the click's real grid (0.15m default vs 0.089m), leaving the drill_rig busy (fuelCostPerTick+maintenanceCostPerTick, balance.ts) for 18 more ticks across all 9 holes and draining $188 more than the real click ever did."
       }
     },
     {
@@ -150,7 +150,7 @@
       "expect": {
         "increased": ["buildingCount"],
         "equals": {
-          "cash": 13356
+          "cash": 13544
         }
       }
     },
@@ -174,7 +174,7 @@
       "expect": {
         "increased": ["employeeCount"],
         "equals": {
-          "cash": 12356
+          "cash": 12544
         },
         "note": "HIRING_COSTS.driller is 1000 (balance.ts)"
       }

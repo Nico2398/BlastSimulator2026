@@ -58,8 +58,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20",
-      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m — this file's whole point is hauling dispatch, not drilling, so the plan only needs to produce enough on-ground fragments to prove auto-haul works, at a workload the staffed roster's driller lands quickly. The click drags the (20,20)-(22,22) rectangle at 2m spacing to compute the declared 2x2. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20 diameter:0.089",
+      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m — this file's whole point is hauling dispatch, not drilling, so the plan only needs to produce enough on-ground fragments to prove auto-haul works, at a workload the staffed roster's driller lands quickly. The click drags the (20,20)-(22,22) rectangle at 2m spacing to compute the declared 2x2. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent, a $54 divergence carried into both downstream cash checkpoints below. Confirmed exact: adding the real default reproduces interaction mode's own $79,268 figure precisely.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -270,7 +270,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. #553: employee 6, not 1 -- staffed:true's roster occupies ids 1-5.",
       "expect": {
         "equals": {
-          "cash": 79214
+          "cash": 79268
         },
         "note": "the driver already holds driving.truck at level 1 from ROLE_STARTING_QUALIFICATION -- this call is a same-level no-op"
       },
@@ -296,7 +296,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 79214
+          "cash": 79268
         }
       }
     },

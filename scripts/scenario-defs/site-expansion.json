@@ -44,8 +44,8 @@
       }
     },
     {
-      "command": "drill_plan add x:34 z:10 depth:6",
-      "description": "Was left as a bare command (role bootstrap) because whether the 3D tile picker could raycast ground still outside the site was unverified. #558 fixes exactly that -- landscape meshes now join pickScene's raycast past the claimed edge -- so this is a real click through the Drill step's point-placement tool, exercising the fix directly.",
+      "command": "drill_plan add x:34 z:10 depth:6 diameter:0.089",
+      "description": "Was left as a bare command (role bootstrap) because whether the 3D tile picker could raycast ground still outside the site was unverified. #558 fixes exactly that -- landscape meshes now join pickScene's raycast past the claimed edge -- so this is a real click through the Drill step's point-placement tool, exercising the fix directly. diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real point-placement tool always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console `drill_plan add` fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission kept the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent, a $30 divergence at the save/load checkpoints below. Confirmed exact: adding the real default reproduces interaction mode's own $456,518 figure precisely.",
       "timeout": 150,
       "interaction": [
         {
@@ -85,7 +85,7 @@
       "role": "player"
     },
     {
-      "command": "drill_plan add x:-4 z:10 depth:6",
+      "command": "drill_plan add x:-4 z:10 depth:6 diameter:0.089",
       "description": "Was left as a bare command (role bootstrap) for the same reason as the step above -- converted now that #558 lets the picker raycast past the (still-expanding) site edge.",
       "timeout": 150,
       "interaction": [
@@ -361,7 +361,7 @@
       ],
       "expect": {
         "equals": {
-          "cash": 456488
+          "cash": 456518
         }
       },
       "role": "setup"
@@ -378,7 +378,7 @@
       ],
       "expect": {
         "equals": {
-          "cash": 456488,
+          "cash": 456518,
           "worldSizeX": 160,
           "worldMinX": -16,
           "buildingCount": 1
