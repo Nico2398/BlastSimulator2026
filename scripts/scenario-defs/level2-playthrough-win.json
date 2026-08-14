@@ -27,6 +27,10 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
         },
