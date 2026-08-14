@@ -298,12 +298,8 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is). PR #586 CI fix: the toolbar's [data-panel=\"employees\"] click dropped here on purpose -- the crew panel is already open, left that way by the previous cycle's `employee fire` step, which never closes it back. UIManager.togglePanel (src/ui/UIManager.ts) treats the rail button as a real toggle: clicking it while its own panel is already active calls hideAllPanels() instead of opening it. Re-clicking it here closed the panel via that toggle, and the driller hire row survives the close in the DOM (CrewPanel never unmounts on hide(), just sets display:none on #bs-employee-panel), so waitForSelector below still resolved -- inspectSelector's unclickable report (scripts/shared/interaction-executor.ts) also only reads the *clicked* element's own computed style, not its display:none ancestor's, so CI's failure surfaced as \"element has zero size (0x0)\" rather than \"not visible\": a real, deterministic panel-state bug in this scenario, not a rendering race.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -362,8 +358,12 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:45,20",
-      "description": "Grid 2/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing carries over from grid 1 already at 2m, so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2.",
+      "description": "Grid 2/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing carries over from grid 1 already at 2m, so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2. PR #586 CI fix: the toolbar's [data-panel=\"blast\"] click restored here -- #553's own driller-per-cycle rework (hire/vehicle-buy/fire steps) opens the employees and vehicles panels between grid 1's blast and this step, so #bs-blast-panel is no longer the active panel by the time this step starts; clicking straight into #bs-blast-panel [data-step=\"1\"] hit the same display:none-ancestor \"zero size (0x0)\" failure as the driller-row bug fixed just above (UIManager.showPanel/hideAllPanels, src/ui/UIManager.ts) -- restoring this toolbar click reopens the blast panel first, same as grid 1 already does.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -566,12 +566,8 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is). PR #586 CI fix: the toolbar's [data-panel=\"employees\"] click dropped here on purpose -- the crew panel is already open, left that way by the previous cycle's `employee fire` step, which never closes it back. UIManager.togglePanel (src/ui/UIManager.ts) treats the rail button as a real toggle: clicking it while its own panel is already active calls hideAllPanels() instead of opening it. Re-clicking it here closed the panel via that toggle, and the driller hire row survives the close in the DOM (CrewPanel never unmounts on hide(), just sets display:none on #bs-employee-panel), so waitForSelector below still resolved -- inspectSelector's unclickable report (scripts/shared/interaction-executor.ts) also only reads the *clicked* element's own computed style, not its display:none ancestor's, so CI's failure surfaced as \"element has zero size (0x0)\" rather than \"not visible\": a real, deterministic panel-state bug in this scenario, not a rendering race.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -630,8 +626,12 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:5,45",
-      "description": "Grid 3/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing is still at 2m inherited from grid 1 (grid 2 didn't touch it), so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2.",
+      "description": "Grid 3/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing is still at 2m inherited from grid 1 (grid 2 didn't touch it), so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2. PR #586 CI fix: the toolbar's [data-panel=\"blast\"] click restored here -- same reasoning as grid 2/4's own fix note above: #553's hire/vehicle-buy/fire steps between blast cycles leave the blast panel closed by the time this step starts.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -917,12 +917,8 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is). PR #586 CI fix: the toolbar's [data-panel=\"employees\"] click dropped here on purpose -- the crew panel is already open, left that way by the previous cycle's `employee fire` step, which never closes it back. UIManager.togglePanel (src/ui/UIManager.ts) treats the rail button as a real toggle: clicking it while its own panel is already active calls hideAllPanels() instead of opening it. Re-clicking it here closed the panel via that toggle, and the driller hire row survives the close in the DOM (CrewPanel never unmounts on hide(), just sets display:none on #bs-employee-panel), so waitForSelector below still resolved -- inspectSelector's unclickable report (scripts/shared/interaction-executor.ts) also only reads the *clicked* element's own computed style, not its display:none ancestor's, so CI's failure surfaced as \"element has zero size (0x0)\" rather than \"not visible\": a real, deterministic panel-state bug in this scenario, not a rendering race.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -981,8 +977,12 @@
     },
     {
       "command": "drill_plan grid rows:8 cols:8 spacing:1 depth:6 start:5,5",
-      "description": "Grid 4/4. #553 restores this file's original 8x8 (64 holes) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts's own coverage regression guard (#404), which locks in a rows:8/cols:8 grid to exceed MAX_ACTIVE_PROJECTILES (256, balance.ts) and exercise the projectile-grouping path once heavily overcharged below. Spacing tightened to 1m (two decrement clicks off the 2m spacing inherited from grids 1-3; the second click is a no-op against the 1m floor, but the first alone would already suffice) so the drag only spans (5,5)-(12,12): a single driller/drill_rig still takes over 1000 ticks door-to-door even at this minimum footprint (see the wait rounds below), so a wider spacing was not affordable inside any reasonable file runtime.",
+      "description": "Grid 4/4. #553 restores this file's original 8x8 (64 holes) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts's own coverage regression guard (#404), which locks in a rows:8/cols:8 grid to exceed MAX_ACTIVE_PROJECTILES (256, balance.ts) and exercise the projectile-grouping path once heavily overcharged below. Spacing tightened to 1m (two decrement clicks off the 2m spacing inherited from grids 1-3; the second click is a no-op against the 1m floor, but the first alone would already suffice) so the drag only spans (5,5)-(12,12): a single driller/drill_rig still takes over 1000 ticks door-to-door even at this minimum footprint (see the wait rounds below), so a wider spacing was not affordable inside any reasonable file runtime. PR #586 CI fix: the toolbar's [data-panel=\"blast\"] click restored here -- same reasoning as grid 2/4's own fix note above: #553's hire/vehicle-buy/fire steps between blast cycles leave the blast panel closed by the time this step starts.",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
