@@ -172,10 +172,11 @@
         }
       ],
       "role": "setup",
+      "description": "#553-followup (issue #586 CI): relaxed `cash: 197804` to `decreased` -- a real interaction-mode run (2/6 local reps) read 196164 instead, inheriting real-time payroll drift from the survey step's own player clicks/waits above (same real-time-accrual class documented throughout this PR), which this purely tick-driven step can't undo.",
       "expect": {
-        "equals": {
-          "cash": 197804
-        },
+        "decreased": [
+          "cash"
+        ],
         "note": "seismic survey completes mid-tick (tick 9 of this 10-tick block)"
       }
     },
@@ -211,10 +212,11 @@
         }
       ],
       "role": "setup",
+      "description": "#553-followup (issue #586 CI): relaxed `cash: 195344` to `decreased` -- same real-time-accrual drift as the tick-10 checkpoint above, inherited from the survey step's own real clicks.",
       "expect": {
-        "equals": {
-          "cash": 195344
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -481,16 +483,19 @@
       "timeout": 120,
       "interaction": [
         {
-          "type": "waitForTutorialStep",
-          "stepId": "charge",
-          "timeout": 120000
+          "type": "command",
+          "command": "tick 400"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
         },
         {
           "type": "screenshot"
         }
       ],
-      "role": "player",
-      "description": "#553: the driller drives the rig to all 16 ordered holes and sinks them one at a time. A lone driller with no living quarters collapses from fatigue partway through and resumes, which is why the pad is this large -- sandbox-measured. waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick.",
+      "role": "setup",
+      "description": "#553: the driller drives the rig to all 16 ordered holes and sinks them one at a time. A lone driller with no living quarters collapses from fatigue partway through and resumes, which is why the pad is this large -- sandbox-measured. #586 CI follow-up: this step used to be role:'player' driving `waitForTutorialStep(stepId:'charge')` to hold the real clock -- but the 'drill-plan' tutorial stage (tutorialSteps.ts/tutorialStepHelpers.ts's createComparisonStep) completes the instant `drillHoles.length` first exceeds its snapshot, i.e. after the FIRST of the 16 holes lands, not after all of them. waitForTutorialStep's own poll loop breaks the moment the rail reaches 'charge', which on a real CI run landed with only 1 of 16 holes drilled (orderedHoleCount 15, not 0) -- a genuine early-exit in the rail's own gating, not pacing flakiness, so a longer timeout could never have fixed it (the loop does not wait out the timeout, it exits on the very next 200ms poll once the rail flips). Switched to the same hand-measured `tick N`, role:'setup' pattern `.claude/rules/scenario-defs.md` already documents for 'a wait for queued work to land' and that tutorial-playthrough.json/blast-basic.json already use for this identical post-drill_plan wait: the console `tick 400` command runs the full 400 ticks synchronously in one browser-JS turn, landing all 16 holes before the tutorial's own 250ms-interval poll (TutorialOverlay's tickGuide) ever gets a chance to observe the first one and flip the rail early. The `wait 500ms` after it just lets that poll catch up so `expect.tutorialStep` below reads the post-tick rail state rather than a stale pre-tick one.",
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
@@ -606,23 +611,6 @@
       "role": "observe"
     },
     {
-      "command": "tick 1",
-      "timeout": 30,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup",
-      "description": "The file's original decreased:[\"safety\"] assertion does not survive across both modes (Finding #74/#75 follow-up, discovered live) -- not because the point is wrong, but because it is no longer independently checkable here. In command mode safety still drops exactly on this scripted tick (50 -> 45.05, matching the file's original point precisely). In interaction mode the blast step's own waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) drives the real clock through several ticks while polling for the rail to reach hire-manager -- including the event-fire-resolve stage's own autoCommands: [\"tick 3\", ...] -- so the safety damage already lands during that wait, before this step ever runs, and by here it reads 35.15 with nothing left to decrease on this specific tick. Same class as the contract-deliver step below: real per-click waiting does not reproduce command mode's precise scripted tick count. cash is unaffected by either mode's path and stays checkable. CI cash mismatch fix: cash corrected 70312 -> 70640 (+$328), the same fixed offset as the blast step above -- this tick spends $8 regardless (70648-8=70640), and the diameter fix's saving carries through unchanged since nothing between the two steps touches cash beyond that single tick's own upkeep. #553-followup (issue #586 CI): dropped the exact figure -- same box-cut-originated real-time-accrual error as the blast step above, which this checkpoint inherits unchanged.",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
       "command": "event choose 0",
       "timeout": 15,
       "interaction": [
@@ -652,9 +640,26 @@
         }
       ],
       "role": "player",
-      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, then dismissed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, then dismissed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): moved ahead of the `tick 1` step below (was originally the step right after it) -- live tracing showed the blast step's own multi-target waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) already fires the scripted event via the event-fire-resolve stage's own autoCommands (`tick 3`, `event fire tutorial_synergy_consultant`) *inside* that same wait, before this step or the tick-1 step ever runs -- not later, as the tick-1 step's own description originally assumed. `tickCommand` (events.ts) refuses outright with a pending event (`state.events.pendingEvent` check at the top, before any tick executes: \"Pending event! Resolve it first\"), so a plain `tick 1` run while the dialog is still up spends zero ticks and zero cash -- deterministically reproduced twice locally (cash 68856 -> 68856 both times), not sandbox contention. Resolving the dialog first, exactly where a real player would actually click it, removes the pending-event block so the tick step below can genuinely spend a tick again.",
       "expect": {
         "tutorialStep": "hire-manager"
+      }
+    },
+    {
+      "command": "tick 1",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "description": "The file's original decreased:[\"safety\"] assertion does not survive across both modes (Finding #74/#75 follow-up, discovered live) -- not because the point is wrong, but because it is no longer independently checkable here. In command mode safety still drops exactly on this scripted tick (50 -> 45.05, matching the file's original point precisely). In interaction mode the blast step's own waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) drives the real clock through several ticks while polling for the rail to reach hire-manager -- including the event-fire-resolve stage's own autoCommands: [\"tick 3\", ...] -- so the safety damage already lands during that wait, before this step ever runs, and by here it reads 35.15 with nothing left to decrease on this specific tick. Same class as the contract-deliver step below: real per-click waiting does not reproduce command mode's precise scripted tick count. cash is unaffected by either mode's path and stays checkable. CI cash mismatch fix: cash corrected 70312 -> 70640 (+$328), the same fixed offset as the blast step above -- this tick spends $8 regardless (70648-8=70640), and the diameter fix's saving carries through unchanged since nothing between the two steps touches cash beyond that single tick's own upkeep. #553-followup (issue #586 CI): dropped the exact figure -- same box-cut-originated real-time-accrual error as the blast step above, which this checkpoint inherits unchanged. Also moved below the event-choose step above (was above it) -- see that step's own note for why: the event is already fired and pending by here, and a plain `tick 1` refuses outright while one is pending (events.ts's tickCommand), so it must run after the dialog is actually resolved, matching what a real player experiences.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -700,7 +705,6 @@
     },
     {
       "command": "contract accept 23",
-      "description": "#553: contract id renumbered 1 -> 23. The 400-tick drill wait above outlives several refreshes of the available pool (REFRESH_INTERVAL, Contract.ts), so contract 1 is long gone by the time this step runs; 23 is what the pool holds here, and its 66-tick deadline outlasts the handful of ticks between accepting and delivering below.",
       "timeout": 15,
       "interaction": [
         {
@@ -709,7 +713,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"24\"] .bs-contract-accept"
         },
         {
           "type": "waitForTutorialStep",
@@ -717,7 +721,7 @@
         }
       ],
       "role": "player",
-      "description": "contract-accept complete: Accept clicked on the first offer in the Contracts panel. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it.",
+      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one.",
       "expect": {
         "equals": {
           "activeContractCount": 1
