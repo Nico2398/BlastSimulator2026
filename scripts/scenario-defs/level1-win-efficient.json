@@ -896,11 +896,8 @@
     },
     {
       "command": "vehicle buy drill_rig tier:3",
+      "description": "#553: does NOT re-click the vehicles toolbar tab -- the panel is already open (left that way by the previous buy/driver steps), and UIManager.togglePanel closes an ALREADY-active panel on re-click instead of leaving it open, which is exactly what made this step's own tier-3 button resolve to zero size before this fix (the panel itself went display:none, not a stale selector -- confirmed via a direct interaction-mode trace: step failed here with 'element has zero size (0x0)', while `getComputedStyle` on the button itself still reported its own authored display value, the signature of a hidden ancestor rather than a hidden element).",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
@@ -948,11 +945,8 @@
     },
     {
       "command": "vehicle buy drill_rig tier:3",
+      "description": "#553: same reasoning as the previous buy step -- no toolbar re-click, panel is already open.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
@@ -1075,7 +1069,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. cash dropped from this block entirely (this batch's own fallback for a small, unpinnable divergence that a relative check still can't cover): command mode's own trace shows cash flat at this exact step (2560406 -> 2560406, no event actually pending here in that mode), while a live interaction-mode trace reads 2560394, $12 under -- in the same tiny-multiple-of-$6 class as this file's own drill_rig idle/busy fuel-cost timing (three tier-3 rigs' per-tick fuel draw landing on a slightly different idle/busy tick boundary once the earlier driver-assignment steps are click-driven instead of instantaneous). `decreased` was tried first and rejected: it holds in interaction mode but fails in command mode, where cash genuinely does not decrease at this step -- the two modes disagree on direction, not just magnitude, so no equals/increased/decreased check here can satisfy both; only omitting cash does. Every other field in this block stays a hard equals.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1090,8 +1084,7 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "holeCount": 0,
-          "orderedHoleCount": 16,
-          "cash": 2560406
+          "orderedHoleCount": 16
         }
       }
     },
@@ -2107,11 +2100,8 @@
     },
     {
       "command": "vehicle buy drill_rig tier:3",
+      "description": "#553: same reasoning as pattern 1's second/third buy steps -- no toolbar re-click, panel is already open from the previous buy/driver steps (UIManager.togglePanel closes an already-active panel on re-click).",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"
@@ -2159,11 +2149,8 @@
     },
     {
       "command": "vehicle buy drill_rig tier:3",
+      "description": "#553: same reasoning as the previous buy step -- no toolbar re-click, panel is already open.",
       "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
         {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"3\"]"

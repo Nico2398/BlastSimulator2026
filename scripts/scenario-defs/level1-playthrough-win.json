@@ -520,6 +520,10 @@
       "command": "vehicle driver 2 10",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         },
@@ -528,7 +532,7 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         }
       ],
-      "description": "#552/#553: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare the $25,000 a manual purchase would cost on top of everything else -- see the file description's bankruptcy finding for just how tight that budget already is. Employee #10 (hired driver, licensed driving.truck lvl5 above) boards it.",
+      "description": "#552/#553: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare the $25,000 a manual purchase would cost on top of everything else -- see the file description's bankruptcy finding for just how tight that budget already is. Employee #10 (hired driver, licensed driving.truck lvl5 above) boards it. Re-opens the vehicles panel first (UIManager.togglePanel, same pattern as level2-playthrough-win's fix): the panel had switched to employees then build (the surveyor/driller/blaster/driver hires and the freight_warehouse placement above), so #bs-vehicle-panel's own [data-vehicle-id=\"2\"] row was off-screen (display:none, zero size) at this point -- not a stale selector, the panel itself just wasn't the active one. togglePanel only closes an ALREADY-active panel, so this click safely switches to vehicles rather than toggling it shut.",
       "role": "player",
       "expect": {
         "equals": {
