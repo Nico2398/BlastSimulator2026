@@ -253,6 +253,10 @@
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
         },
