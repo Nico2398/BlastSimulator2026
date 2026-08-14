@@ -916,16 +916,19 @@
       "command": "event choose 0",
       "interaction": [
         {
-          "type": "resolveEventIfPending"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. union_rep_secretary -- another real event: option 0 is a fixed, RNG-free delta sandbox-traced to cashDelta:-5000, scoreDelta.wellBeing:+7. wellBeing's climb from 0 to 7 resets the revolt streak (WorkerRevolt.ts: any wellBeing above 0 zeroes ticksAtZero) -- the countdown toward a real revolt restarts from wherever wellBeing next reads 0, one tick later. #553-followup (issue #586 CI): cash dropped -- the delta itself is fixed, but it lands on the same drifted base as the tick-298 step's note above, so the resulting absolute figure inherits the drift too. wellBeing:7 is the event's own fixed, RNG-free effect and stays exact.",
-      "role": "player",
+      "description": "union_rep_secretary -- another real event: option 0 is a fixed, RNG-free delta sandbox-traced to cashDelta:-5000, scoreDelta.wellBeing:+7. wellBeing's climb from 0 to 7 resets the revolt streak (WorkerRevolt.ts: any wellBeing above 0 zeroes ticksAtZero) -- the countdown toward a real revolt restarts from wherever wellBeing next reads 0, one tick later. #553-followup (issue #586 CI): cash dropped -- the delta itself is fixed, but it lands on the same drifted base as the tick-298 step's note above, so the resulting absolute figure inherits the drift too. wellBeing:7 is the event's own fixed, RNG-free effect and stays exact. Interaction-mode finding (issue #586 CI): unlike the file's other post-bankruptcy events, this one is genuinely unreachable, not a covered-by-div race -- sandbox-reproduced (scripts/_repro_temp.ts-class harness replay, real Puppeteer clicks throughout): the tick-10 step above's own blast (0-hole ghost, same as the pattern-2/3/4 blasts throughout this file) arms BlastReportModal's 3-real-second open delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts); UIManager.update (UIManager.ts:421) defers EventModal.update entirely while that report is pending-or-visible, so the union_rep_secretary dialog never opens and #bs-event-dialog still holds stale, hidden .bs-event-choice nodes from the PREVIOUS (already-dismissed) event -- exactly the kind of stale-node trap a bare waitForSelector(selector) can't tell apart from a live dialog, which is what produced Puppeteer's own \"Node is either not clickable or not an Element\" against a display:none ancestor. Confirmed via __probeSelector that this is not a race that a longer wait fixes: right now the blast report's own Close button reads \"hidden\" (still inside its 3s delay); left running past that delay it flips to \"covered\" -- LevelEndScreen's z-index 9999 sits above BlastReportModal's shared z-index 600 (unlike the event dialog's own 10500, styles.ts), so once armed, the report can never be dismissed post-bankruptcy either, and the event stays gated behind it permanently. `blocked` proves the report's Close button (the real control standing between the player and this event) while `event choose 0` still runs directly to keep tickCount/wellBeing on the same track as the rest of the file.",
+      "role": "guard",
       "expect": {
         "equals": {
           "wellBeing": 7,
           "tickCount": 315
-        }
+        },
+        "blocked": ".bs-confirm-overlay [data-action=\"report-close\"]",
+        "note": "#553-followup (issue #586 CI): the report-close button this proves against is present but hidden the instant the event fires (still inside BlastReportModal's 3s real-time open delay) -- a stronger, later-timed probe against the same control reads 'covered' once the delay elapses, matching the bankruptcy overlay's own z-index over every z-index:600 modal elsewhere in this file. Either reading proves the same permanent block; 'hidden' is what a probe taken this early and reliably observes."
       }
     },
     {
