@@ -1791,7 +1791,7 @@
           "command": "charge hole:* explosive:krackle amount:5 stemming:3"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 900,
@@ -1802,7 +1802,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
       },
       "description": "#553: 0 holes charged -- state.drillHoles is empty (no drill_rig survives to claim any of this pattern's 25 ordered ghosts). A real, honest no-op, not a scenario-authoring shortcut."
     },
@@ -1814,7 +1815,7 @@
           "command": "sequence auto delay_step:20"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 900,
@@ -1825,7 +1826,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
       }
     },
     {
@@ -1836,7 +1838,7 @@
           "command": "blast"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 900,
@@ -1847,7 +1849,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
       "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies (deathCount stays 4, from blast 1). The mine has been legally seized since tick 132; this is the operator going through the motions of a blast cycle with no explosives to fire."
     },
@@ -2372,7 +2375,7 @@
           "command": "charge hole:* explosive:boomite amount:6 stemming:3"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 1507,
@@ -2383,7 +2386,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
       },
       "description": "#553: 0 holes charged -- state.drillHoles is empty (no drill_rig survives to claim any of this pattern's 30 ordered ghosts). A real, honest no-op, not a scenario-authoring shortcut."
     },
@@ -2395,7 +2399,7 @@
           "command": "sequence auto delay_step:20"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 1507,
@@ -2406,7 +2410,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
       }
     },
     {
@@ -2417,7 +2422,7 @@
           "command": "blast"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 1507,
@@ -2428,7 +2433,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
       "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies (deathCount stays 4, from blast 1). The mine has been legally seized since tick 132; this is the operator going through the motions of a blast cycle with no explosives to fire."
     },
@@ -3068,7 +3074,7 @@
           "command": "charge hole:* explosive:krackle amount:6 stemming:3"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 2387,
@@ -3079,7 +3085,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
       },
       "description": "#553: 0 holes charged -- state.drillHoles is empty (no drill_rig survives to claim any of this pattern's 48 ordered ghosts). A real, honest no-op, not a scenario-authoring shortcut."
     },
@@ -3091,7 +3098,7 @@
           "command": "sequence auto delay_step:20"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 2387,
@@ -3102,7 +3109,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
       }
     },
     {
@@ -3113,7 +3121,7 @@
           "command": "blast"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
           "tickCount": 2387,
@@ -3124,7 +3132,8 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
       "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies. The mine has been legally seized since tick 132; this is the operator going through the motions with no explosives to fire."
     },
