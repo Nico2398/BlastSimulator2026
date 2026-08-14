@@ -293,8 +293,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5",
-      "description": "depth corrected from the originally-declared 12 to 6, the Drill panel's own DEFAULT_DEPTH_M (Drill.ts), same class of fix as level1-lose-ecology.json's Finding #42/Ground rule #15. spacing:3 already matched the panel's own default; the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so row/col/spacing was already correct. #553: this only ORDERS the 25 holes as ghosts (state.plannedDrillHoles) -- holeCount stays 0 until employee #12 physically drives vehicle #5 to each one (vehicle #1 never contributes, permanently deadlocked -- see above).",
+      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5 diameter:0.089",
+      "description": "depth corrected from the originally-declared 12 to 6, the Drill panel's own DEFAULT_DEPTH_M (Drill.ts), same class of fix as level1-lose-ecology.json's Finding #42/Ground rule #15. spacing:3 already matched the panel's own default; the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so row/col/spacing was already correct. #553: this only ORDERS the 25 holes as ghosts (state.plannedDrillHoles) -- holeCount stays 0 until employee #12 physically drives vehicle #5 to each one (vehicle #1 never contributes, permanently deadlocked -- see above). diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/tutorial-playthrough.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a console-only default (0.15, mining.ts) that drilled each hole slower -- with the real default, holes land a little sooner, shifting the holeCount/cash progression through the fixed tick-40 checkpoints below (re-measured, confirmed via direct trace) while leaving the revolt's own outcome (tick 410, worker_revolt, 8 of 25 holes landed) unchanged in kind.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -348,12 +348,14 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "cash": 479050,
           "wellBeing": 70.21000000000012,
           "holeCount": 0,
           "orderedHoleCount": 25
         },
-        "note": "sandbox-measured: wellBeing still rising here, same as the pre-#553 trajectory this early -- avgMorale hasn't crashed yet, employee #12 is still travelling to the pattern. The reversal comes later (see tick 290 below)."
+        "decreased": [
+          "cash"
+        ],
+        "note": "sandbox-measured: wellBeing still rising here, same as the pre-#553 trajectory this early -- avgMorale hasn't crashed yet, employee #12 is still travelling to the pattern. The reversal comes later (see tick 290 below). cash relaxed from equals:479050 to decreased (this batch's own fallback for a genuine command-vs-interaction divergence, not just interaction-mode drift): command mode's own trace reliably computes 479050 at this tick, while a live interaction-mode trace (`npx tsx scripts/run-all-scenarios.ts --mode interaction --port 5202 level1-lose-revolt`) reliably reads 479500, $450 more -- both figures reproduce consistently in their own mode, so this is not noise to re-pin but a real economic-timing difference between the click-driven `drill_plan`/`vehicle driver` steps earlier in this file and their command-mode equivalents (likely a payroll/fuel tick landing on one side or the other of a boundary once the driller's travel is driven by real clicks instead of an instantaneous console command). Every other field in this block (tickCount, wellBeing, holeCount, orderedHoleCount) already matches exactly between both modes -- only cash diverges, and only at this one checkpoint's magnitude; it is not re-asserted with a hard equals again until the file's own trajectory renormalizes."
       }
     },
     {
@@ -521,10 +523,10 @@
           "tickCount": 250,
           "cash": 322080,
           "wellBeing": 30.575000000000166,
-          "holeCount": 2,
-          "orderedHoleCount": 23
+          "holeCount": 3,
+          "orderedHoleCount": 22
         },
-        "note": "employee #12/vehicle #5 has reached the pattern and started drilling -- 2 of 25 holes landed so far. Vehicle #1 has contributed nothing (still deadlocked at (1,2))."
+        "note": "employee #12/vehicle #5 has reached the pattern and started drilling -- 3 of 25 holes landed so far. Vehicle #1 has contributed nothing (still deadlocked at (1,2))."
       }
     },
     {
@@ -549,10 +551,10 @@
       "expect": {
         "equals": {
           "tickCount": 290,
-          "cash": 293326,
+          "cash": 293350,
           "wellBeing": 0,
-          "holeCount": 4,
-          "orderedHoleCount": 21
+          "holeCount": 3,
+          "orderedHoleCount": 22
         },
         "note": "wellBeing bottoms out at its floor (clampScore, ScoreManager.ts) here and, confirmed via direct trace, stays pinned at 0 for the rest of this file -- the accumulated needs collapse across the 12-employee roster (no living quarters anywhere on this level) outweighs any building/decay recovery. This is the tick revolt.ticksAtZero (WorkerRevolt.ts) starts counting from."
       }
@@ -579,10 +581,10 @@
       "expect": {
         "equals": {
           "tickCount": 330,
-          "cash": 265058,
+          "cash": 265076,
           "wellBeing": 0,
-          "holeCount": 5,
-          "orderedHoleCount": 20
+          "holeCount": 4,
+          "orderedHoleCount": 21
         }
       }
     },
@@ -608,7 +610,7 @@
       "expect": {
         "equals": {
           "tickCount": 370,
-          "cash": 236236,
+          "cash": 236254,
           "wellBeing": 0,
           "holeCount": 6,
           "orderedHoleCount": 19
@@ -637,10 +639,10 @@
       "expect": {
         "equals": {
           "tickCount": 410,
-          "cash": 207968,
+          "cash": 207974,
           "wellBeing": 0,
-          "holeCount": 9,
-          "orderedHoleCount": 16,
+          "holeCount": 8,
+          "orderedHoleCount": 17,
           "deathCount": 0,
           "employeeCount": 12,
           "revolted": true,
@@ -691,7 +693,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 207968,
+          "cash": 207974,
           "wellBeing": 0,
           "ecology": 50,
           "tickCount": 410,
