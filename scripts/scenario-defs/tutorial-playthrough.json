@@ -222,8 +222,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:15,15",
-      "description": "#553: the drag rectangle was shrunk from (15,15)-(25,25) to (15,15)-(21,21). Command and click stay equivalent -- the Drill panel's own default spacing (DEFAULT_SPACING_M=3) computes cols/rows as round(size/spacing)+1, so round(6/3)+1 = 3x3 = 9 holes for this rectangle, exactly what the command declares. The shrink is the point: drill_hole is now real queued work, and a lone driller with one drill_rig and no living quarters collapses from fatigue partway through a pattern (sandbox-measured: hole 9 of 9 lands at tick 119, hole 16 of 16 not until tick ~400). 16 holes would have made this file a study of one worker's stamina rather than a tutorial playthrough. depth stays 6, the panel default this step never clicks away from. Blast consequences re-measured at the smaller pattern rather than carried over -- see the blast step below",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:15,15 diameter:0.089",
+      "description": "#553: the drag rectangle was shrunk from (15,15)-(25,25) to (15,15)-(21,21). Command and click stay equivalent -- the Drill panel's own default spacing (DEFAULT_SPACING_M=3) computes cols/rows as round(size/spacing)+1, so round(6/3)+1 = 3x3 = 9 holes for this rectangle, exactly what the command declares. The shrink is the point: drill_hole is now real queued work, and a lone driller with one drill_rig and no living quarters collapses from fatigue partway through a pattern (sandbox-measured: hole 9 of 9 lands at tick 119, hole 16 of 16 not until tick ~400). 16 holes would have made this file a study of one worker's stamina rather than a tutorial playthrough. depth stays 6, the panel default this step never clicks away from. Blast consequences re-measured at the smaller pattern rather than carried over -- see the blast step below. diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/save-load-visual.json/weather-flood.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission kept the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. Confirmed exact: adding the real default here reproduces interaction mode's own $126,884 figure at the very next charge step, and the same fixed $108 offset carries unchanged through every remaining cash checkpoint in this file (the second drill_plan below needs no change -- its own diameter default happens not to move the total further).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -299,7 +299,7 @@
       "expect": {
         "equals": {
           "chargedCount": 9,
-          "cash": 126776
+          "cash": 126884
         }
       }
     },
@@ -358,7 +358,7 @@
           "chargedCount": 0,
           "sequencedCount": 0,
           "deathCount": 2,
-          "cash": 126776
+          "cash": 126884
         }
       }
     },
@@ -418,7 +418,7 @@
       "description": "event fire -- test hook: no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy).",
       "expect": {
         "equals": {
-          "cash": 126776
+          "cash": 126884
         },
         "note": "firing only makes the event pending -- its consequence doesn't apply until the choice below."
       },
@@ -450,7 +450,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 123776
+          "cash": 123884
         },
         "increased": [
           "wellBeing"
@@ -477,7 +477,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 121776,
+          "cash": 121884,
           "employeeCount": 3
         }
       }
@@ -493,7 +493,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 121776
+          "cash": 121884
         }
       },
       "role": "bootstrap"
@@ -508,11 +508,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -521,7 +521,7 @@
           "activeContractCount": 1
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #5 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 5 amount:5000",
@@ -571,7 +571,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 120976,
+          "cash": 121084,
           "employeeCount": 4
         }
       }
@@ -587,7 +587,7 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
         "equals": {
-          "cash": 120976
+          "cash": 121084
         }
       },
       "role": "bootstrap"
@@ -611,7 +611,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 95976,
+          "cash": 96084,
           "vehicleCount": 1
         }
       }
@@ -631,7 +631,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 95976
+          "cash": 96084
         }
       }
     },
@@ -666,7 +666,7 @@
       "description": "Per #526: was `build storage_depot at:12,8`, a phantom BuildingType (commandOutput: \"Unknown subcommand or building type\") with no catalog row and nothing to click -- \"storage_depot\" maps to the real freight_warehouse building. Converted to the tutorial's own real `build-storage` stage (TUTORIAL_STAGES['build-storage'], tutorialStages.ts), whose region tile is REGION.warehouse = (6,6), not the phantom step's (12,8).",
       "expect": {
         "equals": {
-          "cash": 80976,
+          "cash": 81084,
           "buildingCount": 1
         },
         "note": "cash 44000 - freight_warehouse tier-1 constructionCost 15000 (BuildingDefs.ts) = 29000. Every later hard-asserted cash value in this file shifts down by the same 15000 delta from the old no-op's 0 cost."
@@ -682,11 +682,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -695,7 +695,7 @@
           "activeContractCount": 2
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"2\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #2 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"10\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #10 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 10 amount:5000",
@@ -758,7 +758,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 79976
+          "cash": 80084
         }
       }
     },
@@ -791,7 +791,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 79976
+          "cash": 80084
         }
       }
     },
@@ -804,11 +804,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -817,7 +817,7 @@
           "activeContractCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"3\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #3 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"11\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #11 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
     },
     {
       "command": "contract deliver 11 amount:5000",
@@ -867,7 +867,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 44976,
+          "cash": 45084,
           "vehicleCount": 2
         }
       }
@@ -892,7 +892,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 43976,
+          "cash": 44084,
           "employeeCount": 5
         }
       }
@@ -909,7 +909,7 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 43976
+          "cash": 44084
         }
       }
     },
@@ -929,7 +929,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 43976
+          "cash": 44084
         }
       }
     },
@@ -973,7 +973,7 @@
         "equals": {
           "orderedHoleCount": 4,
           "holeCount": 0,
-          "cash": 43976
+          "cash": 44084
         },
         "note": "#553: ordering only -- the four holes are ghosts until the driller drives the rig to each one, drained by the step below."
       }
@@ -1035,7 +1035,7 @@
       "expect": {
         "equals": {
           "chargedCount": 4,
-          "cash": 28000
+          "cash": 28108
         }
       },
       "role": "player"
@@ -1103,7 +1103,7 @@
           "chargedCount": 0,
           "sequencedCount": 0,
           "deathCount": 3,
-          "cash": 28000
+          "cash": 28108
         },
         "note": "#553: this second, smaller blast now costs a third life. The manager (#3) and the driver (#4) are still nowhere near it, but the replacement driller (#5) is standing at the pattern they have just finished sinking -- the same way the first blast took the first driller. Pre-#553 nobody was ever at a pattern, because confirming a plan created the holes outright."
       }

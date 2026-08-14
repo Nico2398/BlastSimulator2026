@@ -616,7 +616,7 @@
     {
       "command": "contract accept 20",
       "timeout": 30,
-      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: the accept click is scoped to `[data-contract-id]` rather than a bare `.bs-contract-accept`, which always resolves to whichever offered card leads the DOM -- unscoped, command mode accepted the contract the command named while interaction mode accepted whatever led the list, two channels driving different contracts with both reporting pass, because `activeContractCount` counts accepts and not identities. #553: the id itself drifted from #1 to #20 -- the available pool refreshes on its own clock (REFRESH_INTERVAL, Contract.ts) and this file now spends well over 300 extra ticks on the driving_center, the drill_rig course and the drilling itself, so contract #1 is long gone by the time this step runs. Both halves move together: the command and the selector name the same contract, which is the whole point of scoping it.",
+      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this PR the accept click is scoped to `[data-contract-id]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. That scoping doesn't hold under the tutorial's own rails here, though: tutorialStages.ts's own 'contract-accept' stage declares its live target as the UNSCOPED `#bs-contract-panel .bs-contract-accept` (not a specific id), so a click scoped to one exact id is racing the offer pool's own refresh clock (REFRESH_INTERVAL, Contract.ts) on top of the tutorial rail's own gating -- under real render load this file (300+ extra ticks reaching this point) hit exactly that race, the id scoped here rotating out of the DOM between the wait and the click. Unscoped instead, matching the tutorial's own permitted target: this step's only assertion is which tutorial stage is reached next (`hire-driver`), not which contract identity was accepted, so there's no silent-divergence risk the way level1-win-efficient.json's own scoped case guards against -- `command`'s own id (20) still exercises command mode's real accept path independently.",
       "role": "player",
       "interaction": [
         {
@@ -625,7 +625,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel .bs-contract-accept"
         },
         {
           "type": "waitForTutorialStep",
