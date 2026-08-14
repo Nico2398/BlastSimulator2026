@@ -917,6 +917,10 @@
       "command": "vehicle driver 3 5",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
           "type": "waitForSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
         },
@@ -925,7 +929,7 @@
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
         }
       ],
-      "description": "#553: the replacement driller (employee #5) takes the replacement rig (vehicle #3).",
+      "description": "#553: the replacement driller (employee #5) takes the replacement rig (vehicle #3). #553-followup (issue #586 CI): added the toolbar vehicles-panel click -- the preceding two steps (employee hire, then a command-only assign_skill bootstrap) leave the Crew panel active, not Fleet, so the vehicle-panel selectors below were never actually visible (`10000ms exceeded` on CI).",
       "role": "player",
       "expect": {
         "equals": {
