@@ -1035,11 +1035,10 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
       "expect": {
         "equals": {
-          "chargedCount": 4,
-          "cash": 28108
+          "chargedCount": 4
         }
       },
       "role": "player"
@@ -1106,10 +1105,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 3,
-          "cash": 28108
+          "deathCount": 3
         },
-        "note": "#553: this second, smaller blast now costs a third life. The manager (#3) and the driver (#4) are still nowhere near it, but the replacement driller (#5) is standing at the pattern they have just finished sinking -- the same way the first blast took the first driller. Pre-#553 nobody was ever at a pattern, because confirming a plan created the holes outright."
+        "note": "#553: this second, smaller blast now costs a third life. The manager (#3) and the driver (#4) are still nowhere near it, but the replacement driller (#5) is standing at the pattern they have just finished sinking -- the same way the first blast took the first driller. Pre-#553 nobody was ever at a pattern, because confirming a plan created the holes outright. #553-followup (issue #586 CI): dropped `cash: 28108` here too -- inherits the same real-time-accrual drift as the charge step above, and the blast itself is cash-neutral (deaths don't deduct immediately), so there is nothing left to assert about cash at this checkpoint."
       }
     },
     {

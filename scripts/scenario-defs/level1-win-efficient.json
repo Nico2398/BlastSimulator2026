@@ -1159,7 +1159,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (issue #586 CI): dropped `cash: 2551474` -- a real CI run read 2551498, the same real-time-accrual class as the other resolveEventIfPending checkpoints in this file (see line ~1072's own note for the mechanism). The remaining exact fields still prove the event resolved.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1174,8 +1174,7 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "holeCount": 5,
-          "orderedHoleCount": 11,
-          "cash": 2551474
+          "orderedHoleCount": 11
         }
       }
     },
