@@ -1105,9 +1105,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 3
+          "deathCount": 2
         },
-        "note": "#553: this second, smaller blast now costs a third life. The manager (#3) and the driver (#4) are still nowhere near it, but the replacement driller (#5) is standing at the pattern they have just finished sinking -- the same way the first blast took the first driller. Pre-#553 nobody was ever at a pattern, because confirming a plan created the holes outright. #553-followup (issue #586 CI): dropped `cash: 28108` here too -- inherits the same real-time-accrual drift as the charge step above, and the blast itself is cash-neutral (deaths don't deduct immediately), so there is nothing left to assert about cash at this checkpoint."
+        "note": "#593-followup (issue #586 CI): deathCount dropped from 3 to 2 -- direct trace confirms the replacement driller (#5) is no longer standing at the pattern when this blast goes off. #593 fixed releaseVehicleReservation to sync a dismounting driver's x/z to the vehicle's real current position instead of leaving them frozen at wherever they'd boarded; traced here, employee #5 ends up at (17,13) after dismounting, not at the (24,24)-(27,27) pattern this blast hits, so they survive. The manager (#3) and the driver (#4) are still nowhere near it either. Pre-#553 nobody was ever at a pattern, because confirming a plan created the holes outright. #553-followup (issue #586 CI): dropped `cash: 28108` here too -- inherits the same real-time-accrual drift as the charge step above, and the blast itself is cash-neutral (deaths don't deduct immediately), so there is nothing left to assert about cash at this checkpoint."
       }
     },
     {
@@ -1160,12 +1160,13 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "activeContractCount": 3,
           "employeeCount": 5,
           "vehicleCount": 1,
           "holeCount": 0
-        }
+        },
+        "note": "#593-followup (issue #586 CI): chained from the blast step above -- deathCount 3 -> 2, the replacement driller (#5) now survives the second blast."
       }
     }
   ]
