@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 1 real blast and 3 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory. Interaction-mode finding, this file's own: once levelEndReason turns non-null at tick 132, LevelEndScreen's full-viewport overlay (z-index 9999, every panel/toolbar control sits at z 100-200) covers the whole screen for the rest of the run and never clears -- no player click reaches ANY panel again after that tick, including blast 1's own charge/sequence/execute and every contract-accept/drill-plan-grid step that follows. Every step past tick 132 that mutates state now runs its command directly (role:'guard' + expect.blocked, same convention this file already used for its 3 phantom blasts) instead of pretending a click still lands -- the state trajectory (1 real blast, 4 deaths, 3 phantom patterns, 5 contract cycles, final -$1,299,912) is unchanged from before; only the UI-reachability half of each assertion was wrong.",
+  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 2 real blasts and 2 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, long before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory. Interaction-mode finding, this file's own: once levelEndReason turns non-null at tick 132, LevelEndScreen's full-viewport overlay (z-index 9999, every panel/toolbar control sits at z 100-200) covers the whole screen for the rest of the run and never clears -- no player click reaches ANY panel again after that tick, including blast 1's own charge/sequence/execute and every contract-accept/drill-plan-grid step that follows. Every step past tick 132 that mutates state now runs its command directly (role:'guard' + expect.blocked, same convention this file already used for its phantom blasts) instead of pretending a click still lands. #586 (issue #593's dispatch/position-sync fix): blast 1 now kills 2 (both surveyors) instead of 4 -- both driller/drill_rig pairs survive it, so pattern 2 is no longer a ghost: it drills and blasts for real, killing the 2 drillers blast 1 spared and destroying both rigs. deathCount still totals 4 by tick 900, same as the pre-#593 file, just reached via a second real blast instead of a single one; patterns 3 and 4 are the ones that are ghosts now. Final state: 4 deaths, 2 real blasts, 2 phantom patterns, 5 contract cycles, final cash -$1,381,027 (was -$1,299,912 pre-#593 -- lower now, from blast 2's own payroll/materials/event cascade running on a shifted tick schedule) -- only the UI-reachability half of each assertion, plus the numbers this second real blast actually moves, needed fixing.",
   "steps": [
     {
       "command": "new_game seed:2277 cash:150000 staffed:true",
@@ -1073,7 +1073,7 @@
           "command": "tick 150"
         }
       ],
-      "description": "#553: sandbox-measured -- this is where the mine's math actually breaks. staffed:true's free composition adds 5 more salaried employees on top of this file's own 7 hires -- a 12-person roster costing ~$7,570 per payroll cycle (Payroll transaction, every ~10 ticks, Finance.ts) against a $150,000 budget that used to only have to fund 7. After hiring, surveying and the 3-vehicle fleet, cash sits at $3,278 -- already under BANKRUPTCY_THRESHOLD ($5,000, balance.ts) before a single tick of this wait runs. BANKRUPTCY_GRACE_TICKS (100) later, 'BANKRUPTCY! The mine is seized.' fires at tick 132 (state.bankruptcy.bankrupt / state.levelEnded flip to true, state.levelEndReason to 'bankruptcy', Bankruptcy.ts) -- inside this very first tick chunk, 205 ticks before the 2 driller/drill_rig pairs actually finish sinking this 24-hole pattern (tick 337) and long before blast 1 ever fires. Nothing in the engine stops a `tick` command from continuing to run a level after levelEnded flips (a genuinely pending EVENT, like the Explosive Tariff below, is the only thing that ever halts one), so the mine keeps operating -- legally seized, crew still working -- for the rest of this file.",
+      "description": "#553: sandbox-measured -- this is where the mine's math actually breaks. staffed:true's free composition adds 5 more salaried employees on top of this file's own 7 hires -- a 12-person roster costing ~$7,570 per payroll cycle (Payroll transaction, every ~10 ticks, Finance.ts) against a $150,000 budget that used to only have to fund 7. After hiring, surveying and the 3-vehicle fleet, cash sits at $3,278 -- already under BANKRUPTCY_THRESHOLD ($5,000, balance.ts) before a single tick of this wait runs. BANKRUPTCY_GRACE_TICKS (100) later, 'BANKRUPTCY! The mine is seized.' fires at tick 132 (state.bankruptcy.bankrupt / state.levelEnded flip to true, state.levelEndReason to 'bankruptcy', Bankruptcy.ts) -- inside this very first tick chunk, long before the 2 driller/drill_rig pairs land 23 of this pattern's 24 holes by tick 440 (the 24th never lands -- a narrow #593 dispatch-timing edge case, see the charge step below) and long before blast 1 ever fires. Nothing in the engine stops a `tick` command from continuing to run a level after levelEnded flips (a genuinely pending EVENT, like the Explosive Tariff below, is the only thing that ever halts one), so the mine keeps operating -- legally seized, crew still working -- for the rest of this file.",
       "role": "setup",
       "expect": {
         "increased": [
@@ -1144,8 +1144,8 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 0,
-          "holeCount": 24,
+          "orderedHoleCount": 1,
+          "holeCount": 23,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1153,7 +1153,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "levelEnded/levelEndReason/bankrupt flipped true back at tick 132, mid-chunk-1 -- this step is the first one in the file positioned to observe it now that the fields are in scope."
+        "note": "levelEnded/levelEndReason/bankrupt flipped true back at tick 132, mid-chunk-1 -- this step is the first one in the file positioned to observe it now that the fields are in scope. #586: orderedHoleCount is 1, not 0 -- under the fixed dispatch (#593), 23 of the 24 ordered holes have landed by tick 440, one still queued -- sandbox-confirmed, same real trajectory the charge step below observes as holeCount:23."
       }
     },
     {
@@ -1190,13 +1190,13 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
+          "holeCount": 23,
+          "chargedCount": 23,
           "sequencedCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
       },
-      "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update/renderForState, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel and toolbar control here sits at z-panel/z-rail (100-200, tokens.ts) -- once that screen shows, it covers literally everything underneath for the rest of the run, including charge-all. This is not a padding mistake to trim around: a real player genuinely cannot reach this button again after tick 132. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 24 holes really do charge and the rest of this file's own trajectory (4 deaths at blast 1, destroyed fleet, -$1.3M) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong."
+      "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update/renderForState, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel and toolbar control here sits at z-panel/z-rail (100-200, tokens.ts) -- once that screen shows, it covers literally everything underneath for the rest of the run, including charge-all. This is not a padding mistake to trim around: a real player genuinely cannot reach this button again after tick 132. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's holes really do charge and the rest of this file's own trajectory keeps holding -- only the UI-reachability half of the old assertion was wrong. #586: holeCount/chargedCount are 23, not 24 -- under #593's fixed dispatch, only 23 of this pattern's 24 ordered holes have landed by tick 440 (one still queued, orderedHoleCount:1 above), a narrow timing edge case (sandbox-confirmed), and blast 1 below kills 2, not 4, for the same #593 reason."
     },
     {
       "command": "sequence auto delay_step:25",
@@ -1214,13 +1214,13 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 24,
-          "chargedCount": 24,
-          "sequencedCount": 24
+          "holeCount": 23,
+          "chargedCount": 23,
+          "sequencedCount": 23
         },
         "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
       },
-      "description": "#553: same class as the charge step above -- the full-viewport bankruptcy overlay has covered auto-sequence since tick 132 too."
+      "description": "#553: same class as the charge step above -- the full-viewport bankruptcy overlay has covered auto-sequence since tick 132 too. #586: 23, not 24, same #593 dispatch-timing edge case as the charge step above."
     },
     {
       "command": "blast",
@@ -1234,7 +1234,7 @@
       "expect": {
         "equals": {
           "tickCount": 440,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1244,7 +1244,7 @@
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
-      "description": "#553: this 24-hole pattern kills 4 -- both driller/drill_rig pairs (Bob Quartzman #1, Otto McBoom #8) standing at the holes they had just finished sinking, plus both surveyors (Jake Stoneface #6, Earl Boulder #7), confirmed via direct trace of `employee list` after the blast (4 entries read DEAD, the other 8 read OK). Both drill_rigs (vehicle #1 and #7) are destroyed alongside their drivers -- the same fate as tutorial-playthrough's single rig, just twice over. The mine is already legally seized (bankrupt since tick 132, see the wait step above) when this fires; the blast report and the deaths are real regardless -- but, per the charge step's finding above, no player can click Execute to fire it: the bankruptcy overlay has owned the whole screen since tick 132. `expect.blocked` proves that; the command still runs so the real casualty/fleet numbers below keep holding."
+      "description": "#586: this 23-hole pattern kills 2, not 4 -- under #593's fix (a dismounting driver now syncs to the vehicle's real position instead of freezing at boarding-time coordinates), both driller/drill_rig pairs (Bob Quartzman #1, Otto McBoom #8) are standing clear when this fires and survive, along with both drill_rigs (vehicle #1 and #7). Only the two surveyors (Jake Stoneface #6, Earl Boulder #7) die -- confirmed via direct trace of `employee list` after the blast (2 entries read DEAD, the other 10 read OK). Because both rigs and drillers survive, pattern 2 below is not a ghost -- they go on to drill and charge it for real, and its own blast kills the 2 drillers this pattern spared (see that blast step's own description). The mine is already legally seized (bankrupt since tick 132, see the wait step above) when this fires; the blast report and the deaths are real regardless -- but, per the charge step's finding above, no player can click Execute to fire it: the bankruptcy overlay has owned the whole screen since tick 132. `expect.blocked` proves that; the command still runs so the real casualty/fleet numbers below keep holding."
     },
     {
       "command": "state full",
@@ -1258,7 +1258,7 @@
       "expect": {
         "equals": {
           "tickCount": 440,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1277,7 +1277,7 @@
       "expect": {
         "equals": {
           "tickCount": 440,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1296,7 +1296,7 @@
       "expect": {
         "equals": {
           "tickCount": 440,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1306,7 +1306,7 @@
           "nuisance": 50
         }
       },
-      "description": "#553: wellBeing craters to 0 -- 4 deaths this run instead of the pre-#553 file's 2, plus every surviving employee's morale sits at 0 (sandbox-measured `employee list`, no living_quarters anywhere in this file to recover it)."
+      "description": "#586: wellBeing craters to 0 -- even with only 2 deaths this run (down from 4 pre-#593), every surviving employee's morale sits at 0 (sandbox-measured `employee list`, no living_quarters anywhere in this file to recover it)."
     },
     {
       "command": "tick 6",
@@ -1320,7 +1320,7 @@
       "expect": {
         "equals": {
           "tickCount": 440,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1339,7 +1339,7 @@
       "expect": {
         "equals": {
           "tickCount": 440,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1360,7 +1360,7 @@
       "expect": {
         "equals": {
           "tickCount": 446,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1378,7 +1378,7 @@
       "expect": {
         "equals": {
           "tickCount": 446,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1397,7 +1397,7 @@
       "expect": {
         "equals": {
           "tickCount": 446,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1416,7 +1416,7 @@
       "expect": {
         "equals": {
           "tickCount": 446,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -1451,7 +1451,7 @@
       "expect": {
         "equals": {
           "tickCount": 446,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1486,7 +1486,7 @@
       "expect": {
         "equals": {
           "tickCount": 446,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1505,7 +1505,7 @@
       "expect": {
         "equals": {
           "tickCount": 446,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3,
@@ -1515,7 +1515,7 @@
           "sequencedCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
-        "note": "#553: ordering only -- but with both drill_rigs destroyed in blast 1, these 25 holes are ghosts that will never be claimed. See the tick-wait steps below. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/accept steps above -- grid-tool is covered by tick 446, so `expect.blocked` proves the real block while the command still runs directly to order the ghost pattern."
+        "note": "#586: ordering only -- unlike the pre-#593 trajectory, both drill_rigs survived blast 1 (see that blast step's description) and go on to actually claim all 25 of these holes by tick 900, see the tick-wait steps below. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/accept steps above -- grid-tool is covered by tick 446, so `expect.blocked` proves the real block while the command still runs directly to order the pattern."
       }
     },
     {
@@ -1530,13 +1530,13 @@
       "expect": {
         "equals": {
           "tickCount": 450,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
         }
       },
-      "description": "#553: this pattern never lands a single hole -- both drill_rigs (vehicle #1 and #7) were destroyed alongside their drivers in blast 1, and this file never buys a replacement (its $150,000 budget, already overrun into bankruptcy since tick 132, has no room left for another $35,000 rig). Driller #9, this file's second hired driller, is deliberately unlicensed (see the opening's crew note) and couldn't crew a rig that doesn't exist regardless. Sandbox-measured: orderedHoleCount stays 25 across all 4 of these tick chunks."
+      "description": "#586: unlike the pre-#593 trajectory, both drill_rigs (vehicle #1 and #7) survived blast 1 -- this pattern lands its 25 holes for real by tick 900 (see the tick-900 checkpoint and the drill_plan-show step below), not the ghost pattern this file used to describe."
     },
     {
       "command": "event choose 0",
@@ -1550,7 +1550,7 @@
       "expect": {
         "equals": {
           "tickCount": 450,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1571,7 +1571,7 @@
       "expect": {
         "equals": {
           "tickCount": 600,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1589,7 +1589,7 @@
       "expect": {
         "equals": {
           "tickCount": 600,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1608,7 +1608,7 @@
       "expect": {
         "equals": {
           "tickCount": 750,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1626,7 +1626,7 @@
       "expect": {
         "equals": {
           "tickCount": 750,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1645,12 +1645,12 @@
       "expect": {
         "equals": {
           "tickCount": 900,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 25,
-          "holeCount": 0
+          "orderedHoleCount": 0,
+          "holeCount": 25
         }
       }
     },
@@ -1665,12 +1665,12 @@
       "expect": {
         "equals": {
           "tickCount": 900,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 25,
-          "holeCount": 0
+          "orderedHoleCount": 0,
+          "holeCount": 25
         }
       }
     },
@@ -1686,7 +1686,7 @@
       "expect": {
         "equals": {
           "tickCount": 900,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1705,7 +1705,7 @@
       "expect": {
         "equals": {
           "tickCount": 900,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1724,7 +1724,7 @@
       "expect": {
         "equals": {
           "tickCount": 900,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1743,17 +1743,17 @@
       "expect": {
         "equals": {
           "tickCount": 900,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
+          "holeCount": 25,
+          "chargedCount": 25,
           "sequencedCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
       },
-      "description": "#553: 0 holes charged -- state.drillHoles is empty (no drill_rig survives to claim any of this pattern's 25 ordered ghosts). A real, honest no-op, not a scenario-authoring shortcut."
+      "description": "#586: 25 holes charged, not 0 -- both drill_rigs survived blast 1 (see that blast step's description) and fully drilled this pattern by tick 900. This is no longer a ghost pattern."
     },
     {
       "command": "sequence auto delay_step:20",
@@ -1767,13 +1767,13 @@
       "expect": {
         "equals": {
           "tickCount": 900,
-          "deathCount": 4,
+          "deathCount": 2,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "holeCount": 25,
+          "chargedCount": 25,
+          "sequencedCount": 25
         },
         "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
       }
@@ -1800,7 +1800,7 @@
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
-      "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies (deathCount stays 4, from blast 1). The mine has been legally seized since tick 132; this is the operator going through the motions of a blast cycle with no explosives to fire."
+      "description": "#586: a real, second blast, not a phantom -- 25 holes charged and sequenced above, and this CATASTROPHIC-rated blast (1037 projections, sandbox-confirmed) kills the 2 drillers pattern 1 spared (Bob Quartzman #1, Otto McBoom #8), standing at the rigs they had just finished drilling with. deathCount reaches 4 (2 here + 2 at blast 1) -- the same total the pre-#593 file had, by a different route: both drill_rigs (vehicle #1 and #7) are destroyed here instead of at blast 1, and with them, drilling capacity for the rest of the file -- patterns 3 and 4 below are genuine ghosts, same as pattern 2 used to be. The mine has been legally seized since tick 132; this is the operator running a real blast cycle nobody can see the button for -- `expect.blocked` proves that; the command still runs so the real casualty/fleet/ecology numbers below keep holding."
     },
     {
       "command": "state full",
@@ -1877,10 +1877,11 @@
           "surveyCount": 3,
           "wellBeing": 0.0,
           "safety": 0.0,
-          "ecology": 50,
-          "nuisance": 50
+          "ecology": 39.629999999999995,
+          "nuisance": 24.075
         }
-      }
+      },
+      "description": "#586: ecology drops from 50 to 39.63, and nuisance from 50 to 24.075 -- the blast just above is a real, CATASTROPHIC-rated detonation (1037 projections, 173 cracked voxels) where the pre-#593 trajectory had a phantom with nothing to fire; both scores take the real environmental hit this time. Sandbox-confirmed, exact float."
     },
     {
       "command": "tick 6",
@@ -1893,7 +1894,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 901,
+          "tickCount": 900,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -1912,7 +1913,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 901,
+          "tickCount": 900,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -1933,7 +1934,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 907,
+          "tickCount": 901,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -1951,7 +1952,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 907,
+          "tickCount": 901,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -1970,7 +1971,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 907,
+          "tickCount": 901,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -1989,7 +1990,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 907,
+          "tickCount": 901,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2024,7 +2025,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 907,
+          "tickCount": 901,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2043,7 +2044,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 907,
+          "tickCount": 901,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2062,7 +2063,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 907,
+          "tickCount": 901,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2087,7 +2088,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1057,
+          "tickCount": 1051,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2105,7 +2106,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 1057,
+          "tickCount": 1051,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2124,7 +2125,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1207,
+          "tickCount": 1201,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2142,7 +2143,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 1207,
+          "tickCount": 1201,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2161,7 +2162,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1357,
+          "tickCount": 1351,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2179,7 +2180,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 1357,
+          "tickCount": 1351,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2198,7 +2199,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2218,7 +2219,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2239,7 +2240,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2258,7 +2259,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2277,7 +2278,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2296,7 +2297,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2320,7 +2321,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2343,7 +2344,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2354,7 +2355,7 @@
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
-      "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies (deathCount stays 4, from blast 1). The mine has been legally seized since tick 132; this is the operator going through the motions of a blast cycle with no explosives to fire."
+      "description": "#586: a phantom blast (pattern 3) -- 0 charged holes, so nothing detonates and nobody new dies (deathCount stays 4, set by blasts 1 and 2, see their own descriptions). No drill_rig survives blast 2 to claim any of this pattern's holes. The mine has been legally seized since tick 132; this is the operator going through the motions of a blast cycle with no explosives to fire."
     },
     {
       "command": "state full",
@@ -2367,7 +2368,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2386,7 +2387,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1507,
+          "tickCount": 1501,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2405,7 +2406,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1508,
+          "tickCount": 1503,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2426,7 +2427,7 @@
       "expect": {
         "blocked": "#bs-event-dialog .bs-event-choice",
         "equals": {
-          "tickCount": 1508,
+          "tickCount": 1503,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2445,7 +2446,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2463,7 +2464,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2482,7 +2483,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2501,7 +2502,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2536,7 +2537,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2555,17 +2556,18 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 0.2999999999999993,
+          "wellBeing": 6.3000000000000025,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
         }
-      }
+      },
+      "description": "#586: wellBeing reads 6.3 here, not the pre-#593 file's 0.3 -- the faster dispatch cascade (#593) shifts which events have fired and how many payroll/needs ticks have elapsed by this checkpoint. Sandbox-confirmed, exact float."
     },
     {
       "command": "build medical_bay at:10,10",
@@ -2578,7 +2580,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2598,7 +2600,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2618,7 +2620,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2637,7 +2639,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2656,7 +2658,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 1514,
+          "tickCount": 1509,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -2681,14 +2683,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1637,
+          "tickCount": 1630,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
         }
       },
-      "description": "#553: still no drill_rig anywhere in the fleet (both were destroyed in blast 1, tick 440, and this file never buys a replacement) -- sandbox-measured: orderedHoleCount stays 48 across all 6 of these tick chunks, the largest pattern in this file drilling exactly as much as patterns 2 and 3 did: nothing."
+      "description": "#586: still no drill_rig anywhere in the fleet (both were destroyed in blast 2, tick 900 -- not blast 1, see that blast step's description -- and this file never buys a replacement) -- sandbox-measured: orderedHoleCount stays 48 across all 6 of these tick chunks, the largest pattern in this file drilling exactly as much as pattern 3 did: nothing."
     },
     {
       "command": "event choose 0",
@@ -2701,7 +2703,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 1637,
+          "tickCount": 1630,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2722,7 +2724,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1787,
+          "tickCount": 1780,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2740,7 +2742,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 1787,
+          "tickCount": 1780,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2759,7 +2761,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 1937,
+          "tickCount": 1930,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2777,7 +2779,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 1937,
+          "tickCount": 1930,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2796,7 +2798,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2087,
+          "tickCount": 2080,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2814,7 +2816,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 2087,
+          "tickCount": 2080,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2833,7 +2835,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2237,
+          "tickCount": 2230,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2851,7 +2853,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 2237,
+          "tickCount": 2230,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2870,7 +2872,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2890,7 +2892,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2911,7 +2913,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2930,7 +2932,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2949,7 +2951,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2968,7 +2970,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -2992,7 +2994,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3015,7 +3017,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3026,7 +3028,7 @@
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       },
-      "description": "#553: a phantom blast -- 0 charged holes, so nothing detonates and nobody new dies. The mine has been legally seized since tick 132; this is the operator going through the motions with no explosives to fire."
+      "description": "#586: a phantom blast (pattern 4) -- 0 charged holes, so nothing detonates and nobody new dies. No drill_rig survives blast 2 (see that blast step's description) to claim any of this pattern's holes. The mine has been legally seized since tick 132; this is the operator going through the motions with no explosives to fire."
     },
     {
       "command": "state full",
@@ -3039,7 +3041,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3058,7 +3060,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2387,
+          "tickCount": 2380,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3077,7 +3079,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2393,
+          "tickCount": 2386,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3095,7 +3097,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 2393,
+          "tickCount": 2386,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3114,7 +3116,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3132,7 +3134,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3151,7 +3153,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 0,
@@ -3170,7 +3172,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
@@ -3205,15 +3207,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "cash": -1299912
+          "cash": -1381027
         }
       },
-      "description": "#553: this file's real conclusion. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). The pre-#553 substitute trajectory reached a modest $32,530 profit -- still short of $250k, but a going concern. Under queued, vehicle-gated drilling, the same $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait: the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, and by the time this file's own 4 blasts and 5 contract cycles have played out -- 2 real drill_rigs destroyed in blast 1 and never replaced, patterns 2-4 drilling nothing at all -- cash sits at -$1,299,912. Sandbox-measured, command mode; the number is exact and does not change run to run (fixed seed, no dependency on wall-clock timing)."
+      "description": "#586: this file's real conclusion. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). Under queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait: the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires. Under #593's dispatch fix, blast 1 kills 2 (both surveyors) instead of 4, and -- because both drill_rigs and drillers survive it this time -- pattern 2 drills and blasts for real (not a ghost), killing the 2 drillers blast 1 spared and destroying both rigs; deathCount still reaches 4 by tick 900, same total as before, just via a different blast. Patterns 3 and 4 are the real ghosts now (no drill_rig survives blast 2). By the time this file's own 4 blast attempts (2 real, 2 phantom) and 5 contract cycles have played out, cash sits at -$1,381,027 -- lower than the pre-#593 file's -$1,299,912, since blast 2's own payroll/materials/event cascade now runs on a different tick schedule. Sandbox-measured, command mode; the number is exact and does not change run to run (fixed seed, no dependency on wall-clock timing)."
     },
     {
       "command": "scores",
@@ -3226,13 +3228,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0.0,
-          "safety": 50,
+          "safety": 43.099999999999696,
           "ecology": 50,
           "nuisance": 50
         }
@@ -3249,13 +3251,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0.0,
-          "safety": 50,
+          "safety": 43.099999999999696,
           "ecology": 50,
           "nuisance": 50
         }
@@ -3272,20 +3274,20 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2399,
+          "tickCount": 2392,
           "deathCount": 4,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0.0,
-          "safety": 50,
+          "safety": 43.099999999999696,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "note": "Findings #59-#60 (unchanged): `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default), so this file runs against the substitute new_game world throughout. #553: bankrupt/levelEnded/levelEndReason are this file's new real conclusion -- the mine was formally seized at tick 132 (Bankruptcy.ts's BANKRUPTCY_GRACE_TICKS after cash first fell under the $5,000 threshold, straight after the 3-vehicle fleet purchase), and nothing after that point un-seizes it. The pre-#553 file reached bankrupt:false, levelEnded:false here; a 12-person staffed+hired roster against a $150,000 budget that now also has to survive hundreds of ticks of real drilling time no longer can."
+        "note": "Findings #59-#60 (unchanged): `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default), so this file runs against the substitute new_game world throughout. #553: bankrupt/levelEnded/levelEndReason are this file's new real conclusion -- the mine was formally seized at tick 132 (Bankruptcy.ts's BANKRUPTCY_GRACE_TICKS after cash first fell under the $5,000 threshold, straight after the 3-vehicle fleet purchase), and nothing after that point un-seizes it. The pre-#553 file reached bankrupt:false, levelEnded:false here; a 12-person staffed+hired roster against a $150,000 budget that now also has to survive hundreds of ticks of real drilling time no longer can. #586: safety reads 43.1 here, not 50 -- blast 2 (see its own description above) is a real, second detonation the pre-#593 trajectory never fired, and it dents safety along with ecology/nuisance."
       }
     }
   ]
