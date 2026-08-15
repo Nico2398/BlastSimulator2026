@@ -743,13 +743,41 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
  *
  * Dead, injured, and collapsing employees are skipped.
  * Employees that already have a rest PendingAction in the queue are skipped.
+ *
+ * `justCompletedRestEmployeeIds` (#593) skips an employee whose rest
+ * completed earlier this very tick (tickGeneralRestCompletion, called before
+ * this function every tick — events.ts). A building's replenishment is
+ * deliberately modest — a Tier-1 living_quarters lands well under its own
+ * warning threshold (gameplay-employee-needs: "restores about 11", warning
+ * at 25-35) — so without this guard, an employee who just finished a
+ * genuine collapse-rest at a living_quarters immediately qualifies for
+ * another one, self-targeted (targetEmployeeId set below) and zero distance
+ * away. claimActionsTargetedAtEmployee (tickEmployees, this file) claims and
+ * promotes a self-targeted action unconditionally, ahead of ever reaching
+ * fillIdleEmployeeFromQueueOrPool's cost-based pool selection — so the
+ * interrupted task this employee was doing before they collapsed (still
+ * queued, open-pool) never gets a chance to be reclaimed. The employee
+ * cycles rest-to-rest at the building forever instead. One tick's grace is
+ * enough: dispatch (tickEmployees, later this same tick) gets first crack at
+ * sending the employee back to their interrupted work; if the gauge is still
+ * under warning once they're busy again, the next tick's insertion just
+ * enqueues behind that work instead of preempting it (reserveOnePoolActionAhead).
+ * The no-building path never needed this — NEED_REST_NO_BUILDING_CAP clears
+ * every warning threshold in one completion, so autoInsertNeedTasks never
+ * had a next rest to offer in the first place.
  */
-export function autoInsertNeedTasks(state: GameState, _firedEvents?: FiredEvent[], _emitter?: EventEmitter): NeedInsertionResult {
+export function autoInsertNeedTasks(
+  state: GameState,
+  _firedEvents?: FiredEvent[],
+  _emitter?: EventEmitter,
+  justCompletedRestEmployeeIds?: ReadonlySet<number>,
+): NeedInsertionResult {
   const result: NeedInsertionResult = { inserted: [], skipped: [] };
 
   for (const emp of state.employees.employees) {
     // Skip dead, injured, or collapsing employees
     if (!emp.alive || emp.injured || emp.collapsing) continue;
+    if (justCompletedRestEmployeeIds?.has(emp.id)) continue;
 
     // Skip employees already mid-rest — resting, or (#437) still walking to
     // rest with the timer not yet started. Their gauge is still below its

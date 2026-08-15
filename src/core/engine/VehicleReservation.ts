@@ -157,6 +157,21 @@ export function releaseVehicleReservation(state: GameState, actionId: number): v
 
   vehicle.reservedForActionId = null;
   if (vehicle.driverId !== null) {
+    // #593: the driver dismounts wherever the vehicle currently sits, not
+    // wherever they boarded it. Driving never updates the employee's own
+    // x/z — EntityMovementTick.tickVehicle only ever advances the vehicle —
+    // so without this, a needs-interruption mid-drive (a collapse, most
+    // visibly) leaves the employee's logical position frozen at the
+    // boarding point, potentially many tiles from where the vehicle actually
+    // is when it's released. Every distance-based decision that follows
+    // (nearest living_quarters, the walk back to reboard) used that stale
+    // position, compounding worse the farther the vehicle had driven since
+    // boarding.
+    const driver = state.employees.employees.find(e => e.id === vehicle.driverId);
+    if (driver) {
+      driver.x = vehicle.x;
+      driver.z = vehicle.z;
+    }
     unassignDriver(state.vehicles, vehicle.id);
     setVehicleIdle(vehicle);
   }
