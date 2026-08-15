@@ -349,8 +349,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "collapsedCount": 0
-        }
+          "collapsedCount": 1
+        },
+        "note": "Stan collapses here, not Walt: idle the whole game (never dispatched), his fatigue drains at the idle rate down to ~17 by tick 185, then the just-built living_quarters (previous step) makes him eligible for a real proactive rest and autoInsertNeedTasks routes him to walk there from his idle spot at (34,32) to (15,15) -- a real ~20-tile walk, not the self-targeted zero-distance rest #593 now skips. isWorking counts a claimed-but-not-yet-arrived rest as work (activeActionId set, restTicksRemaining still null while walking), so fatigue keeps draining at the working rate in transit and hits 0 partway there, inside this very tick window (confirmed by direct probe: fatigue 0, collapsing:true, x/z 18/18 at cumulative tick 205). He recovers by the tick 30 step below, mirroring Walt's earlier collapse-and-recover cycle -- the SPECIAL NOTE's anticipated second collapse from the dispatch-priority fix shifting exactly when a proactive rest gets claimed and walked, not a leftover bug."
       }
     },
     {
