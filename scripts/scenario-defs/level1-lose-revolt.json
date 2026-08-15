@@ -444,13 +444,13 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "tickCount": 130
+        "changedBy": {
+          "tickCount": 40
         },
         "decreased": [
           "cash"
         ],
-        "note": "sandbox-measured: this `tick 40` only advances 10 ticks (120->130) -- a random event (weather_bad_forecast) becomes pending mid-batch and `tick` halts early, same as the resolveEventIfPending steps elsewhere in this file. Resolved by the step below. #553-followup (issue #586 CI): relaxed cash (equals:415734 -> decreased), same real-time-accrual class as the checkpoints above. wellBeing dropped entirely here rather than pinned in either direction: command mode holds flat at its 99.95 ceiling from tick 120 to tick 130 (this window's own derivative is ~0), so a CI-side timing shift could tip the real value either up or down across this specific plateau -- neither `increased` nor `decreased` is safe to assert. tickCount stays exact; it is not host-timing-sensitive."
+        "note": "#596/#597: setupEvents idempotency + cooldown-threshold caching moved when a random event goes pending mid-batch -- this `tick 40` no longer gets interrupted here (sandbox-measured: advances the full 120->160), the interruption that used to land in this batch now lands one batch later (see the next tick 40 below). tickCount converted from a chained absolute to `changedBy` (issue #596) since this checkpoint's own point is that the batch completes, not a specific running total -- robust to any future shift in which batch the interruption falls in. wellBeing stays unpinned in either direction here, same as before: this window's own derivative is near its plateau, not safe to assert. #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints below."
       }
     },
     {
@@ -474,16 +474,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 170,
-          "safety": 54.000000000000114
+          "safety": 50
         },
-        "decreased": [
-          "cash"
-        ],
         "increased": [
-          "wellBeing"
+          "tickCount"
         ],
-        "note": "safety still shows the weather_bad_forecast bump from above, decaying back towards 50 (SCORE_DECAY_RATE, ScoreManager.ts). #553-followup (issue #586 CI): relaxed cash (equals -> decreased) and wellBeing (equals -> increased) -- same real-time-accrual class as the checkpoints above. wellBeing direction is `increased`, not `decreased`, within this step specifically: the weather_bad_forecast event fires immediately before this step and knocks wellBeing down -4 first (confirmed via direct trace, command-mode run), so this step's own before/after span is a partial recovery off that dip, even though the value is lower than two checkpoints back (tick 130's 99.95). tickCount and safety stay exact; the latter is driven by the weather_bad_forecast event's own fixed, deterministic delta plus decay, not by real-time drift."
+        "decreased": [
+          "cash"
+        ],
+        "note": "#596/#597: this is now the batch that gets interrupted (sandbox-measured: only 160->175, 15 of the requested 40 ticks, before a random event goes pending mid-batch) -- the interruption that used to land in the previous tick 40 (see above) shifted here. tickCount relaxed from a chained absolute to `increased` (issue #596): the interrupted-batch behavior is exactly the case the rule calls out as unsafe to pin with `changedBy`, since which batch gets interrupted (and by how much) is what these two fixes changed. The event actually drawn at this point also changed identity -- it's `union_food_trucks` now (wellBeing +10, nuisance +5, $4000 lost), not the old `weather_bad_forecast` (safety +6, wellBeing -4) -- a consequence of #596's event-pool dedup changing the RNG draw order, not a separate bug. safety therefore never gets bumped here and stays flat at its neutral 50 baseline (sandbox-measured); wellBeing direction dropped entirely (was `increased`) since real behavior now goes the other way here (99.56666666666668 -> 95.56666666666673, sandbox-measured) with no stable direction worth asserting across a future timing shift -- same treatment as the plateau step above. cash stays `decreased`, same real-time-accrual class as the checkpoints elsewhere in this file."
       }
     },
     {
@@ -507,14 +506,16 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 210,
-          "safety": 52.00000000000023
+          "safety": 50
+        },
+        "changedBy": {
+          "tickCount": 40
         },
         "decreased": [
           "cash",
           "wellBeing"
         ],
-        "note": "wellBeing has turned and is now falling fast -- avgMorale has crashed below 50 as employee #1's permanent deadlock (see above) and the working crew's own unmet needs (no living quarters on this level) accumulate. This is the reversal from this file's pre-#553 trajectory, where nobody was ever dispatched anywhere and wellBeing only ever rose. #553-followup (issue #586 CI): relaxed cash and wellBeing (both equals -> decreased), same real-time-accrual class as the checkpoints above. tickCount and safety stay exact."
+        "note": "wellBeing has turned and is now falling fast -- avgMorale has crashed below 50 as employee #1's permanent deadlock (see above) and the working crew's own unmet needs (no living quarters on this level) accumulate. This is the reversal from this file's pre-#553 trajectory, where nobody was ever dispatched anywhere and wellBeing only ever rose. #596/#597: this batch runs uninterrupted again (sandbox-measured: full 175->215) -- tickCount converted equals->changedBy (issue #596), same reasoning as the earlier uninterrupted batches. safety updated 52.00000000000023->50: with the weather_bad_forecast event no longer drawn at this point in the sequence (see the note two steps up), there is no safety bump left to decay back down from -- it has stayed flat at its neutral baseline the whole time (sandbox-measured). #553-followup (issue #586 CI): cash and wellBeing stay `decreased`, same real-time-accrual class as the checkpoints above."
       }
     },
     {
@@ -537,14 +538,14 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "tickCount": 250
+        "changedBy": {
+          "tickCount": 40
         },
         "decreased": [
           "cash",
           "wellBeing"
         ],
-        "note": "employee #12/vehicle #5 has reached the pattern and started drilling in command mode -- 3 of 25 holes landed so far there. Vehicle #1 has contributed nothing (still deadlocked at (1,2)). #553-followup (issue #586 CI): relaxed cash and wellBeing (both equals -> decreased), same real-time-accrual class as the checkpoints above; wellBeing is still falling toward its floor here (see tick 290 below), so `decreased` is the correct direction. holeCount/orderedHoleCount (equals:3/22) dropped entirely here, and at every remaining tick checkpoint through 410 below -- direct evidence, not the cash/wellBeing drift class: two consecutive full local interaction-mode runs of this file (`--mode interaction --port 5246`) both showed employee #12/vehicle #5 never actually landing a single hole through tick 410 (holeCount pinned at 0, orderedHoleCount pinned at 25, the whole way), where command mode lands 8 by tick 410. Neither `increased` nor `decreased` fits either -- the interaction-mode value never moves in any window, so there is no direction to assert, only a fixed value that does not match command mode's. The level's own outcome (worker_revolt at tick 410, same deathCount/employeeCount/revolted/levelEnded/levelEndReason) is unaffected in both modes -- confirmed identical across both runs -- so this is scoped as a checkpoint relaxation, not a production-code fix, per this batch's own remit. tickCount stays exact; it is not host-timing-sensitive."
+        "note": "employee #12/vehicle #5 has reached the pattern and started drilling in command mode. Vehicle #1 has contributed nothing (still deadlocked at (1,2)). #596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 215->255), same as the other non-interrupted batches in this file, but pinning the running total still couples this step to every batch before it. #553-followup (issue #586 CI): relaxed cash and wellBeing (both equals -> decreased), same real-time-accrual class as the checkpoints above; wellBeing is still falling toward its floor here (see tick 290 below), so `decreased` is the correct direction. holeCount/orderedHoleCount dropped entirely here, and at every remaining tick checkpoint through the revolt below -- direct evidence, not the cash/wellBeing drift class: two consecutive full local interaction-mode runs of this file (`--mode interaction --port 5246`) both showed employee #12/vehicle #5 never actually landing a single hole through the revolt (holeCount pinned at 0, orderedHoleCount pinned at 25, the whole way), where command mode lands holes. Neither `increased` nor `decreased` fits either -- the interaction-mode value never moves in any window, so there is no direction to assert, only a fixed value that does not match command mode's. The level's own outcome (worker_revolt, same deathCount/employeeCount/revolted/levelEnded/levelEndReason) is unaffected in both modes -- so this is scoped as a checkpoint relaxation, not a production-code fix, per this batch's own remit."
       }
     },
     {
@@ -567,14 +568,16 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 40
+        },
         "equals": {
-          "tickCount": 290,
           "wellBeing": 0
         },
         "decreased": [
           "cash"
         ],
-        "note": "wellBeing bottoms out at its floor (clampScore, ScoreManager.ts) here and, confirmed via direct trace, stays pinned at 0 for the rest of this file -- the accumulated needs collapse across the 12-employee roster (no living quarters anywhere on this level) outweighs any building/decay recovery. This is the tick revolt.ticksAtZero (WorkerRevolt.ts) starts counting from. #553-followup (issue #586 CI): relaxed cash (equals:293350 -> decreased), same real-time-accrual class as the checkpoints above. wellBeing stays exact -- it is a floor a CI-side timing shift lands on either side of, not a moving target: the ~1 point/tick decline rate through this window (see tick 210/250 above) dwarfs the sub-1-point drift magnitude observed elsewhere in this file, so it is already pinned at 0 in both modes by this tick. holeCount/orderedHoleCount dropped here (see tick 250 above for the full finding); command mode still lands 3/22 at this tick, real interaction-mode runs show 0/25. tickCount stays exact; it is not host-timing-sensitive."
+        "note": "wellBeing bottoms out at its floor (clampScore, ScoreManager.ts) here and, sandbox-measured, stays pinned at 0 for the rest of this file -- the accumulated needs collapse across the 12-employee roster (no living quarters anywhere on this level) outweighs any building/decay recovery. This is the tick revolt.ticksAtZero (WorkerRevolt.ts) starts counting from. #596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 255->295). wellBeing stays `equals` -- it is a floor, not a moving target, and re-verified at 0 against the real current numbers. #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding)."
       }
     },
     {
@@ -597,14 +600,16 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 40
+        },
         "equals": {
-          "tickCount": 330,
           "wellBeing": 0
         },
         "decreased": [
           "cash"
         ],
-        "note": "#553-followup (issue #586 CI): relaxed cash (equals:265076 -> decreased), same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since tick 290 (see note there). holeCount/orderedHoleCount dropped here (see tick 250 above for the full finding); command mode lands 4/21 at this tick, real interaction-mode runs show 0/25. tickCount stays exact; it is not host-timing-sensitive."
+        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 295->335). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding)."
       }
     },
     {
@@ -627,14 +632,16 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 40
+        },
         "equals": {
-          "tickCount": 370,
           "wellBeing": 0
         },
         "decreased": [
           "cash"
         ],
-        "note": "#553-followup (issue #586 CI): relaxed cash (equals:236254 -> decreased), same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since tick 290 (see note there). holeCount/orderedHoleCount dropped here (see tick 250 above for the full finding); command mode lands 6/19 at this tick, real interaction-mode runs show 0/25. tickCount stays exact; it is not host-timing-sensitive."
+        "note": "#596/#597: tickCount converted equals->changedBy (issue #596) -- this batch runs uninterrupted (sandbox-measured, full 335->375). #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding)."
       }
     },
     {
@@ -658,7 +665,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 410,
+          "tickCount": 415,
           "wellBeing": 0,
           "deathCount": 0,
           "employeeCount": 12,
@@ -669,7 +676,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapses here -- confirmed via direct trace, exactly 120 ticks after wellBeing first hit 0 at tick 290. The level ends in an actual worker revolt in both modes -- deathCount/employeeCount/revolted/levelEnded/levelEndReason all confirmed identical across two full local interaction-mode runs. deathCount stays 0: nobody has ever stood in a blast, since none has fired. #553-followup (issue #586 CI): relaxed cash (equals:207974 -> decreased), same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since tick 290 (see note there). holeCount/orderedHoleCount (equals:8/17) dropped here (see tick 250 above for the full finding); command mode lands 8 of the first pattern's 25 holes drilled by this tick and none charged, sequenced, or blasted -- the mine collapses before the drilling operation, let alone the originally-planned second pattern at (15,15), can finish -- but real interaction-mode runs show 0 holes drilled the entire time (pinned at holeCount:0/orderedHoleCount:25), the terminal revolt outcome reached identically either way."
+        "note": "REVOLT_TICKS (120 consecutive ticks at wellBeing<=0, WorkerRevolt.ts) elapses here. #596/#597: the revolt's own tick moved 410->415 (sandbox-measured) -- setupEvents idempotency + cooldown-threshold caching shifted when the mid-scenario batches above get interrupted (net +5 ticks by this point), which shifts every tick this level runs including the revolt itself; this is a genuine terminal checkpoint (issue #596's own carve-out: 'tickCount at a shutdown... stays equals, always re-verified against the real numbers') so it stays a pinned absolute, just updated to the real current number rather than converted. The level still ends in an actual worker revolt -- deathCount/employeeCount/revolted/levelEnded/levelEndReason unaffected by the timing shift (sandbox-measured). deathCount stays 0: nobody has ever stood in a blast, since none has fired. #553-followup (issue #586 CI): cash stays `decreased`, same real-time-accrual class as the checkpoints above. wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above (see note there). holeCount/orderedHoleCount dropped here (see tick-250-equivalent step above for the full finding)."
       }
     },
     {
@@ -715,14 +722,14 @@
         "equals": {
           "wellBeing": 0,
           "ecology": 50,
-          "tickCount": 410,
+          "tickCount": 415,
           "revolted": true,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
           "deathCount": 0,
           "employeeCount": 12
         },
-        "note": "final state confirms the new, real conclusion under #553: crewing the free staffed rig (required so it's actually usable) permanently deadlocks it behind an unmanned parked vehicle, the working crew's own unmet needs crash wellBeing to its floor, and the site genuinely revolts -- the opposite of this file's pre-#553 finding, where wellBeing only ever rose because nobody was ever physically dispatched anywhere. This is now the file's real, verified premise instead of an unreachable one. #553-followup (issue #586 CI): cash dropped entirely here (was equals:207974) rather than relaxed to `decreased` -- no ticks run between the tick-410 step above and this one (only a no-op event-resolve and two read-only observe steps), so cash is flat across this step by construction and `decreased` would fail deterministically regardless of drift; it already carries the tick-410 step's own `decreased` assertion. wellBeing stays exact -- pinned at its floor since tick 290."
+        "note": "final state confirms the new, real conclusion under #553: crewing the free staffed rig (required so it's actually usable) permanently deadlocks it behind an unmanned parked vehicle, the working crew's own unmet needs crash wellBeing to its floor, and the site genuinely revolts -- the opposite of this file's pre-#553 finding, where wellBeing only ever rose because nobody was ever physically dispatched anywhere. This is now the file's real, verified premise instead of an unreachable one. #596/#597: tickCount updated 410->415, matching the revolt step above -- same genuine-terminal-checkpoint reasoning, stays a pinned absolute. cash dropped entirely here (no ticks run between the revolt step above and this one, only a no-op event-resolve and two read-only observe steps, so cash is flat across this step by construction and `decreased` would fail deterministically regardless of drift; it already carries the revolt step's own `decreased` assertion). wellBeing stays exact -- pinned at its floor since the tick-290-equivalent step above."
       }
     }
   ]

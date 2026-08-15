@@ -651,9 +651,9 @@
       "role": "player"
     },
     {
-      "command": "tick 20",
-      "description": "Fifth and final chunk, deliberately smaller than the rest -- all 9 holes should have landed by now, with margin before the worker-revolt countdown and bankruptcy grace period.",
-      "interaction": [{"type": "command", "command": "tick 20"}],
+      "command": "tick 25",
+      "description": "Fifth and final chunk, deliberately smaller than the rest -- all 9 holes should have landed by now, with margin before the worker-revolt countdown and bankruptcy grace period. Bumped from 20 to 25 (#596/#597): the event pool/cooldown fixes changed which tick a pending event halts a chunk on, so the last hole now lands 5 ticks later than before -- re-measured directly (command-mode engine probe): orderedHoleCount hits 0 at tick 300, still well inside the worker-revolt/bankruptcy margin.",
+      "interaction": [{"type": "command", "command": "tick 25"}],
       "role": "setup",
       "expect": {
         "equals": {

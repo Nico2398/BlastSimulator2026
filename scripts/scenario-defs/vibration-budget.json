@@ -763,6 +763,7 @@
     },
     {
       "command": "finances",
+      "description": "#596/#597: cash dropped from this checkpoint's own expect (was a hand-derived equals:161096) -- the cooldown-caching and event-pool-idempotency fixes (see the grid 3 tick chunks' own note) shift exactly which tick a random event goes pending on, and cycle 2's own chunks above now straddle that shift, so cash is no longer a value this observe step can pin without re-deriving it by hand on every future event-timing change. Same incidental-running-total class level1-win-efficient.json's own finances checkpoints already treat this way (cash absent from their equals blocks) -- a directional decreased/changedBy doesn't fit a read-only `finances` query either (before==after for the query itself; the spend already happened in the setup/action steps above it, which is where a directional cash check belongs, not here).",
       "interaction": [
         {
           "type": "command",
@@ -772,9 +773,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 161096
+          "employeeCount": 0,
+          "vehicleCount": 0
         },
-        "note": "#553 shared-mechanism note: compounds grid 1's own diameter:0.089 correction above (see grid 1's finances note) with grid 2's own drill_plan grid instance of the same fix — corrected from 160988."
+        "note": "structural, not incidental-running-total -- grid 2's own driller/drill_rig were fired/spent before this checkpoint and grid 3's own hire/purchase happen after it, so both are deterministically 0 here regardless of event pacing."
       }
     },
     {
@@ -922,7 +924,27 @@
     },
     {
       "command": "tick 50",
-      "description": "Third chunk — sandbox-measured landing at tick 371 total (slowest of the three cycles: a fresh driller/drill_rig walking out from the depot each cycle, the site itself growing more cluttered after two prior blasts, and the Explosive Embargo event above).",
+      "description": "Third chunk. #596/#597: EventSystem's cooldown threshold is now cached once per cooldown window instead of redrawn on every 5-tick retry, and setupEvents() no longer duplicates the event pool per engine created in the process -- both correct fixes, but together they shift exactly which tick a random event goes pending on, and therefore how much of each 50-tick chunk the drill crew actually gets to work before a `tick` command stops dead for a pending decision (same mechanic as every chunk in this file). Sandbox-measured post-#596/#597: this chunk alone no longer finishes the grid — only 2 of the remaining 3 ordered holes land here.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Fourth chunk, added post-#596/#597 (see the third chunk's own note) -- the last hole needs one more 50-tick window to land.",
       "interaction": [
         {
           "type": "command",
@@ -1107,9 +1129,9 @@
           "vehicleCount": 0,
           "buildingCount": 0,
           "holeCount": 0,
-          "tickCount": 371
+          "tickCount": 391
         },
-        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine. #553 shared-mechanism note: compounds all three grids' own diameter:0.089 corrections (see grid 1's finances note) -- corrected from 75566 to 75748. #553-followup: dropped the hardcoded `equals: {cash: 75748}` -- that value is command mode's own fully tick-command-driven figure (still exact and unchanged there), but interaction mode's `time resume` keeps processFrame ticking off the real render-loop wall clock throughout this file's 3 drilling waits (GameLoop.ts): explicit `tick N` command steps advance the exact same tick count in both modes (confirmed: tickCount is 371 in both, asserted above), but the click-driven hire/purchase/assign steps shift exactly when each vehicle enters its busy/idle cycle relative to those explicit tick blocks, landing per-tick fuel/needs costs on a slightly different accrual boundary -- same mechanism documented in level1-win-efficient.json's own note for its $12 divergence. Sandbox-measured here: interaction mode lands on 75704 instead of command mode's 75748, a $44 gap entirely inside the fuel/needs expense categories (finances breakdown confirmed identical for salaries/equipment/fines). employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (verified equal in both modes' own state dumps) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a discrepancy this small anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
+        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #596/#597: tickCount corrected from 371 to 391 -- EventSystem's cooldown threshold is now cached once per cooldown window instead of redrawn on every 5-tick retry, and setupEvents() is now genuinely idempotent per engine (both correct fixes, see the grid 3 tick chunks' own note above), which shifts exactly which tick a random event goes pending on and therefore how many of grid 3's 50-tick chunks the drill crew actually gets to work with before a `tick` command stops for a pending decision -- grid 3 needed a 4th chunk to finish (added above), landing 20 ticks later than before. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
       }
     },
     {

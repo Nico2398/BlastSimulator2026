@@ -560,11 +560,38 @@
     },
     {
       "command": "tick 30",
-      "description": "Padding: the hauler drives to the piece, loads it, drives to the warehouse, and delivers it.",
+      "description": "Padding: the hauler drives to the piece, loads it, drives to the warehouse, and delivers it. #596/#597: setupEvents idempotency and the cached per-window cooldown threshold both landed correctly and shifted when a random event goes pending on seed 42 -- this batch now gets interrupted after only ~2 real ticks (the bare `tick` command halts the instant an event needs a player decision), so the round trip can't finish inside this step alone any more. The genuine storedMassKg proof moves to the padding step below, after the pending event is resolved and ticking resumes.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 30"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "note": "cash still drains from salary/fuel even though this batch stops early on a pending event; storedMassKg's own check moved past the event-resolve step below since the hauler hasn't had enough real elapsed ticks yet to complete its round trip."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "#596/#597: resolves the event that now halts the 'tick 30' padding step above partway through (sandbox-measured on seed 42) -- idempotent, a no-op when nothing is pending (mirrors the earlier 'event choose 0' step). A bare `tick` refuses outright while an event is pending, so skipping this stalls every tick step after it.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 40",
+      "description": "Makes up the shortfall left by the interrupted 'tick 30' padding step above (it only advanced ~2 real ticks before halting on the pending event resolved just above) so the hauler genuinely gets enough elapsed time to finish driving to the piece, loading it, driving to the warehouse, and delivering it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
         }
       ],
       "role": "setup",
@@ -575,12 +602,12 @@
         "decreased": [
           "cash"
         ],
-        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check \u2014 storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this 'tick 30' step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical to command mode's \u2014 increased is the cross-mode-robust proof."
+        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check \u2014 storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs \u2014 increased is the cross-mode-robust proof."
       }
     },
     {
       "command": "state full",
-      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass \u2014 checked on the tick 30 step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
+      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass \u2014 checked on the 'tick 40' step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
       "interaction": [
         {
           "type": "command",
