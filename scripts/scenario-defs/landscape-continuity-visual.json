@@ -85,12 +85,13 @@
   ],
   "steps": [
     {
-      "command": "new_game mine_type:alpine_granite seed:11 size:48",
+      "command": "new_game mine_type:alpine_granite seed:11 size:48 staffed:true",
       "timeout": 300,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game mine_type:alpine_granite seed:11 size:48"
+          "command": "new_game mine_type:alpine_granite seed:11 size:48 staffed:true"
         }
       ],
       "role": "setup",
@@ -280,9 +281,28 @@
           "worldSizeZ": 48,
           "worldMinX": 0,
           "worldMinZ": 0,
-          "holeCount": 4,
+          "orderedHoleCount": 4,
+          "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "note": "#553: 4 holes ordered (ghosts), none drilled yet"
+      }
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 41).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
         }
       }
     },

@@ -1,6 +1,6 @@
 {
   "name": "vibration-budget",
-  "description": "Chapter 5: 3 catastrophic overcharge blasts crater nuisance and ecology scores. Finding #9: the file's original premise (\"exceed vibration budget 3 times... verify $5,000 fine is applied\") has no implementation anywhere in the codebase to test \u2014 recordVibration (ScoreManager.ts) only moves nuisance/ecology, no budget counter or cash fine exists, and no event/campaign rule ties one to blast count either. That claim is dropped here in favor of the real, checkable effect (nuisance/ecology cratering); whether a real fine mechanic should exist is a game-design question, out of scope for a test-assertion pass \u2014 filed as a follow-up, not silently implemented.",
+  "description": "Chapter 5: 3 catastrophic overcharge blasts crater nuisance and ecology scores. Finding #9: the file's original premise (\"exceed vibration budget 3 times... verify $5,000 fine is applied\") has no implementation anywhere in the codebase to test — recordVibration (ScoreManager.ts) only moves nuisance/ecology, no budget counter or cash fine exists, and no event/campaign rule ties one to blast count either. That claim is dropped here in favor of the real, checkable effect (nuisance/ecology cratering); whether a real fine mechanic should exist is a game-design question, out of scope for a test-assertion pass — filed as a follow-up, not silently implemented.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -19,11 +19,12 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "new_game seed:42 size:96 cash:250000",
+      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill sites to add real travel time on top of an already-long 3-cycle file (campaign start has no staffed:true equivalent, and staffed:true itself doesn't fit here either -- see the drill_plan step below). size:96 keeps this step's original point (a bigger world than the plain new_game default above) without the campaign wrapper. Cash bumped to $250,000: 3 catastrophic blasts each need a fresh driller+drill_rig (see below), $36,000 a cycle, on top of payroll/upkeep during 3 separate drilling waits.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "new_game seed:42 size:96 cash:250000"
         }
       ],
       "role": "setup",
@@ -59,12 +60,76 @@
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "createScoreState's neutral baseline (ScoreManager.ts), before any blast \u2014 the 3 that follow must crater ecology/nuisance from here"
+        "note": "createScoreState's neutral baseline (ScoreManager.ts), before any blast — the 3 that follow must crater ecology/nuisance from here"
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
-      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); the (10,10)-(14,14) rectangle (4x4) computes round(4/3)+1=2 per axis at that default \u2014 the declared 2x2 by coincidence, no stepper click needed (unlike most other blast-* grid steps, Finding #4's class). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance, no employees anywhere to die) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless \u2014 confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action — a driller physically drives a drill_rig to each hole — so each of this file's 3 blast cycles now needs its own fresh crew: rumblox at this overcharge is genuinely lethal (Finding #9's honest premise), and the driller/drill_rig that just drilled a site routinely dies/is destroyed in its own blast (sandbox-measured), so a new one is hired for each grid rather than reused. Fired again right after each blast (see below) so a surviving-but-idle driller from an earlier cycle doesn't drag the roster's average wellbeing down across the whole file and risk a worker_revolt on cycle 3.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:10,10 diameter:0.089",
+      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless — confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -83,11 +148,15 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 10,
           "z1": 10,
-          "x2": 14,
-          "z2": 14
+          "x2": 12,
+          "z2": 12
         },
         {
           "type": "screenshot"
@@ -100,14 +169,63 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 4
+          "orderedHoleCount": 4,
+          "holeCount": 0
         },
-        "note": "2 rows x 2 cols = 4"
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
       }
     },
     {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks rather than one large tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count, and a bare `tick` then refuses outright until it's resolved.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#553: idempotent — a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block. A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: second chunk — sandbox-measured landing at tick 100 total for this cycle (a Newsletter-class event may or may not land inside either chunk; the `event choose 0` after each one handles it either way).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        },
+        "note": "All 4 holes have landed — none lost, none left ordered forever."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
-      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 \u2014 amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/sequence/blast pipeline in every run of this file's history \u2014 no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead \u2014 the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state \u2014 selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m \u2014 producing a normal, non-catastrophic blast (nuisance barely moved, 50\u219249.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5\u219215kg (10 clicks, 1kg/click) and the stemming stepper 2\u21921m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All \u2014 the same class of gap as Finding #4/#5, generalized to explosive selection.",
+      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 — amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/sequence/blast pipeline in every run of this file's history — no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead — the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state — selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m — producing a normal, non-catastrophic blast (nuisance barely moved, 50→49.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5→15kg (10 clicks, 1kg/click) and the stemming stepper 2→1m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All — the same class of gap as Finding #4/#5, generalized to explosive selection.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -247,8 +365,39 @@
           "nuisance",
           "ecology"
         ],
-        "note": "a fired blast clears the plan back to zero; the rumblox overcharge's real, checkable effect \u2014 nuisance and ecology both crater from the 50/50 baseline (recordVibration, ScoreManager.ts) \u2014 not the fabricated fine (see file description)"
+        "note": "a fired blast clears the plan back to zero; the rumblox overcharge's real, checkable effect — nuisance and ecology both crater from the 50/50 baseline (recordVibration, ScoreManager.ts) — not the fabricated fine (see file description)"
       }
+    },
+    {
+      "command": "employee fire 1",
+      "description": "#553: a surviving driller left idle after their blast (rumblox at this overcharge routinely kills them anyway, but not always) drags the roster's average wellbeing down for the rest of the file with no job left to do — fired so cycle 2's fresh driller starts from a clean roster, not because this file is about employee management.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "finances",
@@ -261,15 +410,79 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 207286
         },
-        "note": "explosive cost is never deducted from cash in this build (ground rule #11) \u2014 confirms the file's own $5,000-fine premise has nothing to attach to, cash stays exactly where new_game left it"
+        "note": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. diameter:0.089 added there; this checkpoint's cash corrected from 207232 to the now-exact 207286."
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:20,10",
-      "description": "Grid 2/3.",
+      "command": "employee hire role:driller",
+      "description": "#553: a fresh driller for grid 2/3 — see grid 1's own hire step for why (a new one each cycle, fired after each blast). #553-followup: no toolbar click here -- the preceding `employee fire 1` step already opened the employees panel (it clicks `#bs-toolbar [data-panel=\"employees\"]` itself to reach the dismiss button) and the `finances` step between it and this one is a command-only observe step that never touches panel state, so the panel is still open. ToolRail's click handler is a togglePanel toggle (UIManager.ts:450) -- re-clicking here closed the panel outright, leaving the driller row zero-size for the click that followed.",
       "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,10 diameter:0.089",
+      "description": "Grid 2/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: added the toolbar blast-panel click as the first action here (Grid 1/3's own drill_plan step above has one; this one never did) -- by this point in the file the active panel is \"vehicles\" (opened by the `vehicle buy drill_rig` step just above), not \"blast\", so `#bs-blast-panel [data-step=\"1\"]` was zero-size until the blast panel was actually opened. Also dropped the spacing-decrement click that used to run here: DrillStep.gridSpacing (Drill.ts) is a single instance field, mutated only by the stepper's onDec/onInc and never reset between grid cycles -- Grid 1/3's own decrement already took it from the 3m default down to 2m, and that persists across this whole scenario (BlastPanel/DrillStep is never recreated), so decrementing again here dropped it to 1m (Math.max(1, 2-1)) and turned this rectangle's 2x2 grid into a 3x3 (round(2/1)+1 = 3 per side, 9 holes) -- exactly the `orderedHoleCount should be 4 but is 9` failure. Leaving spacing untouched at its already-correct 2m.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -286,8 +499,8 @@
           "type": "dragTiles",
           "x1": 20,
           "z1": 10,
-          "x2": 24,
-          "z2": 14
+          "x2": 22,
+          "z2": 12
         },
         {
           "type": "screenshot"
@@ -300,10 +513,77 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks — see grid 1's own chunks for why. A Newsletter event fires partway through this cycle on seed 42 (sandbox-measured), which is exactly what the `event choose 0` after each chunk is for.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Third chunk — sandbox-measured landing at tick 235 total for this cycle.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 4
         },
-        "note": "2 rows x 2 cols = 4"
+        "note": "All 4 holes have landed — none lost, none left ordered forever."
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
@@ -447,8 +727,39 @@
           "nuisance",
           "ecology"
         ],
-        "note": "a fired blast clears the plan back to zero; nuisance/ecology continue cratering from blast 1's already-lowered baseline"
+        "note": "a fired blast clears the plan back to zero; nuisance/ecology decrease again from wherever they'd drifted back to during the #553 drilling wait (scores decay toward baseline over idle ticks, same mechanic as blast 1)"
       }
+    },
+    {
+      "command": "employee fire 2",
+      "description": "#553: see grid 1's own fire step for why — a fresh driller each cycle, fired right after their blast.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "finances",
@@ -461,14 +772,79 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 161096
+        },
+        "note": "#553 shared-mechanism note: compounds grid 1's own diameter:0.089 correction above (see grid 1's finances note) with grid 2's own drill_plan grid instance of the same fix — corrected from 160988."
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553: a fresh driller for grid 3/3 — see grid 1's own hire step for why. #553-followup: no toolbar click here -- same reason as grid 2/3's own hire step above: `employee fire 2` already opened the employees panel and the intervening `finances` step is command-only, so the panel is still open when this step runs.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 1
         }
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:30,10",
-      "description": "Grid 3/3.",
+      "command": "vehicle buy drill_rig",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:30,10 diameter:0.089",
+      "description": "Grid 3/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: same fix as Grid 2/3's own drill_plan step above -- added the toolbar blast-panel click as the first action (active panel here is \"vehicles\", from the `vehicle buy drill_rig` step just above, not \"blast\"), and dropped the spacing-decrement click: DrillStep.gridSpacing (Drill.ts) persists across the whole scenario (never reset between grid cycles), so it's already sitting at the correct 2m left behind by Grid 1/3's own single decrement -- decrementing again here would have clamped at Math.max(1, ...) same as Grid 2/3's own bug, and (with Grid 2/3's own decrement now also removed) it never dropped below 2m in the first place.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"1\"]"
@@ -485,8 +861,8 @@
           "type": "dragTiles",
           "x1": 30,
           "z1": 10,
-          "x2": 34,
-          "z2": 14
+          "x2": 32,
+          "z2": 12
         },
         {
           "type": "screenshot"
@@ -499,10 +875,77 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks — see grid 1's own chunks for why. An Explosive Embargo event fires partway through this cycle on seed 42 (sandbox-measured, and an expensive one — the `event choose 0` after each chunk absorbs its cost same as any other).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Third chunk — sandbox-measured landing at tick 371 total (slowest of the three cycles: a fresh driller/drill_rig walking out from the depot each cycle, the site itself growing more cluttered after two prior blasts, and the Explosive Embargo event above).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 4
         },
-        "note": "2 rows x 2 cols = 4"
+        "note": "All 4 holes have landed — none lost, none left ordered forever."
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
@@ -608,7 +1051,7 @@
     },
     {
       "command": "blast",
-      "description": "Blast 3/3 \u2014 the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
+      "description": "Blast 3/3 — the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -640,13 +1083,13 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "sequencedCount": 0,
-          "nuisance": 0
+          "sequencedCount": 0
         },
         "decreased": [
+          "nuisance",
           "ecology"
         ],
-        "note": "a fired blast clears the plan back to zero; ecology keeps cratering, but nuisance already hit its floor of 0 after blast 2 (clampScore, ScoreManager.ts) so it has nowhere left to decrease from \u2014 checked via equals:0 instead"
+        "note": "a fired blast clears the plan back to zero; nuisance/ecology decrease again from wherever they'd drifted back to during the #553 drilling wait. #553: no longer asserting nuisance hits an exact floor of 0 -- that assumed blast 1 and 2's damage compounded with no recovery in between (pre-#553 drilling was instant, so all 3 blasts fired back to back); the real drilling waits between cycles now give scores real time to decay back toward baseline, so nuisance never actually reaches 0 by blast 3 -- decreased is what genuinely holds."
       }
     },
     {
@@ -660,9 +1103,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000
+          "employeeCount": 1,
+          "vehicleCount": 0,
+          "buildingCount": 0,
+          "holeCount": 0,
+          "tickCount": 371
         },
-        "note": "no fine, ever \u2014 cash is exactly where new_game left it after 3 catastrophic overcharge blasts (Finding #9, see file description)"
+        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine. #553 shared-mechanism note: compounds all three grids' own diameter:0.089 corrections (see grid 1's finances note) -- corrected from 75566 to 75748. #553-followup: dropped the hardcoded `equals: {cash: 75748}` -- that value is command mode's own fully tick-command-driven figure (still exact and unchanged there), but interaction mode's `time resume` keeps processFrame ticking off the real render-loop wall clock throughout this file's 3 drilling waits (GameLoop.ts): explicit `tick N` command steps advance the exact same tick count in both modes (confirmed: tickCount is 371 in both, asserted above), but the click-driven hire/purchase/assign steps shift exactly when each vehicle enters its busy/idle cycle relative to those explicit tick blocks, landing per-tick fuel/needs costs on a slightly different accrual boundary -- same mechanism documented in level1-win-efficient.json's own note for its $12 divergence. Sandbox-measured here: interaction mode lands on 75704 instead of command mode's 75748, a $44 gap entirely inside the fuel/needs expense categories (finances breakdown confirmed identical for salaries/equipment/fines). employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (verified equal in both modes' own state dumps) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a discrepancy this small anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
       }
     },
     {

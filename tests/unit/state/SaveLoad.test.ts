@@ -267,6 +267,69 @@ describe('deserialize — v8→v9 migration for Employee.taskQueue (#549)', () =
   });
 });
 
+// ── v10→v11 migration for GameState.plannedDrillHoles (#553) ───────────────
+// SAVE_VERSION bumped 10→11 when GameState gained a `plannedDrillHoles:
+// PlannedHole[]` field — confirming a drill plan now queues one drill_hole
+// action per hole instead of writing DrillHole records straight into
+// state.drillHoles. A save written before that has no plannedDrillHoles
+// field at all; it must load with plannedDrillHoles: [].
+
+describe('deserialize — v10→v11 migration for GameState.plannedDrillHoles (#553)', () => {
+  it('a v10 save without plannedDrillHoles migrates to v11 with plannedDrillHoles: []', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 10;
+    delete parsed['plannedDrillHoles'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.plannedDrillHoles).toEqual([]);
+  });
+
+  it('a v9 (or earlier) save without plannedDrillHoles also migrates cleanly to plannedDrillHoles: [] (migration chain)', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 9;
+    delete parsed['plannedDrillHoles'];
+    // Simulate a genuine pre-#549 save missing taskQueue too, so the full
+    // migration chain (v9->v10->v11) runs, not just the last link.
+    const employeesRaw = parsed['employees'] as Record<string, unknown>;
+    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>>;
+    for (const e of employeeList) delete e['taskQueue'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.plannedDrillHoles).toEqual([]);
+  });
+
+  it('a v11+ save with plannedDrillHoles populated round-trips serialize/deserialize unchanged', () => {
+    const state = createGame({ seed: 42 });
+    state.plannedDrillHoles.push(
+      { id: 'H1', x: 3, z: 4, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 6, z: 4, depth: 8, diameter: 0.15 },
+    );
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.plannedDrillHoles).toEqual([
+      { id: 'H1', x: 3, z: 4, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 6, z: 4, depth: 8, diameter: 0.15 },
+    ]);
+  });
+
+  it('an empty v11+ save (no planned holes) round-trips to an empty array (boundary)', () => {
+    const state = createGame({ seed: 42 });
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.plannedDrillHoles).toEqual([]);
+  });
+});
+
 describe('serialize / deserialize', () => {
   it('round-trip produces an equivalent state', () => {
     const state = createGame({ seed: 42 });

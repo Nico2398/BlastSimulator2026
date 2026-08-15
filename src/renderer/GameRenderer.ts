@@ -345,19 +345,22 @@ export class GameRenderer {
    */
   showBlastPlanOverlay(ctx: MiningContext): void {
     if (!this.blastOverlay || !ctx.state) return;
-    const { drillHoles, chargesByHole, sequenceDelays, softwareTier } = ctx.state;
-    if (drillHoles.length === 0) { this.blastOverlay.hide(); return; }
+    const { drillHoles, plannedDrillHoles, chargesByHole, sequenceDelays, softwareTier } = ctx.state;
+    const allHoles = [...drillHoles, ...plannedDrillHoles];
+    if (allHoles.length === 0) { this.blastOverlay.hide(); return; }
 
-    const cx = drillHoles.reduce((s, h) => s + h.x, 0) / drillHoles.length;
-    const cz = drillHoles.reduce((s, h) => s + h.z, 0) / drillHoles.length;
+    const cx = allHoles.reduce((s, h) => s + h.x, 0) / allHoles.length;
+    const cz = allHoles.reduce((s, h) => s + h.z, 0) / allHoles.length;
     const originSurfaceY = this.getTerrainSurfaceY(cx, cz);
 
     // Per-hole fragment-size / projection-speed predictions, tier-gated the
     // same as the console `preview` commands. Without these, BlastPlanOverlay's
     // fragment-size dots and projection arcs never render — their per-hole
-    // fields stay undefined and the overlay's own guards skip them.
+    // fields stay undefined and the overlay's own guards skip them. Only
+    // already-drilled holes have a charge to preview against — an ordered
+    // hole (#553) has no charge/delay/frag-size data yet.
     let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
-    if (softwareTier >= 2 && ctx.grid) {
+    if (softwareTier >= 2 && ctx.grid && drillHoles.length > 0) {
       const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
       holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier);
     }
@@ -365,19 +368,30 @@ export class GameRenderer {
     this.blastOverlay.show({
       softwareTier,
       origin: new THREE.Vector3(cx, originSurfaceY, cz),
-      holes: drillHoles.map(h => {
-        const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {
+      holes: [
+        ...drillHoles.map(h => {
+          const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {
+            hole: h,
+            delayMs: sequenceDelays[h.id] ?? 0,
+            surfaceY: this.getTerrainSurfaceY(h.x, h.z),
+            drilled: true,
+          };
+          const charge = chargesByHole[h.id];
+          if (charge) hd.charge = charge;
+          const detail = holeDetails[h.id];
+          if (detail?.fragSizeCm !== undefined) hd.predictedFragSizeCm = detail.fragSizeCm;
+          if (detail?.projectionSpeedMs !== undefined) hd.projectionSpeed = detail.projectionSpeedMs;
+          return hd;
+        }),
+        // Ordered-but-undrilled holes (#553) — rendered as ghosts by
+        // BlastPlanOverlay (drilled: false), no charge/delay/frag-size data.
+        ...plannedDrillHoles.map(h => ({
           hole: h,
-          delayMs: sequenceDelays[h.id] ?? 0,
+          delayMs: -1,
           surfaceY: this.getTerrainSurfaceY(h.x, h.z),
-        };
-        const charge = chargesByHole[h.id];
-        if (charge) hd.charge = charge;
-        const detail = holeDetails[h.id];
-        if (detail?.fragSizeCm !== undefined) hd.predictedFragSizeCm = detail.fragSizeCm;
-        if (detail?.projectionSpeedMs !== undefined) hd.projectionSpeed = detail.projectionSpeedMs;
-        return hd;
-      }),
+          drilled: false,
+        } satisfies import('./BlastPlanOverlay.js').HoleOverlayData)),
+      ],
     });
   }
 

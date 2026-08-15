@@ -3,11 +3,12 @@
   "description": "Tests NavGrid updates after blast execution changes terrain",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
@@ -19,7 +20,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 start:10,10",
+      "command": "drill_plan grid rows:1 cols:1 spacing:1 depth:6 diameter:0.089 start:10,10",
       "interaction": [
         {
           "type": "clickSelector",
@@ -51,6 +52,24 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 1,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 30",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands the single hole well inside this pad (sandbox-measured landing at tick 20).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 1
         }
       }
@@ -182,7 +201,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper.",
+      "description": "Purchase a vehicle and send it across the grid — its position should advance tick by tick via the NavGrid-aware pathfinding stepper. #553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st — and the blast above left only 3 of the original 4 alive (the drill_rig that had just drilled H1 sat inside its own blast radius), so this new debris_hauler becomes #5 and brings the count to 4. cash is 16318, not 16306: the drill_plan command above now passes diameter:0.089, matching the Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) that the click always used for H1 — computeDrillHoleDurationTicks (DrillPlan.ts) scales duration by diameter, so the console text used to drill H1 ~2 ticks slower than the click's real hole (0.15m default vs 0.089m), leaving the drill_rig busy (fuelCostPerTick+maintenanceCostPerTick, balance.ts) 2 ticks longer and draining $12 more than the real click ever did.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -200,18 +219,18 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 25000,
-          "vehicleCount": 1
+          "cash": 16318,
+          "vehicleCount": 4
         }
       }
     },
     {
-      "command": "vehicle move 1 to:15,15",
+      "command": "vehicle move 5 to:15,15",
       "interaction": [
         {
           "type": "clickEntity",
           "kind": "vehicle",
-          "id": 1
+          "id": 5
         },
         {
           "type": "awaitUsable",
@@ -237,12 +256,12 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "Real click path: select hauler #1 in the 3D scene, rest the cursor on the destination tile, then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- that is false since the SelectionBar gained `move_here` (G4), and it was only unusable with a mouse until ScenePicking started latching `.aim` separately from the live hover (47f4fef). cameraFocus sits at z=16.5, one tile past the target: at the default orbit the camera ray hits terrain about a tile short of its focus point, so the offset was calibrated in a real browser until the dispatched command read exactly `vehicle move 1 to:15,15`. Never adjust it arithmetically -- re-measure.",
+      "description": "Real click path: select hauler #5 in the 3D scene (#553: the just-bought debris_hauler is the fleet's 5th vehicle under staffed:true, not its 1st), rest the cursor on the destination tile, then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- that is false since the SelectionBar gained `move_here` (G4), and it was only unusable with a mouse until ScenePicking started latching `.aim` separately from the live hover (47f4fef). cameraFocus sits at z=16.5, one tile past the target: at the default orbit the camera ray hits terrain about a tile short of its focus point, so the offset was calibrated in a real browser until the dispatched command read exactly `vehicle move 5 to:15,15`. Never adjust the camera focus offset arithmetically -- re-measure.",
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 25000,
-          "vehicleCount": 1
+          "cash": 16318,
+          "vehicleCount": 4
         }
       }
     },

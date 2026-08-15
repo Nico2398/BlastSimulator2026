@@ -11,7 +11,6 @@ import {
   getEmployees,
   getVehicles,
   countBuildingsOfType,
-  countVehiclesWithDriver,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
 
@@ -82,6 +81,76 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 
   // ── Step 3: hire-driller ──
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
+
+  // ── Step 3b: build-driving-center ──
+  // #553: drill_hole became a queued, vehicle-gated action -- a driller
+  // physically drives a drill_rig to each hole -- but hiring only grants the
+  // driller their 'blasting' qualification (ROLE_STARTING_QUALIFICATION,
+  // Employee.ts), never the driving.drill_rig licence a drill_rig needs. With
+  // nothing in the tutorial ever granting that licence or buying a drill_rig,
+  // the drill-plan step below could never land a single hole -- holeCount
+  // stuck at 0 forever, the same deadlock class #552 fixed for hauling. These
+  // three steps (build a school, train the licence, buy+crew the rig) close
+  // that gap the same way vehicle-buy-assign already does for the hauler.
+  createComparisonStep(
+    'build-driving-center',
+    'tutorial.step_drivingcenter.title',
+    'tutorial.step_drivingcenter',
+    (s) => countBuildingsOfType(s, 'driving_center'),
+    ['build driving_center at:10,8'],
+    TOOLBAR_TARGET.build,
+  ),
+
+  // ── Step 3c: train-driller ──
+  // Not a comparison step: the driller (employee #2, hired just above) holds
+  // no driving.drill_rig qualification to begin with, so "value increased"
+  // has nothing to increase from -- completion is the licence's existence.
+  {
+    id: 'train-driller',
+    titleKey: 'tutorial.step_traindriller.title',
+    textKey: 'tutorial.step_traindriller',
+    commands: ['employee train 2 skill:driving.drill_rig'],
+    highlightTarget: TOOLBAR_TARGET.employees,
+    tickBudget: 25,
+    waitsOnWork: true,
+    isComplete: (state: GameState) => getEmployees(state).some((e) => {
+      const raw = e as unknown as Record<string, unknown>;
+      if (raw.role !== 'driller') return false;
+      const quals = raw.qualifications as Array<{ category: string }> | undefined;
+      return (quals ?? []).some((q) => q.category === 'driving.drill_rig');
+    }),
+  },
+
+  // ── Step 3d: buy-drill-rig-assign ──
+  // Same naive count-increased + existence-check shape as vehicle-buy-assign
+  // below, but that shape is only safe for a step buying the tutorial's
+  // first-ever vehicle (see that step's own comment) -- which, now that this
+  // step exists, is THIS one, not that one. Snapshotting which vehicle ids
+  // already had a driver and requiring a driven vehicle outside that set
+  // keeps this step from false-completing on some other already-driven
+  // vehicle, the same guard vehicle-buy-assign now needs for the same reason.
+  {
+    id: 'buy-drill-rig-assign',
+    titleKey: 'tutorial.step_buydrillrig.title',
+    textKey: 'tutorial.step_buydrillrig',
+    highlightTarget: TOOLBAR_TARGET.vehicles,
+    // The driller trained one step earlier is employee #2.
+    commands: ['vehicle buy drill_rig', 'vehicle driver 1 2'],
+    tickBudget: 20,
+    waitsOnWork: true,
+    captureSnapshot: (state: GameState) => ({
+      prevVehicleCount: getVehicles(state).length,
+      prevDrivenVehicleIds: getVehicles(state).filter((v) => v.driverId !== null).map((v) => v.id),
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prevCount = snapshot.prevVehicleCount as number;
+      const prevDriven = snapshot.prevDrivenVehicleIds as number[];
+      return (
+        getVehicles(state).length > prevCount &&
+        getVehicles(state).some((v) => v.driverId !== null && !prevDriven.includes(v.id))
+      );
+    },
+  },
 
   // ── Step 4: box-cut ──
   // Real pits start the way this step does: an access ramp and a starter cut
@@ -167,12 +236,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
 
   // ── Step 13: vehicle-buy-assign ──
-  // Uses the naive count-increased + existence-check pattern that #409 fixed
-  // for hire steps. Safe here only because the tutorial buys its first-ever
-  // vehicle at this step: there is no pre-existing vehicle for the "assigned"
-  // half of the check to false-positive on, unlike hire steps where a role
-  // could already be staffed before the step opened. Re-evaluate if a future
-  // tutorial revision buys a vehicle earlier or reorders this step.
+  // #553: no longer the tutorial's first-ever vehicle purchase -- the
+  // build-driving-center/train-driller/buy-drill-rig-assign trio above buys
+  // and crews a drill_rig long before this step, and that driller keeps
+  // driving it (or, if the blast destroyed the rig, simply keeps the
+  // driving.drill_rig licence) the whole time in between. The naive
+  // count-increased + "some vehicle has a driver" check #409 used for hire
+  // steps would false-complete the instant this step opened, since the
+  // drill_rig's own driver already satisfies "some vehicle has a driver".
+  // Snapshotting which vehicle ids already had a driver and requiring a
+  // driven vehicle outside that set (the same guard buy-drill-rig-assign
+  // above needs, for the same reason) keeps this step honest again.
   {
     id: 'vehicle-buy-assign',
     titleKey: 'tutorial.step14.title',
@@ -190,12 +264,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     waitsOnWork: true,
     captureSnapshot: (state: GameState) => ({
       prevVehicleCount: getVehicles(state).length,
+      prevDrivenVehicleIds: getVehicles(state).filter((v) => v.driverId !== null).map((v) => v.id),
     }),
     isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevVehicleCount as number;
+      const prevCount = snapshot.prevVehicleCount as number;
+      const prevDriven = snapshot.prevDrivenVehicleIds as number[];
       return (
-        getVehicles(state).length > prev &&
-        countVehiclesWithDriver(state) > 0
+        getVehicles(state).length > prevCount &&
+        getVehicles(state).some((v) => v.driverId !== null && !prevDriven.includes(v.id))
       );
     },
   },

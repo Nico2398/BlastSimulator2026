@@ -3,18 +3,19 @@
   "description": "Visual verification of voxel fragmentation: before/after terrain, crater formation, bench levels, isolated islands",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:400000 staffed:true",
       "timeout": 10,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped to $400,000: this file's 16-hole grid is a heavier workload than most (a single driller/drill_rig lands roughly one hole every 15 ticks door-to-door at this tight spacing), and every hole must actually land before charging — a partially-drilled 4x4 pattern would corrupt the crater/island physics this file exists to visualize — so headroom matters more than usual (no income anywhere in this file).",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:400000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 400000,
           "holeCount": 0
         }
       }
@@ -30,8 +31,8 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:4 depth:6 start:14,14",
-      "description": "One increment click on the spacing stepper (data-field=\"spacing\") raises it 3->4m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (14,14)-(26,26) rectangle computes the declared 4x4 instead of the default-spacing 5x5 (issue #479 follow-up, Finding #4). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "command": "drill_plan grid rows:4 cols:4 spacing:2 depth:6 start:14,14",
+      "description": "One decrement click on the spacing stepper (data-field=\"spacing\") lowers it 3->2m (DEFAULT_SPACING_M, Drill.ts) before dragging, so the (14,14)-(20,20) rectangle computes the declared 4x4. #553: spacing tightened from the original 4m (1 increment click) to 2m (1 decrement) to keep this 16-hole grid's total drilling time inside a single driller/drill_rig's practical workday — sandbox-measured, 16 holes at spacing 4 push the crew into a genuine worker_revolt (WorkerRevolt.ts: wellBeing pinned at 0 for REVOLT_TICKS=120) around tick 400 regardless of cash on hand, since one employee cannot both drill nonstop that long and rest enough; at spacing 2 they land by tick 244 with over $300,000 still in hand. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -51,14 +52,14 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
           "x1": 14,
           "z1": 14,
-          "x2": 26,
-          "z2": 26
+          "x2": 20,
+          "z2": 20
         },
         {
           "type": "screenshot"
@@ -71,9 +72,28 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 16,
+          "holeCount": 0
+        },
+        "note": "4 rows x 4 cols = 16 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 260",
+      "description": "#553: drain the ordered plan — every hole must actually land before charging (a partially-drilled pattern would corrupt the physics this file exists to visualize). Sandbox-measured landing at tick 244.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 260"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 16
         },
-        "note": "4 rows x 4 cols = 16"
+        "note": "All 16 holes have landed — none lost, none left ordered forever."
       }
     },
     {

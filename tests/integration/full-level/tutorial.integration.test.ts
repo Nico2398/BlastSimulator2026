@@ -8,6 +8,7 @@ import {
   tickWithEvents,
   performBlast,
   getStateSummary,
+  driveDrillPlanToCompletion,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
@@ -50,6 +51,14 @@ describe('Tutorial Level — Full Walkthrough', () => {
   });
 
   it('executes full tutorial sequence', () => {
+    // Topped up (#553): this sequence now also crews a drill_rig ($35,000)
+    // so drill_plan grid's queued drill_hole actions can actually land, on
+    // top of everything it already spends (survey, charges, hires, a
+    // debris_hauler) — plus payroll/upkeep across however many ticks the
+    // drill takes. Nothing here asserts anything about an absolute cash
+    // figure.
+    ctx.state!.cash += 50_000;
+
     // 1. Set game speed to 2x
     const speedResult = timeCommand(ctx, ['speed', '2'], {});
     expect(speedResult.success).toBe(true);
@@ -87,6 +96,16 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(assignBlast.success).toBe(true);
     expect(assignBlast.output).toContain('assigned skill');
 
+    // 6b. Also driving.drill_rig, and a drill_rig vehicle to drive (#553):
+    // drill_plan grid now queues one drill_hole PendingAction per hole
+    // instead of writing them straight into state.drillHoles.
+    employeeCommand(ctx, ['assign_skill', '2'], {
+      skill: 'driving.drill_rig',
+      level: '5',
+    });
+    const buyRig = vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+    expect(buyRig.success).toBe(true);
+
     // 7. Create a drill plan: 2×2 grid at (10,10), 4m spacing, 8m depth
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
       origin: '10,10',
@@ -97,6 +116,7 @@ describe('Tutorial Level — Full Walkthrough', () => {
     });
     expect(drillResult.success).toBe(true);
     expect(drillResult.output).toContain('4 holes');
+    driveDrillPlanToCompletion(ctx);
 
     // 8. Charge all holes with boomite
     const chargeResult = chargeCommand(ctx as any, [], {
@@ -163,13 +183,19 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(assignDrive.success).toBe(true);
     expect(assignDrive.output).toContain('assigned skill');
 
-    // 19. Buy a debris_hauler (ID=1)
+    // 19. Buy a debris_hauler. Not asserting a total vehicle count (#553):
+    // the drill_rig from step 6b physically drove to (and parked at) each
+    // hole it drilled, inside the blast footprint — the blast at step 10
+    // can destroy a vehicle standing on ground it clears (blastCommand),
+    // same as it can kill an employee standing there, so the drill_rig's
+    // survival isn't guaranteed. This only asserts the debris_hauler itself
+    // exists.
     const buyVehicle = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     expect(buyVehicle.success).toBe(true);
-    expect(ctx.state!.vehicles.vehicles.length).toBe(1);
+    const haulerId = ctx.state!.vehicles.vehicles.find(v => v.type === 'debris_hauler')!.id;
 
-    // 20. Assign driver #4 to vehicle #1
-    const assignDriver = vehicleCommand(ctx, ['driver', '1', '4'], {});
+    // 20. Assign driver #4 to the debris_hauler
+    const assignDriver = vehicleCommand(ctx, ['driver', String(haulerId), '4'], {});
     expect(assignDriver.success).toBe(true);
 
     // 21. Build a freight_warehouse at (5,5)

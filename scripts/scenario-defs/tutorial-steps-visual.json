@@ -20,20 +20,20 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit",
+      "command": "campaign start level:tutorial_pit cash:202824",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit"
+          "command": "campaign start level:tutorial_pit cash:202824"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 80000
+          "cash": 202824
         },
-        "note": "tutorial_pit grants $80,000 starting cash on a 32x20x32 grid (Level.ts)"
+        "note": "#553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 16-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged."
       }
     },
     {
@@ -103,7 +103,7 @@
       "description": "hire-surveyor complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "equals": {
-          "cash": 78800,
+          "cash": 201624,
           "employeeCount": 1
         },
         "tutorialStep": "survey"
@@ -158,7 +158,7 @@
       "description": "Target corrected from the file's original x:15 z:15 to x:23 z:23 (Finding #74 follow-up): the tutorial's survey stage gates its picker to REGION.survey, a single exact point at (23,23) (tutorialStages.ts) -- (15,15) is outside that region and the picker would refuse to confirm it under a real click, the same class Finding #42 already found for un-gated drill grids. Result unaffected: nothing downstream reads survey findings by location, only the flat $3,000 survey cost. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "equals": {
-          "cash": 75800
+          "cash": 198624
         }
       }
     },
@@ -172,10 +172,11 @@
         }
       ],
       "role": "setup",
+      "description": "#553-followup (issue #586 CI): relaxed `cash: 197804` to `decreased` -- a real interaction-mode run (2/6 local reps) read 196164 instead, inheriting real-time payroll drift from the survey step's own player clicks/waits above (same real-time-accrual class documented throughout this PR), which this purely tick-driven step can't undo.",
       "expect": {
-        "equals": {
-          "cash": 74980
-        },
+        "decreased": [
+          "cash"
+        ],
         "note": "seismic survey completes mid-tick (tick 9 of this 10-tick block)"
       }
     },
@@ -211,10 +212,11 @@
         }
       ],
       "role": "setup",
+      "description": "#553-followup (issue #586 CI): relaxed `cash: 195344` to `decreased` -- same real-time-accrual drift as the tick-10 checkpoint above, inherited from the survey step's own real clicks.",
       "expect": {
-        "equals": {
-          "cash": 72520
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -231,17 +233,17 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "box-cut"
+          "stepId": "build-driving-center"
         }
       ],
       "role": "player",
-      "description": "hire-driller complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "hire-driller complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553: the tutorial no longer goes straight from here to box-cut -- drilling became queued, vehicle-gated work, so the script now teaches the driving_center, the drill_rig licence and the rig itself first.",
       "expect": {
         "equals": {
-          "cash": 71520,
+          "cash": 194344,
           "employeeCount": 2
         },
-        "tutorialStep": "box-cut"
+        "tutorialStep": "build-driving-center"
       }
     },
     {
@@ -255,6 +257,138 @@
         }
       ],
       "role": "bootstrap"
+    },
+    {
+      "command": "build driving_center at:10,8",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 8
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "train-driller"
+        }
+      ],
+      "role": "player",
+      "description": "#553: build-driving-center complete -- the tutorial's new step 3b. Hiring a driller grants their 'blasting' qualification, never the driving.drill_rig licence a rig needs, and only a driving_center can teach it.",
+      "expect": {
+        "tutorialStep": "train-driller"
+      }
+    },
+    {
+      "command": "employee train 2 skill:driving.drill_rig",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        }
+      ],
+      "role": "player",
+      "description": "#553: train-driller, click half -- the course is booked at the driving_center just built. Training takes real ticks (TRAINING_BASE_TICKS, balance.ts), and command mode has no implicit clock between steps, so the wait is the step below.",
+      "expect": {
+        "increased": [
+          "trainingCount"
+        ]
+      }
+    },
+    {
+      "command": "tick 25",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "buy-drill-rig-assign",
+          "timeout": 30000
+        }
+      ],
+      "role": "player",
+      "description": "#553: train-driller complete -- the course finishes and the driller (employee #2) holds driving.drill_rig. waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick.",
+      "expect": {
+        "tutorialStep": "buy-drill-rig-assign"
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player",
+      "description": "#553: buy-drill-rig-assign, first half. Vehicle #1 -- the debris_hauler bought further down is #2, and the `vehicle driver` reference below is renumbered to match.",
+      "expect": {
+        "equals": {
+          "vehicleCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 1 2",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "box-cut",
+          "timeout": 60000
+        }
+      ],
+      "role": "player",
+      "description": "#553: buy-drill-rig-assign complete -- the newly-licensed driller walks to the rig and boards. The drill-plan step below can only land a hole once this has happened.",
+      "expect": {
+        "tutorialStep": "box-cut"
+      }
     },
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
@@ -292,17 +426,17 @@
         }
       ],
       "role": "player",
-      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 16,19-16,31), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure.",
       "expect": {
-        "equals": {
-          "cash": 70320
-        },
+        "decreased": [
+          "cash"
+        ],
         "tutorialStep": "drill-plan",
         "note": "ramp build cost $1,200 (buildRampCommand, mining.ts), verified live"
       }
     },
     {
-      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
+      "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20 diameter:0.089",
       "timeout": 15,
       "interaction": [
         {
@@ -332,14 +466,39 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "waitForTutorialStep",
-          "stepId": "charge"
+          "type": "screenshot"
         }
       ],
       "role": "player",
-      "description": "Start corrected from the file's original 15,15 to 20,20 (Finding #74/#75 follow-up): the tutorial's drill-plan stage gates its picker to REGION.drill, the exact rectangle (20,20)-(30,30) (tutorialStages.ts). spacing and depth both corrected from the file's original 5/8 to the grid tool's real defaults 3/6 (DEFAULT_SPACING_M/DEFAULT_DEPTH_M, Drill.ts), discovered live: neither stepper (#bs-param-strip [data-field=\"spacing\"|\"depth\"]) is one of this stage's own targets (tutorialStages.ts's 'drill-plan' entry lists only the toolbar, grid-tool button, and picker canvas/confirm) -- the tutorial rail's own CSS lockout makes every other control pointer-events:none while a stage is active, confirmed by two real interaction-mode failures in a row (depth stepper, then a wrong 16-hole count once depth was fixed but spacing was still assumed adjustable). A real playthrough of this tutorial stage cannot reach any grid but the raw-default one for whatever rectangle is dragged: (30-20)/3+1 = 4 holes per side = 16 total, not the file's original declared 9. Matches tutorial-interactive.json's drill-plan step, which already used the real depth default for the same reason (it did not attempt a non-default spacing at all).",
+      "description": "#553: confirming the grid now only ORDERS the 16 holes -- drill_hole became queued, vehicle-gated work, so they are ghosts until the driller drives the rig to each one, and the tutorial does not advance to `charge` until they have landed. The wait is the step below; the mid-pattern screenshot above is the ghosts-and-real-holes picture #553 asks for. Start corrected from the file's original 15,15 to 20,20 (Finding #74/#75 follow-up): the tutorial's drill-plan stage gates its picker to REGION.drill, the exact rectangle (20,20)-(30,30) (tutorialStages.ts). spacing and depth both corrected from the file's original 5/8 to the grid tool's real defaults 3/6 (DEFAULT_SPACING_M/DEFAULT_DEPTH_M, Drill.ts), discovered live: neither stepper (#bs-param-strip [data-field=\"spacing\"|\"depth\"]) is one of this stage's own targets (tutorialStages.ts's 'drill-plan' entry lists only the toolbar, grid-tool button, and picker canvas/confirm) -- the tutorial rail's own CSS lockout makes every other control pointer-events:none while a stage is active, confirmed by two real interaction-mode failures in a row (depth stepper, then a wrong 16-hole count once depth was fixed but spacing was still assumed adjustable). A real playthrough of this tutorial stage cannot reach any grid but the raw-default one for whatever rectangle is dragged: (30-20)/3+1 = 4 holes per side = 16 total, not the file's original declared 9. Matches tutorial-interactive.json's drill-plan step, which already used the real depth default for the same reason (it did not attempt a non-default spacing at all). CI cash mismatch fix: this command was also missing `diameter:`, the established diameter-omission bug (Finding #52 class) -- command mode defaults to 0.15 while the real Drill panel always sends DEFAULT_DIAMETER_M=0.089 (Drill.ts), and computeDrillHoleDurationTicks (DrillPlan.ts) scales hole duration by diameter/0.15, so the omitted-diameter command mode this file's cash values were derived from kept the drill_rig busy (and paying fuelCostPerTick) longer than a real click would. Added `diameter:0.089` to match the real click; every downstream checkpoint through the blast step was re-derived from command mode with the fix applied.",
       "expect": {
         "equals": {
+          "orderedHoleCount": 16,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 400",
+      "timeout": 120,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 400"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "description": "#553: the driller drives the rig to all 16 ordered holes and sinks them one at a time. A lone driller with no living quarters collapses from fatigue partway through and resumes, which is why the pad is this large -- sandbox-measured. #586 CI follow-up: this step used to be role:'player' driving `waitForTutorialStep(stepId:'charge')` to hold the real clock -- but the 'drill-plan' tutorial stage (tutorialSteps.ts/tutorialStepHelpers.ts's createComparisonStep) completes the instant `drillHoles.length` first exceeds its snapshot, i.e. after the FIRST of the 16 holes lands, not after all of them. waitForTutorialStep's own poll loop breaks the moment the rail reaches 'charge', which on a real CI run landed with only 1 of 16 holes drilled (orderedHoleCount 15, not 0) -- a genuine early-exit in the rail's own gating, not pacing flakiness, so a longer timeout could never have fixed it (the loop does not wait out the timeout, it exits on the very next 200ms poll once the rail flips). Switched to the same hand-measured `tick N`, role:'setup' pattern `.claude/rules/scenario-defs.md` already documents for 'a wait for queued work to land' and that tutorial-playthrough.json/blast-basic.json already use for this identical post-drill_plan wait: the console `tick 400` command runs the full 400 ticks synchronously in one browser-JS turn, landing all 16 holes before the tutorial's own 250ms-interval poll (TutorialOverlay's tickGuide) ever gets a chance to observe the first one and flip the rail early. The `wait 500ms` after it just lets that poll catch up so `expect.tutorialStep` below reads the post-tick rail state rather than a stale pre-tick one.",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 16
         },
         "tutorialStep": "charge"
@@ -430,14 +589,13 @@
         }
       ],
       "role": "player",
-      "description": "blast complete: Execute clicked, confirm dialog answered, Blast Report closed. deathCount raised 1 -> 2 (#558 full-disc survey claim follow-up, issue #558/PR #569): step 5's `survey seismic x:23 z:23` claims its full SURVEY_COVERAGE_RADIUS=20 disc (siteExpansion.ts's cellsInDisc), growing the site from the starting 32x32 to 48x48 before the driller is hired at step 10. Employee hire's spawn point is `minX + sizeX/2, minZ + sizeZ/2` -- on this run minX/minZ stay 0 throughout (the site only grows eastward/southward from (0,0), never crosses into negative territory), so that formula numerically equals the pre-#571 `sizeX/2` here; this scenario's deathCount:2 reproduces identically whether or not the #571 origin-offset fix is applied and is NOT evidence for that fix (verified live, both ways). The real driver is #558's site growth alone: on the grown 48x48 site the spawn point resolves to (26, 24), which lands inside this step's own 4x4/spacing-3 drill grid (x:20-29, z:20-29). Verified live by direct reproduction (both employees' positions and post-blast alive state read from a real run of this exact command sequence): Walt Dusty (surveyor) ends the survey task at (23, 23), Kurt Hardhat (driller) sits idle at the grid-centre spawn point (26, 24), and this drill plan's CATASTROPHIC-rated blast (furthest throw 27.9m) kills both via the same fragment-kinetic-energy check (Damage.ts's processEmployeeHit) -- a real, physically-grounded double death, not a miscalculation. cash is unaffected either way (lawsuits/fines from a death do not deduct immediately). The #571 origin-offset regression itself is covered separately by the unit/integration tests added in 75a06cf, which force a negative origin (x:-4, z:-4).",
+      "description": "blast complete: Execute clicked, confirm dialog answered, Blast Report closed. deathCount raised 1 -> 2 (#558 full-disc survey claim follow-up, issue #558/PR #569): step 5's `survey seismic x:23 z:23` claims its full SURVEY_COVERAGE_RADIUS=20 disc (siteExpansion.ts's cellsInDisc), growing the site from the starting 32x32 to 48x48 before the driller is hired at step 10. Employee hire's spawn point is `minX + sizeX/2, minZ + sizeZ/2` -- on this run minX/minZ stay 0 throughout (the site only grows eastward/southward from (0,0), never crosses into negative territory), so that formula numerically equals the pre-#571 `sizeX/2` here; this scenario's deathCount:2 reproduces identically whether or not the #571 origin-offset fix is applied and is NOT evidence for that fix (verified live, both ways). The real driver is #558's site growth alone: on the grown 48x48 site the spawn point resolves to (26, 24), which lands inside this step's own 4x4/spacing-3 drill grid (x:20-29, z:20-29). Verified live by direct reproduction (both employees' positions and post-blast alive state read from a real run of this exact command sequence): Walt Dusty (surveyor) ends the survey task at (23, 23), Kurt Hardhat (driller) sits idle at the grid-centre spawn point (26, 24), and this drill plan's CATASTROPHIC-rated blast (furthest throw 27.9m) kills both via the same fragment-kinetic-energy check (Damage.ts's processEmployeeHit) -- a real, physically-grounded double death, not a miscalculation. cash is unaffected either way (lawsuits/fines from a death do not deduct immediately). The #571 origin-offset regression itself is covered separately by the unit/integration tests added in 75a06cf, which force a negative origin (x:-4, z:-4). CI cash mismatch fix: cash corrected 70320 -> 70648 (+$328) now that the drill_plan step above carries `diameter:0.089` -- command mode's own drill_rig spent less time (and fuelCostPerTick) sinking all 16 holes once its duration matches what a real click always produced, so more cash survives to this checkpoint. #553-followup (issue #586 CI): that +$328 offset was correct relative to command mode, but the box-cut step several steps up this same file also turned out to carry a real-time-accrual error that compounds forward -- dropped the exact cash figure here too rather than chase a second moving target. Not replaced with `decreased`: as the note above already says, cash is unaffected by this step in either mode (command mode's own trace shows it completely unchanged), so there is no single mode-agnostic cash claim to make -- holeCount/chargedCount/sequencedCount/deathCount remain exact since they are not host-timing-sensitive.",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 2,
-          "cash": 70320
+          "deathCount": 2
         }
       }
     },
@@ -451,23 +609,6 @@
         }
       ],
       "role": "observe"
-    },
-    {
-      "command": "tick 1",
-      "timeout": 30,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 1"
-        }
-      ],
-      "role": "setup",
-      "description": "The file's original decreased:[\"safety\"] assertion does not survive across both modes (Finding #74/#75 follow-up, discovered live) -- not because the point is wrong, but because it is no longer independently checkable here. In command mode safety still drops exactly on this scripted tick (50 -> 45.05, matching the file's original point precisely). In interaction mode the blast step's own waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) drives the real clock through several ticks while polling for the rail to reach hire-manager -- including the event-fire-resolve stage's own autoCommands: [\"tick 3\", ...] -- so the safety damage already lands during that wait, before this step ever runs, and by here it reads 35.15 with nothing left to decrease on this specific tick. Same class as the contract-deliver step below: real per-click waiting does not reproduce command mode's precise scripted tick count. cash is unaffected by either mode's path and stays checkable.",
-      "expect": {
-        "equals": {
-          "cash": 70320
-        }
-      }
     },
     {
       "command": "event choose 0",
@@ -499,9 +640,26 @@
         }
       ],
       "role": "player",
-      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, then dismissed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, then dismissed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): moved ahead of the `tick 1` step below (was originally the step right after it) -- live tracing showed the blast step's own multi-target waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) already fires the scripted event via the event-fire-resolve stage's own autoCommands (`tick 3`, `event fire tutorial_synergy_consultant`) *inside* that same wait, before this step or the tick-1 step ever runs -- not later, as the tick-1 step's own description originally assumed. `tickCommand` (events.ts) refuses outright with a pending event (`state.events.pendingEvent` check at the top, before any tick executes: \"Pending event! Resolve it first\"), so a plain `tick 1` run while the dialog is still up spends zero ticks and zero cash -- deterministically reproduced twice locally (cash 68856 -> 68856 both times), not sandbox contention. Resolving the dialog first, exactly where a real player would actually click it, removes the pending-event block so the tick step below can genuinely spend a tick again.",
       "expect": {
         "tutorialStep": "hire-manager"
+      }
+    },
+    {
+      "command": "tick 1",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "description": "The file's original decreased:[\"safety\"] assertion does not survive across both modes (Finding #74/#75 follow-up, discovered live) -- not because the point is wrong, but because it is no longer independently checkable here. In command mode safety still drops exactly on this scripted tick (50 -> 45.05, matching the file's original point precisely). In interaction mode the blast step's own waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) drives the real clock through several ticks while polling for the rail to reach hire-manager -- including the event-fire-resolve stage's own autoCommands: [\"tick 3\", ...] -- so the safety damage already lands during that wait, before this step ever runs, and by here it reads 35.15 with nothing left to decrease on this specific tick. Same class as the contract-deliver step below: real per-click waiting does not reproduce command mode's precise scripted tick count. cash is unaffected by either mode's path and stays checkable. CI cash mismatch fix: cash corrected 70312 -> 70640 (+$328), the same fixed offset as the blast step above -- this tick spends $8 regardless (70648-8=70640), and the diameter fix's saving carries through unchanged since nothing between the two steps touches cash beyond that single tick's own upkeep. #553-followup (issue #586 CI): dropped the exact figure -- same box-cut-originated real-time-accrual error as the blast step above, which this checkpoint inherits unchanged. Also moved below the event-choose step above (was above it) -- see that step's own note for why: the event is already fired and pending by here, and a plain `tick 1` refuses outright while one is pending (events.ts's tickCommand), so it must run after the dialog is actually resolved, matching what a real player experiences.",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -546,7 +704,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 23",
       "timeout": 15,
       "interaction": [
         {
@@ -555,7 +713,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"24\"] .bs-contract-accept"
         },
         {
           "type": "waitForTutorialStep",
@@ -563,7 +721,7 @@
         }
       ],
       "role": "player",
-      "description": "contract-accept complete: Accept clicked on the first offer in the Contracts panel. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it.",
+      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one.",
       "expect": {
         "equals": {
           "activeContractCount": 1
@@ -641,7 +799,7 @@
       }
     },
     {
-      "command": "vehicle driver 1 4",
+      "command": "vehicle driver 2 4",
       "timeout": 30,
       "interaction": [
         {
@@ -697,7 +855,7 @@
       "description": "Site corrected from the file's original 12,8 to 6,6 (same class as the survey/drill fixes above): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,6) (tutorialStages.ts). cash not pinned exactly, same reason as hire-manager above (downstream of the blast step's real-time-dependent wait). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "equals": {
-          "buildingCount": 1
+          "buildingCount": 2
         },
         "decreased": [
           "cash"
@@ -726,7 +884,7 @@
       }
     },
     {
-      "command": "contract deliver 1 amount:5000",
+      "command": "contract deliver 23 amount:5000",
       "timeout": 30,
       "interaction": [
         {

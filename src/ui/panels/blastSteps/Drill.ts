@@ -12,7 +12,7 @@ import { LocaleTextRegistry } from '../../localeText.js';
 import { SavedPlansList, savedPlansSignature } from './SavedPlansList.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import type { WeatherState } from '../../../core/weather/WeatherCycle.js';
-import type { DrillHole } from '../../../core/mining/DrillPlan.js';
+import type { DrillHole, PlannedHole } from '../../../core/mining/DrillPlan.js';
 import { hasTubing } from '../../../core/mining/Tubing.js';
 import { wetHoles } from '../../../core/mining/WetHoles.js';
 import { placementRefusalReason, type PlacementKit } from '../../scene/PlacementKit.js';
@@ -128,11 +128,14 @@ export class DrillStep {
 
   update(state: GameState, weather: WeatherState | undefined): void {
     const holes = state.drillHoles;
-    this.lastHoleCount = holes.length;
+    const ordered = state.plannedDrillHoles;
+    const totalCount = holes.length + ordered.length;
+    this.lastHoleCount = totalCount;
     const wet = new Set(weather ? wetHoles(state, weather) : []);
 
     const signature = JSON.stringify({
       holes: holes.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
+      ordered: ordered.map(h => [h.id, h.x, h.z, h.depth, h.diameter]),
       tubed: [...state.tubingState.installedHoles].sort(),
       wet: [...wet].sort(),
       pattern: this.lastGridPattern,
@@ -148,17 +151,20 @@ export class DrillStep {
     this.depthValueEl.textContent = `${this.gridDepth.toFixed(1)} m`;
     this.diameterValueEl.textContent = `${Math.round(this.gridDiameter * 1000)} mm`;
 
-    this.holesNoteEl.textContent = t('ui.blast_workshop.drill.planned', { count: holes.length });
-    this.clearBtn.disabled = holes.length === 0;
+    this.holesNoteEl.textContent = t('ui.blast_workshop.drill.planned', { count: totalCount });
+    this.clearBtn.disabled = totalCount === 0;
 
-    this.renderClearRow(holes.length);
+    this.renderClearRow(totalCount);
     this.savedPlans.render(state.savedPlans);
 
-    if (holes.length === 0) {
+    if (totalCount === 0) {
       this.holeListEl.replaceChildren(emptyState(t('ui.blast_workshop.drill.no_holes')));
       return;
     }
-    this.holeListEl.replaceChildren(...holes.map(h => this.makeHoleRow(h, state, wet)));
+    this.holeListEl.replaceChildren(
+      ...ordered.map(h => this.makeOrderedHoleRow(h)),
+      ...holes.map(h => this.makeHoleRow(h, state, wet)),
+    );
   }
 
   refreshLocale(): void {
@@ -215,6 +221,34 @@ export class DrillStep {
 
     const status = this.holeStatus(hole, state, wet);
     const statusChip = chip(status.label, status.tone);
+    statusChip.style.marginLeft = 'auto';
+
+    const deleteBtn = el('button');
+    deleteBtn.style.cssText = 'width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--bsx-text-micro);cursor:pointer;padding:0';
+    deleteBtn.dataset['action'] = 'remove-hole';
+    deleteBtn.appendChild(iconEl('x', 10));
+    deleteBtn.addEventListener('click', () => this.gameConsole?.(`drill_plan remove hole:${hole.id}`));
+
+    row.append(tag, at, depth, statusChip, deleteBtn);
+    return row;
+  }
+
+  /**
+   * Row for a hole still in `state.plannedDrillHoles` — ordered but not yet
+   * drilled (#553). No wet/tubed/dry status applies to a hole that hasn't
+   * been drilled, so it always shows the ORDERED chip; no charge/sequence
+   * affordance either, since neither exists yet for it — only the remove
+   * button (which cancels its queued `drill_hole` action).
+   */
+  private makeOrderedHoleRow(hole: PlannedHole): HTMLElement {
+    const row = el('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border:1px solid var(--bsx-hairline);border-radius:4px;background:var(--bsx-card);opacity:.7';
+
+    const tag = el('span', { text: hole.id, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-ore);width:24px' } });
+    const at = el('span', { text: `(${hole.x}, ${hole.z})`, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-muted)' } });
+    const depth = el('span', { text: `${hole.depth.toFixed(1)} m`, attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-muted)' } });
+
+    const statusChip = chip(t('ui.blast_workshop.drill.status_ordered'), 'neutral');
     statusChip.style.marginLeft = 'auto';
 
     const deleteBtn = el('button');

@@ -25,6 +25,9 @@ import {
 } from '../../src/core/campaign/SuccessTracker.js';
 import { createGame } from '../../src/core/state/GameState.js';
 import { addIncome, addExpense } from '../../src/core/economy/Finance.js';
+import { STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
+import type { Employee } from '../../src/core/entities/Employee.js';
+import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -400,6 +403,75 @@ describe('Campaign', () => {
 
     expect(result.success).toBe(true);
     expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
+  });
+
+  // ── 10c. campaign start honours staffed: (#551, extended to campaign levels by #553) ──
+
+  describe('campaign start staffed option', () => {
+    /** Greedily matches each composition employee slot to a distinct hired employee. */
+    function assertEmployeesMatchComposition(employees: Employee[]): void {
+      expect(employees.length).toBe(STARTING_SITE_STAFFED_COMPOSITION.employees.length);
+      const remaining = [...employees];
+      for (const slot of STARTING_SITE_STAFFED_COMPOSITION.employees) {
+        const idx = remaining.findIndex(e =>
+          e.role === slot.role &&
+          slot.qualifications.every(q =>
+            e.qualifications.some(eq => eq.category === q.category && eq.proficiencyLevel === q.proficiencyLevel),
+          ),
+        );
+        expect(idx, `no unmatched employee for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
+        remaining.splice(idx, 1);
+      }
+    }
+
+    /** Greedily matches each composition vehicle slot to a distinct purchased, idle, unmanned vehicle. */
+    function assertVehiclesMatchComposition(vehicles: Vehicle[]): void {
+      expect(vehicles.length).toBe(STARTING_SITE_STAFFED_COMPOSITION.vehicles.length);
+      const remaining = [...vehicles];
+      for (const slot of STARTING_SITE_STAFFED_COMPOSITION.vehicles) {
+        const idx = remaining.findIndex(v =>
+          v.type === slot.role && v.tier === slot.tier && v.driverId === null && v.state === 'idle',
+        );
+        expect(idx, `no unmatched vehicle for slot ${JSON.stringify(slot)}`).toBeGreaterThanOrEqual(0);
+        remaining.splice(idx, 1);
+      }
+    }
+
+    it('defaults to an empty roster and fleet when staffed is omitted', () => {
+      const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
+      expect(result.success).toBe(true);
+      expect(ctx.state!.employees.employees.length).toBe(0);
+      expect(ctx.state!.vehicles.vehicles.length).toBe(0);
+    });
+
+    it('staffed:true hires and equips the STARTING_SITE_STAFFED_COMPOSITION roster and fleet on a campaign level', () => {
+      const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', staffed: 'true' });
+      expect(result.success).toBe(true);
+      expect(result.output).toContain('Staffed.');
+      assertEmployeesMatchComposition(ctx.state!.employees.employees);
+      assertVehiclesMatchComposition(ctx.state!.vehicles.vehicles);
+    });
+
+    it('staffed:true leaves starting cash at the level default, same as new_game', () => {
+      const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', staffed: 'true' });
+      expect(result.success).toBe(true);
+      expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH);
+    });
+
+    it('staffed:true composes with a cash: override', () => {
+      const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', staffed: 'true', cash: '200000' });
+      expect(result.success).toBe(true);
+      expect(ctx.state!.cash).toBe(200000);
+      assertEmployeesMatchComposition(ctx.state!.employees.employees);
+    });
+
+    it('rejects staffed:banana, leaving any existing game state untouched', () => {
+      const before = ctx.state;
+      const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit', staffed: 'banana' });
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('Invalid staffed value');
+      expect(ctx.state).toBe(before);
+    });
   });
 
   // ── 11. Starting a locked level returns error ──────────────────────────────

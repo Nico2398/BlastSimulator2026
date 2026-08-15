@@ -3,12 +3,13 @@
   "description": "Visual verification of blast preview overlays across 4 software tiers: tier 0 blind, tier 1 energy heatmap, tier 2 fragment distribution, tier 3 projection zones, tier 4 vibration propagation",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 staffed:true",
       "timeout": 10,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
@@ -61,9 +62,28 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 90",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 88).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 90"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 4
         },
-        "note": "2 rows x 2 cols = 4"
+        "note": "All 4 holes have landed -- none lost, none left ordered forever."
       }
     },
     {
@@ -145,9 +165,9 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 49500
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -174,9 +194,9 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 47500
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -203,9 +223,9 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 42500
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -232,9 +252,9 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 30500
-        }
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {

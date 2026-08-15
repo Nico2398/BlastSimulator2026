@@ -3,17 +3,18 @@
   "description": "Visual verification of the four score bars in the HUD: Worker Well-being, Safety, Ecology, and Neighbor Nuisance scores (0-100). Verifies scores are visible, values update over time with decay, and the scores command reflects current state.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "new_game seed:42 cash:150000",
+      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's own terrain snapped a fresh hire/vehicle purchase's grid-centre spawn (findNearestReachableCell, blocked by relief terrain at the literal centre) to a reachable cell over 60 tiles from this file's drill site, which stalled the driller in permanent collapse/rest cycling and never let a single hole land (sandbox-measured, worker_revolt by tick 400 with zero progress). new_game's flat desert_badlands terrain has no such obstruction. Cash bumped to $150,000 (from dusty_hollow's $50,000) for the drill_rig ($35,000) this file now needs on top of its existing hire/building spend.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "new_game seed:42 cash:150000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 150000
         }
       }
     },
@@ -53,6 +54,42 @@
           "employeeCount": 1
         }
       }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed a vehicle at all) now needs one.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 1 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 1 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "build management_office at:5,5",
@@ -160,9 +197,32 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan — the driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing within the first 50-tick chunk).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 4
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",

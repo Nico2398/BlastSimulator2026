@@ -20,6 +20,7 @@ import { resetHoleIds } from '../../src/core/mining/DrillPlan.js';
 import { hireEmployee } from '../../src/core/entities/Employee.js';
 import { Random } from '../../src/core/math/Random.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
+import { tickCommand } from '../../src/console/commands/events.js';
 
 function makeCtx(): MiningContext {
   const ctx: MiningContext = {
@@ -29,14 +30,38 @@ function makeCtx(): MiningContext {
     tubingState: createTubingState(),
     emitter: new EventEmitter(),
   };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '48' });
+  // Staffed (#553): drill_plan grid now queues one drill_hole PendingAction
+  // per hole instead of writing them straight into state.drillHoles — a
+  // 'blasting'-qualified employee and a drill_rig vehicle are needed for any
+  // hole to actually land.
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '48', staffed: 'true' });
   return ctx;
+}
+
+/**
+ * Ticks until every hole ordered by the last drill_plan grid has landed in
+ * state.drillHoles (#553). Tops up employee need gauges each tick — this
+ * file's staffed site is a single drill_rig/driller, and a multi-hole plan
+ * can run long enough for hunger/fatigue/breakNeed to cross a collapse
+ * threshold mid-drive, an unrelated needs mechanic these tests aren't
+ * exercising.
+ */
+function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
 }
 
 /** Fire a 3×3 pattern at (15,15) with the given stemming. */
 function blastAt(ctx: MiningContext, stemming: string): void {
   resetHoleIds();
   drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
+  driveDrillPlanToCompletion(ctx);
   chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
   sequenceCommand(ctx, ['auto'], { delay_step: '25' });
   const result = blastCommand(ctx, [], {});
@@ -153,6 +178,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     // Both reports exist; the reckless one threw rock further and rates worse.
     resetHoleIds();
     drillPlanCommand(reckless, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', start: '30,30' });
+    driveDrillPlanToCompletion(reckless);
     chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
     sequenceCommand(reckless, ['auto'], {});
     const output = blastCommand(reckless, [], {}).output;

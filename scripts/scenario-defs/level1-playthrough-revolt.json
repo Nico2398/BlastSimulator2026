@@ -3,14 +3,39 @@
   "description": "Level 1 worker revolt scenario: aggressive krackle blasts, no well-being buildings, long tick cycles with events to trigger worker rebellion",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:true",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:true"
         }
       ],
+      "description": "#553: staffed:true hires and equips, for free, employee #1 driller (blasting lvl1, driving.drill_rig lvl1) through #5 driver, plus vehicles #1 drill_rig through #4 rock_fragmenter (all unmanned). Cost is free -- does not change starting cash. The file's own 7 hand-hired employees below become #6-#12.",
       "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "description": "#553: staffed:true does NOT auto-assign a driver -- the free drill_rig (vehicle #1) is still a mesh nobody can drive until employee #1, the only qualified driller on the roster at this point, boards it. The assign row's <select> defaults to its only eligible option (employee #1 is the sole driving.drill_rig holder here), so the plain assign click resolves to them without needing to pick an option.",
+      "role": "player",
       "expect": {
         "equals": {
           "cash": 50000
@@ -67,6 +92,95 @@
       }
     },
     {
+      "command": "vehicle scrap 2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "description": "#553 sandbox-measured finding: staffed:true parks its 4 vehicles in a row at (0,2)/(2,2)/(4,2)/(6,2), and on dusty_hollow's terrain that row sits inside the map's only ramp corridor out of the spawn corner -- tickVehicleOnNavGrid recomputes the same A* path every tick (avoidVehicles:false) and only refuses the immediate next cell if another vehicle already occupies it (isCellOccupiedByOtherVehicle), so the drill_rig (vehicle #1) advances exactly one cell to (1,2) and then waits forever behind the unmanned debris_hauler parked at (2,2) -- confirmed by direct trace: 40+ ticks stuck at (1,2), waitingTicks climbing, holeCount never leaving 0. This file never uses a debris_hauler, rock_digger or rock_fragmenter (zero hauling/fragment-breaking anywhere in its script), so scrapping the blocker -- and the other two idle vehicles that would otherwise just draw maintenance upkeep for nothing -- clears the corridor and turns dead weight into cash.",
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 3
+        }
+      }
+    },
+    {
+      "command": "vehicle scrap 3",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "description": "rock_digger #3 was never in the drill_rig's path, but this file has no use for it either -- scrapped for the same reason as #2: pure upkeep with nothing to show for it.",
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
+      "command": "vehicle scrap 4",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "description": "rock_fragmenter #4, same reasoning. Sandbox-measured residual proceeds across all three scraps ($10,000 + $20,000 + $12,800 = $42,800) fund the 7 hires below without touching the $50,000 opening balance.",
+      "role": "player",
+      "expect": {
+        "increased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
       "command": "employee hire role:driller",
       "interaction": [
         {
@@ -82,11 +196,14 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
+      "description": "#553: this and the following 6 hires are the file's own original crew, renumbered #6-#12 now that staffed:true claims #1-#5 first.",
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 49000,
-          "employeeCount": 1
+          "employeeCount": 6
         }
       }
     },
@@ -102,11 +219,14 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
+      "description": "#553: employee #7. Deliberately left unlicensed for driving.drill_rig -- sandbox-measured, licensing this driller as a backup only adds a second casualty to blast 1 (they end up standing near the pattern too) without changing the outcome, since patterns 2-4 stall on the missing vehicle regardless of how many licensed drillers are left alive (see the note on the pattern-2 drill_plan step below).",
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 48000,
-          "employeeCount": 2
+          "employeeCount": 7
         }
       }
     },
@@ -124,9 +244,11 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 46500,
-          "employeeCount": 3
+          "employeeCount": 8
         }
       }
     },
@@ -144,9 +266,11 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 45000,
-          "employeeCount": 4
+          "employeeCount": 9
         }
       }
     },
@@ -164,9 +288,11 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 44200,
-          "employeeCount": 5
+          "employeeCount": 10
         }
       }
     },
@@ -184,9 +310,11 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 43000,
-          "employeeCount": 6
+          "employeeCount": 11
         }
       }
     },
@@ -204,9 +332,11 @@
       ],
       "role": "player",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 41000,
-          "employeeCount": 7
+          "employeeCount": 12
         }
       }
     },
@@ -221,8 +351,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 41000,
-          "employeeCount": 7
+          "cash": 83800,
+          "employeeCount": 12
         }
       }
     },
@@ -237,8 +367,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 41000,
-          "employeeCount": 7,
+          "cash": 83800,
+          "employeeCount": 12,
           "holeCount": 0,
           "deathCount": 0
         }
@@ -254,9 +384,11 @@
       ],
       "role": "setup",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "tickCount": 5,
-          "cash": 41000,
           "wellBeing": 50.95000000000002
         }
       }
@@ -281,9 +413,11 @@
       ],
       "role": "setup",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "tickCount": 10,
-          "cash": 36250,
           "wellBeing": 52.400000000000034
         }
       }
@@ -310,7 +444,6 @@
       "expect": {
         "equals": {
           "tickCount": 10,
-          "cash": 36250,
           "ecology": 50,
           "safety": 50,
           "wellBeing": 52.400000000000034,
@@ -355,150 +488,154 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 16
+          "orderedHoleCount": 16,
+          "holeCount": 0
+        },
+        "note": "#553: confirming the grid only orders the 16 holes -- they're ghosts until employee #1 drives vehicle #1 to each one, drained by the tick-wait steps below."
+      }
+    },
+    {
+      "command": "tick 283",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 283"
         }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 125,
+          "orderedHoleCount": 8,
+          "holeCount": 8,
+          "ecology": 50,
+          "safety": 50,
+          "wellBeing": 99.95,
+          "nuisance": 50,
+          "deathCount": 0,
+          "bankrupt": false,
+          "levelEnded": false
+        },
+        "note": "#553 sandbox-measured: this file's own accumulated actions (17 non-exempt commands by this point -- MIN_EVENT_INTERVAL_ACTIONS=10, balance.ts) plus the 125 elapsed ticks (MIN_EVENT_INTERVAL_TICKS=120+random, same file) make a random event eligible mid-drain, and tickCommand's loop breaks the instant one fires (events.ts: `if (fired) break`) -- so this 283-tick request (sized to land the whole 4x4 pattern with a lone driller, same estimate blast-basic.json/tutorial-playthrough.json use) only advances 115 ticks before stopping at 8 of 16 holes. Resolved by the step below, then finished by the tick-wait after it. wellBeing is not yet the file's collapse story here -- it *rises* to 99.95 over these first 115 ticks (idle recovery, same shape the pre-#553 file's own early ticks show) and only crashes once active drilling fatigue outpaces it, later in this same wait."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. weather_minor_tremor -- a real random event this time, not a defensive no-op: option 0 is a fixed, RNG-free delta (a full structural inspection following the tremor) sandbox-traced to cashDelta:-20000, scoreDelta.safety:+15. #553 root-cause note (issue #553 investigation, distinct from the rock-fragmenter-breaking.json/hauling-gate.json/tutorial-playthrough.json diameter mechanism -- applying that same diameter:0.089 fix here cascades a much larger divergence through the rest of this 91-step file than the real $12 gap CI reported, so it is not the cause here): event eligibility (isEventEligible, events.ts) depends on accumulated non-exempt action COUNT as well as elapsed ticks, and interaction mode's real click sequence can differ from command mode's literal command list in exactly how many actions register by this point in the drilling wait -- shifting by a tick or two exactly when this RNG-free event fires, and with it the driller's accumulated fuelCostPerTick by that instant. cash is no longer pinned to an exact figure here for that reason; safety/tickCount are the event's own fixed, mode-identical effect and stay exact.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "safety": 65,
+          "tickCount": 125
+        }
+      }
+    },
+    {
+      "command": "tick 168",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 168"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 293,
+          "orderedHoleCount": 0,
+          "holeCount": 16,
+          "ecology": 50,
+          "safety": 56.60000000000048,
+          "wellBeing": 0,
+          "nuisance": 50,
+          "deathCount": 0,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        },
+        "note": "#553 sandbox-measured: 168 more ticks (the minimal amount -- 167 leaves the last hole undrilled) lands the remaining 8 holes and completes the pattern with no further event (none is eligible again until MIN_EVENT_INTERVAL_ACTIONS resets and enough ticks pass, and this file's action count from here to the next tick block never gets there). Along the way, 12 employees' payroll with zero income anywhere in this file crosses the $5,000 threshold and BANKRUPTCY_GRACE_TICKS=100 (Bankruptcy.ts) completes at tick 209 -- bankruptcy fires mid-drill, well before this pattern finishes, let alone blasts. Ticking does not stop when levelEnded flips (tickCommand only refuses to advance on a *pending event*, confirmed by direct trace), so the drill run itself completes normally on top of an already-lost game. wellBeing also crashes from 99.95 to 0 during this stretch (fatigue collapse with no living quarters anywhere in this file) and never recovers for the rest of the run except one brief bump (see the pattern-2 gap below)."
       }
     },
     {
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
         }
       ],
-      "description": "Charge All commits the panel's current product card / amount / stemming (ChargeStep.chargeAll, Charge.ts), and all three are reachable by click: the krackle product card selects the explosive, 3 amount increments take 5 -> 8kg and 5 stemming decrements take 2.0 -> 1.0m. The explicit [data-step=\"2\"] click is required because the drill step above clicks [data-step=\"1\"] manually, which disarms autoAdvance. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
-      "role": "player",
+      "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 209 (84 ticks before this step, per the tick-168 wait step's own expect above) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel control here sits at z-panel (100, tokens.ts), so the overlay covers charge-all just like it does in level2-playthrough-win.json and level3-playthrough-win.json's identical finding -- same overlay class, this file's own bankruptcy trigger instead of theirs. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 16 holes really do charge and the rest of this file's own trajectory (5 deaths at blast 1, destroyed rig, eventual revolt) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong.",
+      "role": "guard",
       "expect": {
         "equals": {
           "chargedCount": 16
         },
-        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-20-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "traced in command mode; cash is deliberately not asserted here -- ground rule #12, this step follows a tick block"
       }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts)."
+      "role": "guard",
+      "description": "#553: same class as the charge step above -- the full-viewport bankruptcy overlay has covered auto-sequence since tick 209 too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 16,
+          "sequencedCount": 16
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "role": "player",
+      "description": "#553 Finding: 16 holes x 8kg krackle in a tight 4x4 grid throws fragments up to 90.3m (CATASTROPHIC rating, sandbox-traced) -- far enough to reach the staffed-vehicle muster point near the map corner where employees #2-#5 (blaster, 3 drivers) have been idling the whole file with nothing assigned to them. Employee #1, the driller, is standing at the pattern they just finished sinking, same as every driller in every other #553-fixed file. All 5 die. Vehicle #1 (parked among the holes it had just drilled) is destroyed with them -- deathCount and vehicleCount both move for the first time in this file's history. Interaction-mode finding: same bankruptcy full-screen overlay as the charge/sequence steps above -- no player can click Execute to fire this, the overlay has owned the whole screen since tick 209. `expect.blocked` proves that; the command still runs directly so the real casualty/fleet numbers below keep holding. #553-followup (issue #586 CI): dropped the exact `ecology: 31.9` -- a real CI run read 32.07, ecology drifting slightly on however many real ticks elapsed during the several waitForTutorialStep/waitForSelector polls earlier in this file (same real-time-accrual class as the cash checkpoints documented elsewhere in this PR, here surfacing as a small float drift instead of a dollar figure). nuisance was assumed to be a pure function of the blast itself and held exact -- wrong: a later CI run showed it drifting too (4.75 -> 5.175), so it carries the same real-time-accrual dependency as ecology and is dropped here as well.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 32.16,
-          "nuisance": 5.399999999999999,
-          "cash": 36250,
-          "deathCount": 0
+          "deathCount": 5,
+          "vehicleCount": 0,
+          "bankrupt": true,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
+      }
+    },
+    {
+      "command": "employee list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee list"
+        }
+      ],
+      "description": "#553 procedure step 5: verify who died, not just assume it's the two who worked the pattern. Sandbox-confirmed the five dead are exactly employees #1-#5 -- every staffed employee this file never dispatches anywhere -- while #6-#12 (the file's own hires) are all still OK, never having been near the site.",
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 5,
+          "employeeCount": 12
         }
       }
     },
@@ -511,13 +648,13 @@
         }
       ],
       "role": "observe",
+      "description": "#553-followup (issue #586 CI): dropped the exact `ecology: 31.9` and `nuisance: 4.75` here too -- both inherit the same real-time-accrual drift as the blast step above (see its own note).",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 32.16,
-          "nuisance": 5.399999999999999,
-          "deathCount": 0,
-          "employeeCount": 7
+          "deathCount": 5,
+          "employeeCount": 12,
+          "vehicleCount": 0
         }
       }
     },
@@ -530,13 +667,13 @@
         }
       ],
       "role": "observe",
+      "description": "#553-followup (issue #586 CI): dropped the exact `ecology: 31.9` and `nuisance: 4.75` here too -- both inherit the same real-time-accrual drift as the blast step above (see its own note).",
       "expect": {
         "equals": {
-          "ecology": 32.16,
-          "safety": 50,
-          "wellBeing": 52.400000000000034,
-          "nuisance": 5.399999999999999
-        }
+          "safety": 56.60000000000048,
+          "wellBeing": 0
+        },
+        "note": "safety still reads the weather event's +15 bump (65, decayed to 56.6 by tick 293) here -- the five deaths' own accident penalty (recentAccidents * 5 per tick, ScoreManager.ts) only starts applying once ticking resumes."
       }
     },
     {
@@ -550,12 +687,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 15,
-          "ecology": 32.40999999999998,
-          "wellBeing": 54.350000000000044,
-          "nuisance": 5.649999999999998,
-          "cash": 36250
-        }
+          "tickCount": 298,
+          "safety": 0,
+          "wellBeing": 0,
+          "deathCount": 5,
+          "bankrupt": true,
+          "revolted": false
+        },
+        "note": "#553-followup (issue #586 CI): dropped cash/ecology/nuisance -- a real CI run read cash -154384 against this file's previously-pinned -154432 ($48 off), the same real-time-accrual drift documented on the blast step above (waitForTutorialStep/waitForSelector polls before tick 293 shift the base slightly; cash/ecology/nuisance accumulate from it and never reset). safety crashes from 56.6 to 0 within these 5 ticks (five deaths' accident penalty vs tutorial-playthrough's two) and stays floored there for the rest of the run -- sandbox-confirmed exact, no drift risk once it hits the floor."
       }
     },
     {
@@ -579,12 +718,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 20,
-          "cash": 31500,
-          "ecology": 32.65999999999997,
-          "wellBeing": 56.80000000000006,
-          "nuisance": 5.899999999999997
-        }
+          "tickCount": 303,
+          "safety": 0,
+          "wellBeing": 0,
+          "deathCount": 5
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
       }
     },
     {
@@ -608,159 +747,114 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 20,
-          "cash": 31500,
-          "ecology": 32.65999999999997,
-          "safety": 50,
-          "wellBeing": 56.80000000000006,
-          "nuisance": 5.899999999999997
-        }
+          "tickCount": 303,
+          "safety": 0,
+          "wellBeing": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
       }
     },
     {
       "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 15,
-          "z1": 5,
-          "x2": 24,
-          "z2": 17
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:4 spacing:3 depth:6 start:15,5"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
-          "holeCount": 20
-        }
+          "orderedHoleCount": 20,
+          "holeCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: ordering still costs nothing and always succeeds (skipQualificationCheck, Drill.ts) -- but this file has zero drillers left with both a driving.drill_rig licence AND a rig to sit in (vehicle #1, the only one this file ever owned, was destroyed in blast 1, and cash is deep in the negative from a 12-employee payroll -- no replacement is affordable). These 20 holes are permanently unreachable ghosts; the tick-wait step below proves it rather than assuming it. Interaction-mode finding: same bankruptcy full-screen overlay as the pattern-1 charge/sequence/blast steps above -- grid-tool is covered by this point too, `expect.blocked` proves it while the command still runs directly to order the ghost pattern."
       }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 20,
+          "holeCount": 0,
+          "tickCount": 313,
+          "deathCount": 5
+        },
+        "note": "#553 sandbox-measured stall proof: orderedHoleCount is unchanged from the step above after 10 full ticks -- no vehicle, no licensed spare, no cash to buy one. This is the real, permanent state for the rest of the file; every later drill_plan/charge/sequence/blast in this file is this same stall repeated at a new site. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "krackle and 1.0m stemming still hold from the first cycle (ChargeStep instance fields, no reset path — a blast clearing the plan does not touch them), so only the amount moves: 2 increments, 8 -> 10kg, krackle's maximum. Asserted before the commit rather than assumed.",
-      "role": "player",
+      "description": "krackle and 1.0m stemming still hold from the first cycle (ChargeStep instance fields, no reset path — a blast clearing the plan does not touch them), so only the amount moves: 2 increments, 8 -> 10kg, krackle's maximum. #553 interaction-mode finding: moot regardless -- charge-all is covered by the bankruptcy overlay from tick 209 onward, same as the pattern-1 charge/sequence/blast steps above, so this is a guard step like the drill_plan step before it.",
+      "role": "guard",
       "expect": {
         "equals": {
-          "chargedCount": 20
+          "chargedCount": 0
         },
-        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-31-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "#553: Charge All still runs -- it charges hole:*, and holeCount is 0 (all 20 holes are still ghosts in plannedDrillHoles, per the stall proof above) -- so it charges nothing. Not a bug in this step; the panel has no way to know a hole is undrillable. Unreachable by click either way -- the bankruptcy overlay covers charge-all here too."
       }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay."
+      "role": "guard",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Auto-sequences 0 holes, same reason as the charge step above. #553: same bankruptcy overlay as the charge step -- auto-sequence is covered too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "role": "player",
+      "description": "#553: a blast with 0 charged holes still fires (BAD rating, 0 voxels cleared, sandbox-confirmed) rather than erroring -- no new ecology/nuisance/casualty consequence, since nothing detonates. Interaction-mode finding: same bankruptcy full-screen overlay as the pattern-1 blast step -- execute is covered here too, `expect.blocked` proves it while the command still runs directly. #553-followup (issue #586 CI): ecology/nuisance dropped from the equals block below -- same real-time-accrual drift class as the tick-298 step's note above.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 7.149999999999967,
-          "nuisance": 0,
-          "cash": 31500,
-          "deathCount": 0
-        }
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "deathCount": 5
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
     },
     {
@@ -775,11 +869,11 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 7.149999999999967,
-          "nuisance": 0,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
+          "deathCount": 5,
+          "employeeCount": 12,
+          "vehicleCount": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -793,11 +887,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "ecology": 7.149999999999967,
-          "safety": 50,
-          "wellBeing": 56.80000000000006,
-          "nuisance": 0
-        }
+          "safety": 0,
+          "wellBeing": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -811,12 +904,50 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 30,
-          "cash": 26750,
-          "ecology": 7.649999999999965,
-          "wellBeing": 63.20000000000009,
-          "nuisance": 0
+          "tickCount": 315,
+          "safety": 0,
+          "wellBeing": 0,
+          "deathCount": 5
+        },
+        "note": "#553 sandbox-measured: this 10-tick request only advances 2 ticks (313 -> 315) -- a second random event (union_rep_secretary) becomes eligible here (same MIN_EVENT_INTERVAL_ACTIONS/MIN_EVENT_INTERVAL_TICKS gates as the pattern-1 interruption) and the tick loop breaks the instant it fires, before the event's own cash/wellBeing deltas apply. Resolved by the step below. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "event choose 0"
         }
+      ],
+      "description": "union_rep_secretary -- another real event: option 0 is a fixed, RNG-free delta sandbox-traced to cashDelta:-5000, scoreDelta.wellBeing:+7. wellBeing's climb from 0 to 7 resets the revolt streak (WorkerRevolt.ts: any wellBeing above 0 zeroes ticksAtZero) -- the countdown toward a real revolt restarts from wherever wellBeing next reads 0, one tick later. #553-followup (issue #586 CI): cash dropped -- the delta itself is fixed, but it lands on the same drifted base as the tick-298 step's note above, so the resulting absolute figure inherits the drift too. wellBeing:7 is the event's own fixed, RNG-free effect and stays exact. Interaction-mode finding (issue #586 CI): unlike the file's other post-bankruptcy events, this one is genuinely unreachable, not a covered-by-div race -- sandbox-reproduced (scripts/_repro_temp.ts-class harness replay, real Puppeteer clicks throughout): the tick-10 step above's own blast (0-hole ghost, same as the pattern-2/3/4 blasts throughout this file) arms BlastReportModal's 3-real-second open delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts); UIManager.update (UIManager.ts:421) defers EventModal.update entirely while that report is pending-or-visible, so the union_rep_secretary dialog never opens and #bs-event-dialog still holds stale, hidden .bs-event-choice nodes from the PREVIOUS (already-dismissed) event -- exactly the kind of stale-node trap a bare waitForSelector(selector) can't tell apart from a live dialog, which is what produced Puppeteer's own \"Node is either not clickable or not an Element\" against a display:none ancestor. Confirmed via __probeSelector that this is not a race that a longer wait fixes: right now the blast report's own Close button reads \"hidden\" (still inside its 3s delay); left running past that delay it flips to \"covered\" -- LevelEndScreen's z-index 9999 sits above BlastReportModal's shared z-index 600 (unlike the event dialog's own 10500, styles.ts), so once armed, the report can never be dismissed post-bankruptcy either, and the event stays gated behind it permanently. `blocked` proves the report's Close button (the real control standing between the player and this event) while `event choose 0` still runs directly to keep tickCount/wellBeing on the same track as the rest of the file.",
+      "role": "guard",
+      "expect": {
+        "equals": {
+          "wellBeing": 7,
+          "tickCount": 315
+        },
+        "blocked": ".bs-confirm-overlay [data-action=\"report-close\"]",
+        "note": "#553-followup (issue #586 CI): the report-close button this proves against is present but hidden the instant the event fires (still inside BlastReportModal's 3s real-time open delay) -- a stronger, later-timed probe against the same control reads 'covered' once the delay elapses, matching the bankruptcy overlay's own z-index over every z-index:600 modal elsewhere in this file. Either reading proves the same permanent block; 'hidden' is what a probe taken this early and reliably observes."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 325,
+          "safety": 0,
+          "wellBeing": 0,
+          "deathCount": 5
+        },
+        "note": "wellBeing's tick-315 bump is already gone -- back at 0 within this block, fatigue with no living quarters wins again immediately. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -840,41 +971,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 40,
-          "cash": 22000,
-          "ecology": 8.149999999999965,
-          "wellBeing": 71.60000000000011,
-          "nuisance": 0
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 50,
-          "cash": 17250,
-          "ecology": 8.649999999999972,
-          "wellBeing": 81.10000000000014,
-          "nuisance": 0
-        }
+          "tickCount": 335,
+          "safety": 0,
+          "wellBeing": 0,
+          "deathCount": 5
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -898,159 +1000,114 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 50,
-          "cash": 17250,
-          "ecology": 8.649999999999972,
-          "safety": 50,
-          "wellBeing": 81.10000000000014,
-          "nuisance": 0
-        }
+          "tickCount": 335,
+          "safety": 0,
+          "wellBeing": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
       "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 5,
-          "z1": 15,
-          "x2": 17,
-          "z2": 24
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 start:5,15"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
-          "holeCount": 20
-        }
+          "orderedHoleCount": 20,
+          "holeCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: same permanently-unreachable ghosts as pattern 2 -- still no vehicle, no cash. Interaction-mode finding: same bankruptcy full-screen overlay as pattern 2's grid-tool step -- covered here too."
       }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 20,
+          "holeCount": 0,
+          "tickCount": 345,
+          "deathCount": 5
+        },
+        "note": "#553 sandbox-measured stall proof, same as pattern 2's. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No third random event actually fires anywhere for the rest of this file's #553 trajectory (sandbox-confirmed by direct trace through the final tick).",
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "8 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:8 stemming:1"
         }
       ],
-      "description": "Back down to 8kg: 2 amount decrements off the 10kg the previous cycle left. Product and stemming untouched.",
-      "role": "player",
+      "description": "Back down to 8kg: 2 amount decrements off the 10kg the previous cycle left. Product and stemming untouched. #553 interaction-mode finding: charge-all is still covered by the bankruptcy overlay here, same as every charge step since pattern 1's blast -- guard step like pattern 2's.",
+      "role": "guard",
       "expect": {
         "equals": {
-          "chargedCount": 20
+          "chargedCount": 0
         },
-        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-44-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "#553: charges nothing, same reason as pattern 2's charge step -- holeCount is still 0."
       }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay."
+      "role": "guard",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes. #553: same bankruptcy overlay as the charge step -- auto-sequence covered too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "role": "player",
+      "description": "#553: another 0-hole blast, same as pattern 2's -- fires cleanly, no new consequence. Interaction-mode finding: same bankruptcy full-screen overlay as the earlier blast steps -- execute is covered here too. #553-followup (issue #586 CI): ecology/nuisance dropped from the equals block below -- same real-time-accrual drift class as the tick-298 step's note above.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 0,
-          "nuisance": 0,
-          "cash": 17250,
-          "deathCount": 0
-        }
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "deathCount": 5
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
     },
     {
@@ -1065,11 +1122,11 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 0,
-          "nuisance": 0,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
+          "deathCount": 5,
+          "employeeCount": 12,
+          "vehicleCount": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1083,11 +1140,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "ecology": 0,
-          "safety": 50,
-          "wellBeing": 81.10000000000014,
-          "nuisance": 0
-        }
+          "safety": 0,
+          "wellBeing": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1101,41 +1157,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 60,
-          "cash": 12500,
-          "wellBeing": 90.60000000000016,
-          "ecology": 0,
-          "nuisance": 0
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 70,
-          "cash": 7750,
-          "wellBeing": 99.95,
-          "ecology": 0,
-          "nuisance": 0
-        }
+          "tickCount": 355,
+          "deathCount": 5
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1159,12 +1184,37 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 80,
-          "cash": 3000,
-          "wellBeing": 99.95,
-          "ecology": 0,
-          "nuisance": 0
+          "tickCount": 365,
+          "deathCount": 5
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
         }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 375,
+          "deathCount": 5
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1188,159 +1238,114 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 80,
-          "cash": 3000,
-          "ecology": 0,
-          "safety": 50,
-          "wellBeing": 99.95,
-          "nuisance": 0
-        }
+          "tickCount": 375,
+          "safety": 0,
+          "wellBeing": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
       "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 15,
-          "z1": 15,
-          "x2": 27,
-          "z2": 27
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:15,15"
         }
       ],
-      "role": "player",
+      "role": "guard",
       "expect": {
         "equals": {
-          "holeCount": 25
-        }
+          "orderedHoleCount": 25,
+          "holeCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"grid-tool\"]",
+        "note": "#553: same permanently-unreachable ghosts as patterns 2 and 3. Interaction-mode finding: same bankruptcy full-screen overlay as patterns 2/3's grid-tool steps -- covered here too."
       }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 25,
+          "holeCount": 0,
+          "tickCount": 385,
+          "deathCount": 5
+        },
+        "note": "#553 sandbox-measured stall proof, same as patterns 2 and 3's. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "type": "command",
+          "command": "charge hole:* explosive:krackle amount:10 stemming:1"
         }
       ],
-      "description": "Back up to 10kg: 2 amount increments off the 8kg the previous cycle left. Product and stemming untouched.",
-      "role": "player",
+      "description": "Back up to 10kg: 2 amount increments off the 8kg the previous cycle left. Product and stemming untouched. #553 interaction-mode finding: charge-all still covered by the bankruptcy overlay, same as every charge step since pattern 1's blast -- guard step like the other stalled patterns.",
+      "role": "guard",
       "expect": {
         "equals": {
-          "chargedCount": 25
+          "chargedCount": 0
         },
-        "note": "traced in command mode (screenshots/scenario-level1-playthrough-revolt-command/step-57-charge.json); cash is deliberately not asserted here — ground rule #12, this step follows a tick block"
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "note": "#553: charges nothing, same reason as the other stalled patterns."
       }
     },
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay."
+      "role": "guard",
+      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Sequences 0 holes. #553: same bankruptcy overlay as the charge step -- auto-sequence covered too.",
+      "expect": {
+        "equals": {
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+      }
     },
     {
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "role": "player",
+      "description": "#553: the fourth and final 0-hole blast -- fires cleanly, no new consequence. Across this whole file, only the very first blast ever detonates real explosive; patterns 2-4 order holes nobody can ever drill. Interaction-mode finding: same bankruptcy full-screen overlay as the earlier blast steps -- execute is covered here too. #553-followup (issue #586 CI): ecology/nuisance dropped from the equals block below -- same real-time-accrual drift class as the tick-298 step's note above.",
+      "role": "guard",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 0,
-          "nuisance": 0,
-          "cash": 3000,
-          "deathCount": 0
-        }
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "deathCount": 5
+        },
+        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
     },
     {
@@ -1355,11 +1360,11 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "ecology": 0,
-          "nuisance": 0,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
+          "deathCount": 5,
+          "employeeCount": 12,
+          "vehicleCount": 0
+        },
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1373,148 +1378,30 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "ecology": 0,
-          "safety": 50,
-          "wellBeing": 99.95,
-          "nuisance": 0
-        }
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 90,
-          "cash": -1750,
-          "wellBeing": 99.95,
-          "ecology": 0,
-          "nuisance": 0
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 100,
-          "cash": -6500,
-          "wellBeing": 99.95,
-          "ecology": 0,
-          "nuisance": 0
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 110,
-          "cash": -11250,
-          "wellBeing": 99.95,
-          "ecology": 0,
-          "nuisance": 0
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 120,
-          "cash": -16000,
-          "wellBeing": 99.95,
-          "ecology": 0,
-          "nuisance": 0
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 130,
-          "cash": -20750,
-          "wellBeing": 99.95,
-          "ecology": 0,
-          "safety": 50,
-          "nuisance": 0
+          "safety": 0,
+          "wellBeing": 0
         },
-        "note": "last checkpoint before the region where a real random event fires in the command-mode trace (next event choose 0 step) -- see that step's description and Finding #44."
+        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 395,
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": false
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1524,7 +1411,7 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
       "role": "player"
     },
     {
@@ -1537,14 +1424,14 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
-        ],
         "equals": {
-          "tickCount": 140,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
+          "tickCount": 405,
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": false
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1554,7 +1441,127 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 415,
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": false
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 425,
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": false
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 435,
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": false
+        },
+        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 445,
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": true
+        },
+        "note": "#553 sandbox-confirmed: wellBeing's continuous zero streak (restarted at tick 316, right after the union event's tick-315 bump wore off) crosses REVOLT_TICKS=120 (WorkerRevolt.ts) during this block, and revolted flips true here -- this file's own premise (worker revolt) actually happens under #553, unlike the pre-#553 trajectory where it never did. levelEndReason stays 'bankruptcy' because that flag was raised first, at tick 209 (updateBankruptcy/updateRevolt both run unconditionally every tick, but GameLoop only records the reason on the first one to trip -- events.ts). #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
       "role": "player"
     },
     {
@@ -1568,213 +1575,17 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 140,
-          "deathCount": 0,
-          "employeeCount": 7
-        },
-        "note": "cash/ecology/safety/wellBeing/nuisance intentionally not asserted from here on -- see step 71's description and Finding #44."
-      }
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 150,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 160,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 170,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 180,
-          "deathCount": 0,
-          "employeeCount": 7
-        },
-        "note": "command-mode trace shows bankrupt flips true here (levelEndReason: 'bankruptcy') but that is not hard-asserted at this exact step -- the earlier event's uncertain timing (step 71) could shift which 10-tick block crosses the bankruptcy grace countdown by one block either way. Asserted instead at the file's final step, where it is robust regardless: BANKRUPTCY_GRACE_TICKS=100 consecutive ticks below the $5000 threshold (Bankruptcy.ts), and this file's cash declines monotonically with zero income sources anywhere, so the countdown that starts around tick ~76 completes by tick 200 no matter when the one weather event's extra -$8000 lands (Finding #44)."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 190,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "tickCount": 200,
-          "deathCount": 0,
-          "employeeCount": 7
-        }
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "tickCount": 200,
-          "deathCount": 0,
-          "employeeCount": 7,
+          "tickCount": 445,
+          "safety": 0,
+          "wellBeing": 0,
+          "deathCount": 5,
+          "employeeCount": 12,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy",
-          "revolted": false
-        }
+          "revolted": true
+        },
+        "note": "unlike the pre-#553 file, nothing about this file's #553 event timeline is uncertain past tick 315 (direct trace confirms no third random event fires through the end). #553-followup (issue #586 CI): that no longer covers ecology/nuisance -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note) regardless of event-timeline certainty, since they accumulate from a slightly-wrong base rather than from anything decided at tick 315. Dropped here for the same reason as every tick-only checkpoint since tick 298; safety/wellBeing stay exact -- both are floored at 0 by this point, immune to base drift."
       }
     },
     {
@@ -1789,7 +1600,7 @@
       "expect": {
         "equals": {
           "bankrupt": true,
-          "tickCount": 200
+          "tickCount": 445
         }
       }
     },
@@ -1804,8 +1615,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 200,
-          "employeeCount": 7
+          "tickCount": 445,
+          "employeeCount": 12
         }
       }
     },
@@ -1820,15 +1631,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 200,
-          "deathCount": 0,
-          "employeeCount": 7,
+          "tickCount": 445,
+          "deathCount": 5,
+          "employeeCount": 12,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy",
-          "revolted": false
+          "revolted": true
         },
-        "note": "confirms the file's own premise doesn't hold: named for worker revolt, but revolted stays false throughout -- wellBeing never gets low enough (it spends the file between 50 and 99.95, only mildly declining near the very end, nowhere near a sustained-low band; see WorkerRevolt.ts). The real, deterministic loss condition is bankruptcy: hiring 7 employees up front with zero contracts or other income anywhere in the file drains cash below the $5000 threshold around tick ~76, and BANKRUPTCY_GRACE_TICKS=100 consecutive ticks below that threshold (Bankruptcy.ts) triggers game-over ~100 ticks later -- independent of which random events fire in between, since this file's cash never recovers once it crosses (Finding #44)."
+        "note": "#553: this file's premise now holds both ways at once. Drilling is real, queued, vehicle-gated work: a single driller sinks the 4x4 pattern (interrupted once by a real random event, weather_minor_tremor at tick 125) by tick 293, and 12 employees' payroll with zero income anywhere in this file crosses the bankruptcy threshold before that pattern even finishes drilling (BANKRUPTCY_GRACE_TICKS=100 completes at tick 209, per Bankruptcy.ts) -- levelEndReason is 'bankruptcy' because that fires first, same conclusion as the pre-#553 file. But pattern 1's blast, once it finally lands, is catastrophic enough (16 holes x 8kg krackle, CATASTROPHIC rating, 90.3m throw) to kill all 5 staffed employees and destroy the only drill_rig this file ever owns -- and with no vehicle, no licensed spare worth the risk, and cash already deep in the negative, patterns 2-4 order 65 more holes that can never be drilled. The survivors' well-being, pinned at 0 by fatigue collapse with no living quarters anywhere in this file (save one brief union-event bump at tick 315 that costs $5,000 and buys seven ticks), stays there long enough (REVOLT_TICKS=120, WorkerRevolt.ts) that revolted flips true too, at tick 445 -- the workforce actually revolts this time, just after the mine is already bankrupt. Pre-#553, confirming a drill plan wrote every hole in instantly, so nobody ever stood in a blast radius, nobody ever ran out of a rig, and revolted stayed false for the whole file (see the pre-#553 note this replaces)."
       }
     }
   ]

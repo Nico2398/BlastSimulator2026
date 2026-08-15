@@ -1,27 +1,29 @@
 {
   "name": "blast-drill-plan-visual",
-  "description": "Visual verification of drill plan UI: grid creation, hole markers, spacing parameters, and plan inspection across multiple camera angles",
+  "description": "Visual verification of drill plan UI: grid creation, hole markers, spacing parameters, and plan inspection across multiple camera angles. #553: confirming a grid queues one drill_hole PendingAction per hole instead of writing holes instantly — holes sit ordered (ghosts) in plannedDrillHoles until a staffed driller/drill_rig actually drills each one, landing it in drillHoles.",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 staffed:true",
       "timeout": 10,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — exactly what #553's automatic drill dispatch needs.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
           "cash": 50000,
-          "holeCount": 0
+          "holeCount": 0,
+          "orderedHoleCount": 0
         }
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:4 spacing:5 depth:6 start:20,20",
-      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks on the strip's spacing stepper (data-field=\"spacing\") raise it to 5 before dragging, so the (20,20)-(35,30) rectangle (15x10) computes the declared 4 cols x 3 rows instead of the default-spacing 6x4. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "command": "drill_plan grid rows:2 cols:3 spacing:5 depth:6 start:20,20",
+      "description": "The grid tool's spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); two increment clicks on the strip's spacing stepper (data-field=\"spacing\") raise it to 5 before dragging, so the (20,20)-(30,25) rectangle (10x5) computes the declared 3 cols x 2 rows. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. #553: confirming the grid queues 6 drill_hole PendingActions and pushes 6 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. Hole count kept modest (6, not the larger pre-#553 pattern) so the staffed roster's ongoing maintenance/fuel costs (no income in this scenario) don't run the site into BANKRUPTCY_GRACE_TICKS territory before the plan finishes draining below.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -47,8 +49,8 @@
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
-          "x2": 35,
-          "z2": 30
+          "x2": 30,
+          "z2": 25
         },
         {
           "type": "screenshot"
@@ -61,9 +63,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 12
+          "orderedHoleCount": 6,
+          "holeCount": 0
         },
-        "note": "3 rows x 4 cols = 12"
+        "note": "2 rows x 3 cols = 6 holes ordered (ghosts) — none drilled yet (#553)."
       }
     },
     {
@@ -77,6 +80,25 @@
       "role": "observe"
     },
     {
+      "command": "tick 40",
+      "description": "#553: partial drilling — the staffed driller/drill_rig has had time to land some, but not all, of the 6 ordered holes. Mid-drilling screenshot for the visual channel to inspect the ghost/drilled split. Tick count is a first estimate from the spec's duration formula and staffed spawn offsets — tune once real timing is observed running against the implementation.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 40"
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": ["holeCount"],
+        "decreased": ["orderedHoleCount"],
+        "note": "Some holes have landed in drillHoles (real) while others remain in plannedDrillHoles (ghosts) — proves the split actually works."
+      }
+    },
+    {
       "command": "state full",
       "interaction": [
         {
@@ -84,13 +106,26 @@
           "command": "state full"
         }
       ],
-      "role": "observe",
+      "role": "observe"
+    },
+    {
+      "command": "tick 200",
+      "description": "#553: drain the rest of the plan — every ordered hole eventually lands. Sandbox-measured landing at tick 230 total (40 + 190) for this spacing:5/start:20,20 pattern (slower than the spacing:4/start:15,15 pattern used elsewhere) — bumped from the original 110 pad, still comfortably under the staffed site's own bankruptcy-grace window (100 sustained ticks below $5000; cash first dips below threshold around hole 4/5, ~50 ticks before landing).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 200"
+        }
+      ],
+      "role": "setup",
       "expect": {
         "equals": {
-          "holeCount": 12,
+          "orderedHoleCount": 0,
+          "holeCount": 6,
           "chargedCount": 0,
           "sequencedCount": 0
-        }
+        },
+        "note": "All 6 holes have landed — none lost, none left ordered forever. Not yet charged/sequenced (that's the Charge/Sequence steps, out of scope for this scenario)."
       }
     },
     {

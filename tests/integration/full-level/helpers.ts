@@ -85,6 +85,32 @@ export function tickWithEvents(ctx: GameContext, n: number): void {
 }
 
 /**
+ * Ticks until every hole ordered by the most recent drill_plan grid/add has
+ * landed in state.drillHoles (#553) — a 'blasting'-qualified employee and a
+ * drill_rig vehicle must already exist for any hole to ever land. Resolves
+ * pending events the same way tickWithEvents does, and tops up employee need
+ * gauges each tick: a solo drill_rig/driller multi-hole drive can otherwise
+ * run long enough for hunger/fatigue/breakNeed to cross a collapse threshold
+ * mid-drive, an unrelated needs mechanic these tests aren't exercising.
+ */
+export function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+    if (ctx.state!.events.pendingEvent) {
+      eventCommand(ctx, ['choose', '0'], {});
+    }
+    if (ctx.state!.isPaused) {
+      ctx.state!.isPaused = false;
+    }
+  }
+}
+
+/**
  * Perform a standard blast cycle: drill grid, charge all, auto-sequence, blast.
  * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
  * @param ctx The game context (cast to MiningContext internally for command compatibility).

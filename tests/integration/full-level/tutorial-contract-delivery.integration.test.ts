@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
   tickWithEvents,
+  driveDrillPlanToCompletion,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
@@ -21,6 +22,8 @@ import {
 } from '../../../src/console/commands/mining.js';
 import { contractCommand } from '../../../src/console/commands/economy.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
+import { isOversized } from '../../../src/core/mining/BlastCalc.js';
+import { findNearestReachableFragment } from '../../../src/core/economy/FragmentTaskLifecycle.js';
 
 describe('Tutorial Level — Contract Delivery', () => {
   let ctx: ReturnType<typeof makeCampaignCtx>;
@@ -39,6 +42,14 @@ describe('Tutorial Level — Contract Delivery', () => {
    * closes).
    */
   function executeTutorialBlast(): { output: string; cashBeforeBlast: number } {
+    // Topped up (#553): this sequence now also crews a drill_rig ($35,000)
+    // so drill_plan grid's queued drill_hole actions can actually land, and
+    // setupHaulingFleet below crews a freight_warehouse + debris_hauler on
+    // top of that — together more than tutorial_pit's $80,000 starting cash
+    // covers. Every assertion here is relative (before/after), never against
+    // an absolute cash figure, so this doesn't change what's being tested.
+    ctx.state!.cash += 50_000;
+
     // 1. Hire surveyor (ID=1) with geology skill
     const hireSurveyor = employeeCommand(ctx, ['hire'], { role: 'surveyor' });
     expect(hireSurveyor.success).toBe(true);
@@ -61,6 +72,15 @@ describe('Tutorial Level — Contract Delivery', () => {
       skill: 'blasting',
       level: '5',
     });
+    // Also driving.drill_rig, and a drill_rig vehicle to drive (#553):
+    // drill_plan grid now queues one drill_hole PendingAction per hole
+    // instead of writing them straight into state.drillHoles.
+    employeeCommand(ctx, ['assign_skill', '2'], {
+      skill: 'driving.drill_rig',
+      level: '5',
+    });
+    const buyRig = vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+    expect(buyRig.success).toBe(true);
 
     // 4. Drill 2×2 grid at (10,10), 4m spacing, 8m depth
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
@@ -72,6 +92,7 @@ describe('Tutorial Level — Contract Delivery', () => {
     });
     expect(drillResult.success).toBe(true);
     expect(drillResult.output).toContain('4 holes');
+    driveDrillPlanToCompletion(ctx);
 
     // 5. Charge all holes with boomite 3kg/hole, stemming 2m
     const chargeResult = chargeCommand(ctx as any, [], {
@@ -97,9 +118,19 @@ describe('Tutorial Level — Contract Delivery', () => {
   }
 
   /**
-   * Hire+skill a hauler driver, build a freight_warehouse, buy a
-   * debris_hauler, assign the driver, and tick until the driver has boarded
-   * the vehicle. Returns the vehicle and driver IDs.
+   * Hire+skill a hauler driver, buy a debris_hauler, assign the driver, tick
+   * until the driver has boarded the vehicle, and only then build the
+   * freight_warehouse. Returns the vehicle and driver IDs.
+   *
+   * Building the warehouse comes last, right before this function returns
+   * with no tick in between — same reasoning as executeTutorialBlast's
+   * drill_rig setup and economy.integration.test.ts's equivalent: self-
+   * dispatch (#552) can only ever start a haul_debris workflow once an
+   * active depot exists (requestHaulFragment's own depot check), so with no
+   * depot yet the hauler simply stays idle/seated across the padding below
+   * instead of auto-claiming the fragment this test's own manual haul step
+   * (in each caller, immediately after this function returns) means to
+   * exercise itself.
    */
   function setupHaulingFleet(): { vehicleId: number; driverId: number } {
     const hireDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
@@ -110,7 +141,18 @@ describe('Tutorial Level — Contract Delivery', () => {
       level: '5',
     });
 
-    // (13,13), near the drill site rather than the old (5,5): bigger levels
+    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(buyResult.success).toBe(true);
+    // find (not [0]) — executeTutorialBlast already purchased a drill_rig.
+    const vehicleId = ctx.state!.vehicles.vehicles.find(v => v.type === 'debris_hauler')!.id;
+
+    const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
+    expect(assignResult.success).toBe(true);
+
+    // Padding: let the driver walk to and board the vehicle.
+    tickWithEvents(ctx, 10);
+
+    // (9,13), near the drill site rather than the old (5,5): bigger levels
     // (#458 T6.1/D13) carry far more natural terrain relief than the old
     // ones, fragmenting NavGrid bench levels into small pockets more often.
     // (5,5) sat on a different bench than the drill/fragment area with no
@@ -119,19 +161,16 @@ describe('Tutorial Level — Contract Delivery', () => {
     // <2-tile trip for 10+ ticks, findMultiLevelPath returning found:false
     // every time). Keeping pickup and drop-off on the same bench sidesteps
     // that pathfinding gap rather than attempting to fix it here — a deeper,
-    // more general fix belongs to T6.2 (pathfinding at scale).
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    // more general fix belongs to T6.2 (pathfinding at scale). Moved from
+    // (13,13) to (9,13) (#553): this function now builds the warehouse after
+    // the vehicle has already parked at the grid centre (16,16) rather than
+    // before purchase — deliberately, to keep self-dispatch (#552) from
+    // racing this test's own manual haul step — and (13,13)'s 4×4 footprint
+    // reaches exactly that corner, trapping the parked vehicle inside its own
+    // now-blocked tile (NavGrid.computeReachableSet from (16,16) returns
+    // empty). (9,13) is on the same bench without touching (16,16).
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '9,13' });
     expect(buildResult.success).toBe(true);
-
-    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
-    expect(buyResult.success).toBe(true);
-    const vehicleId = ctx.state!.vehicles.vehicles[0]!.id;
-
-    const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
-    expect(assignResult.success).toBe(true);
-
-    // Padding: let the driver walk to and board the vehicle.
-    tickWithEvents(ctx, 10);
 
     return { vehicleId, driverId };
   }
@@ -146,13 +185,20 @@ describe('Tutorial Level — Contract Delivery', () => {
     });
     expect(haulResult.success).toBe(true);
 
-    // Padding: pickup + travel to the depot, well beyond what a same-map
-    // haul needs (mirrors the tick-padding convention used elsewhere for
-    // arrival-gated actions).
-    tickWithEvents(ctx, 30);
+    // Tick until delivered rather than a flat padding count (#553): the
+    // drill site and fragment field sit wherever the grid landed relative to
+    // the depot, so the ticks a haul actually needs vary — and one caller
+    // (the deadline-sensitive contract-delivery test) accepts a contract
+    // whose deadlineTicks (30-100, Contract.ts's generateContracts) a fixed,
+    // always-spent 100-tick pad could run past even after delivery finished
+    // long before that. Capped generously above what any same-map haul needs.
+    const tracked = (): { state: string } | undefined =>
+      ctx.state!.logistics.fragments.find(f => f.fragment.id === fragmentId);
+    for (let i = 0; i < 150 && tracked()?.state !== 'stored'; i++) {
+      tickWithEvents(ctx, 1);
+    }
 
-    const tracked = ctx.state!.logistics.fragments.find(f => f.fragment.id === fragmentId);
-    expect(tracked?.state).toBe('stored');
+    expect(tracked()?.state).toBe('stored');
   }
 
   // ── (a) Blast shortcut is closed: no instant cash/ore payout ─────────────
@@ -212,13 +258,20 @@ describe('Tutorial Level — Contract Delivery', () => {
     expect(ctx.state!.logistics.storedMassKg).toBe(0);
 
     // Haul a fragment that actually carries ore. Ore sits in veins, so only
-    // some of a blast's fragments hold any — which one that is depends on where
-    // the veins run, not on anything this test is asserting.
-    const oreBearing = ctx.state!.logistics.fragments
-      .find(f => Object.values(f.fragment.oreDensities).some(d => d > 0));
-    expect(oreBearing, 'blast produced no ore-bearing fragment to haul').toBeDefined();
+    // some of a blast's fragments hold any — which one that is depends on
+    // where the veins run, not on anything this test is asserting. Routed
+    // through findNearestReachableFragment (#553, mirrors
+    // economy.integration.test.ts's "full economy loop" case) rather than a
+    // plain array .find(): the drill site now sits wherever the plan landed
+    // relative to the depot, and an unreachable or oversized pick would fail
+    // this test for a reason unrelated to what it means to exercise.
+    const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    const oreBearingId = findNearestReachableFragment(ctx.state!, vehicleId, vehicle.x, vehicle.z, tracked =>
+      !isOversized(tracked.fragment.volume) && Object.values(tracked.fragment.oreDensities).some(d => d > 0),
+    );
+    expect(oreBearingId, 'blast produced no reachable ore-bearing fragment to haul').not.toBeNull();
 
-    haulFragmentToStorage(vehicleId, oreBearing!.fragment.id);
+    haulFragmentToStorage(vehicleId, oreBearingId!);
 
     // Storage now holds the hauled fragment's mass.
     expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
@@ -232,15 +285,33 @@ describe('Tutorial Level — Contract Delivery', () => {
 
   it('contract deliver after the haul-and-store cycle succeeds, decrements storage, and pays out', () => {
     executeTutorialBlast();
+
+    // Accept contract #1 right after the blast (#553), before the haul
+    // padding below — drilling plus a full haul-and-store cycle now spans
+    // well over a hundred ticks, long enough to run past contract #1's own
+    // deadlineTicks (30-100, Contract.ts's generateContracts) if accepted
+    // only afterward, same as the pre-#553 version of this test did.
+    // Accepting reserves the contract; it doesn't require inventory yet.
+    const acceptResult = contractCommand(ctx, ['accept', '1'], {});
+    expect(acceptResult.success).toBe(true);
+
     const { vehicleId } = setupHaulingFleet();
-    haulFragmentToStorage(vehicleId, 0);
+    // rubble_disposal (materialId '') doesn't care which fragment, only that
+    // it's haulable and reachable — routed through findNearestReachableFragment
+    // (#553, see the equivalent selection above) rather than a hardcoded
+    // id:0, which was reachable before the drilling delay shifted where the
+    // fleet ends up relative to the fragment field, but is not guaranteed to
+    // stay so.
+    const vehicle = ctx.state!.vehicles.vehicles.find(v => v.id === vehicleId)!;
+    const haulableId = findNearestReachableFragment(ctx.state!, vehicleId, vehicle.x, vehicle.z, tracked =>
+      !isOversized(tracked.fragment.volume),
+    );
+    expect(haulableId, 'blast produced no reachable haulable (non-oversized) fragment').not.toBeNull();
+    haulFragmentToStorage(vehicleId, haulableId!);
 
     const storedBefore = ctx.state!.logistics.storedMassKg;
     expect(storedBefore).toBeGreaterThan(0);
     const cashBefore = ctx.state!.cash;
-
-    const acceptResult = contractCommand(ctx, ['accept', '1'], {});
-    expect(acceptResult.success).toBe(true);
 
     // Contract #1 is rubble_disposal (materialId '') — deliver an amount well
     // within what was actually hauled into storage.

@@ -2,7 +2,7 @@
 // Pure data. No side effects. All game data lives here.
 
 import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../config/balance.js';
-import type { DrillHole } from '../mining/DrillPlan.js';
+import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
@@ -60,7 +60,11 @@ import { createSitePolicy } from '../entities/SitePolicy.js';
 // v9 -> v10: Vehicle gained a `reservedForActionId: number | null` field
 // (#550 vehicle-gated actions become executable). See SaveLoad.ts's
 // migrateV9ToV10 stub.
-export const SAVE_VERSION = 10;
+// v10 -> v11: GameState gained `plannedDrillHoles: PlannedHole[]` (#553
+// drilling becomes work — a drill plan queues one `drill_hole` action per
+// hole instead of writing holes into state instantly). See SaveLoad.ts's
+// migrateV10ToV11 stub.
+export const SAVE_VERSION = 11;
 
 export interface GameConfig {
   seed: number;
@@ -162,6 +166,9 @@ export interface GameState {
 
   /** Current drill plan holes. */
   drillHoles: DrillHole[];
+
+  /** Holes ordered but not yet drilled — each queues one `drill_hole` action and lands in `drillHoles` on completion (#553). */
+  plannedDrillHoles: PlannedHole[];
 
   /** Current charge plan per hole (keyed by hole ID). */
   chargesByHole: Record<string, HoleCharge>;
@@ -304,6 +311,7 @@ export function createGame(config: GameConfig): GameState {
     nextSurveyId: 1,
     cash: config.startingCash ?? STARTING_CASH,
     drillHoles: [],
+    plannedDrillHoles: [],
     chargesByHole: {},
     sequenceDelays: {},
     savedPlans: {},

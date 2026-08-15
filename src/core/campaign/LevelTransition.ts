@@ -72,10 +72,14 @@ export function checkLevelComplete(
 /**
  * Create a fresh GameState for the given level, preserving campaign state.
  * Returns null if the level is locked or doesn't exist.
+ * `staffed` mirrors `new_game`/`sandbox start`'s own opt-in (#551): a
+ * pre-hired roster and pre-purchased fleet, applied inside `createGame`
+ * before terrain generation.
  */
 export function createGameForLevel(
   campaign: CampaignState,
   levelId: string,
+  staffed?: boolean,
 ): GameState | null {
   if (!startLevel(campaign, levelId)) return null;
 
@@ -87,6 +91,7 @@ export function createGameForLevel(
     mineType: level.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
+    ...(staffed ? { staffed: true } : {}),
   };
 
   const newState = createGame(config);

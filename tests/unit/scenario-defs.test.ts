@@ -965,9 +965,9 @@ describe('Step expect field is shaped correctly when present', () => {
 // ──────────────────────────────────────────────
 describe('The 3 known un-converted player steps are converted to real UI interactions (#514)', () => {
   const TARGETS: Array<{ file: string; stepIndex: number; expectedCommandPrefix: string }> = [
-    { file: 'multi-deck-blast', stepIndex: 7, expectedCommandPrefix: 'blast' },
-    { file: 'blast-preview-step-visual', stepIndex: 2, expectedCommandPrefix: 'charge hole:*' },
-    { file: 'blast-sequence-step-visual', stepIndex: 2, expectedCommandPrefix: 'charge hole:*' },
+    { file: 'multi-deck-blast', stepIndex: 8, expectedCommandPrefix: 'blast' },
+    { file: 'blast-preview-step-visual', stepIndex: 3, expectedCommandPrefix: 'charge hole:*' },
+    { file: 'blast-sequence-step-visual', stepIndex: 3, expectedCommandPrefix: 'charge hole:*' },
   ];
 
   for (const { file, stepIndex, expectedCommandPrefix } of TARGETS) {

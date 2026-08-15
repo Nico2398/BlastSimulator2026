@@ -37,6 +37,41 @@ function makeCtx(): GameContext {
 }
 
 /**
+ * Hires one driller (qualified 'blasting' by default, ROLE_STARTING_QUALIFICATION)
+ * and buys one drill_rig vehicle, so drill_plan grid's queued drill_hole
+ * actions (#553) can actually land — deliberately NOT `staffed:true`
+ * (STARTING_SITE_STAFFED_COMPOSITION also pre-crews a debris_hauler and
+ * rock_fragmenter, which would race this test's own step-by-step manual
+ * hauler/fragmenter setup via #552's self-dispatch).
+ */
+function hireDrillerAndRig(ctx: GameContext): void {
+  const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
+  expect(hireResult.success).toBe(true);
+  const drillerId = ctx.state!.employees.employees.find(e => e.role === 'driller')!.id;
+  employeeCommand(ctx, ['assign_skill', String(drillerId)], { skill: 'driving.drill_rig', level: '5' });
+  const buyRig = vehicleCommand(ctx, ['buy', 'drill_rig'], {});
+  expect(buyRig.success).toBe(true);
+}
+
+/**
+ * Ticks until every hole ordered by the last drill_plan grid has landed in
+ * state.drillHoles (#553). Tops up employee need gauges each tick — a
+ * solo drill_rig/driller multi-hole drive can otherwise run long enough for
+ * hunger/fatigue/breakNeed to cross a collapse threshold mid-drive, an
+ * unrelated needs mechanic this test isn't exercising.
+ */
+function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
+/**
  * Drill+charge+sequence+blast an undercharged, wide-spacing pattern at
  * (18,19) — same origin as economy.integration.test.ts's full-loop case: it
  * sits on the same flat NavGrid bench as the vehicle spawn and warehouse, so
@@ -45,6 +80,8 @@ function makeCtx(): GameContext {
  * reliably leaves a couple of oversized fragments with zero projections.
  */
 function blastUndercharged(ctx: GameContext): void {
+  hireDrillerAndRig(ctx);
+
   const drillResult = drillPlanCommand(ctx as any, ['grid'], {
     origin: '18,19',
     rows: '2',
@@ -53,6 +90,7 @@ function blastUndercharged(ctx: GameContext): void {
     depth: '8',
   });
   expect(drillResult.success).toBe(true);
+  driveDrillPlanToCompletion(ctx);
 
   const chargeResult = chargeCommand(ctx as any, [], {
     hole: '*',

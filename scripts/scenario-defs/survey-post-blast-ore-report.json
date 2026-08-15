@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
@@ -63,7 +63,7 @@
       "expect": {
         "equals": {
           "employeeCount": 1,
-          "cash": 48800
+          "cash": 198800
         }
       }
     },
@@ -446,7 +446,134 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed a driller at all) now needs one. campaign start has no staffed:true equivalent, so this is a manual hire + purchase, same pattern as survey-then-blast.json. Employee #2 -- #1 is the surveyor hired above.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix (sandbox-measured): a lone continuously-busy driller's own morale collapses to 0 well before this 9-hole grid finishes drilling, and avgMorale (ScoreManager.ts) is a straight average across the roster -- 3 extra idle hires here (never assigned a skill, never given a task, so they simply idle the whole file) dilute that average enough to keep state.scores.wellBeing off the floor long enough that state.revolt.revolted (WorkerRevolt.ts, 120-tick countdown once well-being hits 0) never flips true before charging. No living_quarters/building fix works here -- confirmed by trace: a continuously-busy solo employee's need-driven rest action never wins selectBestActionForEmployee's cost ranking against the next queued drill_hole, so buildings alone can't rescue this, only idle headcount can. Employee #3.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix, same rationale as above -- Employee #4, also left idle for the rest of the file. #553-followup: no toolbar click here -- the preceding Employee #3 hire step already opened the employees panel and nothing since closed it (ToolRail's click handler is a togglePanel toggle, UIManager.ts:450), so re-clicking `#bs-toolbar [data-panel=\"employees\"]` here closed the panel outright, leaving the driller row zero-size for the click that followed. Same class of bug documented in employee-training.json's own driving.drill_rig training step.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 4
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix, same rationale as above -- Employee #5, also left idle for the rest of the file. #553-followup: no toolbar click here either -- same reason as Employee #4 above, the panel is still open from Employee #3's own opening click.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 5
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:20,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -462,18 +589,14 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
-          "x2": 30,
-          "z2": 30
+          "x2": 24,
+          "z2": 24
         },
         {
           "type": "screenshot"
@@ -486,10 +609,89 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
+          "orderedHoleCount": 9,
+          "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable for a single driller/drill_rig (no staffed:true near-origin spawn on a campaign map)."
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts).",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Seventh and final chunk — all 9 holes should have landed by now.",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",

@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
@@ -83,7 +83,7 @@
       "expect": {
         "equals": {
           "employeeCount": 1,
-          "cash": 48800
+          "cash": 198800
         }
       }
     },
@@ -103,7 +103,7 @@
       "expect": {
         "equals": {
           "employeeCount": 2,
-          "cash": 47800
+          "cash": 197800
         }
       }
     },
@@ -123,7 +123,7 @@
       "expect": {
         "equals": {
           "employeeCount": 3,
-          "cash": 46300
+          "cash": 196300
         }
       }
     },
@@ -471,7 +471,103 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:25,25",
+      "command": "vehicle buy drill_rig",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so the driller this file already hires (employee #2) needs a drill_rig to ever staff. campaign start has no staffed:true equivalent, so this is a manual purchase, same pattern as weather-flood.json/vibration-budget.json.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it employee #2 (the driller) could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file's own driller-training beat is elsewhere.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 follow-up: a single driller/drill_rig cannot finish this 9-hole grid before well-being's 120-tick worker-revolt countdown completes -- sandbox-measured directly (pure command-mode engine probe, no browser). A second tier-1 driller/drill_rig closes most of the gap but this file's earlier 3-employee roster (surveyor+driller+blaster, all on payroll since tick 0) means a THIRD employee's payroll and needs upkeep tips the mine into bankruptcy before drilling finishes instead (also sandbox-measured). Buying the second rig at tier:2 (see below) gets the same combined drilling throughput from only one extra employee, which the mine's cash can actually sustain. Employee #4 -- #1 surveyor, #2 the first driller, #3 the blaster.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 4
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig tier:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"2\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"2\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 4 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: same reasoning as employee #2's driving.drill_rig assignment above -- no role starts with this skill, and this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 4 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:25,25",
       "interaction": [
         {
           "type": "clickSelector",
@@ -487,18 +583,14 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
           "x1": 25,
           "z1": 25,
-          "x2": 35,
-          "z2": 35
+          "x2": 29,
+          "z2": 29
         },
         {
           "type": "screenshot"
@@ -511,10 +603,69 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
+          "orderedHoleCount": 9,
+          "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs (one tier-2) working it in parallel -- see the second `employee hire role:driller` step above."
+    },
+    {
+      "command": "tick 50",
+      "description": "#553 follow-up: drain the ordered plan in bounded chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. With a second (tier-2) driller/drill_rig working in parallel, sandbox-measured (pure command-mode engine probe) landing all 9 holes around tick ~300-315 from a drill_plan at tick 102, with 59+ ticks of margin before both the worker-revolt countdown (tick ~333+) and the bankruptcy grace period run out -- the last (5th) chunk below is deliberately smaller than the others to land in that window rather than overshoot.",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "description": "Fifth and final chunk, deliberately smaller than the rest -- all 9 holes should have landed by now, with margin before the worker-revolt countdown and bankruptcy grace period.",
+      "interaction": [{"type": "command", "command": "tick 20"}],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -640,7 +791,7 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 4",
+      "command": "contract accept 14",
       "interaction": [
         {
           "type": "clickSelector",
@@ -648,28 +799,28 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
         }
       ],
       "role": "player",
-      "description": "#581: the command said `contract accept 1`, and contract #1 is not on offer at this point in EITHER mode -- both dump the available pool as ids 4-11, so the command was silently accepting nothing (`activeContractCount` stayed 0 right through it) and the `contract deliver 4` guard below was operating on a contract nothing had accepted. Interaction mode was the half that worked: the unscoped click landed on the first offered card, which IS #4, which is why that guard finds #4's active card and correctly reports its DELIVER disabled. So the click was right and the command text was wrong; the command now names #4 and the click is scoped to it. Nothing downstream is re-baselined -- the three steps after the guard are `observe` and assert nothing."
+      "description": "#581: the command said `contract accept 1`, and contract #1 is not on offer at this point in EITHER mode -- both dump the available pool as ids 4-11, so the command was silently accepting nothing (`activeContractCount` stayed 0 right through it) and the `contract deliver` guard below was operating on a contract nothing had accepted. Interaction mode was the half that worked: the unscoped click landed on the first offered card, which IS the pool's leading id, which is why that guard finds it and correctly reports its DELIVER disabled. So the click was right and the command text was wrong; the command names whatever the pool's leading id actually is and the click is scoped to it. #553 follow-up: id drifted again from #4 to #14 -- the crew-walkout fix earlier in this file (a second driller/tier-2 rig, to keep drilling inside the well-being margin) adds real ticks before this point, and `generateContracts`' CONTRACT_REFRESH_INTERVAL cycling carries the pool further along with them (re-confirmed directly: `contract list` at this exact point now offers [14..21], not [4..11]). Nothing downstream is re-baselined -- the three steps after the guard are `observe` and assert nothing."
     },
     {
-      "command": "contract deliver 4 amount:500",
+      "command": "contract deliver 14 amount:500",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 4 amount:500"
+          "command": "contract deliver 14 amount:500"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: nothing is in storage at this point, so ContractsPanel disables the amount box, MAX and DELIVER together (maxDeliverable = min(remaining, stored) is 0). The console command is no better -- it returns success:false and command mode only fails a step on a thrown exception, so this step is a silent no-op in both modes. Two modes genuinely disagree on WHY, and that is worth knowing: in command mode `contract accept 1` above fails outright (\"Contract #1 not found or already completed\") -- by this point in the campaign, `generateContracts`' CONTRACT_REFRESH_INTERVAL cycling has already carried ids past 1, confirmed directly (`contract list` at this exact point offers [4, 5, ...], not 1) -- leaving activeContractCount at 0 and no card at all, while the interaction-mode click on `.bs-contract-accept` accepts whichever contract is really on offer (the array's first entry, id 4, matching render()'s insertion order). So no `equals` is asserted here -- only `expect.blocked`, which is interaction-mode-only and therefore checks the mode where a card actually exists, scoped to id 4 to match what actually gets accepted rather than the stale id 1 an earlier campaign-length change left behind.",
+      "description": "BLOCKED, and deliberately not converted to a click: nothing is in storage at this point, so ContractsPanel disables the amount box, MAX and DELIVER together (maxDeliverable = min(remaining, stored) is 0). The console command is no better -- it returns success:false and command mode only fails a step on a thrown exception, so this step is a silent no-op in both modes. Two modes genuinely disagree on WHY, and that is worth knowing: in command mode `contract accept 1` above fails outright (\"Contract #1 not found or already completed\") -- by this point in the campaign, `generateContracts`' CONTRACT_REFRESH_INTERVAL cycling has already carried ids past 1, confirmed directly (`contract list` at this exact point now offers [14..21], not 1) -- leaving activeContractCount at 0 and no card at all, while the interaction-mode click on `.bs-contract-accept` accepts whichever contract is really on offer (the array's first entry, id 14, matching render()'s insertion order). So no `equals` is asserted here -- only `expect.blocked`, which is interaction-mode-only and therefore checks the mode where a card actually exists, scoped to id 14 to match what actually gets accepted rather than the stale id this file has already drifted past twice (1 -> 4 -> 14, each time the drilling wait earlier in the file grew).",
       "expect": {
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-deliver"
       },
       "role": "guard"
     },

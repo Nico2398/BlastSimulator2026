@@ -96,10 +96,25 @@ describe('en.json / fr.json — key-set parity', () => {
     // now-dead ui.vehicles.haul key from both locales. tutorial.stage.vehicle_haul
     // was renamed to tutorial.stage.vehicle_watch in the same change, a 1-for-1
     // swap that leaves the count unaffected.
+    // Baseline is now 3254 (up from 3253): #553 added
+    // ui.blast_workshop.drill.status_ordered — the ORDERED status chip for a
+    // hole still in state.plannedDrillHoles, awaiting its drill_hole action —
+    // both locales translated.
+    // Baseline is now 3263 (up from 3254): #553's tutorial fix adds three new
+    // tutorial steps (build-driving-center, train-driller, buy-drill-rig-assign)
+    // closing the deadlock where drill_hole's vehicle gate left the driller
+    // hired but never licensed/equipped to drive a drill_rig — 9 new keys
+    // (3 step text + 3 step title + 3 stage hint), both locales translated.
+    // Baseline is now 3264 (up from 3263): train-driller's own stage sequence
+    // jumped straight from opening the Crew panel to .bs-train-btn, but that
+    // control only renders once CrewPanel's single-expansion model has the
+    // driller's own row open -- an unreachable gate, not a difficulty setting.
+    // tutorial.stage.expand_driller names the real intermediate click, in
+    // both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3253);
+    expect(Object.keys(en).length).toBe(3264);
   });
 });
 

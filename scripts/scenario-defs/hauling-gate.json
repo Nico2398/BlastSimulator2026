@@ -3,17 +3,18 @@
   "description": "Self-dispatching debris hauling (issue #552, superseding the manual 'vehicle haul <id> fragment:<id>' flow from #437): once a debris_hauler and a truck-licensed driver exist, an on-ground blast fragment spawns its own haul_debris PendingAction with no player command at all \u2014 the driver claims it, boards the free hauler, drives to the fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. There is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happened at claim time instead), so this file only advances ticks and asserts on the automatic outcome: logistics.storedMassKg must rise, and by the final tick block the hauled fragment must read state:stored.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:100000",
+      "command": "new_game seed:42 cash:150000 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. This puts 5 employees and 4 vehicles on the roster before this file's own driver/debris_hauler purchase later — not a drilling-specific concern (see the drill_plan step below), just something the file's own employee/vehicle-id references had to account for. Cash bumped from $100,000 to $150,000 to cover the drilling wait's payroll/upkeep on top of the original shopping list.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:100000"
+          "command": "new_game seed:42 cash:150000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000,
+          "cash": 150000,
           "buildingCount": 0
         }
       }
@@ -57,8 +58,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20",
-      "description": "Corrected from the original rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (20,20)-(25,25) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20 diameter:0.089",
+      "description": "#553: shrunk from the original rows:3 cols:3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m — this file's whole point is hauling dispatch, not drilling, so the plan only needs to produce enough on-ground fragments to prove auto-haul works, at a workload the staffed roster's driller lands quickly. The click drags the (20,20)-(22,22) rectangle at 2m spacing to compute the declared 2x2. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent, a $54 divergence carried into both downstream cash checkpoints below. Confirmed exact: adding the real default reproduces interaction mode's own $79,268 figure precisely.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -73,11 +74,15 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
-          "x2": 25,
-          "z2": 25
+          "x2": 22,
+          "z2": 22
         },
         {
           "type": "screenshot"
@@ -90,7 +95,25 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 100",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 88).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 100"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
         }
       }
     },
@@ -105,7 +128,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 4
         }
       }
     },
@@ -120,7 +143,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 9
+          "sequencedCount": 4
         }
       }
     },
@@ -184,6 +207,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
+      "description": "#553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st -- and the blast above destroyed the drill_rig (vehicle #1, sitting inside its own hole's blast radius), so vehicleCount goes 3 -> 4, not 0 -> 1.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -204,12 +228,13 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 1
+          "vehicleCount": 4
         }
       }
     },
     {
       "command": "employee hire role:driver",
+      "description": "#553: staffed:true's roster (driller/blaster/driver/driver, ids 1-5) means this hire is the roster's 6th employee, not its 1st.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -230,29 +255,30 @@
           "cash"
         ],
         "equals": {
-          "employeeCount": 1
+          "employeeCount": 6
         }
       }
     },
     {
-      "command": "employee assign_skill 1 skill:driving.truck level:1",
+      "command": "employee assign_skill 6 skill:driving.truck level:1",
       "interaction": [
         {
           "type": "command",
-          "command": "employee assign_skill 1 skill:driving.truck level:1"
+          "command": "employee assign_skill 6 skill:driving.truck level:1"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. #553: employee 6, not 1 -- staffed:true's roster occupies ids 1-5.",
       "expect": {
         "equals": {
-          "cash": 59200
+          "cash": 79268
         },
         "note": "the driver already holds driving.truck at level 1 from ROLE_STARTING_QUALIFICATION -- this call is a same-level no-op"
       },
       "role": "bootstrap"
     },
     {
-      "command": "vehicle driver 1 1",
+      "command": "vehicle driver 5 6",
+      "description": "#553: vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5. The assign row's <select> (fleetDetailSections.ts's makeAssignRow) lists every eligible, untaken driving.truck-licensed employee in roster order, not just the one this file means to pick -- staffed:true's own drivers (#3 Gus Pickaxe, #5 Pete Crater) already hold that licence and sit untaken (their original drill_rig/rock_digger mounts are gone or never filled), so they sort ahead of #6 in the <select>'s option list and the browser's default-selected first option is #3, not #6. Clicking Assign without first setting the dropdown silently boards Gus instead of Lars Bedrock -- same console command text, different employee, and Gus's own position/availability made the resulting board-and-haul timeline miss this file's tick budget (#553 finding, sandbox-confirmed against a live interaction run: vehicle 5 still read driver:none tick after tick with the unset dropdown). The explicit 'set' step below picks option value \"6\" before the click, matching the console command's own explicit employee id.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -260,17 +286,22 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] select",
+          "value": "6"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 59200
+          "cash": 79268
         }
       }
     },
@@ -299,6 +330,16 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#553: idempotent — a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired during the tick 10 block above. A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls the tick 20 step below before the driver ever gets to deliver -- sandbox-measured, an event can fire in this window on seed 42, and events.ts's tick command stops dead the instant one fires mid-block, silently short of the requested count.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "tick 20",
@@ -340,20 +381,25 @@
       "role": "observe"
     },
     {
+      "command": "event choose 0",
+      "description": "#553: idempotent — a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-file (sandbox-measured: an event fires around here on seed 42). A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls the tick 40 step below.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "tick 40",
+      "description": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Not re-asserting the amount a second time, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all. #553: cash no longer asserted decreased here either -- the event choose 0 above may itself have moved cash (income or cost, event-dependent), so a following tick's own further decrease isn't guaranteed on every seed/timing. No checkable field left that holds on every seed/timing; the next state-full step's exact equals block is this step's real proof that nothing broke.",
       "interaction": [
         {
           "type": "command",
           "command": "tick 40"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "note": "storedMassKg is deliberately not asserted to an exact value here: automatic dispatch's own fragment choice (findReachableGroundFragment, run at claim time instead of on a player click) is sensitive to the driver's exact tick-by-tick position, and interaction mode's real wall-clock ticking (Finding #12) can in principle pick a different -- but equally valid -- fragment than command mode's clean tick10. Left as increased/under-asserted-exact rather than hard-pinning a specific kg figure, since the prior tick 20 step's increased:[storedMassKg] already proves delivery completed at all -- not re-asserting the amount a second time."
-      }
+      "role": "setup"
     },
     {
       "command": "fragments",
@@ -376,10 +422,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "employeeCount": 1,
-          "vehicleCount": 1,
+          "employeeCount": 6,
+          "vehicleCount": 4,
           "buildingCount": 1
-        }
+        },
+        "note": "#553: staffed:true's roster/fleet (5 employees, 4 vehicles minus the drill_rig the blast destroyed, plus this file's own driver/debris_hauler) — not 1/1/1"
       }
     }
   ]

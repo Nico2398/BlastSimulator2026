@@ -3,6 +3,11 @@
 
 import { type VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import {
+  DRILL_HOLE_BASE_DURATION_TICKS,
+  DRILL_HOLE_REFERENCE_DEPTH_M,
+  DRILL_HOLE_REFERENCE_DIAMETER_M,
+} from '../config/balance.js';
 
 export interface DrillHole {
   id: string;
@@ -15,6 +20,15 @@ export interface DrillHole {
   /** Hole diameter in meters (real drill holes: 75–150mm). */
   diameter: number;
 }
+
+/**
+ * A hole that has been ordered but not yet drilled — lives in
+ * `state.plannedDrillHoles` until its `drill_hole` action completes and it
+ * lands in `state.drillHoles` (#553). The split is which state array a hole
+ * lives in, not the value shape: `PlannedHole` and `DrillHole` are the same
+ * fields.
+ */
+export type PlannedHole = DrillHole;
 
 let nextHoleId = 1;
 
@@ -31,7 +45,7 @@ export function createGridPlan(
   spacing: number,
   depth: number,
   diameter: number,
-): DrillHole[] {
+): PlannedHole[] {
   const holes: DrillHole[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -54,7 +68,7 @@ export function addHole(
   z: number,
   depth: number,
   diameter: number,
-): DrillHole {
+): PlannedHole {
   const hole: DrillHole = { id: `H${nextHoleId++}`, x, z, depth, diameter };
   holes.push(hole);
   return hole;
@@ -77,6 +91,33 @@ export function removeHole(holes: DrillHole[], holeId: string): boolean {
  */
 export function holeNumericId(holeId: string): number {
   return parseInt(holeId.slice(1), 10);
+}
+
+/**
+ * Move a hole from the ordered pool to the drilled pool once its `drill_hole`
+ * action completes (#553). Same value shape, different state array — see
+ * `PlannedHole`.
+ */
+export function landDrilledHole(planned: PlannedHole): DrillHole {
+  return {
+    id: planned.id,
+    x: planned.x,
+    z: planned.z,
+    depth: planned.depth,
+    diameter: planned.diameter,
+  };
+}
+
+/** Ticks required to drill one hole, scaled from the reference depth/diameter (#553). */
+export function computeDrillHoleDurationTicks(depth: number, diameter: number): number {
+  return Math.max(
+    1,
+    Math.round(
+      DRILL_HOLE_BASE_DURATION_TICKS
+      * (depth / DRILL_HOLE_REFERENCE_DEPTH_M)
+      * (diameter / DRILL_HOLE_REFERENCE_DIAMETER_M),
+    ),
+  );
 }
 
 export interface DigVoxelResult {

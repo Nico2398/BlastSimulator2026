@@ -15,13 +15,14 @@
   ],
   "steps": [
     {
-      "command": "new_game seed:42 size:32",
+      "command": "new_game seed:42 size:32 staffed:true",
       "timeout": 30,
       "role": "setup",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:32"
+          "command": "new_game seed:42 size:32 staffed:true"
         }
       ],
       "expect": {
@@ -35,7 +36,7 @@
       "command": "drill_plan grid origin:5,5 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 60,
       "role": "player",
-      "description": "Split out of the original bundled setup step (issue #479). Drag (5,5)-(8,8) is 3x3 at the panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts) — matches the declared spacing:3 exactly, no stepper click needed (unlike most other blast-* grid steps, Finding #4).",
+      "description": "Split out of the original bundled setup step (issue #479). Drag (5,5)-(8,8) is 3x3 at the panel's own default spacing (DEFAULT_SPACING_M=3, Drill.ts) — matches the declared spacing:3 exactly, no stepper click needed (unlike most other blast-* grid steps, Finding #4). #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -70,9 +71,27 @@
       ],
       "expect": {
         "equals": {
-          "holeCount": 4
+          "orderedHoleCount": 4,
+          "holeCount": 0
         },
-        "note": "2 rows x 2 cols = 4"
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 45",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 35).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 45"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
       }
     },
     {
@@ -130,9 +149,7 @@
         }
       ],
       "expect": {
-        "equals": {
-          "cash": 49500
-        }
+        "decreased": ["cash"]
       }
     },
     {

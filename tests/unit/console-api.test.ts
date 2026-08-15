@@ -54,11 +54,16 @@ import type { MiningContext } from '../../src/console-api.js';
  * columns had no field to check beyond inferring it from a flat
  * employeeCount (which still counts dead employees, since killEmployee
  * marks alive:false rather than removing the roster entry).
+ * orderedHoleCount (state.plannedDrillHoles.length) closes the same gap for
+ * a confirmed drill plan's holes still in flight (#553) — drill_plan
+ * grid/add now queues one drill_hole action per hole instead of writing it
+ * straight into state.drillHoles, so a scenario proving a plan was queued
+ * but not yet drilled had no field to check before this.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'chargedCount',
+  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'deathCount',
@@ -270,7 +275,30 @@ describe('console-api', () => {
       runner.runner.run('new_game seed:42');
       runner.runner.run('campaign start level:tutorial_pit');
       runner.runner.run('employee hire role:driller');
+      const empId = runner.ctx.state!.employees.employees[0]!.id;
+      // The hired driller starts qualified 'blasting' (ROLE_STARTING_QUALIFICATION,
+      // Employee.ts) but drill_plan grid now queues one drill_hole PendingAction
+      // per hole instead of writing them straight into state.drillHoles (#553) —
+      // it also needs a drill_rig vehicle (and a driving.drill_rig licence) to
+      // ever complete one. Buying/assigning both and ticking to completion sends
+      // the driller walking to (and standing at) each ordered hole in turn,
+      // which is squarely inside the blasted grid — an even more direct proof
+      // of "standing in the cleared columns" than the pre-#553 instant-drill
+      // version.
+      runner.runner.run(`employee assign_skill ${empId} skill:driving.drill_rig level:1`);
+      runner.runner.run('vehicle buy drill_rig');
       runner.runner.run('drill_plan grid rows:4 cols:4 spacing:3 depth:8 start:15,15');
+      for (let i = 0; i < 600 && runner.ctx.state!.plannedDrillHoles.length > 0; i++) {
+        // Tops up needs each tick — this solo multi-hole drive would otherwise
+        // run long enough to trip an unrelated needs collapse mid-task (out of
+        // scope for this test; see mining-commands.test.ts's equivalent helper).
+        for (const emp of runner.ctx.state!.employees.employees) {
+          emp.hunger = 100;
+          emp.fatigue = 100;
+          emp.breakNeed = 100;
+        }
+        runner.runner.run('tick 1');
+      }
       runner.runner.run('charge hole:* explosive:boomite amount:5 stemming:2');
       runner.runner.run('sequence auto delay_step:25');
       runner.runner.run('blast');
@@ -341,12 +369,30 @@ describe('console-api', () => {
     });
 
     it('tracks drill holes added after creation', () => {
-      runner.runner.run('new_game mine_type:desert seed:42');
+      // Staffed (#553): drill_plan grid now queues one drill_hole
+      // PendingAction per hole instead of writing them straight into
+      // state.drillHoles — a 'blasting'-qualified employee and a drill_rig
+      // vehicle are needed for any hole to actually land.
+      runner.runner.run('new_game mine_type:desert seed:42 staffed:true');
       runner.runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:6 start:15,15');
+      expect(serializeGameState(runner.ctx as MiningContext)!.orderedHoleCount).toBe(6);
+
+      for (let i = 0; i < 300 && runner.ctx.state!.plannedDrillHoles.length > 0; i++) {
+        // Tops up needs each tick — a solo multi-hole drive can otherwise run
+        // long enough to trip an unrelated needs collapse mid-task (out of
+        // scope here; see mining-commands.test.ts's equivalent helper).
+        for (const emp of runner.ctx.state!.employees.employees) {
+          emp.hunger = 100;
+          emp.fatigue = 100;
+          emp.breakNeed = 100;
+        }
+        runner.runner.run('tick 1');
+      }
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.holeCount).toBe(6);
       expect(state.drillHoles).toHaveLength(6);
+      expect(state.orderedHoleCount).toBe(0);
     });
 
     it('is deterministic for a given seed', () => {

@@ -3,17 +3,18 @@
   "description": "Visual verification of safety and projection systems: safety zone evacuation before blast, blast projection trajectories based on overcharge/stemming/free face/sequence, buildings/vehicles in projection path, and post-blast damage assessment.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "new_game seed:42 cash:250000 staffed:true",
+      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill site to matter, and campaign start has no staffed:true equivalent anyway. staffed:true (a driller with blasting + drill_rig licence, plus an unmanned drill_rig, hired/purchased for free) is what #553's automatic drill dispatch needs to ever land an ordered hole. Cash bumped to $250,000 for headroom through the drilling wait (no income anywhere in this file) on top of the freight_warehouse/software-tier spend already here.",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "new_game seed:42 cash:250000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 250000
         }
       }
     },
@@ -48,7 +49,7 @@
       "description": "Left unmarked, confirmed not equivalent (not merely unverified): Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using `currentZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)` -- a rectangle derived from the live drill plan, never a player-typed one. At this point in the file state.drillHoles is empty (the file's only drill_plan step runs later), so computeDangerZone returns null, this.currentZone is null, and the horn button is disabled outright (occupants defaults to [] when zone is null, and hornBtn.disabled = occupants.length === 0) -- soundHorn() itself also no-ops on a null zone (`if (!zone) return;`). A player cannot produce this command by clicking here: not a different rectangle, but a control that doesn't work yet at this point in the scenario. (Later in the file, once the 4x4/spacing:3 grid at (20,20) exists, computeDangerZone's own padding would still produce (5,5,44,44), not this step's literal (5,5,35,35) -- so even a same-moment click would diverge from this explicit rectangle.)",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 250000
         },
         "note": "no state field exposes zone bounds/status -- proven instead by the zone status observe step's own text output"
       },
@@ -103,8 +104,58 @@
       }
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix (issue #586 CI): the staffed driller working this 4x4=16-hole pattern unattended for the hundreds of real ticks drilling now takes runs well-being down far enough that WORKER REVOLT fires right as the last hole lands (razor-thin, confirmed sandbox-measured on this exact seed) -- its full-screen game-over overlay then blocks every subsequent panel click, exactly the `clickSelector \"#bs-blast-panel [data-step=\\\"2\\\"]\" failed: element is covered by div` CI failure. Adding a second working drill_rig was tried first and rejected: it changes hole-completion ORDER (two drillers interleave which hole lands when), and this file's blast turned out to be order-sensitive -- sequence auto's V-pattern delay assignment produced a measurably different fragment count and, worse, destroyed the freight_warehouse this file's whole safety-zone premise depends on surviving (sandbox-confirmed: identical 1114 cleared voxels either way, but a different exact voxel set). Two idle, unrigged relief hires instead (this employee and the one below) leave the sole driller's own drilling completely unchanged -- same order, same timing, same blast outcome, byte-for-byte (sandbox-confirmed: 2230 fragments and the warehouse at full HP, identical to the pre-fix file) -- while their fresh, untouched needs pull the roster's average morale (and therefore well-being, ScoreManager.ts) up just enough that the 120-tick WORKER REVOLT countdown never matures before tick 400. Employee #6 (staffed:true's own roster already occupies ids 1-5). #553-followup: the preceding step (`build freight_warehouse`) leaves the build panel active (ToolRail's click handler is a togglePanel toggle, UIManager.ts:450), not employees -- added the toolbar employees-panel click as the first action here so the driller row is actually visible before waitForSelector/clickSelector reach it.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 6
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 crew-walkout fix: employee #7, the second idle relief hire -- see the step above for why. Deliberately left unrigged and unskilled, same as employee #6.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 7
+        }
+      }
+    },
+    {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 start:20,20",
-      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged.",
+      "description": "Corrected from the original rows:3 cols:3 spacing:5 (which command mode ran literally, producing 9 holes): the click drags the (20,20)-(30,30) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = 4x4 = 16 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json. Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing deliberately left at the default 3m rather than tightened like most other files' 9-16-hole grids -- a sandbox-measured trial at 2m produced a drastically more violent CATASTROPHIC blast (1259 affected voxels vs. 3m's much smaller footprint) that destroyed the freight_warehouse this file's own safety-zone premise depends on surviving. Cash bumped further ($250,000) to cover the longer drilling wait at the unmodified 3m spacing instead.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -136,13 +187,174 @@
       "role": "player",
       "expect": {
         "equals": {
+          "orderedHoleCount": 16,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). Sandbox-measured landing at tick 400 (8 chunks) for this 16-hole grid with the staffed roster's single driller.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "Eighth and final chunk \u2014 all 16 holes should have landed by now.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
           "holeCount": 16
         }
       }
     },
     {
-      "command": "charge hole:* explosive:boomite amount:8 stemming:1",
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:1.8",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): stemming raised 1.0 m -> 1.8 m, the fix for the freight_warehouse dying in interaction mode while command mode kept it alive. Root cause is flyrock, not the crater: a building is destroyed either by a cleared voxel landing inside its footprint (BlastExecution.ts step 5b) or by a thrown fragment coming to rest within HIT_RADIUS=2.0 m of its centre with >=500 J (processProjections, Damage.ts, called from the blast command). At 1.0 m stemming on 6 m holes the charge vents to the surface and throws 444 projections up to ~52 m across a 64x64 m site, so *every* tile on the map is inside flyrock range and warehouse survival is a lottery on where those 444 land. What decides that is the auto-sequence delay layout, which keys off state.drillHoles' array ORDER, and interaction mode fills that array in real-time drill-completion order rather than command mode's fixed plan order. Sandbox-measured over 64 shuffled completion orders on this exact setup: at amount:8 stemming:1 the warehouse survives 42/64 (closest projection landed 0.2 m from its centre, peak damage 9345 vs 150 HP); at amount:8 stemming:1.8 it survives 64/64, closest landing 3.8 m -- nearly 2x the 2.0 m hit radius, with no hit recorded at all. Rejected alternatives, both sandbox-measured: (a) moving the warehouse further out does nothing, because flyrock at 1.0 m stemming is sprayed over the whole site -- (38,25) 11/24, (40,25) 11/24, (42,25) 11/24, (45,25) 12/24, i.e. still a coin flip 16 tiles away, and at 1.8 m stemming (45,25) is actually *worse* (29/32) than (35,25) (64/64); (b) cutting the charge to 6 kg also holds, but throws away the overcharge this file exists to visualise (77 projections vs 147). Stemming is the physically right knob anyway -- flyrock is what an under-stemmed hole produces, and 1.0 m of stemming on a 6 m hole is barely a sixth of the column. The blast stays CATASTROPHIC and gets *bigger*, not tamer: confining it puts more energy into the rock (1247 cleared voxels vs 1114), it still throws 147 projections ~51 m for the projection preview to draw, and ecology/nuisance still drop. Panel clicks follow the value: DEFAULT_STEMMING_M=2 with 0.2 m per click (Charge.ts), so one decrement now instead of five.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -169,22 +381,6 @@
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
           "type": "assert",
           "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"][data-selected=\"true\"]"
         },
@@ -198,7 +394,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "1.0 m"
+          "expectedValue": "1.8 m"
         },
         {
           "type": "clickSelector",
@@ -316,10 +512,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "cash": 27500
-        },
-        "note": "Finding #36: buy_software used to leave state.finances.cash diverged from this flat field by the sum of every tier cost, fixed at the root"
+        "note": "Finding #36: buy_software used to leave state.finances.cash diverged from this flat field by the sum of every tier cost, fixed at the root. #553-followup: dropped the hardcoded `equals: {cash: 60430}` -- adding the employees-panel toolbar click to the Employee #6 hire step above (see that step's own note) is interaction-mode-only (command mode's own `employee hire role:driller` string is untouched), and processFrame ticks off the render loop's own wall clock while `time resume` is in effect (GameLoop.ts): one extra CDP round-trip before this checkpoint means interaction mode now accrues different payroll than command mode's fully tick-command-driven, unaffected 60430 (sandbox-measured: interaction mode lands on 60684 here, deterministic for a given host load, but not equal to command mode's own value). `decreased` alone still proves the tier-3 purchase actually spent cash in both modes, matching tier:1/tier:2's own steps above, which never asserted an exact figure to begin with."
       }
     },
     {
@@ -337,9 +530,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 27500
+          "chargedCount": 16,
+          "sequencedCount": 16
         },
-        "note": "a preview is read-only -- no cash or hole/charge/sequence count moves"
+        "note": "a preview is read-only -- no cash or hole/charge/sequence count moves. #553-followup: switched the read-only proof from an exact cash figure to chargedCount/sequencedCount -- cash is real-time-tick-sensitive in interaction mode (see buy_software tier:3's own note above) and no longer has a single value both modes agree on, while charge/sequence counts don't decay with elapsed ticks the way cash does, so they hold in both modes regardless of host timing."
       }
     },
     {
@@ -391,7 +585,7 @@
           "ecology",
           "nuisance"
         ],
-        "note": "buildingCount stays 1 -- the freight_warehouse the safety-zone/projection setup is built around survives the blast unscathed (confirmed via direct trace: HP 150/150 unchanged), which is this file's own premise about the safety zone doing its job"
+        "note": "buildingCount stays 1 -- the freight_warehouse the safety-zone/projection setup is built around survives the blast unscathed (confirmed via direct trace: HP 150/150 unchanged), which is this file's own premise about the safety zone doing its job. #553-followup (issue #586 CI): this used to hold in command mode and fail in interaction mode; it now holds in both because the charge step's stemming went 1.0 m -> 1.8 m, which drops flyrock from 444 projections to 147 and moves the closest landing from 0.2 m to 3.8 m of the warehouse centre against a 2.0 m hit radius (Damage.ts HIT_RADIUS) -- survival measured 64/64 over shuffled drill-completion orders instead of 42/64. Full measurement and the rejected alternatives are in the charge step's own description. Deliberately NOT weakened to a note-only field: proving the building survives is what this file is for."
       }
     },
     {

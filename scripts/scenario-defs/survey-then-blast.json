@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow cash:200000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow cash:200000"
         }
       ],
       "role": "setup",
@@ -83,7 +83,7 @@
       "expect": {
         "equals": {
           "employeeCount": 1,
-          "cash": 48800
+          "cash": 198800
         }
       }
     },
@@ -446,7 +446,127 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:25,25",
+      "command": "employee hire role:driller",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed a driller at all) now needs one. campaign start has no staffed:true equivalent, so this is a manual hire + purchase, same pattern as weather-flood.json/vibration-budget.json. Employee #2 -- #1 is the surveyor hired above.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "#553 follow-up: a single driller/drill_rig cannot finish this 9-hole grid before well-being's 120-tick worker-revolt countdown completes -- sandbox-measured directly (pure command-mode engine probe, no browser): one driller starting fresh at tick 0 with full needs still only reaches 5/9 holes by the tick the crew revolts, and a `build living_quarters` early makes it WORSE (the driller detours to rest there instead of progressing, landing 0/9 holes). A second driller/drill_rig running in parallel is the strategy that actually finishes in time -- sandbox-measured landing at tick ~297 vs. revolt's tick ~333, an 8-tick margin at the tick-block sizes below. Employee #3 -- #1 is the surveyor, #2 the first driller, both hired above.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 3 skill:driving.drill_rig level:1",
+      "description": "Left unmarked: same reasoning as employee #2's driving.drill_rig assignment above -- no role starts with this skill, and this file isn't about training.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 3 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:25,25",
       "interaction": [
         {
           "type": "clickSelector",
@@ -462,18 +582,14 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "dragTiles",
           "x1": 25,
           "z1": 25,
-          "x2": 35,
-          "z2": 35
+          "x2": 29,
+          "z2": 29
         },
         {
           "type": "screenshot"
@@ -486,10 +602,69 @@
       "role": "player",
       "expect": {
         "equals": {
-          "holeCount": 9
+          "orderedHoleCount": 9,
+          "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs working it in parallel (a single driller cannot finish before the 120-tick worker-revolt countdown -- see the second `employee hire role:driller` step above)."
+    },
+    {
+      "command": "tick 50",
+      "description": "#553 follow-up: drain the ordered plan in bounded chunks rather than one large tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. With two drillers working in parallel, sandbox-measured (pure command-mode engine probe) landing all 9 holes around tick ~297-310 from a drill_plan at tick 102, comfortably inside the worker-revolt countdown's tick ~333 deadline -- the last (5th) chunk below is deliberately smaller than the others to land in that window with margin rather than overshoot into revolt.",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [{"type": "command", "command": "tick 50"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "description": "Fifth and final chunk, deliberately smaller than the rest -- all 9 holes should have landed by now, with margin before the worker-revolt countdown completes.",
+      "interaction": [{"type": "command", "command": "tick 20"}],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",

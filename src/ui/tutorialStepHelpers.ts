@@ -197,11 +197,11 @@ export function getEmployees(state: GameState): { role: string; hunger: number; 
 }
 
 /** Safe access to vehicles array from mock-friendly state. */
-export function getVehicles(state: GameState): { driverId: number | null }[] {
+export function getVehicles(state: GameState): { id: number; driverId: number | null }[] {
   const v = getGameStateDict(state).vehicles;
-  if (Array.isArray(v)) return v as unknown as { driverId: number | null }[];
+  if (Array.isArray(v)) return v as unknown as { id: number; driverId: number | null }[];
   const vObj = v as Record<string, unknown> | undefined;
-  return (vObj?.vehicles ?? []) as { driverId: number | null }[];
+  return (vObj?.vehicles ?? []) as { id: number; driverId: number | null }[];
 }
 
 /** Safe access to buildings array. */

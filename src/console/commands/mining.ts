@@ -3,7 +3,11 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import { createGridPlan, addHole, removeHole, resetHoleIds } from '../../core/mining/DrillPlan.js';
+import {
+  createGridPlan, addHole, removeHole, resetHoleIds,
+  computeDrillHoleDurationTicks,
+} from '../../core/mining/DrillPlan.js';
+import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
 import { createCharge, batchCharge } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
@@ -64,6 +68,42 @@ function requireGame(ctx: MiningContext): string | null {
   return null;
 }
 
+/** Payload carried by a queued `drill_hole` PendingAction (#553). */
+export interface DrillHoleActionPayload {
+  holeId: string;
+  x: number;
+  z: number;
+  depth: number;
+  diameter: number;
+  durationTicks: number;
+}
+
+/**
+ * Cancel every outstanding `drill_hole` PendingAction (queued/assigned/
+ * in_progress — anything not yet completed) and empty both hole pools
+ * (`plannedDrillHoles` and `drillHoles`), plus any per-hole charge/sequence
+ * state keyed by hole id (#553). Cancellation is routed through the shared
+ * `cancelAction` (#548) so an in-flight employee/vehicle is released back to
+ * idle and any order-time cost is refunded — `drill_hole` carries none today
+ * (only `survey` charges upfront), so the refund is always 0 in practice.
+ * Returns the total number of holes cleared (ordered + drilled).
+ */
+export function clearDrillPlan(ctx: MiningContext): number {
+  const state = ctx.state!;
+  const clearedCount = state.drillHoles.length + state.plannedDrillHoles.length;
+
+  for (const action of state.pendingActions.filter(a => a.type === 'drill_hole')) {
+    cancelAction(state, action.id);
+  }
+
+  state.plannedDrillHoles = [];
+  state.drillHoles = [];
+  state.chargesByHole = {};
+  state.sequenceDelays = {};
+
+  return clearedCount;
+}
+
 // ── Drill plan commands ──
 
 export function drillPlanCommand(
@@ -98,25 +138,39 @@ export function drillPlanCommand(
       return { success: false, output: claim.output! };
     }
 
-    ctx.state!.drillHoles = planned;
-    // Clear stale charges/sequences from previous plan
-    ctx.state!.chargesByHole = {};
-    ctx.state!.sequenceDelays = {};
+    // A grid replaces the whole plan (#553): drop every hole (ordered or
+    // already drilled) and any drill_hole action still outstanding for them
+    // first, so resetHoleIds()'s restart-at-H1 above never collides with an
+    // id still live in pendingActions/plannedDrillHoles.
+    clearDrillPlan(ctx);
 
-    // Patch NavGrid to reflect new drill hole cells
-    if (ctx.state!.navGrid && ctx.grid) {
-      const ox = Math.floor(origin[0] ?? 0);
-      const oz = Math.floor(origin[1] ?? 0);
-      const region = {
-        minX: ox, maxX: ox + Math.ceil(cols * spacing),
-        minZ: oz, maxZ: oz + Math.ceil(rows * spacing),
-      };
-      NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, region);
+    for (const hole of planned) {
+      const durationTicks = computeDrillHoleDurationTicks(hole.depth, hole.diameter);
+      const actionId = ctx.state!.nextPendingActionId++;
+      // skipQualificationCheck (#553, mirrors HaulDispatch.ts's #552
+      // syncHaulDispatch): a drill plan must queue silently even when nobody
+      // on the roster currently holds 'blasting' or a drill_rig licence —
+      // rejecting it outright here would make ordering holes depend on
+      // hiring order instead of eventually being drillable once qualified.
+      dispatchPendingAction(ctx.state!, {
+        id: actionId,
+        type: 'drill_hole',
+        requiredSkill: 'blasting',
+        requiredVehicleRole: 'drill_rig',
+        targetX: hole.x,
+        targetZ: hole.z,
+        targetY: 0,
+        payload: {
+          holeId: hole.id, x: hole.x, z: hole.z, depth: hole.depth, diameter: hole.diameter, durationTicks,
+        } satisfies DrillHoleActionPayload,
+        targetEmployeeId: null,
+      }, { skipQualificationCheck: true });
+      ctx.state!.plannedDrillHoles.push(hole);
     }
 
     return {
       success: true,
-      output: `Drill plan: ${rows}×${cols} grid, ${ctx.state!.drillHoles.length} holes, spacing ${spacing}m, depth ${depth}m`,
+      output: `Drill plan: ${rows}×${cols} grid, ${ctx.state!.plannedDrillHoles.length} holes ordered, spacing ${spacing}m, depth ${depth}m`,
     };
   }
 
@@ -128,41 +182,70 @@ export function drillPlanCommand(
     const claim = claimForAction(ctx, [{ x, z }], 'drill');
     if (!claim.ok) return { success: false, output: claim.output! };
 
-    const hole = addHole(ctx.state!.drillHoles, x, z, depth, diameter);
+    // Additive — unlike 'grid' above, does not clear the existing plan.
+    const hole = addHole(ctx.state!.plannedDrillHoles, x, z, depth, diameter);
+    const durationTicks = computeDrillHoleDurationTicks(hole.depth, hole.diameter);
+    const actionId = ctx.state!.nextPendingActionId++;
+    dispatchPendingAction(ctx.state!, {
+      id: actionId,
+      type: 'drill_hole',
+      requiredSkill: 'blasting',
+      requiredVehicleRole: 'drill_rig',
+      targetX: hole.x,
+      targetZ: hole.z,
+      targetY: 0,
+      payload: {
+        holeId: hole.id, x: hole.x, z: hole.z, depth: hole.depth, diameter: hole.diameter, durationTicks,
+      } satisfies DrillHoleActionPayload,
+      targetEmployeeId: null,
+    }, { skipQualificationCheck: true });
+
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };
   }
 
   if (sub === 'clear') {
-    const clearedCount = ctx.state!.drillHoles.length;
-    ctx.state!.drillHoles = [];
-    ctx.state!.chargesByHole = {};
-    ctx.state!.sequenceDelays = {};
+    const clearedCount = clearDrillPlan(ctx);
     return { success: true, output: `Cleared drill plan (${clearedCount} holes)` };
   }
 
   if (sub === 'remove') {
+    const state = ctx.state!;
     const holeSpec = named['hole'] ?? '';
-    const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
+    const holeId = (state.drillHoles.find(h => h.id === holeSpec) || state.plannedDrillHoles.find(h => h.id === holeSpec))
       ? holeSpec
       : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
 
-    if (!removeHole(ctx.state!.drillHoles, holeId)) {
-      return { success: false, output: `Hole "${holeId}" not found` };
+    if (removeHole(state.drillHoles, holeId)) {
+      delete state.chargesByHole[holeId];
+      delete state.sequenceDelays[holeId];
+      return { success: true, output: `Removed hole ${holeId}` };
     }
 
-    delete ctx.state!.chargesByHole[holeId];
-    delete ctx.state!.sequenceDelays[holeId];
+    const plannedIdx = state.plannedDrillHoles.findIndex(h => h.id === holeId);
+    if (plannedIdx !== -1) {
+      const action = state.pendingActions.find(a => a.type === 'drill_hole' && a.payload['holeId'] === holeId);
+      if (action) cancelAction(state, action.id);
+      state.plannedDrillHoles.splice(plannedIdx, 1);
+      delete state.chargesByHole[holeId];
+      delete state.sequenceDelays[holeId];
+      return { success: true, output: `Removed hole ${holeId}` };
+    }
 
-    return { success: true, output: `Removed hole ${holeId}` };
+    return { success: false, output: `Hole "${holeId}" not found` };
   }
 
   if (sub === 'show') {
-    if (ctx.state!.drillHoles.length === 0) {
+    const state = ctx.state!;
+    if (state.drillHoles.length === 0 && state.plannedDrillHoles.length === 0) {
       return { success: true, output: 'No drill holes. Use drill_plan grid or drill_plan add.' };
     }
-    const lines = ctx.state!.drillHoles.map(h =>
+    const orderedLines = state.plannedDrillHoles.map(h =>
+      `  ${h.id}: (${h.x}, ${h.z}) depth=${h.depth}m dia=${h.diameter}m [ORDERED]`,
+    );
+    const drilledLines = state.drillHoles.map(h =>
       `  ${h.id}: (${h.x}, ${h.z}) depth=${h.depth}m dia=${h.diameter}m`,
     );
+    const lines = [...orderedLines, ...drilledLines];
     return { success: true, output: `Drill plan (${lines.length} holes):\n${lines.join('\n')}` };
   }
 
@@ -208,11 +291,15 @@ export function chargeCommand(
   }
 
   // Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format
-  const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
+  const holeId = (ctx.state!.drillHoles.find(h => h.id === holeSpec) || ctx.state!.plannedDrillHoles.find(h => h.id === holeSpec))
     ? holeSpec
     : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
   const hole = ctx.state!.drillHoles.find(h => h.id === holeId);
-  if (!hole) return { success: false, output: `Hole "${holeId}" not found` };
+  if (!hole) {
+    const planned = ctx.state!.plannedDrillHoles.find(h => h.id === holeId);
+    if (planned) return { success: false, output: `Hole "${holeId}" has not been drilled yet.` };
+    return { success: false, output: `Hole "${holeId}" not found` };
+  }
 
   const result = createCharge(explosiveId, amount, stemming, hole.depth);
   if ('error' in result) return { success: false, output: result.error };

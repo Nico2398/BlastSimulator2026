@@ -15,19 +15,19 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit",
+      "command": "campaign start level:tutorial_pit cash:250000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera",
+      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list.",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit"
+          "command": "campaign start level:tutorial_pit cash:250000"
         }
       ],
       "expect": {
         "equals": {
-          "cash": 80000
+          "cash": 250000
         }
       }
     },
@@ -196,7 +196,136 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "box-cut"
+          "stepId": "build-driving-center"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "build-driving-center"
+      }
+    },
+    {
+      "command": "build driving_center at:10,8",
+      "timeout": 30,
+      "description": "#553: build-driving-center complete: driving_center built through the Build panel -- drill_hole became a queued, vehicle-gated action (a driller physically drives a drill_rig to each hole), and hiring only grants the driller their 'blasting' qualification, never the driving.drill_rig licence a drill_rig needs. This step and the two after it (train-driller, buy-drill-rig-assign) close that gap, the same deadlock class #552 fixed for hauling.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 10,
+          "z": 8
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "train-driller"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "train-driller"
+      }
+    },
+    {
+      "command": "employee train 2 skill:driving.drill_rig",
+      "timeout": 30,
+      "description": "#553: train-driller, click half: driving.drill_rig course booked at the driving_center just built. Training itself takes real ticks (TRAINING_BASE_TICKS, balance.ts) -- command mode has no implicit clock between steps (unlike interaction mode's own waitForTutorialStep), so the wait is its own step right below, mirroring this file's existing tick-1/tick-6 wait-only beats.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "trainingCount"
+        ]
+      }
+    },
+    {
+      "command": "tick 25",
+      "timeout": 30,
+      "description": "#553: train-driller complete: the training course finishes and the driller (employee #2) is granted driving.drill_rig. waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick since it has no implicit clock between steps.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "buy-drill-rig-assign",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "buy-drill-rig-assign"
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "timeout": 30,
+      "description": "buy-drill-rig-assign, first half: Vehicles panel open, tier-1 drill_rig bought and placed on the terrain surface",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 1 2",
+      "timeout": 90,
+      "description": "#553: buy-drill-rig-assign complete: Assign clicked, then the tutorial's own clock runs while the newly-licensed driller (employee #2) walks to the drill_rig and boards -- the drill-plan step right after this one can only ever land a hole once this actually completes.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "box-cut",
+          "timeout": 60000
         }
       ],
       "expect": {
@@ -266,7 +395,7 @@
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
       "timeout": 60,
-      "description": "drill-plan complete: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed",
+      "description": "drill-plan, click half: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below.",
       "role": "player",
       "interaction": [
         {
@@ -294,10 +423,24 @@
         {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
-        },
+        }
+      ],
+      "expect": {
+        "increased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "tick 300",
+      "timeout": 90,
+      "description": "#553: drill-plan complete: the driller drives the drill_rig to all 9 ordered holes and drills them (sandbox-measured: a single driller/drill_rig lands a 3x3 spacing:5 grid on tutorial_pit in ~300 ticks door-to-door). waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick since it has no implicit clock between steps.",
+      "role": "player",
+      "interaction": [
         {
           "type": "waitForTutorialStep",
-          "stepId": "charge"
+          "stepId": "charge",
+          "timeout": 90000
         }
       ],
       "expect": {
@@ -306,6 +449,16 @@
           "holeCount"
         ]
       }
+    },
+    {
+      "command": "event choose 0",
+      "description": "Defensive: a `tick N` step silently completes fewer ticks than requested if a random event fires mid-wait, and every subsequent tick then refuses until the event is resolved. No-op when nothing is pending.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ]
     },
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
@@ -461,9 +614,9 @@
       }
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept 20",
       "timeout": 30,
-      "description": "contract-accept complete: Accept clicked on the first offer in the Contracts panel #513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it.",
+      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this PR the accept click is scoped to `[data-contract-id]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. That scoping doesn't hold under the tutorial's own rails here, though: tutorialStages.ts's own 'contract-accept' stage declares its live target as the UNSCOPED `#bs-contract-panel .bs-contract-accept` (not a specific id), so a click scoped to one exact id is racing the offer pool's own refresh clock (REFRESH_INTERVAL, Contract.ts) on top of the tutorial rail's own gating -- under real render load this file (300+ extra ticks reaching this point) hit exactly that race, the id scoped here rotating out of the DOM between the wait and the click. Unscoped instead, matching the tutorial's own permitted target: this step's only assertion is which tutorial stage is reached next (`hire-driver`), not which contract identity was accepted, so there's no silent-divergence risk the way level1-win-efficient.json's own scoped case guards against -- `command`'s own id (20) still exercises command mode's real accept path independently.",
       "role": "player",
       "interaction": [
         {
@@ -472,7 +625,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel .bs-contract-accept"
         },
         {
           "type": "waitForTutorialStep",
@@ -544,9 +697,9 @@
       }
     },
     {
-      "command": "vehicle driver 1 4",
+      "command": "vehicle driver 2 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1 (destroyed by its own blast, but the id isn't reused).",
       "role": "player",
       "interaction": [
         {
@@ -627,9 +780,9 @@
       }
     },
     {
-      "command": "contract deliver 1 amount:5000",
+      "command": "contract deliver 20 amount:200",
       "timeout": 90,
-      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Left unmarked: command mode's own `contract deliver` fails synchronously here (\"Not enough stored material\" -- command mode's automatic dispatch (#552) needs real ticks to actually drive/load/deliver, and the haul-debris step above only advances a single tick, so nothing is ever in storage there), while interaction mode's identical click genuinely succeeds because the tutorial's own waitForTutorialStep gate only advances once delivery truly completes -- activeContractCount would drop to 0 there but stay 1 in command mode, so it is not safely checkable across both modes (same class as Findings #21/#22/#31).",
+      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Left unmarked: command mode's own `contract deliver` fails synchronously here (\"Not enough stored material\" -- command mode's automatic dispatch (#552) needs real ticks to actually drive/load/deliver, and the haul-debris step above only advances a single tick, so nothing is ever in storage there), while interaction mode's identical click genuinely succeeds because the tutorial's own waitForTutorialStep gate only advances once delivery truly completes -- activeContractCount would drop to 0 there but stay 1 in command mode, so it is not safely checkable across both modes (same class as Findings #21/#22/#31). #553: contract ID drifted from #1 to #20 (see the accept step's own note); amount lowered from 5000 to 200 to match contract #20's own 430kg cap.",
       "role": "player",
       "interaction": [
         {

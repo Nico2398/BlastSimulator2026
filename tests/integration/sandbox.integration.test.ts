@@ -116,10 +116,26 @@ describe('sandbox mode', () => {
   });
 
   it('is playable: a blast on a sandbox site removes rock', () => {
-    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:42');
+    // Staffed (#553): drill_plan grid now queues one drill_hole PendingAction
+    // per hole instead of writing them straight into state.drillHoles — a
+    // 'blasting'-qualified employee and a drill_rig vehicle are needed for
+    // any hole to actually land, same composition drill-plan-queueing.test.ts
+    // uses for `new_game ... staffed:true`.
+    runner.run('sandbox start biome:desert_badlands difficulty:easy seed:42 staffed:true');
     const before = solidCount(ctx.grid!);
 
     runner.run('drill_plan grid rows:3 cols:3 spacing:4 depth:6 start:20,20');
+    for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
+      // Tops up needs each tick — a solo multi-hole drive can otherwise run
+      // long enough to trip an unrelated needs collapse mid-task (out of
+      // scope for this test).
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      runner.run('tick 1');
+    }
     runner.run('charge hole:* explosive:boomite amount:5 stemming:2');
     runner.run('sequence auto');
     const blast = runner.run('blast');

@@ -11,7 +11,7 @@ import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
-import { sanitizeFiniteOverride } from './commandUtils.js';
+import { sanitizeFiniteOverride, parseStaffedFlag } from './commandUtils.js';
 // ── campaign status ──
 
 export function campaignStatusCommand(
@@ -92,7 +92,16 @@ export function campaignStartCommand(
   // command itself tolerate the same case instead of erroring on it.
   const campaign = ctx.state?.campaign ?? createCampaignState();
 
-  const newState = createGameForLevel(campaign, levelId);
+  // `staffed:`, mirroring new_game/sandbox start's own opt-in (#551): a
+  // pre-hired roster and pre-purchased fleet, so a scenario that only needs
+  // an ordinary staffed opening does not have to hire/license/buy/assign it
+  // by hand on every campaign level.
+  const staffedFlag = parseStaffedFlag(named['staffed']);
+  if (staffedFlag.error) {
+    return { success: false, output: staffedFlag.error };
+  }
+
+  const newState = createGameForLevel(campaign, levelId, staffedFlag.staffed);
   if (!newState) {
     const lvl = getLevel(levelId);
     if (!lvl) return { success: false, output: `Unknown level: "${levelId}".` };
@@ -142,7 +151,7 @@ export function campaignStartCommand(
   // that was silently ignored, which is the bug this override exists to fix.
   return {
     success: true,
-    output: `Started level "${levelId}". Grid: ${level.gridX}×${level.gridY}×${level.gridZ}. Cash: $${ctx.state.cash.toLocaleString('en-US')}.`,
+    output: `Started level "${levelId}". Grid: ${level.gridX}×${level.gridY}×${level.gridZ}. Cash: $${ctx.state.cash.toLocaleString('en-US')}.${staffedFlag.staffed ? ' Staffed.' : ''}`,
   };
 }
 

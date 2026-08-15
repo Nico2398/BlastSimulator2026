@@ -22,6 +22,7 @@ import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
 import { RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
 import { MIN_STEMMING_M } from '../../../src/core/config/balance.js';
+import { tickCommand } from '../../../src/console/commands/events.js';
 
 function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
@@ -29,8 +30,43 @@ function makeMiningContext(): MiningContext {
     grid: null,
     emitter: new EventEmitter(),
   };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
+  // Staffed (#553): a `drill_plan grid/add` no longer writes holes straight
+  // into state.drillHoles — it queues one drill_hole PendingAction per hole,
+  // which needs a qualified employee (`blasting`) and a `drill_rig` vehicle
+  // to actually complete. Every test in this file that drills a plan and
+  // then charges/blasts it needs the hole to have actually landed, so the
+  // context is staffed by default — mirrors drill-plan-queueing.test.ts's
+  // `new_game ... staffed:true`. Staffing hires/purchases for free (see
+  // applyStaffedComposition, GameState.ts) so it doesn't perturb any of this
+  // file's cash-based assertions.
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', staffed: 'true' });
   return ctx;
+}
+
+/**
+ * Ticks the game loop until every hole ordered by the most recent
+ * `drill_plan grid/add` has landed in `state.drillHoles` (#553), or
+ * `maxTicks` is exhausted. Needed anywhere a test drills a plan and then
+ * immediately charges/sequences/blasts it — those all read `state.drillHoles`,
+ * which now only gains a hole once its own `drill_hole` action completes.
+ *
+ * Tops every employee's need gauges up before each tick: this file's plans
+ * are driven by a single drill_rig/driller, and a multi-hole plan can run
+ * long enough (walking between holes, drilling each one) for hunger/fatigue/
+ * breakNeed to cross a collapse threshold mid-drive — an unrelated needs
+ * mechanic this test isn't exercising. Keeping the gauges topped up isolates
+ * the behavior under test (drill_hole queueing/landing) from needs/rest,
+ * which have their own dedicated test coverage elsewhere.
+ */
+function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
 }
 
 beforeEach(() => resetHoleIds());
@@ -84,6 +120,7 @@ describe('drillPlanCommand — remove subcommand', () => {
   it('removes the named hole from the plan', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     expect(ctx.state!.drillHoles.map(h => h.id)).toEqual(['H1', 'H2']);
 
     const result = drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
@@ -95,6 +132,7 @@ describe('drillPlanCommand — remove subcommand', () => {
   it('drops the removed hole\'s charge and sequence delay entries', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '25ms' });
     expect(ctx.state!.chargesByHole['H1']).toBeDefined();
@@ -109,6 +147,7 @@ describe('drillPlanCommand — remove subcommand', () => {
   it('returns success:false and leaves the plan untouched for an unknown hole ID', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
 
     const result = drillPlanCommand(ctx, ['remove'], { hole: 'H99' });
 
@@ -122,6 +161,7 @@ describe('drillPlanCommand — clear subcommand', () => {
   it('empties holes, charges, and sequence delays', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['auto'], {});
     expect(ctx.state!.drillHoles.length).toBe(2);
@@ -257,6 +297,7 @@ describe('blast_preview', () => {
   function makePlan(ctx: MiningContext, tier?: number): void {
     if (tier !== undefined) ctx.state!.softwareTier = tier;
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
@@ -288,6 +329,7 @@ describe('blast_preview', () => {
   it('returns success:false with validation error when holes exist but charges are missing', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('Missing charge');
@@ -386,6 +428,7 @@ describe('blast_preview — state.lastBlastPreview', () => {
   function makePlan(ctx: MiningContext, tier?: number): void {
     if (tier !== undefined) ctx.state!.softwareTier = tier;
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
@@ -791,9 +834,10 @@ describe('blastCommand — ore report event wiring', () => {
 
   it('populates state.lastBlastReport with tick, rating, and spent after a blast', () => {
     const ctx = makeMiningContext();
-    ctx.state!.tickCount = 7;
 
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    ctx.state!.tickCount = 7;
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
@@ -811,6 +855,7 @@ describe('blastCommand — ore report event wiring', () => {
   it('sums spent across every charged hole, not just the last one', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
     sequenceCommand(ctx, ['auto'], {});
 
@@ -934,6 +979,7 @@ describe('chargeCommand — stemming floor', () => {
   it('a single-hole charge below MIN_STEMMING_M returns success:false and names the refusal', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
 
     const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '0.2m' });
 
@@ -945,6 +991,7 @@ describe('chargeCommand — stemming floor', () => {
   it('does not write a charge to state for the refused hole', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
 
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '0.2m' });
 
@@ -954,6 +1001,7 @@ describe('chargeCommand — stemming floor', () => {
   it('a stemming value exactly at MIN_STEMMING_M is accepted (boundary)', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
 
     const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: `${MIN_STEMMING_M}m` });
 
@@ -965,6 +1013,7 @@ describe('chargeCommand — stemming floor', () => {
   it('a batch charge (hole:*) below MIN_STEMMING_M refuses and writes no charges', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
 
     const result = chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '0.2m' });
 
@@ -976,6 +1025,7 @@ describe('chargeCommand — stemming floor', () => {
   it('omitting the stemming: argument entirely defaults to MIN_STEMMING_M and succeeds', () => {
     const ctx = makeMiningContext();
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
 
     const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg' });
 

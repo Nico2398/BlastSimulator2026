@@ -115,6 +115,12 @@ const REGION = {
   // toward and a void for the rock to fall into. One line, not a corridor of
   // candidate lines: the console hint names this exact ramp.
   boxcut: { x1: 16, z1: 19, x2: 16, z2: 31, exact: true },
+  // One tile, same origin-corner placement as the warehouse above. Sits in
+  // the same clear north-west quarter as the warehouse (6,6) but well clear
+  // of it and of the box-cut/drill footprints further east and south (#553:
+  // drilling is now vehicle-gated — the driller needs somewhere to train for
+  // and park a drill_rig before drill-plan can ever land a hole).
+  drivingCenter: { x1: 10, z1: 8, x2: 10, z2: 8, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
@@ -147,6 +153,37 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'hire-driller': hireStages('driller', 'tutorial.stage.hire_driller'),
+
+  'build-driving-center': [
+    { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
+    {
+      target: '#bs-build-panel [data-build-type="driving_center"] .bs-build-buy-btn',
+      hintKey: 'tutorial.stage.build_driving_center',
+    },
+    ...pickerStages('tutorial.stage.build_site', REGION.drivingCenter),
+  ],
+
+  'train-driller': [
+    { target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.open_crew' },
+    // CrewPanel is single-expansion (expandedId) -- .bs-train-btn only
+    // renders once the driller's own row is expanded, so this stage cannot
+    // skip straight to it. The driller hired by 'hire-driller' is always
+    // employee #2 at this point in the campaign's own tutorial script.
+    {
+      target: '#bs-employee-panel [data-employee-id="2"] .bs-detail-toggle',
+      hintKey: 'tutorial.stage.expand_driller',
+    },
+    {
+      target: '#bs-employee-panel .bs-train-btn[data-skill="driving.drill_rig"]',
+      hintKey: 'tutorial.stage.train_drill_rig',
+    },
+  ],
+
+  'buy-drill-rig-assign': [
+    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
+    { target: '#bs-vehicle-panel [data-vtype="drill_rig"]', hintKey: 'tutorial.stage.vehicle_buy_drill_rig' },
+    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
+  ],
 
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
