@@ -516,6 +516,92 @@ describe('Economy', () => {
 
   // ── 13. contract deliver amount validation & capping (#456) ────────────────
 
+  // ── contract accept/decline/deliver/negotiate by material/type selector (#597) ──
+  // A scenario naming a contract by id assumes exactly which one generation
+  // handed it this run — the id shifts (or the contract rotates out of the
+  // pool entirely) the moment upstream pacing changes. `material:`/`type:`
+  // names it by what it actually is instead.
+
+  it('contract accept resolves a contract by material: selector, no id needed', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const result = contractCommand(ctx, ['accept'], { material: c.materialId });
+    expect(result.success).toBe(true);
+    expect(result.output).toContain(`#${c.id}`);
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)).toBeDefined();
+  });
+
+  it('contract accept resolves a contract by material: + type: selector together', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const result = contractCommand(ctx, ['accept'], { material: c.materialId, type: c.type });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.contracts.active.find(a => a.id === c.id)).toBeDefined();
+  });
+
+  it('contract accept by material: selector is refused when nothing matches, naming what was searched for', () => {
+    const result = contractCommand(ctx, ['accept'], { material: 'no_such_material' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('no_such_material');
+  });
+
+  it('contract accept with neither an id nor a material/type selector returns the usage message', () => {
+    const result = contractCommand(ctx, ['accept'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Usage');
+  });
+
+  it('contract decline resolves a contract by material: selector', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const before = ctx.state!.contracts.available.length;
+    const result = contractCommand(ctx, ['decline'], { material: c.materialId });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.contracts.available.length).toBe(before - 1);
+    expect(ctx.state!.contracts.available.find(a => a.id === c.id)).toBeUndefined();
+  });
+
+  it('contract deliver resolves an active contract by material: selector', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    expect(contractCommand(ctx, ['accept'], { material: c.materialId }).success).toBe(true);
+    pushStoredFragment(ctx, 1, 500, 0.04, { [c.materialId]: 1.0 });
+    ctx.state!.collectedOre[c.materialId] = 100;
+
+    const result = contractCommand(ctx, ['deliver'], { material: c.materialId, amount: '100' });
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('COMPLETED');
+  });
+
+  it('contract negotiate resolves an available contract by material: selector', () => {
+    const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
+    const result = contractCommand(ctx, ['negotiate'], { material: c.materialId });
+    expect(result.success).toBe(true);
+    expect(ctx.state!.contracts.lastNegotiation?.contractId).toBe(c.id);
+  });
+
+  it('contract accept by material: selector still finds a same-kind contract after the numeric id it started as has rotated out of the pool', () => {
+    const rng = new Random(7);
+    generateContracts(ctx.state!.contracts, rng, ctx.state!.tickCount);
+    const target = ctx.state!.contracts.available[0]!;
+    const evictedId = target.id;
+
+    // Force enough refresh cycles that the original entry is evicted from
+    // `available` — the exact scenario #586 hit by hand-editing ids.
+    let tick = ctx.state!.tickCount;
+    while (ctx.state!.contracts.available.some(c => c.id === evictedId)) {
+      tick += 20;
+      generateContracts(ctx.state!.contracts, new Random(7 + tick), tick);
+    }
+    expect(contractCommand(ctx, ['accept', String(evictedId)]).success).toBe(false);
+
+    // If a same-kind contract is still on offer, the selector finds it —
+    // no id renumbering required.
+    const stillOffered = ctx.state!.contracts.available.find(
+      c => c.type === target.type && c.materialId === target.materialId,
+    );
+    if (stillOffered) {
+      const result = contractCommand(ctx, ['accept'], { material: target.materialId, type: target.type });
+      expect(result.success).toBe(true);
+    }
+  });
+
   it('contract deliver rejects a non-finite amount and leaves cash unchanged', () => {
     const c = insertOreSaleContract(ctx.state!.contracts, 100, 10);
     const acceptResult = contractCommand(ctx, ['accept', String(c.id)], {});

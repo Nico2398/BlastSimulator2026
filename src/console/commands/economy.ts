@@ -7,6 +7,10 @@ import {
   generateContracts,
   acceptContract,
   deliverMaterials,
+  findContract,
+  type Contract,
+  type ContractSelector,
+  type ContractType,
 } from '../../core/economy/Contract.js';
 import { negotiateContract } from '../../core/economy/Negotiation.js';
 import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
@@ -69,6 +73,51 @@ export function financesCommand(
 
 // ── contract command ──
 
+const CONTRACT_TYPES: readonly ContractType[] = ['ore_sale', 'rubble_disposal', 'supply'];
+
+/**
+ * Parse a contract subcommand's target from its args: a numeric id
+ * (positional or `id:`, the existing form) or a `type:`/`material:` selector
+ * that survives the offer pool rotating (#597 — see `ContractSelector`'s
+ * doc comment in `Contract.ts`). Returns `null` when neither form is given.
+ */
+function parseContractSelector(args: string[], named: Record<string, string>): ContractSelector | null {
+  const idRaw = args[1] ?? named['id'];
+  const id = idRaw !== undefined ? parseInt(idRaw, 10) : NaN;
+  if (!isNaN(id)) return { id };
+
+  const typeRaw = named['type'];
+  const type = typeRaw !== undefined && (CONTRACT_TYPES as readonly string[]).includes(typeRaw)
+    ? (typeRaw as ContractType)
+    : undefined;
+  const materialId = named['material'];
+  if (type === undefined && materialId === undefined) return null;
+  return {
+    ...(type !== undefined ? { type } : {}),
+    ...(materialId !== undefined ? { materialId } : {}),
+  };
+}
+
+/** Human-readable name for a selector, for a "not found" message. */
+function describeContractSelector(selector: ContractSelector): string {
+  if (selector.id !== undefined) return `#${selector.id}`;
+  return ['contract', selector.type, selector.materialId].filter(Boolean).join(' ');
+}
+
+/** Resolve a subcommand's target contract against `pool`, or a CommandResult error explaining why not. */
+function resolveContract(
+  pool: readonly Contract[],
+  args: string[],
+  named: Record<string, string>,
+  usage: string,
+): Contract | CommandResult {
+  const selector = parseContractSelector(args, named);
+  if (!selector) return { success: false, output: usage };
+  const contract = findContract(pool, selector);
+  if (!contract) return { success: false, output: `Contract ${describeContractSelector(selector)} not found.` };
+  return contract;
+}
+
 export function contractCommand(
   ctx: GameContext,
   args: string[],
@@ -97,22 +146,20 @@ export function contractCommand(
     }
 
     case 'accept': {
-      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: contract accept <id>' };
-      const contract = acceptContract(state.contracts, id, state.tickCount);
-      if (!contract) return { success: false, output: `Contract #${id} not found in available list.` };
-      return { success: true, output: `Accepted contract #${id}: ${contract.description}` };
+      const usage = 'Usage: contract accept <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]';
+      const resolved = resolveContract(state.contracts.available, args, named, usage);
+      if ('success' in resolved) return resolved;
+      const contract = acceptContract(state.contracts, resolved.id, state.tickCount);
+      if (!contract) return { success: false, output: `Contract #${resolved.id} not found in available list.` };
+      return { success: true, output: `Accepted contract #${contract.id}: ${contract.description}` };
     }
 
     case 'decline': {
-      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: contract decline <id>' };
-      const before = state.contracts.available.length;
-      state.contracts.available = state.contracts.available.filter(c => c.id !== id);
-      if (state.contracts.available.length === before) {
-        return { success: false, output: `Contract #${id} not found.` };
-      }
-      return { success: true, output: `Declined contract #${id}.` };
+      const usage = 'Usage: contract decline <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]';
+      const resolved = resolveContract(state.contracts.available, args, named, usage);
+      if ('success' in resolved) return resolved;
+      state.contracts.available = state.contracts.available.filter(c => c.id !== resolved.id);
+      return { success: true, output: `Declined contract #${resolved.id}.` };
     }
 
     case 'status': {
@@ -132,15 +179,15 @@ export function contractCommand(
     }
 
     case 'deliver': {
-      const id = parseInt(args[1] ?? '', 10);
+      const usage = 'Usage: contract deliver <id> amount:<kg> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] amount:<kg>';
       const amount = parseFloat(named['amount'] ?? '0');
-      if (isNaN(id) || !Number.isFinite(amount) || amount <= 0) {
-        return { success: false, output: 'Usage: contract deliver <id> amount:<kg>' };
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { success: false, output: usage };
       }
-      const contract = state.contracts.active.find(c => c.id === id);
-      if (!contract) {
-        return { success: false, output: `Contract #${id} not found or already completed.` };
-      }
+      const resolved = resolveContract(state.contracts.active, args, named, usage);
+      if ('success' in resolved) return resolved;
+      const contract = resolved;
+      const id = contract.id;
       const cappedAmount = Math.min(amount, contract.quantityKg - contract.deliveredKg);
       if (cappedAmount <= 0) {
         return { success: false, output: `Contract #${id} already fulfilled or has no outstanding quantity.` };
@@ -168,8 +215,10 @@ export function contractCommand(
     }
 
     case 'negotiate': {
-      const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: contract negotiate <id>' };
+      const usage = 'Usage: contract negotiate <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]';
+      const resolved = resolveContract(state.contracts.available, args, named, usage);
+      if ('success' in resolved) return resolved;
+      const id = resolved.id;
       const result = negotiateContract(state.contracts, id, 0, rng);
       if (!result) return { success: false, output: `Contract #${id} not found.` };
       state.contracts.lastNegotiation = { contractId: id, success: result.success, changes: result.changes };

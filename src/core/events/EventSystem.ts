@@ -47,6 +47,20 @@ export interface EventSystemState {
   actionCountSinceEvent: number;
   /** Multiplier on event frequency (1 = normal, 0 = no events). When 0, all event firing is suppressed. */
   eventFreqMultiplier: number;
+  /**
+   * Minimum-ticks-since-last-event threshold for the current cooldown window,
+   * drawn once (`MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE)`)
+   * and reused across every recheck of that window, including the short-retry
+   * recheck every 5 ticks while cooldown holds. Without this, a timer that
+   * expired while cooldown was still blocking redrew on every retry, so the
+   * RNG stream advanced a number of times that depended on tick pacing —
+   * inserting ticks/actions upstream reshuffled which event fired downstream
+   * even though nothing about *this* window's threshold had changed (#597).
+   * Null between events, before the next window's threshold has been drawn;
+   * reset to null whenever an event actually fires so the next window draws
+   * its own threshold fresh.
+   */
+  cooldownMinIntervalTicks: number | null;
 }
 
 export interface FiredEvent {
@@ -90,6 +104,7 @@ export function createEventSystemState(eventFreqMultiplier: number = 1): EventSy
     lastEventTick: 0,
     actionCountSinceEvent: 0,
     eventFreqMultiplier,
+    cooldownMinIntervalTicks: null,
   };
 }
 
@@ -121,6 +136,7 @@ export function tickEventSystem(
       state.pendingEvent = { eventId, firedAtTick: ctx.tickCount };
       state.lastEventTick = ctx.tickCount;
       state.actionCountSinceEvent = 0;
+      state.cooldownMinIntervalTicks = null;
       return state.pendingEvent;
     }
   }
@@ -132,8 +148,14 @@ export function tickEventSystem(
       // Reset timer with score-modulated interval
       timer.remaining = getModulatedInterval(timer.category, ctx.scores, timer.baseInterval);
 
-      // Cooldown check — prevent events from firing too rapidly
-      const minInterval = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
+      // Cooldown check — prevent events from firing too rapidly. The random
+      // component is drawn once per cooldown window and cached (#597) rather
+      // than redrawn on every retry below — see cooldownMinIntervalTicks's
+      // doc comment for why that matters.
+      if (state.cooldownMinIntervalTicks === null) {
+        state.cooldownMinIntervalTicks = MIN_EVENT_INTERVAL_TICKS + rng.nextInt(0, MIN_EVENT_INTERVAL_RANDOM_RANGE);
+      }
+      const minInterval = state.cooldownMinIntervalTicks;
       const ticksSinceLastEvent = ctx.tickCount - state.lastEventTick;
       if (ticksSinceLastEvent < minInterval || state.actionCountSinceEvent < MIN_EVENT_INTERVAL_ACTIONS) {
         // Short retry delay (5 ticks) before re-checking cooldown — avoids tight loop
@@ -148,6 +170,7 @@ export function tickEventSystem(
         state.pendingEvent = { eventId: event.id, firedAtTick: ctx.tickCount };
         state.lastEventTick = ctx.tickCount;
         state.actionCountSinceEvent = 0;
+        state.cooldownMinIntervalTicks = null;
         return state.pendingEvent;
       }
     }

@@ -110,6 +110,42 @@ describe('getOptionEffectHints', () => {
     expect(hints).toEqual([{ kind: 'other', key: 'custom', direction: 'neutral' }]);
   });
 
+  // ── setupEvents idempotency (#597) ──
+  //
+  // Every createRunner() call — one per scenario engine in a batch run like
+  // run-all-scenarios.ts — calls setupEvents() again. registerEvents used to
+  // push unconditionally, so the shared pool doubled, tripled, ... on every
+  // subsequent call in the same process, and selectEvent's weighted pick
+  // indexes into that pool — corrupting which event fired based on how many
+  // *other* engines had already been created earlier in the same process,
+  // nothing to do with the scenario's own seed or pacing.
+
+  it('calling setupEvents twice leaves the pool the same size as calling it once', () => {
+    clearEvents();
+    setupEvents();
+    const first = getAllEvents().length;
+    setupEvents();
+    const second = getAllEvents().length;
+    expect(second).toBe(first);
+  });
+
+  it('calling setupEvents three times still leaves the pool the same size', () => {
+    clearEvents();
+    setupEvents();
+    const first = getAllEvents().length;
+    setupEvents();
+    setupEvents();
+    expect(getAllEvents().length).toBe(first);
+  });
+
+  it('the pool contains no duplicate event ids after repeated setupEvents calls', () => {
+    clearEvents();
+    setupEvents();
+    setupEvents();
+    const ids = getAllEvents().map(e => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   // ── Completeness guard: every real registered event's options resolve without throwing ──
 
   it('every registered event resolves getOptionEffectHints for all its options without throwing', () => {

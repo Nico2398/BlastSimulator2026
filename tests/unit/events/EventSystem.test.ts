@@ -410,6 +410,98 @@ describe('Event system engine', () => {
 
   // ── lastOutcome / clearLastOutcome ──
 
+  // ── Cooldown randomness insulation from tick/action pacing (#597) ──
+
+  it('cooldownMinIntervalTicks is null in fresh state', () => {
+    const state = createEventSystemState();
+    expect(state.cooldownMinIntervalTicks).toBeNull();
+  });
+
+  it('the cooldown path does not consume randomness on a retry — same rng position after N blocked rechecks as after one', () => {
+    registerEvents([makeEvent('test1', 'union')]);
+
+    // Run A: cooldown blocks once (lastEventTick close to tickCount), then a
+    // later call at a tick where cooldown passes.
+    const { state: stateA, timer: timerA } = setupEventState();
+    stateA.lastEventTick = 190;
+    stateA.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    timerA.remaining = 1;
+    const rngA = new Random(42);
+    const blockedA = tickEventSystem(stateA, makeCtx({ tickCount: 200 }), rngA);
+    expect(blockedA).toBeNull();
+    // Same rng object continues — a second, third, fourth retry, all still blocked.
+    timerA.remaining = 1;
+    tickEventSystem(stateA, makeCtx({ tickCount: 205 }), rngA);
+    timerA.remaining = 1;
+    tickEventSystem(stateA, makeCtx({ tickCount: 210 }), rngA);
+    timerA.remaining = 1;
+    tickEventSystem(stateA, makeCtx({ tickCount: 215 }), rngA);
+    // Now cooldown passes — the draw that decides the outcome must be the
+    // SAME rng call as it would have been with no retries at all, i.e. the
+    // very first draw from a freshly-seeded Random(42) never consumed by any
+    // of the blocked rechecks above.
+    timerA.remaining = 1;
+    const firedA = tickEventSystem(stateA, makeCtx({ tickCount: 400 }), rngA);
+    expect(firedA).not.toBeNull();
+
+    // Run B: cooldown passes on the very first check — no retries at all.
+    const { state: stateB, timer: timerB } = setupEventState();
+    stateB.lastEventTick = 190;
+    stateB.actionCountSinceEvent = MIN_EVENT_INTERVAL_ACTIONS;
+    timerB.remaining = 1;
+    const rngB = new Random(42);
+    // Skip straight to the tick where run A's cooldown finally passed.
+    const firedB = tickEventSystem(stateB, makeCtx({ tickCount: 400 }), rngB);
+    expect(firedB).not.toBeNull();
+
+    // If the retries in run A had redrawn randomness, its threshold (and
+    // therefore which category/event fires) would diverge from run B's.
+    expect(firedA!.eventId).toBe(firedB!.eventId);
+  });
+
+  it('inserting extra ticks and extra actions ahead of a run leaves the resulting event sequence unchanged', () => {
+    registerEvents([
+      makeEvent('common', 'union', 10),
+      makeEvent('rare', 'union', 0.1),
+    ]);
+
+    function runToFirstEvent(insertExtraTicksAndActions: boolean) {
+      const state = createEventSystemState();
+      const timer = state.timers.find(t => t.category === 'union')!;
+      const rng = new Random(99);
+      let tickCount = 0;
+
+      if (insertExtraTicksAndActions) {
+        // A handful of extra ticks (no timer expiry) and extra player actions
+        // inserted "upstream", before the run that matters.
+        for (let i = 0; i < 7; i++) {
+          tickCount++;
+          tickEventSystem(state, makeCtx({ tickCount }), rng);
+        }
+        incrementActionCount(state);
+        incrementActionCount(state);
+        incrementActionCount(state);
+      }
+
+      // Drive actionCountSinceEvent past the gate and run ticks until an
+      // event fires (the union timer's base interval plus enough ticks to
+      // clear the tick-based cooldown).
+      for (let i = 0; i < MIN_EVENT_INTERVAL_ACTIONS; i++) incrementActionCount(state);
+      let fired: ReturnType<typeof tickEventSystem> = null;
+      for (let i = 0; i < 400 && !fired; i++) {
+        tickCount++;
+        fired = tickEventSystem(state, makeCtx({ tickCount }), rng);
+      }
+      return fired;
+    }
+
+    const withoutExtra = runToFirstEvent(false);
+    const withExtra = runToFirstEvent(true);
+    expect(withoutExtra).not.toBeNull();
+    expect(withExtra).not.toBeNull();
+    expect(withExtra!.eventId).toBe(withoutExtra!.eventId);
+  });
+
   it('lastOutcome is null in fresh state', () => {
     const state = createEventSystemState();
     expect(state.lastOutcome).toBeNull();
