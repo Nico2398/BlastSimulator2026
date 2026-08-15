@@ -172,6 +172,16 @@ export interface ScenarioStepGoal {
   decreased?: string[];
   /** Field/value pairs the state dump must match exactly after this step's actions ran. */
   equals?: Record<string, unknown>;
+  /**
+   * Field/amount pairs: `after[field] - before[field]` must equal the given amount exactly
+   * (negative for a decrease). The step-local counterpart to `equals` — asserts what this
+   * step's own actions did to a field without pinning the field's running total, so an
+   * edit earlier in the scenario that shifts the field's value going in does not invalidate
+   * this step. Prefer this over `equals` for any field that accumulates across a scenario
+   * (cash, scores, counts); reserve `equals` for a field that describes a state rather than
+   * a running total (flags, ids, terminal outcomes, counts that are set rather than accrued).
+   */
+  changedBy?: Record<string, number>;
   /** A control that must be usable after this step (interaction mode only). */
   usable?: string;
   /** A control that must NOT be reachable after this step (interaction mode only). For guard/rejection proofs. */

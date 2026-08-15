@@ -78,6 +78,12 @@ export interface InteractionGoal {
   decreased?: string[];
   /** Field/value pairs the state dump must match exactly. */
   equals?: Record<string, unknown>;
+  /**
+   * Field/amount pairs: `after[field] - before[field]` must equal the given amount exactly
+   * (negative for a decrease). See `ScenarioStepGoal.changedBy` (scenario-types.ts) for the
+   * rationale — this is its field-for-field mirror.
+   */
+  changedBy?: Record<string, number>;
   /** A control that must be usable by now. */
   usable?: string;
   /**
