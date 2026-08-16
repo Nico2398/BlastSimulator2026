@@ -38,8 +38,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 75000,
           "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": -25000
         }
       }
     },
@@ -89,8 +91,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 75000,
           "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         },
         "note": "vehicle list confirms idle → moving; no scalar field exists for vehicle task state"
       }

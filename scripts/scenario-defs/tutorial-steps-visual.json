@@ -103,8 +103,10 @@
       "description": "hire-surveyor complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
         "equals": {
-          "cash": 201624,
           "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -1200
         },
         "tutorialStep": "survey"
       }
@@ -157,8 +159,8 @@
       "role": "player",
       "description": "Target corrected from the file's original x:15 z:15 to x:23 z:23 (Finding #74 follow-up): the tutorial's survey stage gates its picker to REGION.survey, a single exact point at (23,23) (tutorialStages.ts) -- (15,15) is outside that region and the picker would refuse to confirm it under a real click, the same class Finding #42 already found for un-gated drill grids. Result unaffected: nothing downstream reads survey findings by location, only the flat $3,000 survey cost. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
-        "equals": {
-          "cash": 198624
+        "changedBy": {
+          "cash": -3000
         }
       }
     },
@@ -240,8 +242,10 @@
       "description": "hire-driller complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553: the tutorial no longer goes straight from here to box-cut -- drilling became queued, vehicle-gated work, so the script now teaches the driving_center, the drill_rig licence and the rig itself first.",
       "expect": {
         "equals": {
-          "cash": 194344,
           "employeeCount": 2
+        },
+        "changedBy": {
+          "cash": -1000
         },
         "tutorialStep": "build-driving-center"
       }

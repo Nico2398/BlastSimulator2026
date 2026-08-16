@@ -35,13 +35,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "description": "No `cash:` here on purpose: this command fails (tier-2 level, locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it."
@@ -57,13 +59,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -78,7 +82,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -89,6 +92,9 @@
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -103,13 +109,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -124,13 +132,15 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -146,13 +156,15 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"storage_depot\" maps to the real freight_warehouse building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -168,13 +180,15 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -190,13 +204,15 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"canteen\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -212,13 +228,15 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -234,13 +252,15 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"bunkhouse\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "cash": 185800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -276,13 +296,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 177800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -8000
         }
       }
     },
@@ -297,13 +319,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 177800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -318,13 +342,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 177800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -347,13 +373,15 @@
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the rock_digger tier-1 row ($50,000). awaitUsable is the affordability assertion. Opens the Fleet panel first; the four buys below reuse it.",
       "expect": {
         "equals": {
-          "cash": 127800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -50000
         }
       },
       "role": "player"
@@ -373,13 +401,15 @@
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": 102800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -25000
         }
       },
       "role": "player"
@@ -399,13 +429,15 @@
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the drill_rig tier-1 row ($35,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": 67800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -35000
         }
       },
       "role": "player"
@@ -425,13 +457,15 @@
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the building_destroyer tier-1 row ($30,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": 37800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -30000
         }
       },
       "role": "player"
@@ -451,13 +485,15 @@
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the whole fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
       "expect": {
         "equals": {
-          "cash": 12800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -25000
         }
       },
       "role": "player"
@@ -473,13 +509,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 12800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -494,13 +532,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 12800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -523,13 +563,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driller row ($1,000). Opens the Crew panel first; the nine hires below reuse it.",
       "expect": {
         "equals": {
-          "cash": 11800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
         }
       },
       "role": "player"
@@ -549,13 +591,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driller row ($1,000).",
       "expect": {
         "equals": {
-          "cash": 10800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 2,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
         }
       },
       "role": "player"
@@ -575,13 +619,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driller row ($1,000).",
       "expect": {
         "equals": {
-          "cash": 9800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 3,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
         }
       },
       "role": "player"
@@ -601,13 +647,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the blaster row ($1,500).",
       "expect": {
         "equals": {
-          "cash": 8300,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 4,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
         }
       },
       "role": "player"
@@ -627,13 +675,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the blaster row ($1,500).",
       "expect": {
         "equals": {
-          "cash": 6800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
         }
       },
       "role": "player"
@@ -653,13 +703,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driver row ($800).",
       "expect": {
         "equals": {
-          "cash": 6000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 6,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -800
         }
       },
       "role": "player"
@@ -679,13 +731,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the driver row ($800).",
       "expect": {
         "equals": {
-          "cash": 5200,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 7,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -800
         }
       },
       "role": "player"
@@ -705,13 +759,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the surveyor row ($1,200).",
       "expect": {
         "equals": {
-          "cash": 4000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 8,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1200
         }
       },
       "role": "player"
@@ -731,13 +787,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the manager row ($2,000).",
       "expect": {
         "equals": {
-          "cash": 2000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 9,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -2000
         }
       },
       "role": "player"
@@ -757,13 +815,15 @@
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the run funded the button is enabled and this is a real click on the manager row ($2,000).",
       "expect": {
         "equals": {
-          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -2000
         }
       },
       "role": "player"
@@ -779,13 +839,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -800,13 +862,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -821,13 +885,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 0,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -842,13 +908,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -7050,
           "tickCount": 10,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -7050
         }
       }
     },
@@ -862,13 +930,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -7050,
           "tickCount": 10,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -884,13 +954,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -14100,
           "tickCount": 20,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -7050
         }
       }
     },
@@ -904,13 +976,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -14100,
           "tickCount": 20,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -926,13 +1000,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -7050
         }
       }
     },
@@ -946,13 +1022,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -968,13 +1046,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -989,7 +1069,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -21150,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1000,6 +1079,9 @@
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1014,13 +1096,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -28325,
           "tickCount": 45,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -7175
         }
       }
     },
@@ -1034,13 +1118,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -28325,
           "tickCount": 45,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -1056,13 +1142,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -42300,
           "tickCount": 60,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -13975
         }
       }
     },
@@ -1076,13 +1164,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -42300,
           "tickCount": 60,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -1098,13 +1188,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -7175
         }
       }
     },
@@ -1118,13 +1210,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -1140,13 +1234,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1161,7 +1257,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -49475,
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1172,6 +1267,9 @@
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1186,13 +1284,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -63450,
           "tickCount": 90,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -13975
         }
       }
     },
@@ -1206,13 +1306,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -63450,
           "tickCount": 90,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -1249,13 +1351,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -70625,
           "tickCount": 105,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -1271,13 +1375,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
+        },
+        "changedBy": {
+          "cash": -13975
         }
       }
     },
@@ -1291,13 +1397,15 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "player"
@@ -1313,13 +1421,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1334,7 +1444,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -84600,
           "tickCount": 120,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1345,6 +1454,9 @@
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1366,7 +1478,9 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "issues #596/#597: cash relaxed from equals to decreased -- which tick a random event becomes pending (and whether it costs money once resolved) now lands at a different point than before these fixes, so this batch's own cash delta is no longer safe to pin exactly. tickCount was re-measured via a real run (135, up from the pre-fix 130): this particular batch now completes its full 15 ticks without an early halt, unlike the very next `tick 15` below, which still gets interrupted at +10. tickCount stays a hardcoded exact figure -- deterministic for this seed/command sequence in command mode -- not a directional check."
       }
     },
@@ -1409,7 +1523,9 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the tick-130 checkpoint above. tickCount stays exact."
       }
     },
@@ -1452,7 +1568,9 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the checkpoints above. tickCount stays exact."
       }
     },
@@ -1541,7 +1659,9 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the checkpoints above. tickCount stays exact."
       }
     },
@@ -1584,7 +1704,9 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the checkpoints above. tickCount stays exact."
       }
     },

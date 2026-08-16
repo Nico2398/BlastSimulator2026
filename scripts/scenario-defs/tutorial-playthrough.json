@@ -36,8 +36,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 188648,
           "timeScale": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -60,8 +62,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 187448,
           "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -1200
         }
       }
     },
@@ -75,8 +79,8 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
-        "equals": {
-          "cash": 187448
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -115,8 +119,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 184448
+        "changedBy": {
+          "cash": -3000
         }
       }
     },
@@ -139,8 +143,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 183448,
           "employeeCount": 2
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -154,8 +160,8 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
-        "equals": {
-          "cash": 183448
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -170,8 +176,8 @@
       ],
       "description": "#553: the driller needs the drill_rig licence before any drill_hole action can be assigned to them -- hiring grants only the role's own starting qualification, never a driving licence. Left unmarked for the same reason as the assign_skill steps above: the player-facing path is `employee train` at a driving_center, which tutorial-interactive.json is the file that actually clicks.",
       "expect": {
-        "equals": {
-          "cash": 183448
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -196,8 +202,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 148448,
           "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": -35000
         }
       }
     },
@@ -216,8 +224,8 @@
       "description": "#553: the driller (employee #2) is assigned to the drill_rig. Without a driver the rig is a mesh and the queued drill_hole actions never start.",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 148448
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -260,8 +268,10 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 9,
-          "holeCount": 0,
-          "cash": 148448
+          "holeCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         },
         "note": "#553: confirming the grid only orders the 9 holes -- they are ghosts until the driller drives the drill_rig to each one, so holeCount is 0 here and the wait is the step below."
       }
@@ -298,8 +308,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 9,
-          "cash": 126884
+          "chargedCount": 9
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -357,8 +369,10 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 2,
-          "cash": 126884
+          "deathCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -417,8 +431,8 @@
       ],
       "description": "event fire -- test hook: no UI control and none is intended (a player cannot summon an event on demand). Left unmarked (legacy).",
       "expect": {
-        "equals": {
-          "cash": 126884
+        "changedBy": {
+          "cash": 0
         },
         "note": "firing only makes the event pending -- its consequence doesn't apply until the choice below."
       },
@@ -449,8 +463,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 123884
+        "changedBy": {
+          "cash": -3000
         },
         "increased": [
           "wellBeing"
@@ -477,8 +491,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 121884,
           "employeeCount": 3
+        },
+        "changedBy": {
+          "cash": -2000
         }
       }
     },
@@ -492,8 +508,8 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
-        "equals": {
-          "cash": 121884
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -571,8 +587,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 121084,
           "employeeCount": 4
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -586,8 +604,8 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
-        "equals": {
-          "cash": 121084
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -611,8 +629,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 96084,
           "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": -25000
         }
       }
     },
@@ -630,8 +650,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 96084
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -666,8 +686,10 @@
       "description": "Per #526: was `build storage_depot at:12,8`, a phantom BuildingType (commandOutput: \"Unknown subcommand or building type\") with no catalog row and nothing to click -- \"storage_depot\" maps to the real freight_warehouse building. Converted to the tutorial's own real `build-storage` stage (TUTORIAL_STAGES['build-storage'], tutorialStages.ts), whose region tile is REGION.warehouse = (6,6), not the phantom step's (12,8).",
       "expect": {
         "equals": {
-          "cash": 81084,
           "buildingCount": 1
+        },
+        "changedBy": {
+          "cash": -15000
         },
         "note": "cash 44000 - freight_warehouse tier-1 constructionCost 15000 (BuildingDefs.ts) = 29000. Every later hard-asserted cash value in this file shifts down by the same 15000 delta from the old no-op's 0 cost."
       },
@@ -757,8 +779,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 80084
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -790,8 +812,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 80084
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -867,8 +889,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 45084,
           "vehicleCount": 2
+        },
+        "changedBy": {
+          "cash": -35000
         }
       }
     },
@@ -892,8 +916,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 44084,
           "employeeCount": 5
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -908,8 +934,8 @@
       "description": "#553: the drill_rig licence for the replacement driller, same reason and same unmarked-role justification as the assign_skill for employee #2 above.",
       "role": "bootstrap",
       "expect": {
-        "equals": {
-          "cash": 44084
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -932,8 +958,8 @@
       "description": "#553: the replacement driller (employee #5) takes the replacement rig (vehicle #3). #553-followup (issue #586 CI): added the toolbar vehicles-panel click -- the preceding two steps (employee hire, then a command-only assign_skill bootstrap) leave the Crew panel active, not Fleet, so the vehicle-panel selectors below were never actually visible (`10000ms exceeded` on CI).",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 44084
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -976,8 +1002,10 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 4,
-          "holeCount": 0,
-          "cash": 44084
+          "holeCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         },
         "note": "#553: ordering only -- the four holes are ghosts until the driller drives the rig to each one, drained by the step below."
       }

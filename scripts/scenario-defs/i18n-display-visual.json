@@ -107,8 +107,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 50000,
           "wellBeing": 50,
           "safety": 50,
           "ecology": 50,

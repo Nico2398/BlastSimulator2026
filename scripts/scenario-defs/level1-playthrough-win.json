@@ -10,7 +10,7 @@
           "command": "campaign start level:dusty_hollow staffed:true"
         }
       ],
-      "description": "#553: staffed:true hires and equips, for free, before any assertion: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster (blasting lvl1), #3/#4/#5 drivers (driving.truck/driving.excavator/driving.excavator lvl1), vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter (all tier 1, all unmanned). Free -- cash is unaffected, still $50,000, matching dusty_hollow's own default.",
+      "description": "#553: staffed:true hires and equips, for free, before any assertion: employee #1 driller (blasting lvl1, driving.drill_rig lvl1), #2 blaster (blasting lvl1), #3/#4/#5 drivers (driving.truck/driving.excavator/driving.excavator lvl1), vehicle #1 drill_rig, #2 debris_hauler, #3 rock_digger, #4 rock_fragmenter (all tier 1, all unmanned). Free -- cash is unaffected, still $50,000, matching dusty_hollow's own default. Left as `equals` (issue #596): this is the file's first step, so there is no prior-step \"before\" cash for `changedBy` to diff against -- the evaluator reads it as 0, not the pre-game state.",
       "expect": {
         "equals": {
           "cash": 50000
@@ -27,8 +27,8 @@
         }
       ],
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "setup"
@@ -43,11 +43,13 @@
       ],
       "expect": {
         "equals": {
-          "cash": 50000,
           "ecology": 50,
           "safety": 50,
           "wellBeing": 50,
           "nuisance": 50
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "observe"
@@ -61,8 +63,8 @@
         }
       ],
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "observe"
@@ -105,8 +107,8 @@
       "description": "New finding (see file description): the free debris_hauler (#2) is the first of three parked vehicles standing directly in drill_rig #1's only cheap route east -- confirmed directly by sandbox trace, the rig sits welded to (1,2) for 300+ ticks otherwise, for any target requiring eastward travel. Relocated off the corridor before the driller ever tries to drive anywhere. `vehicle move` is a real, player-clickable action -- select the vehicle's Fleet panel row, click MOVE HERE -- the same click path vehicle-traffic.json already exercises for this exact command. Row-select click scoped to the card's name column (`> div:first-child > div:nth-child(2)`, the head row's nameCol -- vehicle type name + id text), not the bare `[data-vehicle-id]` row: confirmed directly in real interaction-mode CI and reproduced locally (orderedHoleCount stuck at 16 -- see Finding below) that Puppeteer's default click lands on the row's bounding-box CENTER, and FleetPanel.ts's row-click handler bails out (`target.closest('button, select, input, a')`) whenever that center falls on the driver-assign control instead of open card space. debris_hauler's extra load-gauge row (makeLoadGauge, FleetPanel.ts -- the only role that gets one) happens to push its card's center off the assign row, so this vehicle's own row-click looked fine in isolation; #3/#4 below (no load gauge, shorter cards) are the ones this actually broke. `.bs-fleet-hp`/`.bs-fleet-status` were tried first and rejected -- FleetPanel.ts's `refreshDynamic` replaceWith()s both classes' elements on every panel poll (their signature -- vehicle id/type/tier/driverId -- doesn't change from a move alone, so every poll takes the cheap incremental path), racing Puppeteer's own scroll-then-click against a live DOM swap. `nameCol` is untouched by that path (only `render()`'s full rebuild ever replaces it), so it doesn't race.",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -144,8 +146,8 @@
       "description": "The second blocker in line -- clearing #2 alone only reveals rock_digger (#3) welded to the next cell over, confirmed directly. Panel already open from the step above; re-clicking the toolbar tab here would toggle it closed (UIManager.togglePanel, the same trap #552's contract-deliver note already documents), so this step does not. Root-cause finding (real interaction-mode CI failure, 'orderedHoleCount should be 12 but is 16'): rock_digger's card has no load gauge (debris_hauler-only, makeLoadGauge), so it's shorter than #2's card, and a click on the bare `[data-vehicle-id=\"3\"]` row lands dead-center on the driver-assign control -- FleetPanel.ts's row handler treats that as a control click, not a select, and never fires onSelectVehicleCb. Confirmed directly: `#bs-selection-bar .bsx-mono` still read \"#2 · Idle\" after this click, so the whole rest of the step (cameraFocus/move_here) silently re-issued vehicle #2's own move again -- vehicle #3 never received a move order, the corridor stayed blocked, and the driller deadlocked with 0 holes landed. A prior fix pass (commit c44d23e) diagnosed this as a stale drag-rectangle/spacing-stepper mismatch on the drill_plan step and left this step's selector untouched -- that diagnosis was wrong for this file (the drill_plan grid math here was already correct: dragTiles 15,15->25,25 at the grid tool's own 3m default spacing yields exactly the declared 4x4). Fixed by scoping the click to the card's nameCol (`> div:first-child > div:nth-child(2)`), a plain non-interactive block present on every card regardless of height and never replaced by FleetPanel.ts's incremental refresh path (unlike `.bs-fleet-hp`/`.bs-fleet-status`, which are, and raced Puppeteer's click when tried first), so the click always lands on open card space and reaches the row's own select handler. Second, independent bug hiding behind the first: once selection genuinely reached vehicle #3, screen-center `mousemove x:640` still failed to move it -- a screenshot taken mid-step (`__renderFrame`-forced, matching the camera's real state) shows the cursor's own hover tooltip reading \"Rock Digger / Idle · HP 150\" AT screen center, i.e. `cameraFocus(4.5,6.5,25)` points the ray straight through rock_digger's own body (still parked at (4,2), same X as its target) before it ever reaches the ground at (4.5,6.5) -- `scenePicking.aim.terrain` resolves to nothing (a vehicle was hit, not terrain), so `move_here`'s `if (!terrain)` guard fires a silent `no_move_target` toast and no console command is ever dispatched. Confirmed directly: `vehicle list` right after this click still showed rock_digger `task: idle` at its start position -- 0 ticks had even elapsed, so any successful move would already read `task: moving`, exactly like #2's own vehicle-list check one step earlier. Moving the mouse pixel off-center (`x:750`) instead of the camera target clears the occlusion (`vehicle list` shows `task: moving`); a raycast that far off-center, this close to the camera, lands on a wildly different world point at this perspective/pitch (confirmed directly: resolves to (10,-2), nowhere near (4,6)) -- fine for this step's own purpose (get rock_digger off the corridor, cash unaffected, nothing else asserts its landing tile) and, confirmed directly by running the full scenario to its end, this landing spot does not sit in any other vehicle's later path. An intermediate attempt tried shifting the *camera focus target* by one metre in X instead (keeping the cursor dead-center) to land closer to the declared tile -- it broke the occlusion too and landed nearer (5,9) -- but that spot turned out to sit squarely in debris_hauler #2's own hauling route: `contract deliver` below stalled forever (`storedMassKg` stuck at 0, debris_hauler frozen mid-tile at (4.12,8.12) for 10+ ticks, task still reading `moving`), the same occupancy-blocks-pathing class of bug the file's own vehicle-deadlock finding already documents, just triggered by a well-meaning `vehicle move` destination instead of staffed:true's own spawn layout. Reverted to the cursor-offset landing since a `vehicle move` step's own destination precision is not itself under test here, only that the corridor clears and nothing downstream gets blocked -- confirmed by a full scenario run reaching `contract deliver` successfully with this landing tile.",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -183,8 +185,8 @@
       "description": "The third and last blocker (rock_fragmenter). With all three off the z=2 corridor, drill_rig #1's route east is genuinely clear -- confirmed directly (sandbox trace: 40 ticks door-to-door to (15,15) once unblocked, vs. never before). Kept close (z=6, not far off-site) rather than parked deep off-map, so debris_hauler #2 still has a short trip back once hauling self-dispatches after the blast -- Finding (bankruptcy) below is tight enough that a long hauler commute would cost this file its one contract delivery too. Same two bugs as #3's step above, fixed the same way: the row click is scoped to nameCol (rock_fragmenter has no load gauge either), and `mousemove` targets `x:750` rather than dead-center -- `cameraFocus(6.5,6.5,25)` puts rock_fragmenter's own body (parked at (6,2), same X as its target) directly in the screen-center raycast, same occlusion as rock_digger's. Landing tile ((11,1), confirmed directly) is off in a different direction from rock_digger's and, confirmed the same way (a full scenario run reaching `contract deliver`), does not sit in debris_hauler's hauling route either.",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -203,8 +205,8 @@
       "description": "#553: staffed:true's free driller (employee #1, already licensed blasting lvl1 + driving.drill_rig lvl1) boards the free drill_rig (vehicle #1). Without a driver the rig is a mesh and no drill_hole action ever starts.",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -540,8 +542,8 @@
       "description": "#552/#553: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare the $25,000 a manual purchase would cost on top of everything else -- see the file description's bankruptcy finding for just how tight that budget already is. Employee #10 (hired driver, licensed driving.truck lvl5 above) boards it. Re-opens the vehicles panel first (UIManager.togglePanel, same pattern as level2-playthrough-win's fix): the panel had switched to employees then build (the surveyor/driller/blaster/driver hires and the freight_warehouse placement above), so #bs-vehicle-panel's own [data-vehicle-id=\"2\"] row was off-screen (display:none, zero size) at this point -- not a stale selector, the panel itself just wasn't the active one. togglePanel only closes an ALREADY-active panel, so this click safely switches to vehicles rather than toggling it shut. New finding, real interaction-mode CI: `.bs-vehicle-assign-btn` (`makeAssignRow`, fleetDetailSections.ts) reads a `<select>` next to it, not a fixed target -- clicking Assign without first choosing an option in that select just assigns whoever the browser's default selection lands on (its first eligible option), which for this vehicle is one of staffed:true's own free drivers (a lower employee id than the hired #10), not employee #10 named in the command. Confirmed directly: `vehicle list` after this step showed debris_hauler's `driver` as employee #3, not #10, and hauling still happened (#552 self-dispatch doesn't care WHICH qualified driver boards) but not the one this step names. Fixed with a `set` action on the row's own `select` (scoped by `[data-vehicle-id=\"2\"]`, matching the file's other dropdown-driven steps) before the Assign click, mirroring the Charge step's own real-control convention (issue #515) rather than relying on whatever the dropdown defaulted to.",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 26000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -555,12 +557,14 @@
       ],
       "expect": {
         "equals": {
-          "cash": 26000,
           "tickCount": 0,
           "holeCount": 0,
           "deathCount": 0,
           "employeeCount": 13,
           "vehicleCount": 4
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "observe"

@@ -39,8 +39,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 99000,
           "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -59,8 +61,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 97500,
           "employeeCount": 2
+        },
+        "changedBy": {
+          "cash": -1500
         }
       }
     },

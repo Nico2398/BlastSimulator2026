@@ -82,8 +82,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 47700,
           "proficiencyTotal": 2
         },
         "note": "already level 1 from hiring's Rookie starting qualification -- this call is a same-level no-op, not the first level-up"
@@ -100,8 +102,10 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 47700,
           "proficiencyTotal": 2
         }
       },
@@ -127,8 +131,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 47700,
           "pendingActionCount": 1
         }
       },
@@ -145,8 +151,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 47700,
           "pendingActionCount": 1
         }
       }
@@ -161,8 +169,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 47700,
           "pendingActionCount": 2
         },
         "note": "the second dispatch's ghost preview -- employee A is still busy with the first task and employee B can't claim it (wrong skill), so this stays queued through the next several checkpoints. Count is 2 (not 1) since #547: the first dispatch's claimed-but-in-progress PendingAction still counts alongside this new unclaimed one."

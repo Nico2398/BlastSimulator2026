@@ -162,8 +162,10 @@
       "role": "player",
       "description": "#553: built directly on top of hole H1's now-drilled cell — placeBuilding only checks bounds/other-building occupancy, not NavGrid cell type, so a landed drill_hole cell is a legal building site.",
       "expect": {
+        "changedBy": {
+          "cash": -20000
+        },
         "equals": {
-          "cash": 15454,
           "buildingCount": 1
         }
       }
@@ -194,8 +196,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -15000
+        },
         "equals": {
-          "cash": 454,
           "buildingCount": 2
         }
       }

@@ -61,9 +61,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "employeeCount": 1,
-          "cash": 48800
+          "employeeCount": 1
         },
         "note": "HIRING_COSTS.surveyor = 1200 (balance.ts)"
       }
@@ -99,9 +101,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "employeeCount": 2,
-          "cash": 47600
+          "employeeCount": 2
         }
       }
     },

@@ -310,8 +310,10 @@
       ],
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 10620,
           "tickCount": 50,
           "deathCount": 0,
           "employeeCount": 1,
@@ -346,8 +348,10 @@
       "role": "player",
       "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 1 increment click: 25ms default -> 30 (DELAY_STEP_INCREMENT=5ms, Sequence.ts). dstepMs is a plain instance field with no reset path (Finding #75/level1-lose-revolt.json) -- this file's later delay_step:25 occurrence below relies on it moving back down.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 10620,
           "tickCount": 50,
           "deathCount": 0,
           "employeeCount": 1,
@@ -388,8 +392,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 10620,
           "tickCount": 50,
           "deathCount": 1,
           "employeeCount": 1,
@@ -411,8 +417,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 10620,
           "tickCount": 50,
           "deathCount": 1,
           "employeeCount": 1,
@@ -430,8 +438,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 10620,
           "tickCount": 50,
           "deathCount": 1,
           "employeeCount": 1,
@@ -1153,8 +1163,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": -19317,
           "tickCount": 140,
           "deathCount": 1,
           "employeeCount": 1,
@@ -1622,8 +1634,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": -23453,
           "tickCount": 220,
           "deathCount": 1,
           "employeeCount": 1,
@@ -1646,8 +1660,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": -23453,
           "tickCount": 220,
           "deathCount": 1,
           "employeeCount": 1,

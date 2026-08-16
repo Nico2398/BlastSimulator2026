@@ -49,8 +49,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -20000
+        },
         "equals": {
-          "cash": 30000,
           "buildingCount": 1
         }
       }
@@ -81,8 +83,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -15000
+        },
         "equals": {
-          "cash": 15000,
           "buildingCount": 2
         }
       }
@@ -98,8 +102,10 @@
       ],
       "description": "role: guard (issue #515): selecting tier 2 in the catalog row's own tier dropdown is a real interaction; the Buy button is then genuinely disabled — `refreshCatalogButtons`'s `locked` check (BuildMenu.ts) is true since tier 2 is not researched.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 15000,
           "buildingCount": 2
         },
         "blocked": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn",
@@ -118,8 +124,10 @@
       ],
       "description": "role: guard (issue #515) — same reasoning as the explosive_warehouse tier:2 attempt above.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 15000,
           "buildingCount": 2
         },
         "blocked": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn",

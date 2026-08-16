@@ -39,8 +39,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "employeeCount": 1,
-          "cash": 149000
+          "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -63,8 +65,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 1,
-          "cash": 114000
+          "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": -35000
         }
       }
     },
@@ -80,8 +84,10 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 114000,
           "qualificationCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -146,10 +152,12 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 4,
-          "cash": 108622
+          "holeCount": 4
         },
-        "note": "All 4 holes have landed — none lost, none left ordered forever."
+        "decreased": [
+          "cash"
+        ],
+        "note": "All 4 holes have landed — none lost, none left ordered forever. cash drains from payroll/upkeep across the 80-tick wait; not pinned exactly since interaction mode's real wall-clock ticking (isPaused:false by default) can extend the drain beyond command mode's headless tick N (same class as this file's later tick-block checkpoints)."
       }
     },
     {
@@ -257,8 +265,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "employeeCount": 2,
-          "cash": 107822
+          "employeeCount": 2
+        },
+        "changedBy": {
+          "cash": -800
         },
         "note": "HIRING_COSTS.driver = 800 (balance.ts)"
       }
@@ -308,8 +318,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "vehicleCount": 1,
-          "cash": 82822
+          "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": -25000
         },
         "note": "debris_hauler tier-1 purchaseCost = 25000 (balance.ts); vehicleCount is 1, not 2, because the blast above destroyed vehicle #1 (the drill_rig)"
       }

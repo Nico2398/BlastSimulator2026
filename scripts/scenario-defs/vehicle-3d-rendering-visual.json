@@ -41,8 +41,10 @@
       "role": "player",
       "description": "Opens the Fleet panel and buys the hauler by clicking its tier-1 dealership row. Every later buy reuses the open panel.",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 175000,
           "vehicleCount": 1
         }
       }
@@ -63,8 +65,10 @@
       "role": "player",
       "description": "Real click on the rock_digger tier-1 row: $175,000 in hand against $50,000, so the row is enabled. awaitUsable is the affordability assertion -- FleetPanel disables a tier row on cash < purchaseCost, so an underfunded run fails here instead of buying anyway.",
       "expect": {
+        "changedBy": {
+          "cash": -50000
+        },
         "equals": {
-          "cash": 125000,
           "vehicleCount": 2
         }
       }
@@ -85,8 +89,10 @@
       "role": "player",
       "description": "Real click on the drill_rig tier-1 row: $125,000 in hand against $35,000.",
       "expect": {
+        "changedBy": {
+          "cash": -35000
+        },
         "equals": {
-          "cash": 90000,
           "vehicleCount": 3
         }
       }
@@ -107,8 +113,10 @@
       "role": "player",
       "description": "Real click on the building_destroyer tier-1 row: $90,000 in hand against $30,000.",
       "expect": {
+        "changedBy": {
+          "cash": -30000
+        },
         "equals": {
-          "cash": 60000,
           "vehicleCount": 4
         }
       }
@@ -129,8 +137,10 @@
       "role": "player",
       "description": "Real click on the rock_fragmenter tier-1 row: $60,000 in hand against $32,000. Fifth and last role, so the shots below capture one of every vehicle mesh with the balance still in the black.",
       "expect": {
+        "changedBy": {
+          "cash": -32000
+        },
         "equals": {
-          "cash": 28000,
           "vehicleCount": 5
         }
       }

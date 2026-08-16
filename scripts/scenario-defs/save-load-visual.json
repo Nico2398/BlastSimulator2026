@@ -93,8 +93,8 @@
       ],
       "role": "bootstrap",
       "expect": {
-        "equals": {
-          "cash": 84000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -108,8 +108,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 83360
+        "changedBy": {
+          "cash": -640
         },
         "note": "#553: no longer flat -- the driller/drill_rig now on the roster drain payroll/maintenance even while idle, unlike the pre-#553 empty roster this file used to open with."
       }
@@ -134,8 +134,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 82720
+        "changedBy": {
+          "cash": -640
         }
       }
     },
@@ -179,8 +179,8 @@
         }
       ],
       "expect": {
-        "equals": {
-          "cash": 82720
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "setup"
@@ -200,8 +200,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 82720
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -224,8 +224,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 82720
+        "changedBy": {
+          "cash": 0
         },
         "note": "the real UI slot_1 here goes through SavesModal.ts's own IndexedDB-backed persistence -- a completely separate backend from the console save/load commands' in-memory quickSaveSlots map used above. This is the actual save the later load step reads back."
       }
@@ -308,9 +308,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "chargedCount": 4,
-          "cash": 77994
+          "chargedCount": 4
         }
       }
     },

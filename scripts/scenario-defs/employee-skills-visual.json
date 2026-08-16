@@ -35,7 +35,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 1,
           "qualificationCount": 1,
@@ -57,7 +59,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2,
           "qualificationCount": 2,
@@ -79,7 +83,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 3,
           "qualificationCount": 3,
@@ -101,7 +107,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 4,
           "qualificationCount": 4,
@@ -123,7 +131,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 5,
           "qualificationCount": 5,
@@ -133,7 +143,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "Employee #6 — hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below). Toggled bottom-up (6 -> 1) so the panel's own scrollIntoView leaves it resting on #1's card once every row is expanded — #1 is the one that later gains a second qualification, and every screenshot from here on needs it in frame, not wherever the last click of a top-down pass happened to land. A screenshot right after each individual click — before the next click's own scrollIntoView moves the panel again — is what gets #2-#5's cards in frame too; the step's single closing screenshot only ever shows one scroll position.",
+      "description": "Employee #6 \u2014 hired but never given an assign_skill call. Only carries its role's default 'blasting' qualification, exercising the minimal-qualifications display (contrast with #1, which gets two more assigned below). Toggled bottom-up (6 -> 1) so the panel's own scrollIntoView leaves it resting on #1's card once every row is expanded \u2014 #1 is the one that later gains a second qualification, and every screenshot from here on needs it in frame, not wherever the last click of a top-down pass happened to land. A screenshot right after each individual click \u2014 before the next click's own scrollIntoView moves the panel again \u2014 is what gets #2-#5's cards in frame too; the step's single closing screenshot only ever shows one scroll position.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -146,7 +156,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 6,
           "qualificationCount": 6,
@@ -164,8 +176,10 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "qualificationCount": 7,
           "proficiencyTotal": 9
         },
@@ -183,8 +197,10 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "qualificationCount": 8,
           "proficiencyTotal": 11
         },
@@ -202,8 +218,10 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "qualificationCount": 8,
           "proficiencyTotal": 14
         },
@@ -221,8 +239,10 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "qualificationCount": 8,
           "proficiencyTotal": 14
         },
@@ -240,8 +260,10 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "qualificationCount": 8,
           "proficiencyTotal": 18
         },
@@ -259,8 +281,10 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "qualificationCount": 8,
           "proficiencyTotal": 19
         },
@@ -288,8 +312,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "qualificationCount": 8,
           "proficiencyTotal": 19
         }
@@ -315,8 +341,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "pendingActionCount": 1
         }
       },
@@ -423,8 +451,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 42500,
           "pendingActionCount": 6
         }
       }

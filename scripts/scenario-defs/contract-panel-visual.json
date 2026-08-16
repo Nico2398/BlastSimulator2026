@@ -55,9 +55,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "activeContractCount": 1,
-          "cash": 50000
+          "activeContractCount": 1
         },
         "note": "real click on the Contracts panel's first available row -- contract #1 (Supply dirtite) is genuinely first in both the console list and the panel, matching `contract accept 1`'s explicit id; no Finding #55-class mismatch here"
       },
@@ -83,8 +85,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -108,8 +110,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -147,9 +149,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "activeContractCount": 2,
-          "cash": 50000
+          "activeContractCount": 2
         },
         "note": "2nd real click on the same unqualified .bs-contract-accept selector -- with contract #1 already moved to active, the panel's first available row is now #2 (Dispose of rubble), matching `contract accept 2`'s explicit id; verified via a real interaction-mode run rather than assumed from panel-ordering logic"
       },
@@ -175,8 +179,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -200,9 +204,11 @@
       ],
       "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 because this scenario never mines or hauls, so nothing is ever in storage (0.0 kg available). A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-id=\"2\"]`, issue #513) rather than performing one.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "activeContractCount": 2,
-          "cash": 50000
+          "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver",
@@ -230,8 +236,8 @@
       ],
       "role": "observe",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -245,8 +251,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 50000,
           "activeContractCount": 2
         }
       }

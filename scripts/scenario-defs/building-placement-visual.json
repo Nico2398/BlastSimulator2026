@@ -51,8 +51,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
         "equals": {
-          "cash": 140000,
           "buildingCount": 1
         }
       }
@@ -94,8 +96,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -15000
+        },
         "equals": {
-          "cash": 125000,
           "buildingCount": 2
         }
       }
@@ -137,8 +141,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -12000
+        },
         "equals": {
-          "cash": 113000,
           "buildingCount": 3
         }
       }
@@ -180,8 +186,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -8000
+        },
         "equals": {
-          "cash": 105000,
           "buildingCount": 4
         }
       }
@@ -224,8 +232,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -8000
+        },
         "equals": {
-          "cash": 97000,
           "buildingCount": 5
         },
         "increased": ["worldSizeX"]

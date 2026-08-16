@@ -49,8 +49,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -12000
+        },
         "equals": {
-          "cash": 48000,
           "buildingCount": 1
         }
       }
@@ -81,8 +83,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -15000
+        },
         "equals": {
-          "cash": 33000,
           "buildingCount": 2
         }
       }
@@ -113,8 +117,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -8000
+        },
         "equals": {
-          "cash": 25000,
           "buildingCount": 3
         }
       }
@@ -145,8 +151,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -12000
+        },
         "equals": {
-          "cash": 13000,
           "buildingCount": 4
         }
       }
@@ -179,8 +187,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "cash": 12000,
           "employeeCount": 1
         }
       }
@@ -199,8 +209,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
         "equals": {
-          "cash": 10500,
           "employeeCount": 2
         }
       }
@@ -233,8 +245,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -2500
+        },
         "equals": {
-          "cash": 8000,
           "trainingCount": 1
         }
       }

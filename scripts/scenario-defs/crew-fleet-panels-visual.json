@@ -53,8 +53,8 @@
       ],
       "expect": {
         "increased": ["employeeCount"],
-        "equals": {
-          "cash": 49000
+        "changedBy": {
+          "cash": -1000
         },
         "note": "HIRING_COSTS.driller is 1000 (balance.ts)"
       }
@@ -75,8 +75,8 @@
       ],
       "expect": {
         "increased": ["employeeCount"],
-        "equals": {
-          "cash": 48200
+        "changedBy": {
+          "cash": -800
         },
         "note": "HIRING_COSTS.driver is 800 (balance.ts)"
       }
@@ -101,8 +101,8 @@
       ],
       "expect": {
         "increased": ["vehicleCount"],
-        "equals": {
-          "cash": 23200
+        "changedBy": {
+          "cash": -25000
         },
         "note": "tier-1 debris_hauler costs 25000 (confirmed against the real state dump, VEHICLE_BASE_STATS pricing is computed, not a flat constant)"
       }

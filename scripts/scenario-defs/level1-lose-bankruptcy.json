@@ -28,8 +28,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 147500
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -53,8 +53,10 @@
       ],
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 147500,
           "buildingCount": 0
         }
       },
@@ -70,8 +72,10 @@
       ],
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 147500,
           "buildingCount": 0
         }
       },
@@ -87,8 +91,10 @@
       ],
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 147500,
           "buildingCount": 0
         }
       },
@@ -104,8 +110,10 @@
       ],
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"canteen\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 147500,
           "buildingCount": 0
         }
       },
@@ -121,8 +129,10 @@
       ],
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"storage_depot\" maps to the real freight_warehouse building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 147500,
           "buildingCount": 0
         }
       },
@@ -138,8 +148,10 @@
       ],
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 147500,
           "buildingCount": 0
         },
         "note": "confirmed via direct trace: all six declared building types are invalid, none of them ever exist -- this file's own \"overspend on buildings\" half of its premise never actually happens, only vehicles and employees genuinely drive the overspend below."
@@ -174,8 +186,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -50000
+        },
         "equals": {
-          "cash": 97500,
           "vehicleCount": 1
         }
       }
@@ -194,8 +208,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the level is funded for the full fleet, so this is a real click on the debris_hauler tier-1 row ($25,000) in the panel already open from the rock_digger buy. awaitUsable is the affordability assertion.",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 72500,
           "vehicleCount": 2
         }
       },
@@ -215,8 +231,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the level is funded for the full fleet, so this is a real click on the drill_rig tier-1 row ($35,000) in the panel already open from the rock_digger buy. awaitUsable is the affordability assertion.",
       "expect": {
+        "changedBy": {
+          "cash": -35000
+        },
         "equals": {
-          "cash": 37500,
           "vehicleCount": 3
         }
       },
@@ -236,8 +254,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the level is funded for the full fleet, so this is a real click on the building_destroyer tier-1 row ($30,000) in the panel already open from the rock_digger buy. awaitUsable is the affordability assertion.",
       "expect": {
+        "changedBy": {
+          "cash": -30000
+        },
         "equals": {
-          "cash": 7500,
           "vehicleCount": 4
         }
       },
@@ -271,8 +291,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the driller row ($1,000). Opens the Crew panel first; the five hires below reuse it.",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "cash": 6500,
           "employeeCount": 1
         }
       },
@@ -292,8 +314,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the driller row ($1,000).",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "cash": 5500,
           "employeeCount": 2
         }
       },
@@ -313,8 +337,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the blaster row ($1,500).",
       "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
         "equals": {
-          "cash": 4000,
           "employeeCount": 3
         }
       },
@@ -334,8 +360,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the driver row ($800).",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 3200,
           "employeeCount": 4
         }
       },
@@ -355,8 +383,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the surveyor row ($1,200).",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "cash": 2000,
           "employeeCount": 5
         }
       },
@@ -376,8 +406,10 @@
       ],
       "description": "Was an unmarked command step that overdrew: CrewPanel.ts disables a hire button on `state.cash < HIRING_COSTS[role]`, so no click could make this hire while the console made it anyway. With the level funded the button is enabled and this is a real click on the manager row ($2,000).",
       "expect": {
+        "changedBy": {
+          "cash": -2000
+        },
         "equals": {
-          "cash": 0,
           "employeeCount": 6
         }
       },
@@ -403,8 +435,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -4160
+        },
         "equals": {
-          "cash": -4160,
           "tickCount": 10,
           "bankrupt": false
         }
@@ -430,8 +464,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -4160
+        },
         "equals": {
-          "cash": -8320,
           "tickCount": 20
         }
       }
@@ -456,8 +492,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -4160
+        },
         "equals": {
-          "cash": -12480,
           "tickCount": 30
         }
       }
@@ -492,8 +530,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -4240
+        },
         "equals": {
-          "cash": -16720,
           "tickCount": 45
         }
       }
@@ -518,8 +558,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -8240
+        },
         "equals": {
-          "cash": -24960,
           "tickCount": 60
         }
       }
@@ -544,8 +586,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -4240
+        },
         "equals": {
-          "cash": -29200,
           "tickCount": 75
         }
       }
@@ -580,8 +624,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -8240
+        },
         "equals": {
-          "cash": -37440,
           "tickCount": 90
         }
       }
@@ -636,8 +682,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": -8240
+        },
         "equals": {
-          "cash": -49920,
           "tickCount": 120,
           "bankrupt": true
         }

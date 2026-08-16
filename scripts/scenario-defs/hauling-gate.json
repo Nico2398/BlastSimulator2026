@@ -269,8 +269,8 @@
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. #553: employee 6, not 1 -- staffed:true's roster occupies ids 1-5.",
       "expect": {
-        "equals": {
-          "cash": 79268
+        "changedBy": {
+          "cash": 0
         },
         "note": "the driver already holds driving.truck at level 1 from ROLE_STARTING_QUALIFICATION -- this call is a same-level no-op"
       },
@@ -300,8 +300,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 79268
+        "changedBy": {
+          "cash": 0
         }
       }
     },

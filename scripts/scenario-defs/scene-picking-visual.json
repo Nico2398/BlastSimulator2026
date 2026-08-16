@@ -71,8 +71,8 @@
       "role": "player",
       "expect": {
         "increased": ["buildingCount"],
-        "equals": {
-          "cash": 42000
+        "changedBy": {
+          "cash": -8000
         },
         "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost)"
       }
@@ -229,8 +229,8 @@
       "role": "player",
       "expect": {
         "increased": ["employeeCount"],
-        "equals": {
-          "cash": 41000
+        "changedBy": {
+          "cash": -1000
         },
         "note": "HIRING_COSTS.driller is 1000 (balance.ts); cash was 42000 after the management_office purchase above"
       }

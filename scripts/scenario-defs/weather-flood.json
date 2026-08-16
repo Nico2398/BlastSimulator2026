@@ -28,8 +28,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 100000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -44,8 +44,10 @@
       "description": "Left unmarked: no UI sets weather at all -- grepping src/ui for gameConsole?.(`weather finds zero call sites. This is a real gap, not a conversion shortfall: nothing lets a player change the weather, only `weather set` from the console/scenario harness. Also fixed a scenario bug while here: the command was `weather heavy_rain` (missing `set`), which mining.ts's weatherCommand silently falls through to a plain read for -- the flood test never actually set heavy_rain at all. Corrected to `weather set heavy_rain`.",
       "expect": {
         "equals": {
-          "weather": "heavy_rain",
-          "cash": 100000
+          "weather": "heavy_rain"
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"
@@ -61,8 +63,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 100000,
           "tickCount": 5
+        },
+        "changedBy": {
+          "cash": 0
         },
         "note": "confirmed via direct trace: cash stays flat, no employees exist yet to pay"
       }
@@ -105,8 +109,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 99000,
           "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -129,8 +135,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 64000,
           "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": -35000
         }
       }
     },
@@ -146,8 +154,10 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 64000,
           "qualificationCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -186,8 +196,10 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 9,
-          "holeCount": 0,
-          "cash": 64000
+          "holeCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },

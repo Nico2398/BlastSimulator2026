@@ -48,8 +48,8 @@
       ],
       "description": "Left unmarked, confirmed not equivalent (not merely unverified): Fire.ts's Sound the Horn button (`[data-action=\"sound-horn\"]`) sends `zone clear` using `currentZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)` -- a rectangle derived from the live drill plan, never a player-typed one. At this point in the file state.drillHoles is empty (the file's only drill_plan step runs later), so computeDangerZone returns null, this.currentZone is null, and the horn button is disabled outright (occupants defaults to [] when zone is null, and hornBtn.disabled = occupants.length === 0) -- soundHorn() itself also no-ops on a null zone (`if (!zone) return;`). A player cannot produce this command by clicking here: not a different rectangle, but a control that doesn't work yet at this point in the scenario. (Later in the file, once the 4x4/spacing:3 grid at (20,20) exists, computeDangerZone's own padding would still produce (5,5,44,44), not this step's literal (5,5,35,35) -- so even a same-moment click would diverge from this explicit rectangle.)",
       "expect": {
-        "equals": {
-          "cash": 250000
+        "changedBy": {
+          "cash": 0
         },
         "note": "no state field exposes zone bounds/status -- proven instead by the zone status observe step's own text output"
       },

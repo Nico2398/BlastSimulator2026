@@ -36,8 +36,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 25000,
           "vehicleCount": 1
         }
       }
@@ -60,8 +62,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 24200,
           "employeeCount": 1
         }
       }
@@ -112,8 +116,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 24200,
           "vehicleCount": 1
         },
         "note": "arrival-gated like surveys — the driver walks to the vehicle before boarding, `vehicle list` still shows driver:none right after this click"
@@ -157,8 +163,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
         "equals": {
-          "cash": 22685,
           "employeeCount": 2
         }
       }
@@ -173,8 +181,10 @@
       ],
       "description": "Left unmarked: vehicle #1 already has a driver, so FleetPanel shows only an Unassign control here, not the assign picker -- and even that picker would never have listed employee #2 (a blaster has no driving.truck licence). Confirmed by the console command itself failing with \"Employee lacks licence for this role\": genuinely unreachable by a click, not a conversion gap.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 22685,
           "employeeCount": 2
         },
         "note": "rejected: Employee lacks licence for this role"

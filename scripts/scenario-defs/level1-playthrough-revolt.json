@@ -37,8 +37,8 @@
       "description": "#553: staffed:true does NOT auto-assign a driver -- the free drill_rig (vehicle #1) is still a mesh nobody can drive until employee #1, the only qualified driller on the roster at this point, boards it. The assign row's <select> defaults to its only eligible option (employee #1 is the sole driving.drill_rig holder here), so the plain assign click resolves to them without needing to pick an option.",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -52,8 +52,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -67,8 +67,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 50000,
           "ecology": 50,
           "safety": 50,
           "wellBeing": 50,
@@ -86,8 +88,8 @@
       ],
       "role": "observe",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
