@@ -2704,7 +2704,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#553 Finding (real trajectory): the workforce permanently revolts (WorkerRevolt.ts, REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) here, before pattern 2's 25 holes finish landing (10 of 25 still ordered) -- sandbox-measured across three independent tick-chunking styles (5/10/20-tick batches all agree). wellBeing first hit exactly 0 at tick 185, mid-pattern-1; ScoreManager's avgMorale averages ALL employees ever hired, including the dead (their morale sits permanently at 0, Employee.ts/events.ts), so each blast's casualties permanently drag the roster average down for the rest of the file -- pattern 1's 4 deaths are why pattern 2's own crew, freshly hired at full morale, still starts the drain already averaged toward zero. This -- not a third blast, not a near-breakeven $46,760 -- is the file's real ending under #553: buying enough automated drilling capacity to survive one blast does not leave enough workforce goodwill to survive a second. #553-followup (this batch's own proactive pass): switched `cash: 2025975` from a hardcoded equals to `decreased` -- three tier-3 rigs are actively mid-drill on pattern 2 right up to the revolt trigger, same real-time-accrual class as line ~1072's own note. `levelEnded`/`levelEndReason` stay exact -- the revolt boundary itself is a discrete tick-count/wellBeing threshold, not wall-clock-sensitive, and is the actual point of this checkpoint. `holeCount: 15`/`orderedHoleCount: 10` also dropped -- landing-boundary block (holeCount changes from 13 to 15 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225.",
+      "description": "#Employee.ts morale fix (computeAverageMorale now filters to employees.filter(e => e.alive) before averaging, where it previously summed every roster entry including corpses): the WorkerRevolt threshold (REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) now completes one 20-tick chunk later than before -- tick 491, not 471 -- confirmed via direct trace (three independent tick-chunking styles agree). wellBeing was already exactly 0 by the time this chunk starts; this is purely a shift in exactly when the 120-consecutive-tick streak finishes, not a change in whether it does.",
       "interaction": [
         {
           "type": "command",
@@ -2714,7 +2714,50 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "deathCount": 4,
+          "employeeCount": 7,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 4,
+          "employeeCount": 7,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "description": "#553 Finding (real trajectory), updated for the Employee.ts morale fix (computeAverageMorale now filters to employees.filter(e => e.alive) before averaging, where it previously summed every roster entry including corpses): this tick advance is the one that lands the WorkerRevolt threshold (REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) -- tickCount 491, not the pre-fix file's 471, confirmed via direct trace (three independent tick-chunking styles agree). wellBeing first hit exactly 0 at tick 185, mid-pattern-1, same as before the fix -- pattern 1's 4 deaths crash it there regardless. What changed is what happens next: pre-fix, a dead employee's morale stayed in the average forever (frozen near 0), so pattern 2's fresh crew started already dragged toward zero and the 120-tick revolt streak completed uninterrupted. Post-fix, a dead employee drops out of the average the instant they die, so the streak gets interrupted once (a single tick's wellBeing briefly clears 0) before resuming -- delaying completion by exactly one 20-tick chunk. Real consequence: pattern 2 now has 20 more ticks to work with, which turns out to be enough to land all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) before the revolt fires -- not 10 short, as the pre-fix file's own finding claimed. The ending is unchanged: buying enough automated drilling capacity to survive one blast still doesn't leave enough workforce goodwill to survive a second, even when the second pattern itself finishes. #553-followup (this batch's own proactive pass): `cash` stays `decreased` rather than a hardcoded equals -- three tier-3 rigs are actively mid-drill on pattern 2 right up to the revolt trigger, same real-time-accrual class as line ~1072's own note. `levelEnded`/`levelEndReason` are asserted on the following step (event choose 0, index 116), not here -- this step's own tick advance is what crosses the threshold, but the engine only sets levelEndReason at the top of the next command's own tick-processing pass.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2738,7 +2781,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2760,7 +2803,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2779,7 +2822,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2798,7 +2841,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2817,7 +2860,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2840,7 +2883,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2854,7 +2897,7 @@
     },
     {
       "command": "campaign status",
-      "description": "#553 Findings, final: the level ends in a permanent worker revolt at tick 458, with pattern 2 abandoned 10 holes short of its 25. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount), matching a direct trace through this exact sequence. Cash ends at $2,025,975, down from the $3,000,000 opening bump, spent on: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), 386 ticks (72->458) of payroll/fuel/maintenance for a 4-to-7-person roster, and two punitive random events (an ore-name lawsuit -$20,000 at tick 130, a union strike -$25,000 at tick 278) -- no lucky_strike bonus landed this run, unlike the pre-#553 version of this file. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. What #553 changes is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before a second pattern can fire.",
+      "description": "#553 Findings, final, updated for the Employee.ts morale fix (see step 115's own note for the mechanism): the level ends in a permanent worker revolt at tick 491, not the pre-fix file's 458/471 -- but pattern 2 now finishes all 25 of its own holes before the revolt fires (holeCount: 25, orderedHoleCount: 0), where the pre-fix file found it abandoned 10 holes short. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount), matching a direct trace through this exact sequence. Cash ends at $2,029,295, down from the $3,000,000 opening bump, spent on: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), 419 ticks (72->491) of payroll/fuel/maintenance for a 4-to-7-person roster, and two punitive random events (an ore-name lawsuit -$20,000 at tick 130, a union strike -$25,000 at tick 278) -- no lucky_strike bonus landed this run, unlike the pre-#553 version of this file. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. What #553 changes is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before the level can be won, even once pattern 2's own drilling genuinely finishes.",
       "interaction": [
         {
           "type": "command",
@@ -2864,7 +2907,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 471,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2875,7 +2918,9 @@
           "nuisance": 50,
           "bankrupt": false,
           "levelEnded": true,
-          "levelEndReason": "worker_revolt"
+          "levelEndReason": "worker_revolt",
+          "holeCount": 25,
+          "orderedHoleCount": 0
         }
       }
     }

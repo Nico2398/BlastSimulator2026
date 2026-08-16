@@ -541,6 +541,33 @@ export async function executeActionOnPage(
       });
       if (!pending) break;
 
+      // An event can be genuinely pending in state while the level has
+      // already ended (bankruptcy/revolt/ecological shutdown) — the event
+      // system keeps scheduling regardless. Once that happens the dialog is
+      // permanently unreachable by design, not a rendering race:
+      // LevelEndScreen owns the whole screen from the moment
+      // state.levelEndReason goes non-null (UIManager.update defers
+      // eventModal for exactly this reason, mirroring the same deferral
+      // BlastReportModal already needed). A real player has no click left to
+      // make here either — the level is over — so resolve the same way
+      // command mode already does (a direct console call) rather than
+      // hanging `evTimeout` waiting on a control that will never show.
+      const levelEnded = await page.evaluate(() => {
+        const getState = (window as unknown as {
+          __gameState?: () => { levelEndReason: string | null } | null;
+        }).__gameState;
+        return getState?.()?.levelEndReason != null;
+      });
+      if (levelEnded) {
+        await page.evaluate(() => {
+          const run = (window as unknown as {
+            __gameConsole?: (c: string) => unknown;
+          }).__gameConsole;
+          run?.('event choose 0');
+        });
+        break;
+      }
+
       // Something IS pending, so the dialog must appear — wait for it to be
       // genuinely usable (see `waitUsableAndClick`'s own doc comment for why
       // a bare `page.waitForSelector` is the wrong primitive here: the panel

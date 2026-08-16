@@ -319,6 +319,24 @@ export function calculateSalary(employee: Employee): number {
     employee.qualifications.reduce((sum, q) => sum + QUALIFICATION_SALARY_BONUS[q.proficiencyLevel], 0);
 }
 
+/**
+ * Average morale across the LIVING roster, for feeding ScoreManager's
+ * wellBeing input. A dead employee is never spliced from `employees` (only
+ * fireEmployee does that — killEmployee just sets alive:false, same as
+ * processPayCycle already treats above), so an unfiltered average keeps
+ * counting a corpse's morale, frozen at whatever it was the instant they
+ * died, forever after — permanently depressing wellBeing even once the rest
+ * of a fully-recovered crew is back at 100 morale, with no way to ever clear
+ * it (no UI control fires a dead employee; there is nothing to click).
+ * Defaults to the neutral 50 when nobody is alive, matching the pre-hire
+ * zero-employee default the caller already relied on.
+ */
+export function computeAverageMorale(employees: readonly Employee[]): number {
+  const living = employees.filter(e => e.alive);
+  if (living.length === 0) return 50;
+  return living.reduce((sum, e) => sum + e.morale, 0) / living.length;
+}
+
 /** Get effectiveness multiplier based on morale (0.5–1.2). */
 export function getEffectiveness(employee: Employee): number {
   if (employee.injured || !employee.alive || employee.collapsing) return 0;

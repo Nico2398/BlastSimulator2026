@@ -71,7 +71,7 @@
           "command": "build medical_bay at:5,5"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
           "cash": 50000,
@@ -91,7 +91,7 @@
           "command": "build office at:8,5"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
           "cash": 50000,
@@ -122,7 +122,9 @@
       "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file, whose whole premise pre-#553 was buying zero vehicles and hiring zero employees, now needs exactly one of each before a single hole can land. This is the ONLY hire in the file: no blaster, no driver, no living quarters -- the file's real point (no hauling infrastructure ever exists) is unchanged, only drilling itself is no longer free. Employee #1.",
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
@@ -169,7 +171,9 @@
       "description": "#553: the only vehicle this file ever buys (purchaseCost $35,000, VEHICLE_STATS in balance.ts) -- required because drill_plan no longer writes holes into state directly, it queues drill_hole actions that only a driver-crewed drill_rig can claim. Vehicle #1, and the last one: this file's premise (no hauling infrastructure, so no delivery ever succeeds) depends on never buying a debris_hauler, rock_digger or rock_fragmenter either, and per its own instructions this file does not buy a replacement rig even after this one is destroyed below.",
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "tickCount": 0,
           "deathCount": 0,
@@ -259,7 +263,9 @@
       "description": "#553: sandbox-measured -- the single driller/drill_rig lands all 4 holes of this pattern by tick 40 (H4 at 13, H1 at 20, H2 at 25, H3 at 32); tick 50 is the pad. Cash keeps draining under the pad ($4/tick fuel+maintenance on the rig, $60/tick averaged driller payroll) even after the holes land, which is why cash is asserted as decreased rather than pinned to the exact pad-dependent figure.",
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "orderedHoleCount": 0,
           "holeCount": 4,
@@ -302,7 +308,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. Sandbox-measured: charging pop_rock at this amount costs nothing here (cash unchanged before/after in both this file's pre-#553 version and a direct #553 trace) -- unlike tutorial-playthrough's boomite charge, whatever pricing this leaves at $0 for this explosive/amount combination, not an authoring oversight.",
       "expect": {
         "equals": {
           "cash": 10620,
@@ -448,7 +454,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["safety"],
+        "decreased": [
+          "safety"
+        ],
         "equals": {
           "tickCount": 70,
           "deathCount": 1,
@@ -828,7 +836,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "tickCount": 135,
           "deathCount": 1,
@@ -1149,12 +1159,12 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 79.47999999999988,
+          "wellBeing": 60.58000000000044,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#597 (event cooldown caching): the sparkium contract (#3, accepted at tick 90) already expired earlier in this file (tick 133, during the tick 20 step now checkpointed at tickCount 135), so this is a quiet checkpoint after that drop rather than before it. #593: cash/wellBeing/safety all re-verified against current code -- with the driller dead (first pattern's blast, far above) cash sits flat at -$19,317 rather than continuing to drain. safety is pinned at its floor of 0 rather than recovering: sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run once it bottoms out. wellBeing, by contrast, keeps climbing (not falling) -- with no living employee left to accrue hunger/fatigue, the score decays back up toward its neutral baseline over time; see the final scores step, where it reaches ~100. ecology/nuisance stay untouched here -- no real blast has happened since the first one, and no event has fired yet at this tick (see the first scores step's note)."
+        "note": "#597 (event cooldown caching): the sparkium contract (#3, accepted at tick 90) already expired earlier in this file (tick 133, during the tick 20 step now checkpointed at tickCount 135), so this is a quiet checkpoint after that drop rather than before it. #593: cash/wellBeing/safety all re-verified against current code -- with the driller dead (first pattern's blast, far above) cash sits flat at -$19,317 rather than continuing to drain. safety is pinned at its floor of 0 rather than recovering: sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run once it bottoms out. wellBeing, by contrast, keeps climbing (not falling) -- with no living employee left to accrue hunger/fatigue, the score decays back up over time. Employee.ts's computeAverageMorale fix (dead employees now excluded from the average, not just diluted) means the sole driller's own frozen-at-death morale no longer feeds this at all -- with zero living employees, avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback), not whatever the driller's morale happened to be at death. wellBeing climbs toward the equilibrium that constant produces, not all the way to 100; see the final scores step for where it actually settles. ecology/nuisance stay untouched here -- no real blast has happened since the first one, and no event has fired yet at this tick (see the first scores step's note)."
       }
     },
     {
@@ -1224,7 +1234,9 @@
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
-        "changedBy": { "cash": -4000 },
+        "changedBy": {
+          "cash": -4000
+        },
         "equals": {
           "tickCount": 175,
           "deathCount": 1,
@@ -1405,7 +1417,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m — the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" — inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m \u2014 the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" \u2014 inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
       "expect": {
         "equals": {
           "tickCount": 180,
@@ -1551,7 +1563,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "tickCount": 220,
           "deathCount": 1,
@@ -1614,12 +1628,12 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 99.95,
+          "wellBeing": 66.58000000000067,
           "safety": 0,
           "ecology": 50,
           "nuisance": 52.75000000000013
         },
-        "note": "#593, superseding the pre-#593 note this once carried: with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down -- wellBeing instead decays back UP toward its neutral baseline with nothing left to complain about, reaching 99.95 by this checkpoint rather than bottoming at 0. safety is re-verified as pinned at its floor of 0, not recovering -- sandbox-measured, it never moves off 0 anywhere in this file's run once it bottoms out there (tickCount 70, see that scores step's note). nuisance is no longer untouched either: the food_fest event partway through the run (see its own changedBy step) added +5 and it has been decaying back down since (52.75 here). ecology alone stays at the fresh-game 50 -- confirmed across the whole file: the one real blast (the first pattern) never registered a vibration hit, and the other three never fired at all."
+        "note": "#593, superseding the pre-#593 note this once carried, and updated again for the Employee.ts computeAverageMorale fix (dead employees now excluded from the average outright, not diluted-but-never-cleared): with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down, and with zero living employees avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback) rather than the driller's own frozen-at-death morale. wellBeing decays back up from its post-death low toward the equilibrium that constant produces, reaching 66.58 by this checkpoint (still climbing from the earlier scores checkpoint's 60.58) rather than climbing all the way toward 100 the way a higher, morale-derived average once did. safety is re-verified as pinned at its floor of 0, not recovering -- sandbox-measured, it never moves off 0 anywhere in this file's run once it bottoms out there (tickCount 70, see that scores step's note). nuisance is no longer untouched either: the food_fest event partway through the run (see its own changedBy step) added +5 and it has been decaying back down since (52.75 here). ecology alone stays at the fresh-game 50 -- confirmed across the whole file: the one real blast (the first pattern) never registered a vibration hit, and the other three never fired at all."
       }
     },
     {
@@ -1638,7 +1652,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 99.95,
+          "wellBeing": 66.58000000000067,
           "safety": 0
         }
       }
@@ -1659,7 +1673,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 99.95,
+          "wellBeing": 66.58000000000067,
           "safety": 0,
           "bankrupt": false,
           "levelEnded": false,

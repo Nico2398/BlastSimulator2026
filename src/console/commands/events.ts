@@ -17,7 +17,7 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome, type ExpenseCategory } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { processPayCycle } from '../../core/entities/Employee.js';
+import { processPayCycle, computeAverageMorale } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost } from '../../core/entities/Building.js';
 import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
@@ -165,9 +165,7 @@ export function tickCommand(
     }
 
     // 7. Score updates — decay + building/morale/vibration effects
-    const avgMorale = state.employees.employees.length > 0
-      ? state.employees.employees.reduce((s, e) => s + e.morale, 0) / state.employees.employees.length
-      : 50;
+    const avgMorale = computeAverageMorale(state.employees.employees);
     const scoreInputs: ScoreInputs = {
       buildings: state.buildings,
       avgMorale,

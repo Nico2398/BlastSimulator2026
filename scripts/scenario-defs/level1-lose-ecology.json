@@ -1,21 +1,208 @@
 {
   "name": "level1-lose-ecology",
-  "description": "Level 1 losing scenario: massive blasts with max krackle, triggering ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). depth:6 (not the originally-declared 12) throughout: the Drill panel's real click always uses its own DEFAULT_DEPTH_M regardless of what a scenario's command field declares, a new sub-class of Finding #3/#4 caught only by a real interaction-mode run (see the note on the first blast step). With the corrected, shallower/more-violent holes, ecology bottoms out at exactly 0 after just the SECOND blast (not the fifth), and the file's own original tick budget already ticks past the 150-consecutive-ticks-at-zero threshold -- the shutdown this file is named for now fires for real, no extension needed.",
+  "description": "Level 1 losing scenario: a massive blast with max krackle triggers ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). Rewritten for the Employee.ts morale fix (computeAverageMorale now filters to `employees.filter(e => e.alive)` before averaging, where it previously summed every roster entry including corpses): the file's own prior 4-round design was tuned against the PRE-fix behaviour, where a dead crew member's morale, frozen at whatever it was at death, diluted-but-never-cleared the average forever -- with the fix live, that whole problem stops existing (a dead employee is dropped from the average outright, the instant they die), so this file no longer needs the old design's massive 15-employee filler cushion refreshed every round, nor the fire-everyone-and-rehire-fresh dance between rounds that pre-fix corpse-dilution forced. Rebuilt from scratch as a single round: 4 parallel driller+drill_rig crews (employee #1's staffed:true rig plus 3 freshly hired/equipped ones) drill one 7x7-hole grid (49 holes, 2m spacing -- tight on purpose, see below) alongside 15 idle filler employees who never leave the depot. The blast (max krackle, 10kg, minimum 1.0m stemming) then kills all 4 active crew -- confirmed via state.damage.accidents, ~90m throw radius is unavoidable on this 96x96 map -- while driving ecology to exactly 0.\n\nThe key mechanic this redesign leans on, confirmed by direct probe and not previously documented in this file: once ecology clamps to exactly 0, it stays there completely unassisted. ScoreManager.ts's applyDecay only pulls a score that is strictly between 0 and 100 back toward the neutral 50 -- its own `value > 0` check excludes exactly 0 -- and nothing on this site (no building anywhere in BuildingDefs.ts carries an `ecology` scoreEffect, and the tick loop's own maxRecentVibration input is hardcoded to 0, events.ts) ever pushes it back up from there. So a single, sufficiently large blast reaching exactly 0 is enough to start (and guarantee) the full 150-tick shutdown countdown; the old design's second blast/round existed only to compensate for a first blast that undershot 0 (it reached 5.70, not 0, at the old file's own hole count and spacing) -- sizing the single blast correctly here removes the need for a second one entirely.\n\nTwo further engine quirks, confirmed by direct probe while investigating whether a living_quarters building could stabilize wellBeing here, turned out to make one actively counterproductive for this file's purposes -- noted here rather than fixed, since fixing either is out of this file's scope (scenario-JSON-only edit): (1) GameLoop.ts's completeRestForEmployee, the completion path for a living_quarters-serviced rest, calls replenishNeed with a single tick's own replenish rate (e.g. +8 fatigue for a Tier 1 building) regardless of how many ticks the rest itself took (2/3/8 depending on gauge) -- resting at a building this way replenishes LESS than resting in place with no building at all (which flatly restores the gauge to NEED_REST_NO_BUILDING_CAP=70 in one shot, EmployeeNeeds.ts's own documented design). (2) autoInsertNeedTasks (GameLoop.ts), unlike tickCollapse's own building search, never checks needRestSearchRadius before routing an employee toward the nearest living_quarters -- an employee routed toward a distant one spends the whole walk there counted as `isWorking` (needs drain at the faster \"working\" rate the entire trip, not the slower idle rate), often crashing them into an actual collapse before they arrive. Together these made every living_quarters placement tried here (near the depot, near the drill site, Tier 1, Tier 2) stall the 4 crews' drilling indefinitely rather than help -- confirmed repeatedly by direct probe -- so this file builds no buildings at all and instead leans on two things it can actually control: the 15-employee filler cushion (unaffected by either bug, since they are never routed anywhere) and a drilling phase short enough that even the filler's own slow, unavoidable idle-gauge decay (EmployeeNeeds.ts's idle drain rates, 0.5/tick each for hunger and fatigue) has not yet crashed their morale to the floor by blast time.\n\nThat last constraint is what the tight 2m hole spacing is actually for: confirmed by direct probe, the same 49-hole pattern at the old file's 3m spacing takes long enough to drill (~600+ ticks solo, ~360 with 4 crews at 3m) that the 15 filler's own morale has already crashed to 0 by the time the crew dies -- avgMorale stays pinned at 0 (filler-only, post-death) straight through the 150-tick shutdown window, and worker_revolt (REVOLT_TICKS=120) wins the race. At 2m spacing the same 4 crews finish the same 49 holes in 230 ticks with wellBeing still at 51.16 -- confirmed by direct probe, run twice for determinism -- so avgMorale is still meaningfully positive when the crew dies, and even though wellBeing does still crash to (and stay at) 0 for a stretch afterward (the filler's own decay catches up eventually regardless), that stretch starts late enough that ecological_shutdown's already-running 150-tick countdown (started at the blast) reaches its threshold first: worker_revolt's own ticksAtZero streak is only at 97 of the 120 it needs when shutdown claims levelEndReason at tick 380 -- a 23-tick margin, confirmed by direct probe, run twice for determinism (identical tick 380 / ecological_shutdown / cash outcome both times). events.ts's tick loop only ever sets levelEndReason on the FIRST condition to trip a given tick (bankruptcy, then ecological shutdown, then arrest, then revolt, each gated by `if (!state.levelEnded)`) -- once shutdown locks it in at tick 380, nothing later (including revolt's own counter, which was still climbing) can overwrite it.",
   "steps": [
     {
-      "command": "campaign start level:dusty_hollow",
+      "command": "campaign start level:dusty_hollow staffed:true cash:5000000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow"
+          "command": "campaign start level:dusty_hollow staffed:true cash:5000000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 5000000
         }
       }
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] select",
+          "value": "1"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player",
+      "description": "staffed:true does NOT auto-assign a driver -- crews the free drill_rig (vehicle #1) with employee #1, the only qualified driller already on the roster.",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle scrap 2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "role": "player",
+      "description": "Only vehicle #1 (drill_rig) is used this round -- the staffed roster's debris_hauler/rock_digger/rock_fragmenter would otherwise sit parked in the drill site's path: NavGrid pathing has no notion of \"move aside\", so a vehicle idling on a cell a drilling driller's route crosses blocks that route forever (isCellOccupiedByOtherVehicle, EntityMovementTick.ts) -- confirmed by direct probe, drilling stalls at a handful of holes indefinitely with these left in place, regardless of crew size.",
+      "expect": {
+        "changedBy": {
+          "cash": 10000
+        }
+      }
+    },
+    {
+      "command": "vehicle scrap 3",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 20000
+        }
+      }
+    },
+    {
+      "command": "vehicle scrap 4",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"4\"] .bsx-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 12800
+        }
+      }
+    },
+    {
+      "command": "employee fire 2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "employee fire 3",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-employee-id=\"3\"] .bs-detail-toggle",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "employee fire 4",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-employee-id=\"4\"] .bs-detail-toggle",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "employee fire 5",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-employee-id=\"5\"] .bs-detail-toggle",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "time resume",
@@ -28,7 +215,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 5042800
         }
       }
     },
@@ -40,18 +227,601 @@
           "command": "scores"
         }
       ],
-      "role": "observe",
+      "role": "observe"
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
       "expect": {
-        "equals": {
-          "ecology": 50,
-          "safety": 50,
-          "wellBeing": 50,
-          "nuisance": 50
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 6 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 6 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap",
+      "description": "Hiring a driller only grants the role's starting `blasting` qualification (ROLE_STARTING_QUALIFICATION, Employee.ts) -- the drill_rig licence needed before any drill_hole action can be assigned to them comes from here. No UI equivalent: the player-facing path is `employee train` at a driving_center."
+    },
+    {
+      "command": "vehicle buy drill_rig tier:1",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 5 6",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] select",
+          "value": "6"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player",
+      "description": "The assign row's own <select> (fleetDetailSections.ts's makeAssignRow) must be explicitly set to this employee before clicking Assign -- Assign reads whichever employee the <select> currently shows, which defaults to the first eligible (alive, licensed, not-yet-driving) one in roster order, not whichever employee this step names.",
+      "expect": {
+        "changedBy": {
+          "cash": 0
         }
       }
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5",
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 7 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 7 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig tier:1",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 6 7",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] select",
+          "value": "7"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee assign_skill 8 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 8 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle buy drill_rig tier:1",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "vehicleCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 7 8",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] select",
+          "value": "8"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "description": "15 idle filler employees, never given a task: avgMorale (computeAverageMorale, Employee.ts) averages every ALIVE roster entry equally, so this cushion keeps it (and wellBeing derived from it, ScoreManager.updateScores) off the floor while the 4-crew round below drills and, later, dies in the blast -- once dead, the .alive filter drops them out of the average for good (the pre-fix bug this file used to work around: a dead employee's morale, frozen at whatever it was at death, used to drag the average down forever with no way to clear it).",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan grid rows:7 cols:7 spacing:2 depth:6 diameter:0.089 start:5,5",
       "interaction": [
         {
           "type": "clickSelector",
@@ -70,6 +840,10 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:first-child"
+        },
+        {
           "type": "dragTiles",
           "x1": 5,
           "z1": 5,
@@ -77,20 +851,472 @@
           "z2": 17
         },
         {
-          "type": "screenshot"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }
       ],
       "role": "player",
+      "description": "One decrement click on the strip's own spacing stepper (data-field=\"spacing\", DEFAULT_SPACING_M=3 -> 2, Drill.ts) before dragging the SAME (5,5)-(17,17) box round1 always used: 7x7 holes at 2m spacing spans exactly the 12m this drag already covers (round((17-5)/2)+1=7), the same span 5x5 holes at the old 3m spacing covered (round(12/3)+1=5). Tight 2m spacing is not cosmetic -- confirmed by direct probe, it is what keeps 4 parallel crews finishing all 49 holes in ~230 ticks instead of ~600+: closer holes mean shorter drives between them, which is most of the difference between a crew that finishes with wellBeing still above 50 and one that has already crashed to 0 and cannot recover before the blast.",
       "expect": {
         "equals": {
-          "holeCount": 25,
-          "cash": 50000
-        },
-        "note": "spacing:3 already matches the Drill panel's own default (DEFAULT_SPACING_M=3, Drill.ts) -- the (5,5)-(17,17) drag is a 12-unit span, round(12/3)+1=5, so the row/col/spacing part of the grid was already correct. depth was not: corrected from the originally-declared 12 to 6, the panel's own DEFAULT_DEPTH_M -- caught only by a real interaction-mode run, which failed with ecology 14.47 instead of the depth:12 command-mode trace's 48.99 (shallower holes with the same charge concentrate energy over less rock, producing far more violent fragmentation/projections). A new sub-class of Finding #3/#4: the grid tool's real defaults extend to depth, not just row/col/spacing -- every prior file's `drill_plan grid` fix only ever checked hole COUNT, which depth doesn't affect, so this class could be silently present in already-completed files too; flagged in the plan doc as a follow-up audit item."
+          "orderedHoleCount": 49,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s (#475), leaving them pending so later ticks halt and the run diverges while still passing command mode."
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "description": "230 ticks (23 x tick 10, deterministic given the fixed seed and this exact command sequence) is enough for the 4 parallel driller+drill_rig crews to finish all 49 holes -- confirmed by direct probe, run twice for determinism (holeCount 49, wellBeing 51.16 both times).",
+      "expect": {
+        "equals": {
+          "holeCount": 49,
+          "tickCount": 230
+        }
       }
     },
     {
@@ -165,14 +1391,13 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "Charge All commits the panel's current product card / amount / stemming (ChargeStep.chargeAll, Charge.ts), and all three are reachable by click: the krackle product card ([data-action=\"select-explosive\"][data-explosive=\"krackle\"]) selects the explosive, 5 amount increments take 5 -> 10kg (krackle's maxChargeKg is exactly 10, so this is the top of its range) and 5 stemming decrements take 2.0 -> 1.0m. The explicit [data-step=\"2\"] click is required because the drill step above clicks [data-step=\"1\"] manually, which disarms autoAdvance. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "role": "player",
+      "description": "Max krackle (10kg, the level's strongest available explosive) at minimum stemming (1.0m) -- catastrophic overcharge, exactly the file's own point.",
       "expect": {
         "equals": {
-          "chargedCount": 25,
-          "cash": 50000
+          "chargedCount": 49
         }
-      },
-      "role": "player"
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -203,10 +1428,10 @@
         }
       ],
       "role": "player",
-      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
+      "description": "3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
       "expect": {
         "equals": {
-          "sequencedCount": 25
+          "sequencedCount": 49
         }
       }
     },
@@ -239,316 +1464,14 @@
         }
       ],
       "role": "player",
+      "description": "The catastrophic blast -- this file's whole point. ~90m throw radius is unavoidable on this map for anyone standing at the drill site, so all 4 active crew (employees #1, #6, #7, #8) die (deathCount 0->4); the 15 filler, who never left the depot, do not. Krackle vibration cuts ecology sharply in one blast, deterministically (no RNG in the blast->ecology formula, ScoreManager.ts's recordVibration) -- 49 holes at this spacing/charge produce enough projections (~5300, confirmed by direct probe) to clamp ecology to exactly 0, not merely low. That exact-0 clamp is what starts the government's countdown: applyDecay (ScoreManager.ts) only nudges a score that is strictly between 0 and 100 back toward 50 -- at exactly 0 (`value > 0` excludes it) it does nothing, and with no building anywhere on this site touching the ecology score and maxRecentVibration hardcoded to 0 in the tick loop (events.ts), nothing else ever will either. Ecology stays pinned at exactly 0 from this tick on, unassisted, for the full ECOLOGICAL_SHUTDOWN_TICKS=150 streak below -- one sufficiently large blast is enough; no second round is needed.",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "ecology": 14.469999999999999,
-          "cash": 50000
-        },
-        "note": "confirmed via direct trace with the corrected depth:6: krackle's vibration cuts ecology from 50 to 14.47 in one blast -- deterministic (no RNG in the blast->ecology formula, ScoreManager.ts's recordVibration, called from mining.ts's blastCommand with vibrationMmS derived from result.projectionCount), safe to assert exactly in both modes."
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:20,5",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 20,
-          "z1": 5,
-          "x2": 32,
-          "z2": 17
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 25,
-          "cash": 50000
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "Product card and both steppers still hold krackle / 10kg / 1.0m from the first charge cycle in this file — ChargeStep keeps them as plain instance fields with no reset path, and a console `blast` clearing the plan does not touch them. Asserted before the commit rather than assumed, so a wrong persistence assumption fails loudly instead of quietly charging boomite at 5kg.",
-      "expect": {
-        "equals": {
-          "chargedCount": 25
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
-      "expect": {
-        "equals": {
-          "sequencedCount": 25
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
           "ecology": 0,
-          "cash": 50000
-        },
-        "note": "the 2nd blast alone drives ecology all the way to exactly 0 -- not just low, the literal floor. From here applyDecay's own >0 check (ScoreManager.ts) means it can never climb back on its own without another positive contributor (a building with a positive ecology effect; this file builds nothing), so ecology now stays pinned at exactly 0 for the rest of the file, safe to assert exactly regardless of any other random event firing (confirmed via direct trace: it never moves again, including across the random event that does fire further down)."
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,20",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 5,
-          "z1": 20,
-          "x2": 17,
-          "z2": 32
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 25
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "Product card and both steppers still hold krackle / 10kg / 1.0m from the first charge cycle in this file — ChargeStep keeps them as plain instance fields with no reset path, and a console `blast` clearing the plan does not touch them. Asserted before the commit rather than assumed, so a wrong persistence assumption fails loudly instead of quietly charging boomite at 5kg.",
-      "expect": {
-        "equals": {
-          "chargedCount": 25
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
-      "expect": {
-        "equals": {
-          "sequencedCount": 25
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "ecology": 0,
-          "cash": 50000
+          "deathCount": 4
         }
       }
     },
@@ -563,170 +1486,15 @@
       "role": "observe"
     },
     {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:20,20",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 20,
-          "z1": 20,
-          "x2": 32,
-          "z2": 32
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 25
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "Product card and both steppers still hold krackle / 10kg / 1.0m from the first charge cycle in this file — ChargeStep keeps them as plain instance fields with no reset path, and a console `blast` clearing the plan does not touch them. Asserted before the commit rather than assumed, so a wrong persistence assumption fails loudly instead of quietly charging boomite at 5kg.",
-      "expect": {
-        "equals": {
-          "chargedCount": 25
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
-      "expect": {
-        "equals": {
-          "sequencedCount": 25
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "ecology": 0,
-          "cash": 50000
-        }
-      }
-    },
-    {
-      "command": "scores",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
+          "command": "tick 10"
         }
       ],
       "role": "setup",
-      "expect": {
-        "equals": {
-          "ecology": 0
-        },
-        "note": "ecology has been pinned at exactly 0 since blast 2 and stays there through ordinary ticking -- see the note on that step for why (applyDecay never recovers a score sitting at exactly 0). Ticks-at-zero (EcologicalDisaster.ts) has been accumulating since tick 1 of this block; the shutdown threshold is checked at the file's final tick 30 block below."
-      }
+      "description": "150 more ticks (15 x tick 10) after the blast -- ECOLOGICAL_SHUTDOWN_TICKS (EcologicalDisaster.ts). Ecology, pinned at exactly 0 since the blast above, reaches the sustained streak here; the government shutdown fires on the very last of these ticks (confirmed by direct probe, run twice for determinism: tick 380 both times). wellBeing recovers only partway (the surviving 15 filler's own morale has also been draining on pure idle-gauge decay since tick 0 -- REVOLT_TICKS=120 is close enough behind ECOLOGICAL_SHUTDOWN_TICKS=150 that this file's pacing is the whole point: worker_revolt's own ticksAtZero streak reaches only ~97 of the 120 it needs by the time shutdown locks the outcome in -- events.ts's tick loop sets levelEndReason on the FIRST condition to trip a given tick (bankruptcy, then ecological shutdown, then arrest, then revolt, each gated by `if (!state.levelEnded)`), so once shutdown claims it here, revolt's own later-arriving streak can never overwrite it."
     },
     {
       "command": "event choose 0",
@@ -735,23 +1503,17 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player"
     },
     {
-      "command": "tick 20",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 10"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "ecology": 0
-        }
-      }
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -760,23 +1522,17 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player"
     },
     {
-      "command": "tick 20",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 10"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "ecology": 0
-        }
-      }
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -785,183 +1541,17 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player"
     },
     {
-      "command": "scores",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "scores"
+          "command": "tick 10"
         }
       ],
-      "role": "observe"
-    },
-    {
-      "command": "drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:10,10",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 10,
-          "z1": 10,
-          "x2": 22,
-          "z2": 22
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 25
-        }
-      }
-    },
-    {
-      "command": "charge hole:* explosive:krackle amount:10 stemming:1",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"2\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"][data-selected=\"true\"]"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 kg"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "1.0 m"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
-        }
-      ],
-      "description": "Product card and both steppers still hold krackle / 10kg / 1.0m from the first charge cycle in this file — ChargeStep keeps them as plain instance fields with no reset path, and a console `blast` clearing the plan does not touch them. Asserted before the commit rather than assumed, so a wrong persistence assumption fails loudly instead of quietly charging boomite at 5kg.",
-      "expect": {
-        "equals": {
-          "chargedCount": 25
-        }
-      },
-      "role": "player"
-    },
-    {
-      "command": "sequence auto delay_step:10",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value"
-        },
-        {
-          "type": "assert",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-value",
-          "property": "textContent",
-          "expectedValue": "10 ms"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
-        }
-      ],
-      "role": "player",
-      "description": "dstepMs is a plain instance field on SequenceStep (Sequence.ts) with no reset path -- it persists unchanged across blasts/re-drills within the same page session, so this occurrence's stepper already reads 10ms from the delay_step:10 occurrence earlier in this file. Asserted rather than assumed (Finding #75), so a wrong persistence assumption fails loudly instead of silently charging the wrong delay.",
-      "expect": {
-        "equals": {
-          "sequencedCount": 25
-        }
-      }
-    },
-    {
-      "command": "blast",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "holeCount": 0,
-          "ecology": 0
-        }
-      }
-    },
-    {
-      "command": "scores",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "scores"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "tick 30",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 30"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "ecology": 0,
-          "levelEnded": false
-        }
-      }
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -970,24 +1560,17 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player"
     },
     {
-      "command": "tick 30",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 30"
+          "command": "tick 10"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "ecology": 0,
-          "levelEnded": false
-        }
-      }
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -996,25 +1579,17 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player"
     },
     {
-      "command": "tick 30",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 30"
+          "command": "tick 10"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "ecology": 0,
-          "levelEnded": false
-        },
-        "note": "a real random event fires somewhere in this file's tick sequence (confirmed via direct trace), moving cash/safety/wellBeing; deliberately not asserted here since a real browser run is not guaranteed to roll the same event at the same point (Finding #12/#34's class). ecology itself is unaffected either way, per the note on the 2nd blast above."
-      }
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -1023,29 +1598,17 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "role": "player"
     },
     {
-      "command": "tick 30",
-      "description": "With the corrected depth:6, ecology has been at exactly 0 since the 2nd blast (well before any ticking started), so this file's own original tick budget was always going to be enough: the 150th consecutive tick-at-zero (ECOLOGICAL_SHUTDOWN_TICKS, balance.ts) lands inside this final block -- the government shutdown fires for real here, confirmed via direct trace. No file extension needed, unlike what the depth:12 version would have required.",
+      "command": "tick 10",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 30"
+          "command": "tick 10"
         }
       ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "ecology": 0,
-          "tickCount": 160,
-          "ecologicalShutdown": true,
-          "levelEnded": true,
-          "levelEndReason": "ecological_shutdown"
-        },
-        "note": "the file's own premise, finally proven for real: ecology sat at exactly 0 for 150 straight ticks and the government closed the site. Confirmed via direct trace that levelEnded does not block or alter tick's own advancement, nor any later command in this file."
-      }
+      "role": "setup"
     },
     {
       "command": "event choose 0",
@@ -1054,7 +1617,158 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
@@ -1099,12 +1813,13 @@
       "expect": {
         "equals": {
           "ecology": 0,
-          "tickCount": 160,
+          "tickCount": 380,
           "ecologicalShutdown": true,
           "levelEnded": true,
-          "levelEndReason": "ecological_shutdown"
+          "levelEndReason": "ecological_shutdown",
+          "revolted": false
         },
-        "note": "shutdown persists unchanged through the remaining read-only observe steps, confirming the flag doesn't revert."
+        "note": "Final state confirms the government shutdown -- fired for real at tick 380, exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above -- and that worker_revolt's own, independently-running streak (still short of REVOLT_TICKS=120 at this point) never got the chance to overwrite it. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself."
       }
     }
   ]

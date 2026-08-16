@@ -418,7 +418,19 @@ export class UIManager {
     // so it would render on top and hide the report's own Close button
     // behind it. Re-checked every tick, so the event opens itself the moment
     // the report is closed.
-    if (this.eventModal.visible || (!this.blastReportModal.visible && !this.blastReportModal.pending)) {
+    //
+    // Also deferred once the level has ended: LevelEndScreen owns the whole
+    // screen from the moment state.levelEndReason goes non-null (z-index
+    // var(--bsx-z-menu), 9999), well above this modal's own shared
+    // .bs-confirm-overlay tier (z-index 600, styles.ts) — opening underneath
+    // it would render a dialog no click can ever reach, the exact same
+    // unreachable-modal defect BlastReportModal.update() now guards against
+    // for the same reason. A pending event is moot once play has stopped
+    // anyway, so it simply never opens once the level is over — same as an
+    // already-open BlastReportModal, this only gates a *new* open; if
+    // eventModal is already visible, it keeps updating so an in-progress
+    // decision the player made before the level ended can still resolve.
+    if (this.eventModal.visible || (state.levelEndReason === null && !this.blastReportModal.visible && !this.blastReportModal.pending)) {
       this.eventModal.update(state);
     }
   }

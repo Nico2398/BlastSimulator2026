@@ -5,12 +5,14 @@ import {
   hireEmployee,
   giveRaise,
   fireEmployee,
+  killEmployee,
   processPayCycle,
   getEffectiveness,
   injureEmployee,
   assignSkill,
   gainXp,
   calculateSalary,
+  computeAverageMorale,
   BASE_SALARIES,
   PAY_CYCLE_TICKS,
   HIRING_COSTS,
@@ -512,6 +514,60 @@ describe('calculateSalary() (3.4)', () => {
     expect(QUALIFICATION_SALARY_BONUS[3]).toBeGreaterThan(QUALIFICATION_SALARY_BONUS[2]);
     expect(QUALIFICATION_SALARY_BONUS[4]).toBeGreaterThan(QUALIFICATION_SALARY_BONUS[3]);
     expect(QUALIFICATION_SALARY_BONUS[5]).toBeGreaterThan(QUALIFICATION_SALARY_BONUS[4]);
+  });
+});
+
+describe('computeAverageMorale()', () => {
+  // ── Test 1 (happy path) ────────────────────────────────────────────────────
+  it('averages morale across only the living roster, ignoring dead employees entirely', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee: alive } = hireEmployee(state, 'driller', rng);
+    alive.morale = 80;
+    const { employee: dead } = hireEmployee(state, 'driller', rng);
+    dead.morale = 0;
+    dead.alive = false;
+
+    // A raw, unfiltered average of [80, 0] would read 40 — this is the exact
+    // bug: a corpse's frozen morale permanently dragging wellBeing down long
+    // after the crew that's actually still working has recovered. Only the
+    // living employee's own morale should count.
+    expect(computeAverageMorale(state.employees)).toBe(80);
+  });
+
+  // ── Test 2 (boundary) ──────────────────────────────────────────────────────
+  it('defaults to the neutral 50 when the roster is empty', () => {
+    expect(computeAverageMorale([])).toBe(50);
+  });
+
+  // ── Test 3 (boundary) ──────────────────────────────────────────────────────
+  it('defaults to the neutral 50 when every employee on the roster is dead', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 0;
+    employee.alive = false;
+
+    expect(computeAverageMorale(state.employees)).toBe(50);
+  });
+
+  // ── Test 4 (rejection-equivalent: a killEmployee'd corpse never counts) ────
+  it('a killed employee (alive:false, never fired/spliced) still does not affect the average', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee: survivor } = hireEmployee(state, 'blaster', rng);
+    survivor.morale = 100;
+    const { employee: victim } = hireEmployee(state, 'driller', rng);
+    victim.morale = 55;
+
+    killEmployee(state, victim.id);
+
+    // killEmployee only flips alive:false — it does not splice the roster
+    // (only fireEmployee does), so the dead employee is still physically
+    // present in state.employees here, and would corrupt an unfiltered
+    // average if computeAverageMorale did not filter on alive.
+    expect(state.employees).toHaveLength(2);
+    expect(computeAverageMorale(state.employees)).toBe(100);
   });
 });
 
