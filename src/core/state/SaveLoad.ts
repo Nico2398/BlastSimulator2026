@@ -81,6 +81,21 @@ function migrateV10ToV11(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v11 -> v12: GameState gained a `plannedChargesByHole: Record<string,
+ * PlannedCharge>` field (#554 charging becomes work — a charge order queues
+ * one `charge_hole` action per hole instead of writing charges into state
+ * instantly). A pre-v12 save has no charges in flight — the field defaults
+ * to an empty object. Mutates `obj` in place, matching every other migration
+ * block in `deserialize` below.
+ */
+function migrateV11ToV12(obj: Record<string, unknown>): Record<string, unknown> {
+  if (typeof obj['plannedChargesByHole'] !== 'object' || obj['plannedChargesByHole'] === null) {
+    obj['plannedChargesByHole'] = {};
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -295,6 +310,11 @@ export function deserialize(json: string): GameState {
   // v10 -> v11: GameState.plannedDrillHoles (#553).
   if ((obj['version'] as number) < 11) {
     migrateV10ToV11(obj);
+  }
+
+  // v11 -> v12: GameState.plannedChargesByHole (#554).
+  if ((obj['version'] as number) < 12) {
+    migrateV11ToV12(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

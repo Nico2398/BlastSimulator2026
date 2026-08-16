@@ -63,7 +63,12 @@ export class ChargeHoleList {
 
   get root(): HTMLElement { return this.el; }
 
-  render(holes: DrillHole[], charges: Record<string, HoleCharge>): void {
+  render(
+    holes: DrillHole[],
+    charges: Record<string, HoleCharge>,
+    /** Charges ordered but not yet loaded — the ordered/uncharged row state (#554). Unused until implementer wires it. */
+    _plannedCharges?: Record<string, HoleCharge>,
+  ): void {
     if (holes.length === 0) {
       this.listEl.replaceChildren(emptyState(t('ui.blast_workshop.charge.no_holes')));
       return;
