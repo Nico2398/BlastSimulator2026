@@ -568,17 +568,6 @@
           "selector": ".bs-confirm-overlay .bs-btn-danger"
         },
         {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
           "type": "waitForTutorialStep",
           "stepId": [
             "scores",
@@ -588,15 +577,17 @@
           "timeout": 60000
         }
       ],
-      "role": "player",
-      "description": "blast complete: Execute clicked, confirm dialog answered, Blast Report closed. deathCount raised 1 -> 2 (#558 full-disc survey claim follow-up, issue #558/PR #569): step 5's `survey seismic x:23 z:23` claims its full SURVEY_COVERAGE_RADIUS=20 disc (siteExpansion.ts's cellsInDisc), growing the site from the starting 32x32 to 48x48 before the driller is hired at step 10. Employee hire's spawn point is `minX + sizeX/2, minZ + sizeZ/2` -- on this run minX/minZ stay 0 throughout (the site only grows eastward/southward from (0,0), never crosses into negative territory), so that formula numerically equals the pre-#571 `sizeX/2` here; this scenario's deathCount:2 reproduces identically whether or not the #571 origin-offset fix is applied and is NOT evidence for that fix (verified live, both ways). The real driver is #558's site growth alone: on the grown 48x48 site the spawn point resolves to (26, 24), which lands inside this step's own 4x4/spacing-3 drill grid (x:20-29, z:20-29). Verified live by direct reproduction (both employees' positions and post-blast alive state read from a real run of this exact command sequence): Walt Dusty (surveyor) ends the survey task at (23, 23), Kurt Hardhat (driller) sits idle at the grid-centre spawn point (26, 24), and this drill plan's CATASTROPHIC-rated blast (furthest throw 27.9m) kills both via the same fragment-kinetic-energy check (Damage.ts's processEmployeeHit) -- a real, physically-grounded double death, not a miscalculation. cash is unaffected either way (lawsuits/fines from a death do not deduct immediately). The #571 origin-offset regression itself is covered separately by the unit/integration tests added in 75a06cf, which force a negative origin (x:-4, z:-4). CI cash mismatch fix: cash corrected 70320 -> 70648 (+$328) now that the drill_plan step above carries `diameter:0.089` -- command mode's own drill_rig spent less time (and fuelCostPerTick) sinking all 16 holes once its duration matches what a real click always produced, so more cash survives to this checkpoint. #553-followup (issue #586 CI): that +$328 offset was correct relative to command mode, but the box-cut step several steps up this same file also turned out to carry a real-time-accrual error that compounds forward -- dropped the exact cash figure here too rather than chase a second moving target. Not replaced with `decreased`: as the note above already says, cash is unaffected by this step in either mode (command mode's own trace shows it completely unchanged), so there is no single mode-agnostic cash claim to make -- holeCount/chargedCount/sequencedCount/deathCount remain exact since they are not host-timing-sensitive.",
+      "role": "guard",
+      "description": "blast complete: Execute clicked, confirm dialog answered. deathCount raised 1 -> 2 (#558 full-disc survey claim follow-up, issue #558/PR #569): step 5's `survey seismic x:23 z:23` claims its full SURVEY_COVERAGE_RADIUS=20 disc (siteExpansion.ts's cellsInDisc), growing the site from the starting 32x32 to 48x48 before the driller is hired at step 10. Employee hire's spawn point is `minX + sizeX/2, minZ + sizeZ/2` -- on this run minX/minZ stay 0 throughout (the site only grows eastward/southward from (0,0), never crosses into negative territory), so that formula numerically equals the pre-#571 `sizeX/2` here; this scenario's deathCount:2 reproduces identically whether or not the #571 origin-offset fix is applied and is NOT evidence for that fix (verified live, both ways). The real driver is #558's site growth alone: on the grown 48x48 site the spawn point resolves to (26, 24), which lands inside this step's own 4x4/spacing-3 drill grid (x:20-29, z:20-29). Verified live by direct reproduction (both employees' positions and post-blast alive state read from a real run of this exact command sequence): Walt Dusty (surveyor) ends the survey task at (23, 23), Kurt Hardhat (driller) sits idle at the grid-centre spawn point (26, 24), and this drill plan's CATASTROPHIC-rated blast (furthest throw 27.9m) kills both via the same fragment-kinetic-energy check (Damage.ts's processEmployeeHit) -- a real, physically-grounded double death, not a miscalculation. cash is unaffected either way (lawsuits/fines from a death do not deduct immediately). The #571 origin-offset regression itself is covered separately by the unit/integration tests added in 75a06cf, which force a negative origin (x:-4, z:-4). CI cash mismatch fix: cash corrected 70320 -> 70648 (+$328) now that the drill_plan step above carries `diameter:0.089` -- command mode's own drill_rig spent less time (and fuelCostPerTick) sinking all 16 holes once its duration matches what a real click always produced, so more cash survives to this checkpoint. #553-followup (issue #586 CI): that +$328 offset was correct relative to command mode, but the box-cut step several steps up this same file also turned out to carry a real-time-accrual error that compounds forward -- dropped the exact cash figure here too rather than chase a second moving target. Not replaced with `decreased`: as the note above already says, cash is unaffected by this step in either mode (command mode's own trace shows it completely unchanged), so there is no single mode-agnostic cash claim to make -- holeCount/chargedCount/sequencedCount/deathCount remain exact since they are not host-timing-sensitive. Issue #586 CI, this PR -- root cause is NOT the tutorial rail's own gating order (report-close was never a stage target to begin with, and the file's earlier click-order was never the bug): the preceding `tick 400` wait (previous step) genuinely crashes wellBeing from 76.6 to 0 and flips `state.levelEndReason` to `worker_revolt` -- BEFORE this blast step even runs -- confirmed by direct trace (`state full`) at tick ~465-474 in BOTH command mode and a real interaction-mode run alike (deterministic, not a timing artifact: a lone driller with no living_quarters anywhere in this tutorial's own prescribed step sequence fatigue-collapses repeatedly over the mandatory 400-tick, 16-hole pattern the tutorial's own fixed drill region requires). `blast` still executes and still kills 2 (nothing stops a console command from running post-levelEnd, matching level2-playthrough-win.json's own bankruptcy finding), but BlastReportModal.update() (BlastReportModal.ts) explicitly refuses to arm or open its report once `state.levelEndReason !== null` -- a deliberate guard, the same defensive pattern this session already added to EventModal/LevelEndScreen's own z-index race -- so report-close's button, permanently un-rendered (`display:none` on its ancestor overlay, confirmed via direct DOM trace: rating/stats never populate, `render()` never runs), is not a stage-ordering bug to route around; no player click can ever reach it once the revolt has fired. Unlike level2's bankruptcy case, LevelEndScreen itself never takes over here (`main.ts` skips `levelEndScreen.update()` while `tutorial.isActive`), so this is scoped to the Report modal alone -- the event dialog and every tutorial stage after it are unaffected and keep working via real clicks (verified live).",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 2
-        }
+          "deathCount": 2,
+          "levelEndReason": "worker_revolt"
+        },
+        "blocked": "[data-action=\"report-close\"]"
       }
     },
     {
@@ -615,34 +606,14 @@
       "timeout": 15,
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-event-dialog .bs-event-choice",
-          "timeout": 30000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-choice"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-event-dialog .bs-event-dismiss"
-        },
-        {
-          "type": "waitForTutorialStep",
-          "stepId": "hire-manager"
+          "type": "command",
+          "command": "event choose 0"
         }
       ],
-      "role": "player",
-      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, then dismissed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): moved ahead of the `tick 1` step below (was originally the step right after it) -- live tracing showed the blast step's own multi-target waitForTutorialStep (stepId: [\"scores\",\"event-fire-resolve\",\"hire-manager\"]) already fires the scripted event via the event-fire-resolve stage's own autoCommands (`tick 3`, `event fire tutorial_synergy_consultant`) *inside* that same wait, before this step or the tick-1 step ever runs -- not later, as the tick-1 step's own description originally assumed. `tickCommand` (events.ts) refuses outright with a pending event (`state.events.pendingEvent` check at the top, before any tick executes: \"Pending event! Resolve it first\"), so a plain `tick 1` run while the dialog is still up spends zero ticks and zero cash -- deterministically reproduced twice locally (cash 68856 -> 68856 both times), not sandbox contention. Resolving the dialog first, exactly where a real player would actually click it, removes the pending-event block so the tick step below can genuinely spend a tick again.",
+      "role": "guard",
+      "description": "Issue #586 CI, this PR: the preceding `tick 400` wait (drill-plan step's own wait, several steps up) crashes wellBeing to 0 and flips `state.levelEndReason` to `worker_revolt` well before this event ever fires -- direct trace, deterministic in both modes (see the blast step's own finding). UIManager.update() explicitly defers EventModal while `state.levelEndReason !== null` UNLESS it is already visible (`this.eventModal.visible || (state.levelEndReason === null && ...)`) -- a dialog that has never yet opened can never open post-revolt, so the scripted `tutorial_synergy_consultant` event (fired by the event-fire-resolve stage's own autoCommands, inside the blast step's waitForTutorialStep) sets `state.events.pendingEvent` but EventModal never renders it: direct reproduction shows `waitForSelector('#bs-event-dialog .bs-event-choice')` genuinely times out at 30s, not a slow-render race. This is a real, permanent dead end for a player past this point -- the tutorial's own 'hire-manager' step (`createHireStepWithEventGuard`) requires `pendingEvent == null` to ever advance, and nothing can ever clear it once the dialog that resolves it can never open. `expect.blocked` proves the dialog is unreachable; the command still runs directly so the event resolves and the rest of this file's own already-passing command-mode trajectory (deathCount, cash, employeeCount) keeps holding.",
       "expect": {
-        "tutorialStep": "hire-manager"
+        "blocked": "#bs-event-dialog"
       }
     },
     {
