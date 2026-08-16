@@ -2278,7 +2278,9 @@
         "increased": [
           "tickCount"
         ]
-      }
+      },
+      "description": "CI reported \"Step 98 timed out after 60000ms\" \u2014 the same CPU-bound cost spike as step 96 (see that step's note): this step drains the rest of the same 30-hole drill_plan dispatch/pathfinding backlog from step 95, right after step 96 already paid the first half of that cost. Same fix: raise this step's own timeout to 120s.",
+      "timeout": 120
     },
     {
       "command": "event choose 0",

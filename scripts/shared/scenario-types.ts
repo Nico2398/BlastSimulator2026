@@ -116,7 +116,34 @@ export type InteractionStepAction =
    * bookkeeping deciding whether to wait — the actual resolution is still a
    * real click, which is the thing under test.
    */
-  | { type: 'resolveEventIfPending'; timeoutMs?: number };
+  | { type: 'resolveEventIfPending'; timeoutMs?: number }
+  /**
+   * Advance time until a named state-dump field reaches a target value,
+   * bounded by a maximum so a stall fails loudly instead of hanging (issue
+   * #590). Replaces a hand-measured `tick N` pad — #553's own migration
+   * needed one in 51 scenario files, none of which assert anything about
+   * whether the pad was actually long enough: `tick 130` passes whether the
+   * work landed at tick 40 or tick 130, and only a tight `equals`/`increased`
+   * immediately after it catches drift, if the author remembered to write
+   * one. This primitive asserts the wait itself.
+   *
+   * Command mode loops the console's own `tick 1` (reusing `tickCommand`
+   * exactly as it stands, `runCommand(engine, 'tick 1')` — see
+   * `command-runner.ts`'s `runWaitUntil`) up to `maxTicks` times, checking
+   * the state dump after each. Interaction mode drives the page's real
+   * running clock (`__setAutoTick`, the same mechanism
+   * `waitForTutorialStep` already uses) and polls `window.__gameState()`,
+   * bounded by `timeoutMs` real milliseconds — the two harnesses do not
+   * advance ticks at the same real-world rate, so the tick budget and the
+   * wall-clock budget are two separate, explicitly author-supplied numbers
+   * rather than one converted from the other.
+   *
+   * `equals` matches with `===` — for a numeric field that settles exactly
+   * (a count, a boolean, an id), not a score that merely trends. A step
+   * using this is `role: 'setup'`, the same class as `tick N` and
+   * `waitForTutorialStep` — not a player action.
+   */
+  | { type: 'waitUntil'; field: string; equals: unknown; maxTicks: number; timeoutMs: number };
 
 /**
  * Whether a step's `interaction` models something the player must do by

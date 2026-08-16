@@ -735,6 +735,45 @@ export async function executeActionOnPage(
       await runAction(page, { do: type, ...rest } as PlayerAction);
       break;
     }
+    case 'waitUntil': {
+      // Advance time until a named state-dump field reaches a target value
+      // (issue #590) — the interaction-mode counterpart to
+      // command-runner.ts's own runWaitUntil, generalizing waitForTutorialStep's
+      // pattern from "the tutorial rail's current step id" to any field.
+      const deadline = Date.now() + action.timeoutMs;
+      const setAutoTick = (enabled: boolean) => page.evaluate((on: boolean) => {
+        (window as unknown as { __setAutoTick?: (e: boolean) => void }).__setAutoTick?.(on);
+      }, enabled);
+      // Drive the real rAF-driven, isPaused-gated clock for this wait only —
+      // scenarioMode has switched auto-tick off, and the queued work this is
+      // usually waiting on (a drilled hole, a loaded charge) needs real time
+      // to pass. Restored on the way out so every other action keeps the
+      // deterministic scripted-tick clock.
+      await setAutoTick(true);
+      try {
+        let lastValue: unknown;
+        for (;;) {
+          const state = await page.evaluate(() => {
+            const fn = (window as unknown as {
+              __gameState?: () => Record<string, unknown> | null;
+            }).__gameState;
+            return fn === undefined ? null : fn();
+          });
+          lastValue = state ? state[action.field] : undefined;
+          if (lastValue === action.equals) break;
+          if (Date.now() > deadline) {
+            throw new Error(
+              `waitUntil: "${action.field}" never reached ${JSON.stringify(action.equals)}`
+              + ` — stalled at ${JSON.stringify(lastValue)} after ${action.timeoutMs}ms`,
+            );
+          }
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      } finally {
+        await setAutoTick(false);
+      }
+      break;
+    }
     default: {
       // Exhaustiveness check
       const _exhaustive: never = action;

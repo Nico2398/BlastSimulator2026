@@ -7,7 +7,7 @@ import { resolve } from 'path';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
 import { runCommand } from '../../src/console/createRunner.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
-import type { ScenarioStepDef, StepResult } from './scenario-types.js';
+import type { InteractionStepAction, ScenarioStepDef, StepResult } from './scenario-types.js';
 import {
   formatStepIndex,
   formatCommandSlug,
@@ -15,6 +15,38 @@ import {
   type ReportableStep,
 } from './scenario-utils.js';
 import { checkGoalAgainstState } from './scenario-goal.js';
+
+/**
+ * Command-mode side of the `waitUntil` action (issue #590): loop the
+ * console's own `tick 1` — reusing `tickCommand` exactly as it stands via
+ * `runCommand`, never duplicating its body — checking the state dump after
+ * each tick, up to `maxTicks`. A budget exhausted without a match is a
+ * scenario failure naming the field, its last-seen value, and the budget,
+ * not a silent pass-through to whatever assertion comes next.
+ */
+function runWaitUntil(
+  engine: RunnerWithContext,
+  action: Extract<InteractionStepAction, { type: 'waitUntil' }>,
+): { output: string; gameState: Record<string, unknown> | null } {
+  const { ctx } = engine;
+  let lastValue: unknown;
+  let lastState: Record<string, unknown> | null = null;
+  for (let i = 0; i < action.maxTicks; i++) {
+    runCommand(engine, 'tick 1');
+    lastState = serializeGameState(ctx) as Record<string, unknown> | null;
+    lastValue = lastState ? lastState[action.field] : undefined;
+    if (lastValue === action.equals) {
+      return {
+        output: `waitUntil: "${action.field}" reached ${JSON.stringify(action.equals)} after ${i + 1} tick(s)`,
+        gameState: lastState,
+      };
+    }
+  }
+  throw new Error(
+    `waitUntil: "${action.field}" never reached ${JSON.stringify(action.equals)}`
+    + ` — stalled at ${JSON.stringify(lastValue)} after ${action.maxTicks} ticks`,
+  );
+}
 
 // Re-export canonical types from scenario-types.ts
 export type { StepResult } from './scenario-types.js';
@@ -45,9 +77,18 @@ export function runSteps(
     const paddedIdx = formatStepIndex(i);
     const cmdSlug = formatCommandSlug(step.command);
     const before = (serializeGameState(ctx) as Record<string, unknown> | null) ?? {};
+    // `waitUntil` drives command mode too (issue #590) — its `interaction`
+    // entry is the one authoritative field/target/budget spec both modes
+    // read, so a step using it runs the tick-loop instead of its own
+    // `command` string (which is descriptive only, never executed as-is).
+    const waitUntilAction = step.interaction?.find(
+      (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
+    );
 
     try {
-      const result = runCommand(engine, step.command);
+      const result = waitUntilAction
+        ? runWaitUntil(engine, waitUntilAction)
+        : runCommand(engine, step.command);
       const gameState = serializeGameState(ctx) as Record<string, unknown> | null;
 
       if (step.expect) {

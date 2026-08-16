@@ -133,6 +133,41 @@ describe('a player step whose click cannot complete fails and names the selector
   });
 });
 
+describe('executeActionOnPage — waitUntil (issue #590)', () => {
+  it('resolves once the polled field reaches the target, toggling auto-tick on then off', async () => {
+    const evaluate = vi.fn()
+      // setAutoTick(true)
+      .mockResolvedValueOnce(undefined)
+      // __gameState() poll — field already at target
+      .mockResolvedValueOnce({ holeCount: 25 })
+      // setAutoTick(false)
+      .mockResolvedValueOnce(undefined);
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:400', role: 'setup' };
+    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 400, timeoutMs: 30000 };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(evaluate).toHaveBeenCalledTimes(3);
+  });
+
+  it('exhausts its wall-clock budget and throws naming the field, its last value, and the budget', async () => {
+    const evaluate = vi.fn().mockImplementation(async (fn: (...a: unknown[]) => unknown) => {
+      // Distinguish the setAutoTick calls (which pass an `enabled` arg) from
+      // the parameterless __gameState() poll by arity of the page.evaluate
+      // call signature used at each site.
+      return fn.length === 0 ? { holeCount: 3 } : undefined;
+    });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:1', role: 'setup' };
+    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 1, timeoutMs: 250 };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      /"holeCount" never reached 25 — stalled at 3 after 250ms/,
+    );
+  });
+});
+
 describe('describeStepFailure', () => {
   it('prefixes a player step\'s error with its label', () => {
     const step: ScenarioStepDef = { command: 'blast', description: 'fire the blast', role: 'player' };
