@@ -425,8 +425,8 @@
       "expect": {
         "equals": {
           "tickCount": 80,
-          "holeCount": 6,
-          "orderedHoleCount": 14,
+          "holeCount": 8,
+          "orderedHoleCount": 12,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -449,9 +449,9 @@
       "expect": {
         "equals": {
           "tickCount": 80,
-          "cash": 70562,
-          "holeCount": 6,
-          "orderedHoleCount": 14,
+          "cash": 70508,
+          "holeCount": 8,
+          "orderedHoleCount": 12,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -471,8 +471,8 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "holeCount": 8,
-          "orderedHoleCount": 12,
+          "holeCount": 9,
+          "orderedHoleCount": 11,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -495,9 +495,9 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "cash": 64936,
-          "holeCount": 8,
-          "orderedHoleCount": 12,
+          "cash": 64882,
+          "holeCount": 9,
+          "orderedHoleCount": 11,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -517,8 +517,8 @@
       "expect": {
         "equals": {
           "tickCount": 120,
-          "holeCount": 8,
-          "orderedHoleCount": 12,
+          "holeCount": 10,
+          "orderedHoleCount": 10,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -541,9 +541,9 @@
       "expect": {
         "equals": {
           "tickCount": 120,
-          "cash": 59432,
-          "holeCount": 8,
-          "orderedHoleCount": 12,
+          "cash": 59378,
+          "holeCount": 10,
+          "orderedHoleCount": 10,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -563,144 +563,6 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 140,
-          "cash": 53844,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 160,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 160,
-          "cash": 48094,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 180,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 180,
-          "cash": 42602,
-          "holeCount": 11,
-          "orderedHoleCount": 9,
-          "deathCount": 0,
-          "employeeCount": 5,
-          "levelEnded": false,
-          "levelEndReason": null
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 200,
           "holeCount": 12,
           "orderedHoleCount": 8,
           "deathCount": 0,
@@ -724,8 +586,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 200,
-          "cash": 37002,
+          "tickCount": 140,
+          "cash": 53790,
           "holeCount": 12,
           "orderedHoleCount": 8,
           "deathCount": 0,
@@ -746,7 +608,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 220,
+          "tickCount": 160,
           "holeCount": 13,
           "orderedHoleCount": 7,
           "deathCount": 0,
@@ -770,8 +632,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 220,
-          "cash": 31504,
+          "tickCount": 160,
+          "cash": 48066,
           "holeCount": 13,
           "orderedHoleCount": 7,
           "deathCount": 0,
@@ -792,7 +654,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 240,
+          "tickCount": 180,
           "holeCount": 15,
           "orderedHoleCount": 5,
           "deathCount": 0,
@@ -816,8 +678,8 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 240,
-          "cash": 25678,
+          "tickCount": 180,
+          "cash": 42464,
           "holeCount": 15,
           "orderedHoleCount": 5,
           "deathCount": 0,
@@ -838,7 +700,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 260,
+          "tickCount": 200,
           "holeCount": 16,
           "orderedHoleCount": 4,
           "deathCount": 0,
@@ -862,10 +724,148 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 260,
-          "cash": 20138,
+          "tickCount": 200,
+          "cash": 36894,
           "holeCount": 16,
           "orderedHoleCount": 4,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 220,
+          "holeCount": 18,
+          "orderedHoleCount": 2,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 220,
+          "cash": 31360,
+          "holeCount": 18,
+          "orderedHoleCount": 2,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 240,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 240,
+          "cash": 25588,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 260,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
+          "deathCount": 0,
+          "employeeCount": 5,
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "tickCount": 260,
+          "cash": 20088,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
@@ -893,10 +893,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 19138,
+          "cash": 19088,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 6,
           "levelEnded": false,
@@ -919,10 +919,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 18138,
+          "cash": 18088,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 7,
           "levelEnded": false,
@@ -945,10 +945,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 17138,
+          "cash": 17088,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 8,
           "levelEnded": false,
@@ -971,10 +971,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 15638,
+          "cash": 15588,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 9,
           "levelEnded": false,
@@ -997,10 +997,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 14138,
+          "cash": 14088,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
           "levelEnded": false,
@@ -1023,10 +1023,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 12638,
+          "cash": 12588,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 11,
           "levelEnded": false,
@@ -1049,10 +1049,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 11838,
+          "cash": 11788,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1071,10 +1071,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11838,
+          "cash": 11788,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1093,10 +1093,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11838,
+          "cash": 11788,
           "tickCount": 260,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1116,9 +1116,9 @@
       "expect": {
         "equals": {
           "tickCount": 265,
-          "cash": 11818,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "cash": 11768,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1139,8 +1139,8 @@
       "expect": {
         "equals": {
           "tickCount": 265,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1165,8 +1165,8 @@
       "expect": {
         "equals": {
           "tickCount": 285,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1190,8 +1190,8 @@
       "expect": {
         "equals": {
           "tickCount": 285,
-          "holeCount": 16,
-          "orderedHoleCount": 4,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1214,8 +1214,8 @@
       "expect": {
         "equals": {
           "tickCount": 305,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1239,8 +1239,8 @@
       "expect": {
         "equals": {
           "tickCount": 305,
-          "holeCount": 18,
-          "orderedHoleCount": 2,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1263,8 +1263,8 @@
       "expect": {
         "equals": {
           "tickCount": 325,
-          "holeCount": 19,
-          "orderedHoleCount": 1,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1288,8 +1288,8 @@
       "expect": {
         "equals": {
           "tickCount": 325,
-          "holeCount": 19,
-          "orderedHoleCount": 1,
+          "holeCount": 20,
+          "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
           "levelEnded": false,
@@ -1602,7 +1602,7 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). Finding: 4 of the 12 employees on site die (deathCount 0 -> 4) -- a direct trace of who: employees #1 (Gus Rubble, the driller who just spent 260-345 ticks physically working every hole in this pattern), #2 (Walt Rockwell, the staffed blaster), #3 (Earl Boulder) and #5 (Walt Quartzman, two of the staffed drivers) are all standing close enough to the pattern for Damage.ts's DEATH_THRESHOLD (2000 kJ) to be met; employee #4 (Pete Quartzman) and all 7 hand-hired employees (#6-#12, hired at tick 260 and never dispatched anywhere near the pattern) survive. The drill_rig (vehicle #1) survives too, thanks to the relocate step above. Ecology crashes 50 -> 29.54 (ScoreManager.ts's vibration-based ecology penalty).",
+      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). #593 (autoInsertNeedTasks no longer preempts an employee's own interrupted work the instant rest completes; releaseVehicleReservation now syncs a dismounting driver's position to the vehicle's real location instead of freezing it at the old boarding point) changes who is standing where at fire time: Finding: all 5 of the original staffed employees die (deathCount 0 -> 5) -- employees #1 (Gus Rubble, the driller who just spent 260-345 ticks physically working every hole in this pattern), #2 (Walt Rockwell, the staffed blaster), #3 (Earl Boulder), #4 (Pete Quartzman) and #5 (Walt Quartzman, the staffed drivers) are all standing close enough to the pattern for Damage.ts's DEATH_THRESHOLD (2000 kJ) to be met -- #4 no longer stays frozen at a safe boarding-point position under the old bug and now dies alongside the rest; all 7 hand-hired employees (#6-#12, hired at tick 260 and never dispatched anywhere near the pattern) survive. The drill_rig (vehicle #1) survives too, thanks to the relocate step above. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty).",
       "role": "player",
       "expect": {
         "equals": {
@@ -1611,7 +1611,7 @@
           "orderedHoleCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "vehicleCount": 1,
           "levelEnded": false,
@@ -1634,7 +1634,7 @@
       "expect": {
         "equals": {
           "tickCount": 360,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1656,11 +1656,11 @@
       "expect": {
         "equals": {
           "tickCount": 360,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "wellBeing": 36.982000000000184,
           "safety": 50,
-          "ecology": 29.54,
+          "ecology": 29.53,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1709,7 +1709,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1736,7 +1736,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1764,7 +1764,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1792,7 +1792,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1815,7 +1815,7 @@
       "expect": {
         "equals": {
           "tickCount": 360,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1837,11 +1837,11 @@
       "expect": {
         "equals": {
           "tickCount": 360,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "wellBeing": 36.982000000000184,
           "safety": 50,
-          "ecology": 29.54,
+          "ecology": 29.53,
           "nuisance": 0,
           "levelEnded": false,
           "levelEndReason": null
@@ -1866,7 +1866,7 @@
           "tickCount": 380,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1887,7 +1887,7 @@
           "tickCount": 380,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1906,7 +1906,7 @@
       "expect": {
         "equals": {
           "tickCount": 380,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1925,11 +1925,11 @@
       "expect": {
         "equals": {
           "tickCount": 380,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "wellBeing": 41.19866666666675,
           "safety": 0,
-          "ecology": 30.540000000000013,
+          "ecology": 30.530000000000015,
           "nuisance": 0,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1948,11 +1948,11 @@
       "expect": {
         "equals": {
           "tickCount": 380,
-          "deathCount": 4,
+          "deathCount": 5,
           "employeeCount": 12,
           "wellBeing": 41.19866666666675,
           "safety": 0,
-          "ecology": 30.540000000000013,
+          "ecology": 30.530000000000015,
           "nuisance": 0,
           "levelEnded": true,
           "levelEndReason": "bankruptcy",

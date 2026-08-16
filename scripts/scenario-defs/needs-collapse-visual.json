@@ -349,8 +349,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "collapsedCount": 0
-        }
+          "collapsedCount": 1
+        },
+        "note": "#593: this crossing belongs to Stan, not Walt. Stan (id 2, blaster) is never dispatched -- he idles for the whole file, draining at the idle rate the whole way from 100 down through this point, and the living_quarters built the step before (at cumulative tick 185, fatigue 17) puts him in range just as his own gauge crosses the collapse floor. Before #593, autoInsertNeedTasks's unconditional self-targeted re-rest the instant a rest completed could just as easily re-trap an idle employee as a working one -- direct diagnosis (single-tick replay against the pre-#593 GameLoop.ts) shows Stan hitting the exact same rest-to-rest cycle Walt used to, just landing, by luck of this file's tick budget, on a moment mid-cycle where he read as recovered. #593's one-tick grace changes that timing: Stan's rest here hasn't completed by cumulative tick 205, so collapsing is still genuinely true. He recovers before the next checkpoint (below)."
       }
     },
     {

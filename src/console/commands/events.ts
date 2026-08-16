@@ -188,9 +188,14 @@ export function tickCommand(
     const firedEvents: FiredEvent[] = [];
     // Complete rests started on a prior tick before creating any new ones —
     // mirrors processShiftCycle's own complete-then-create ordering.
-    tickGeneralRestCompletion(state);
+    const restCompletion = tickGeneralRestCompletion(state);
     tickCollapse(state, firedEvents, emitter);
-    autoInsertNeedTasks(state, firedEvents, emitter);
+    // #593: an employee whose rest just completed above gets first refusal
+    // on resuming their own interrupted work (via tickEmployees, later this
+    // tick) before autoInsertNeedTasks can proactively route them right back
+    // to the same building — see that function's own doc comment.
+    const justCompletedRestEmployeeIds = new Set(restCompletion.completed.map(c => c.employeeId));
+    autoInsertNeedTasks(state, firedEvents, emitter, justCompletedRestEmployeeIds);
     processShiftCycle(state, firedEvents, emitter);
     // Emit any needs-related events via console
     for (const fe of firedEvents) {

@@ -1,6 +1,6 @@
 {
   "name": "level1-win-conservative",
-  "description": "Level 1 (Dusty Hollow): 4 small blasts and 2 contract attempts -- named for a conservative win, but no hauling infrastructure means no delivery ever succeeds; see Findings #52-#53 for why the real trajectory (a net cash loss, well short of the $80k target) was originally asserted instead of the named outcome. #553: drilling now requires a licensed driller and a drill_rig, so exactly one vehicle is now bought where the file previously bought none -- the file's own point (no hauling infrastructure, so no delivery ever succeeds) is unchanged, but the real trajectory is far worse: the single rig ends up parked on the pattern it just drilled when the first blast fires (same mechanic tutorial-playthrough documents) and is destroyed, and because this file never buys a replacement, the remaining 3 drill_plan calls only ever order ghost holes nothing can claim. Combined with the driller's own payroll/fuel drain and the same unlucky contract-expiry fines Findings #52-#53 already documented, the level ends deeply in the red -- see the final campaign status step.",
+  "description": "Level 1 (Dusty Hollow): 4 small blasts and 2 contract attempts -- named for a conservative win, but no hauling infrastructure means no delivery ever succeeds; see Findings #52-#53 for why the real trajectory (a net cash loss, well short of the $80k target) was originally asserted instead of the named outcome. #553: drilling now requires a licensed driller and a drill_rig, so exactly one vehicle is now bought where the file previously bought none -- the file's own point (no hauling infrastructure, so no delivery ever succeeds) is unchanged, but the real trajectory is far worse: the single rig ends up parked on the pattern it just drilled when the first blast fires (same mechanic tutorial-playthrough documents) and is destroyed, and because this file never buys a replacement, the remaining 3 drill_plan calls only ever order ghost holes nothing can claim. #593: the driller dies alongside the rig in that same first blast (releaseVehicleReservation now correctly syncs the dismounting driver's position to the vehicle's actual location instead of leaving it frozen at the boarding point) -- deathCount ends the run at 1, and payroll/fuel drain stops at tick ~50 rather than running the whole level. Combined with the same unlucky contract-expiry fines Findings #52-#53 already documented, the level still ends deeply in the red -- see the final campaign status step.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow",
@@ -385,14 +385,14 @@
         "equals": {
           "cash": 10620,
           "tickCount": 50,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
         },
-        "note": "#553: the sole driller and the sole drill_rig both end this blast right where the driller just finished drilling (a real trace: emp#1 never leaves (82,34), veh#1 ends at (72,29), one of this pattern's own 4 holes), the same unavoidable mechanic tutorial-playthrough's Finding documents (nothing in the UI relocates a vehicle before firing). deathCount stays 0 -- re-verified via a direct trace of state.damage: the destroyed rig is a vehicle_destroyed accident, not an injury/death (the driller's own tracked position is not inside the cleared voxels). vehicleCount drops 1->0 here (confirmed via `vehicle list`: \"No vehicles.\") -- not asserted (this file has no vehicleCount checks anywhere), but it is what makes every remaining drill_plan below order holes nothing can ever claim, since this file's own point requires never buying a second rig."
+        "note": "#553: the sole driller and the sole drill_rig both end this blast right where the driller just finished drilling (a real trace: emp#1 never leaves (82,34), veh#1 ends at (72,29), one of this pattern's own 4 holes), the same unavoidable mechanic tutorial-playthrough's Finding documents (nothing in the UI relocates a vehicle before firing). #593: deathCount is now 1, not 0 -- releaseVehicleReservation now correctly syncs the dismounting driver's position to the vehicle's actual (destroyed) location instead of leaving it frozen at the old boarding point, so the driller is standing where the rig was when this blast clears the voxels underneath it; re-verified via a direct trace of state.damage. vehicleCount drops 1->0 here (confirmed via `vehicle list`: \"No vehicles.\") -- not asserted (this file has no vehicleCount checks anywhere), but it is what makes every remaining drill_plan below order holes nothing can ever claim, since this file's own point requires never buying a second rig. With the driller dead, no employee is left alive to work or draw payroll -- see the tick step immediately below."
       }
     },
     {
@@ -408,7 +408,7 @@
         "equals": {
           "cash": 10620,
           "tickCount": 50,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         }
@@ -427,7 +427,7 @@
         "equals": {
           "cash": 10620,
           "tickCount": 50,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
           "wellBeing": 65.08000000000018,
@@ -435,7 +435,7 @@
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#553: safety is still 50 here -- the vehicle_destroyed accident from the blast above only starts costing safety on the ticks that follow (ScoreManager.ts: recentAccidents * 5 per tick against every accident inside the last 10 ticks), checked on the next tick step. wellBeing has already climbed from the fresh-hire baseline of 50 purely from the driller's own morale ticking up while working; ecology/nuisance are untouched -- this file's one real blast (4 holes, pop_rock) never triggers a vibration hit in a direct trace, unlike the original file's larger boomite blasts."
+        "note": "#553: safety is still 50 here -- the accident from the blast above only starts costing safety on the ticks that follow (ScoreManager.ts: recentAccidents * 5 per tick against every accident inside the last 10 ticks), checked on the next tick step. wellBeing has already climbed from the fresh-hire baseline of 50 purely from the driller's own morale ticking up while working; ecology/nuisance are untouched -- this file's one real blast (4 holes, pop_rock) never triggers a vibration hit in a direct trace, unlike the original file's larger boomite blasts. #593: deathCount is 1 here, not 0 -- the driller died in the blast above (see its own note)."
       }
     },
     {
@@ -448,14 +448,14 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash", "safety"],
+        "decreased": ["safety"],
         "equals": {
           "tickCount": 70,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         },
-        "note": "#553: confirmed via direct trace -- safety collapses from 50 toward 0 over these 20 ticks (recentAccidents * 5 per tick, ScoreManager.ts, against the single vehicle_destroyed accident from the blast above, which stays \"recent\" for its own 10-tick window) -- the same mechanism tutorial-playthrough's two-death blast documents, just from property damage instead of a death. cash keeps draining from ordinary driller payroll/fuel even with nothing left to do."
+        "note": "#553: confirmed via direct trace -- safety collapses from 50 toward 0 over these 20 ticks (recentAccidents * 5 per tick, ScoreManager.ts, against the accident from the blast above, which stays \"recent\" for its own 10-tick window). #593: cash is no longer asserted as decreased here -- with the driller dead (see the blast step above), nothing is left alive to draw payroll or burn vehicle fuel, so cash sits flat at $10,620 across this block and stays flat until the first contract-expiry fine (sandbox-measured: cash does not move again until tickCount 135, below)."
       }
     },
     {
@@ -470,7 +470,7 @@
       "expect": {
         "equals": {
           "tickCount": 70,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         }
@@ -487,13 +487,13 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
         "equals": {
           "tickCount": 90,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
-        }
+        },
+        "note": "#593: cash is no longer asserted as decreased here -- the driller died in the first blast above, so nothing alive draws payroll or burns vehicle fuel; cash sits flat at $10,620 through this block."
       }
     },
     {
@@ -508,7 +508,7 @@
       "expect": {
         "equals": {
           "tickCount": 90,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         }
@@ -527,7 +527,7 @@
       "expect": {
         "equals": {
           "tickCount": 90,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         }
@@ -553,7 +553,7 @@
       "expect": {
         "equals": {
           "tickCount": 90,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -572,7 +572,7 @@
       "expect": {
         "equals": {
           "tickCount": 90,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
@@ -623,7 +623,7 @@
           "orderedHoleCount": 8,
           "holeCount": 0,
           "tickCount": 90,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -644,7 +644,7 @@
           "orderedHoleCount": 8,
           "holeCount": 0,
           "tickCount": 95,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -686,7 +686,7 @@
       "expect": {
         "equals": {
           "tickCount": 95,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
           "holeCount": 0,
@@ -721,7 +721,7 @@
       "expect": {
         "equals": {
           "tickCount": 95,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
           "holeCount": 0,
@@ -751,7 +751,7 @@
       "expect": {
         "equals": {
           "tickCount": 95,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
           "holeCount": 0,
@@ -774,7 +774,7 @@
       "expect": {
         "equals": {
           "tickCount": 95,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -790,13 +790,13 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
         "equals": {
           "tickCount": 115,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
-        }
+        },
+        "note": "#593: cash stays flat at $10,620 -- still no one alive to draw payroll or fuel."
       }
     },
     {
@@ -811,7 +811,7 @@
       "expect": {
         "equals": {
           "tickCount": 115,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -831,7 +831,7 @@
         "decreased": ["cash"],
         "equals": {
           "tickCount": 135,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         },
@@ -851,7 +851,7 @@
       "expect": {
         "equals": {
           "tickCount": 135,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         },
@@ -871,7 +871,7 @@
       "expect": {
         "equals": {
           "tickCount": 135,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
         }
@@ -897,7 +897,7 @@
       "expect": {
         "equals": {
           "tickCount": 135,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -916,7 +916,7 @@
       "expect": {
         "equals": {
           "tickCount": 135,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
@@ -966,7 +966,7 @@
           "orderedHoleCount": 16,
           "holeCount": 0,
           "tickCount": 135,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -980,15 +980,14 @@
           "command": "tick 5"
         }
       ],
-      "description": "#553: same as the previous pattern's landing check -- no drill_rig exists, so orderedHoleCount holds at 16 and holeCount holds at 0 regardless of ticks spent waiting.",
+      "description": "#553: same as the previous pattern's landing check -- no drill_rig exists, so orderedHoleCount holds at 16 and holeCount holds at 0 regardless of ticks spent waiting. #593: cash also holds flat here (was asserted decreased pre-#593) -- the driller died in the first pattern's blast, far above, so no one is left alive to draw payroll or fuel.",
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
         "equals": {
           "orderedHoleCount": 16,
           "holeCount": 0,
           "tickCount": 140,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -1038,7 +1037,7 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
           "holeCount": 0,
@@ -1075,7 +1074,7 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
           "holeCount": 0,
@@ -1105,7 +1104,7 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
           "holeCount": 0,
@@ -1128,7 +1127,7 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -1145,17 +1144,17 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -24767,
+          "cash": -19317,
           "tickCount": 140,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 7.880000000000265,
-          "safety": 4.499999999999988,
+          "wellBeing": 79.47999999999988,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#597 (event cooldown caching): cash pinned exact here, re-verified against current code -- the sparkium contract (#3, accepted at tick 90) already expired earlier in this file (tick 133, during the tick 20 step now checkpointed at tickCount 135), so this is a quiet checkpoint after that drop rather than before it. safety is still cratering from the first blast's vehicle_destroyed accident (10-tick recentAccidents window, ScoreManager.ts); wellBeing has fallen from its tick-70 high as the driller's own needs cycle (hunger/fatigue) runs down with nothing left to work on. ecology/nuisance stay untouched -- no real blast has happened since the first one, and that one never moved them (see the first scores step's note)."
+        "note": "#597 (event cooldown caching): the sparkium contract (#3, accepted at tick 90) already expired earlier in this file (tick 133, during the tick 20 step now checkpointed at tickCount 135), so this is a quiet checkpoint after that drop rather than before it. #593: cash/wellBeing/safety all re-verified against current code -- with the driller dead (first pattern's blast, far above) cash sits flat at -$19,317 rather than continuing to drain. safety is pinned at its floor of 0 rather than recovering: sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run once it bottoms out. wellBeing, by contrast, keeps climbing (not falling) -- with no living employee left to accrue hunger/fatigue, the score decays back up toward its neutral baseline over time; see the final scores step, where it reaches ~100. ecology/nuisance stay untouched here -- no real blast has happened since the first one, and no event has fired yet at this tick (see the first scores step's note)."
       }
     },
     {
@@ -1168,14 +1167,13 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
         "equals": {
           "tickCount": 160,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
-        "note": "#597 (event cooldown caching): re-verified against current code -- contract #3 (sparkium) already expired earlier in this file (tick 133, checkpointed at tickCount 135 above), so this block no longer contains that expiry. No event fires either; all 20 ticks advance and only ordinary payroll/fuel drain the cash here."
+        "note": "#597 (event cooldown caching): re-verified against current code -- contract #3 (sparkium) already expired earlier in this file (tick 133, checkpointed at tickCount 135 above), so this block no longer contains that expiry. No event fires either; all 20 ticks advance. #593: cash is no longer asserted as decreased -- the driller died in the first pattern's blast, far above, so there is no payroll/fuel left to drain; cash sits flat at -$19,317."
       }
     },
     {
@@ -1190,7 +1188,7 @@
       "expect": {
         "equals": {
           "tickCount": 160,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -1207,14 +1205,13 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
         "equals": {
           "tickCount": 175,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
-        "note": "#597 (event cooldown caching): sandbox-measured against current code -- a union_merch event fires partway through this block, which is why command mode reports only 15 of the 20 requested ticks advanced before returning for the choice below; interaction mode's own tick loop halts at the same point for the same reason."
+        "note": "#593: superseding the pre-#593 note this once carried (which had a union_merch event firing partway through this block) -- sandbox-measured against current code, no event is pending during this block at all, so all 20 requested ticks advance in both modes; the pending food_fest event (see the choose-0 step below) surfaces only once this block's own tick loop returns. cash is no longer asserted as decreased either: the driller died in the first pattern's blast, far above, so cash sits flat at -$19,317 through this block."
       }
     },
     {
@@ -1227,14 +1224,14 @@
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
-        "changedBy": { "cash": -2500 },
+        "changedBy": { "cash": -4000 },
         "equals": {
           "tickCount": 175,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
-        "note": "#597 (event cooldown caching): union_merch's option 0 (Branded Merch) is a fixed, RNG-free -$2,500 -- sandbox-measured, not from this file's control, just the event this exact command/tick sequence happens to fire under the fixed cooldown pacing."
+        "note": "#593: superseding the pre-#593 union_merch/-$2,500 note this once carried -- with the driller dead (first pattern's blast, far above) the pool of pending events this exact command/tick sequence lands on has shifted, and it's now UnionEvents2's food_fest whose option 0 fires: sandbox-measured as a fixed, RNG-free -$4,000 (also +10 wellBeing, +5 nuisance, not separately asserted here)."
       },
       "role": "player"
     },
@@ -1250,7 +1247,7 @@
       "expect": {
         "equals": {
           "tickCount": 175,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -1276,7 +1273,7 @@
       "expect": {
         "equals": {
           "tickCount": 175,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
         }
@@ -1295,7 +1292,7 @@
       "expect": {
         "equals": {
           "tickCount": 175,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
         },
@@ -1345,7 +1342,7 @@
           "orderedHoleCount": 16,
           "holeCount": 0,
           "tickCount": 175,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
         }
@@ -1366,7 +1363,7 @@
           "orderedHoleCount": 16,
           "holeCount": 0,
           "tickCount": 180,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
         }
@@ -1412,7 +1409,7 @@
       "expect": {
         "equals": {
           "tickCount": 180,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
           "holeCount": 0,
@@ -1447,7 +1444,7 @@
       "expect": {
         "equals": {
           "tickCount": 180,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
           "holeCount": 0,
@@ -1477,7 +1474,7 @@
       "expect": {
         "equals": {
           "tickCount": 180,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
           "holeCount": 0,
@@ -1500,7 +1497,7 @@
       "expect": {
         "equals": {
           "tickCount": 180,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
         }
@@ -1516,13 +1513,13 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
         "equals": {
           "tickCount": 200,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
-        }
+        },
+        "note": "#593: cash is no longer asserted as decreased -- the driller died in the first pattern's blast, far above, so cash sits flat at -$23,317 through this block."
       }
     },
     {
@@ -1537,7 +1534,7 @@
       "expect": {
         "equals": {
           "tickCount": 200,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
         }
@@ -1557,11 +1554,11 @@
         "decreased": ["cash"],
         "equals": {
           "tickCount": 220,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
-        "note": "#597 (event cooldown caching): re-verified against current code -- only one of the two remaining contracts expires inside this block: #5 (rubble, $136 penalty) at tick 211. #7 (blingite, 97-tick deadline from its tick-175 accept, $2,919 penalty) is still active at tick 220 -- its own deadline lands well past this file's final checkpoint. cash: -$30,867 -> -$32,203. activeContractCount drops from 2 to 1. Cumulative ticksBelowThreshold (BANKRUPTCY_THRESHOLD=$5,000 in balance.ts) is nowhere near the 100-tick BANKRUPTCY_GRACE_TICKS -- deeply negative, but not an actual bankruptcy game-over; confirmed via a direct trace (`bankrupt`/`levelEnded` both still false at the final checkpoint below)."
+        "note": "#597 (event cooldown caching): re-verified against current code -- only one of the two remaining contracts expires inside this block: #5 (rubble, $136 penalty) at tick 211. #7 (blingite, 97-tick deadline from its tick-175 accept, $2,919 penalty) is still active at tick 220 -- its own deadline lands well past this file's final checkpoint. #593: cash: -$23,317 -> -$23,453 (the rubble fine is the only thing left to move it -- the driller died in the first pattern's blast, far above, so there is no ongoing payroll/fuel drain). activeContractCount drops from 2 to 1. Cumulative ticksBelowThreshold (BANKRUPTCY_THRESHOLD=$5,000 in balance.ts) is nowhere near the 100-tick BANKRUPTCY_GRACE_TICKS -- deeply negative, but not an actual bankruptcy game-over; confirmed via a direct trace (`bankrupt`/`levelEnded` both still false at the final checkpoint below)."
       }
     },
     {
@@ -1576,7 +1573,7 @@
       "expect": {
         "equals": {
           "tickCount": 220,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -1595,7 +1592,7 @@
       "expect": {
         "equals": {
           "tickCount": 220,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
@@ -1612,17 +1609,17 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -32203,
+          "cash": -23453,
           "tickCount": 220,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 0,
-          "safety": 8.499999999999982,
+          "wellBeing": 99.95,
+          "safety": 0,
           "ecology": 50,
-          "nuisance": 50
+          "nuisance": 52.75000000000013
         },
-        "note": "#597 (event cooldown caching): wellBeing has bottomed out at 0 -- the sole driller's needs cycle has nowhere to go with no living quarters and nothing left to work (every pattern from the second on never lands a single hole). safety is slowly climbing back off its post-blast floor as the first blast's vehicle_destroyed accident ages out of ScoreManager.ts's 10-tick recentAccidents window and decay (SCORE_DECAY_RATE) pulls it back toward the neutral baseline of 50. ecology/nuisance never moved from the fresh-game 50 -- confirmed across the whole file: the one real blast (the first pattern) never registered a vibration hit, and the other three never fired at all."
+        "note": "#593, superseding the pre-#593 note this once carried: with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down -- wellBeing instead decays back UP toward its neutral baseline with nothing left to complain about, reaching 99.95 by this checkpoint rather than bottoming at 0. safety is re-verified as pinned at its floor of 0, not recovering -- sandbox-measured, it never moves off 0 anywhere in this file's run once it bottoms out there (tickCount 70, see that scores step's note). nuisance is no longer untouched either: the food_fest event partway through the run (see its own changedBy step) added +5 and it has been decaying back down since (52.75 here). ecology alone stays at the fresh-game 50 -- confirmed across the whole file: the one real blast (the first pattern) never registered a vibration hit, and the other three never fired at all."
       }
     },
     {
@@ -1636,13 +1633,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -32203,
+          "cash": -23453,
           "tickCount": 220,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 0,
-          "safety": 8.499999999999982
+          "wellBeing": 99.95,
+          "safety": 0
         }
       }
     },
@@ -1657,19 +1654,19 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -32203,
+          "cash": -23453,
           "tickCount": 220,
-          "deathCount": 0,
+          "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 0,
-          "safety": 8.499999999999982,
+          "wellBeing": 99.95,
+          "safety": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null,
           "surveyCount": 0
         },
-        "note": "#553/#597, superseding Findings #52-#53: this file used to never hire anyone or buy a vehicle at all, and ended at a bruised but positive $11,867 -- almost entirely from two expired-contract fines and one weather event, never from any operating cost, since nothing in the file ever cost anything to run. Drilling now requires exactly one driller and one drill_rig (the file's own point -- no OTHER hauling infrastructure, so no delivery ever succeeds -- is otherwise unchanged), and that single rig ends up parked on the pattern it just drilled when the first blast fires, destroying it (same mechanic tutorial-playthrough's Finding documents) with no replacement bought after. The other three drill/charge/sequence/blast cycles this file's own description promises still run, but operate on zero real holes throughout: BAD/$0 blast reports, DETONATE disabled at the panel (`expect.blocked`, not a click), nothing to charge or sequence. Real costs this file never used to pay -- $1,000 to hire, $35,000 for the rig, ~$60/tick combined payroll and fuel for 220 ticks -- combine with the SAME class of contract-expiry fine Finding #53 flagged (this run, re-verified against the #597 event-cooldown fix: $29,937 sparkium, $136 rubble) and one union_merch event (-$2,500) to leave cash at -$32,203: a real net loss of $82,203 against the level's $80,000 target, not just a shortfall. The third accepted contract (#7, blingite bulk, $2,919 penalty) never expires within this file's run -- its 97-tick deadline from the tick-175 accept lands past the final checkpoint, so it stays active rather than adding another fine. deathCount stays 0 (re-verified via direct trace of state.damage after every blast -- the driller is never standing in the cleared voxels, only the vehicle is) -- the file's one employee survives the whole run. bankrupt/levelEnded both stay false: cash first crossed below BANKRUPTCY_THRESHOLD ($5,000) early in the run and never recovered, but BANKRUPTCY_GRACE_TICKS (100 consecutive ticks below threshold) had not yet elapsed by the final tick (220) -- confirmed via direct trace. No ecological/revolt shutdown either -- the one real blast never moved ecology/nuisance off the fresh-game baseline of 50."
+        "note": "#553/#597, superseding Findings #52-#53: this file used to never hire anyone or buy a vehicle at all, and ended at a bruised but positive $11,867 -- almost entirely from two expired-contract fines and one weather event, never from any operating cost, since nothing in the file ever cost anything to run. Drilling now requires exactly one driller and one drill_rig (the file's own point -- no OTHER hauling infrastructure, so no delivery ever succeeds -- is otherwise unchanged), and that single rig ends up parked on the pattern it just drilled when the first blast fires, destroying it (same mechanic tutorial-playthrough's Finding documents) with no replacement bought after. The other three drill/charge/sequence/blast cycles this file's own description promises still run, but operate on zero real holes throughout: BAD/$0 blast reports, DETONATE disabled at the panel (`expect.blocked`, not a click), nothing to charge or sequence. #593, superseding this note's own pre-#593 telling: deathCount is 1, not 0 -- releaseVehicleReservation now correctly syncs the dismounting driver's position to the vehicle's actual (destroyed) location instead of freezing it at the old boarding point, so the driller dies alongside the rig in the first blast (see that step's own note) rather than surviving it. That death is also why cash lands far less negative than the pre-#593 figure: real costs this file pays are $1,000 to hire, $35,000 for the rig, and ~$60/tick combined payroll and fuel only for the ~50 ticks the driller is alive to draw them -- not the full 220-tick run. Those combine with the SAME class of contract-expiry fine Finding #53 flagged (this run, re-verified against the #597 event-cooldown fix: $29,937 sparkium, $136 rubble) and one food_fest event (-$4,000, not the pre-#593 union_merch/-$2,500 -- see that step's own note) to leave cash at -$23,453: a real net loss of $73,453 against the level's $80,000 target, not just a shortfall. The third accepted contract (#7, blingite bulk, $2,919 penalty) never expires within this file's run -- its 97-tick deadline from the tick-175 accept lands past the final checkpoint, so it stays active rather than adding another fine. bankrupt/levelEnded both stay false: cash first crossed below BANKRUPTCY_THRESHOLD ($5,000) early in the run and never recovered, but BANKRUPTCY_GRACE_TICKS (100 consecutive ticks below threshold) had not yet elapsed by the final tick (220) -- confirmed via direct trace. No ecological/revolt shutdown either -- the one real blast never moved ecology off the fresh-game baseline of 50 (nuisance did move, from the food_fest event -- see that scores step's note)."
       }
     }
   ]

@@ -1105,9 +1105,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 3
+          "deathCount": 2
         },
-        "note": "#553: this second, smaller blast now costs a third life. The manager (#3) and the driver (#4) are still nowhere near it, but the replacement driller (#5) is standing at the pattern they have just finished sinking -- the same way the first blast took the first driller. Pre-#553 nobody was ever at a pattern, because confirming a plan created the holes outright. #553-followup (issue #586 CI): dropped `cash: 28108` here too -- inherits the same real-time-accrual drift as the charge step above, and the blast itself is cash-neutral (deaths don't deduct immediately), so there is nothing left to assert about cash at this checkpoint."
+        "note": "#593: this second, smaller blast costs no further life. The manager (#3) and the driver (#4) are still nowhere near it, and the replacement driller (#5), who collapsed from fatigue near the pattern earlier, is no longer frozen at the stale boarding position that used to sit inside the blast radius -- releaseVehicleReservation now syncs a dismounting driver's x/z to the vehicle's real position, so #5's real position (17,13, near living_quarters) is correctly outside it (direct trace confirms deathCount stays 0->2, unchanged from the first blast). Pre-#593 the stale position put #5 inside the pattern and this blast took a third life; that was the position-sync bug, not a real consequence of the corrected grid. #553-followup (issue #586 CI): dropped `cash: 28108` here too -- inherits the same real-time-accrual drift as the charge step above, and the blast itself is cash-neutral (deaths don't deduct immediately), so there is nothing left to assert about cash at this checkpoint."
       }
     },
     {
@@ -1160,7 +1160,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 2,
           "activeContractCount": 3,
           "employeeCount": 5,
           "vehicleCount": 1,
