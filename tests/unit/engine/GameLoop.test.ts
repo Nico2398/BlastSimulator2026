@@ -50,6 +50,8 @@ import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { landDrilledHole, type PlannedHole } from '../../../src/core/mining/DrillPlan.js';
+import { landLoadedCharge, type PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
+import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -1143,6 +1145,163 @@ describe('drill_hole actions — dispatch and landing (#553)', () => {
     // each hole — not fixed at initial dispatch time (mirrors #549's own
     // "queue advances ... recomputed from where the previous task actually
     // ended" behavior, exercised here for drill_hole specifically).
+    expect(landedOrder).toEqual(['H3', 'H1', 'H2']);
+  });
+});
+
+// ── Issue #554: charging becomes work — charge_hole PendingActions ─────────
+//
+// Mirrors the drill_hole describe block directly above, adapted for
+// charge_hole's own shape: on foot (requiredVehicleRole: null, unlike
+// drill_hole's drill_rig gate) and keyed into state.plannedChargesByHole
+// (a Record<holeId, PlannedCharge>, not an array like plannedDrillHoles) —
+// landing deletes the map entry rather than splicing an array. These tests
+// are Red today only because landLoadedCharge (ChargePlan.ts) throws 'not
+// implemented' — the claim/ordering machinery itself (#547-#552) is already
+// fully generic and is exercised here, not re-specified.
+//
+// Full end-to-end coverage of the console-level pipeline (chargeCommand
+// dispatching these actions, and the tick command performing this same
+// landing step) lives in tests/integration/charge-plan-queueing.test.ts.
+
+describe('charge_hole actions — dispatch and landing (#554)', () => {
+  const SEED = 42;
+
+  function makeFlatNavGrid(width: number, height: number): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(width, height, cells);
+  }
+
+  function makeBlaster(state: GameState, rng: Random, x: number, z: number) {
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, x, z);
+    return employee;
+  }
+
+  function queueChargeHoleAction(state: GameState, hole: DrillHole, durationTicks = 3): void {
+    state.plannedChargesByHole[hole.id] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    dispatchPendingAction(state, {
+      id: state.nextPendingActionId++,
+      type: 'charge_hole',
+      requiredSkill: 'blasting',
+      requiredVehicleRole: null,
+      targetX: hole.x,
+      targetZ: hole.z,
+      targetY: 0,
+      payload: {
+        holeId: hole.id, explosiveId: 'boomite', amountKg: 5, stemmingM: 2, durationTicks,
+      },
+      targetEmployeeId: null,
+    }, { skipQualificationCheck: true });
+  }
+
+  /**
+   * One full dispatch -> movement -> arrival -> work-tick pass, mirroring
+   * runFullTickAndLandDrilledHoles above but landing charge_hole completions
+   * instead: moves the completed hole's PlannedCharge out of
+   * plannedChargesByHole and into chargesByHole via landLoadedCharge.
+   * charge_hole carries requiredVehicleRole: null, so no vehicle-continuity
+   * promotion step applies here. Returns the ids of holes that landed this
+   * tick, in completion order.
+   */
+  function runFullTickAndLandLoadedCharges(state: GameState): string[] {
+    tickEmployees(state);
+    tickEmployeeMovement(state);
+    tickArrivalGate(state);
+
+    const landed: string[] = [];
+    for (const emp of state.employees.employees) {
+      if (!emp.alive) continue;
+      const progress = tickTaskProgress(state, emp);
+      if (!progress?.completed || progress.actionId === undefined) continue;
+
+      const completingAction = state.pendingActions.find(a => a.id === progress.actionId);
+      const holeId = completingAction?.payload['holeId'] as string | undefined;
+
+      completePendingAction(state, progress.actionId);
+
+      if (holeId !== undefined) {
+        const planned = state.plannedChargesByHole[holeId];
+        if (planned) {
+          delete state.plannedChargesByHole[holeId];
+          state.chargesByHole[holeId] = landLoadedCharge(planned);
+          landed.push(holeId);
+        }
+      }
+    }
+    return landed;
+  }
+
+  it('two blasters each claim a distinct nearest hole out of three — no hole double-queued, no two in-progress actions share one blaster', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 5);
+    const rng = new Random(SEED);
+
+    makeBlaster(state, rng, 0, 0);
+    makeBlaster(state, rng, 30, 0);
+
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 2, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 28, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H3', x: 15, z: 0, depth: 8, diameter: 0.15 },
+    ];
+    state.drillHoles.push(...holes);
+    for (const hole of holes) queueChargeHoleAction(state, hole);
+
+    const landed: string[] = [];
+    let sawTwoInProgressOnSameEmployee = false;
+    for (let i = 0; i < 400 && landed.length < 3; i++) {
+      for (const emp of state.employees.employees) {
+        const inProgressForEmp = state.pendingActions.filter(
+          a => a.type === 'charge_hole' && a.status === 'in_progress' && a.holderId === emp.id,
+        ).length;
+        if (inProgressForEmp > 1) sawTwoInProgressOnSameEmployee = true;
+      }
+      landed.push(...runFullTickAndLandLoadedCharges(state));
+    }
+
+    expect(sawTwoInProgressOnSameEmployee).toBe(false);
+    expect(landed).toHaveLength(3);
+    expect(new Set(landed).size).toBe(3);
+    expect(Object.keys(state.chargesByHole).sort()).toEqual(['H1', 'H2', 'H3']);
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+  });
+
+  it('a single blaster loads three holes one at a time, nearest-first — never two charge_hole actions in progress simultaneously', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 5);
+    const rng = new Random(SEED);
+
+    makeBlaster(state, rng, 0, 0);
+
+    // Distances from (0,0): H3 (5) nearest, H1 (20) middle, H2 (30) farthest.
+    const holes: DrillHole[] = [
+      { id: 'H1', x: 20, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H2', x: 30, z: 0, depth: 8, diameter: 0.15 },
+      { id: 'H3', x: 5, z: 0, depth: 8, diameter: 0.15 },
+    ];
+    state.drillHoles.push(...holes);
+    for (const hole of holes) queueChargeHoleAction(state, hole);
+
+    const landedOrder: string[] = [];
+    let sawSimultaneousInProgress = false;
+    for (let i = 0; i < 400 && landedOrder.length < 3; i++) {
+      const inProgressCount = state.pendingActions.filter(
+        a => a.type === 'charge_hole' && a.status === 'in_progress',
+      ).length;
+      if (inProgressCount > 1) sawSimultaneousInProgress = true;
+
+      landedOrder.push(...runFullTickAndLandLoadedCharges(state));
+    }
+
+    expect(sawSimultaneousInProgress).toBe(false);
     expect(landedOrder).toEqual(['H3', 'H1', 'H2']);
   });
 });
