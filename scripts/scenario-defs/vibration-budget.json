@@ -370,31 +370,26 @@
     },
     {
       "command": "employee fire 1",
-      "description": "#553: a surviving driller left idle after their blast (rumblox at this overcharge routinely kills them anyway, but not always) drags the roster's average wellbeing down for the rest of the file with no job left to do — fired so cycle 2's fresh driller starts from a clean roster, not because this file is about employee management.",
+      "description": "#553: a surviving driller left idle after their blast (rumblox at this overcharge routinely kills them anyway, but not always) drags the roster's average wellbeing down for the rest of the file with no job left to do — fired so cycle 2's fresh driller starts from a clean roster, not because this file is about employee management. #599-followup: the toggle/dismiss/confirm chain was `clickSelector` (hard-fail if absent), which read as a DOM re-render race (\"element vanished from the DOM between the wait and the click\") on a genuine interaction-mode CI failure -- real investigation (live DOM instrumentation, a MutationObserver on #bs-employee-panel across the whole click sequence) found no re-render race at all: the file's own \"not always\" is not a caveat, it is what actually happened in that run -- rumblox killed the driller in the blast this file's own charge/amount is deliberately tuned to routinely trigger, `employee list` confirmed the roster empty, and `.bs-detail-toggle` was never going to exist for a dead crew. `clickSelector` cannot express \"maybe nothing to click\" and fails loudly exactly as designed when the control never appears; `clickIfPresent` is the primitive built for precisely this genuinely-nondeterministic beat (scenario-defs.md's own doc comment) -- polls the same usability gate and no-ops if the driller never shows up alive, still hard-fails through the toolbar click below if the panel itself is unreachable.",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-detail-toggle"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-detail-toggle",
+          "timeoutMs": 5000
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 5000
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 5000
         }
       ],
       "role": "player"
@@ -732,31 +727,26 @@
     },
     {
       "command": "employee fire 2",
-      "description": "#553: see grid 1's own fire step for why — a fresh driller each cycle, fired right after their blast.",
+      "description": "#553: see grid 1's own fire step for why — a fresh driller each cycle, fired right after their blast. #599: this is the step a real interaction-mode CI run actually failed on -- \"clickSelector .bs-detail-toggle failed: element vanished from the DOM between the wait and the click\". Investigated with live DOM instrumentation (a MutationObserver on #bs-employee-panel plus a console-logged rebuild trace across the exact click sequence): no re-render race -- the roster was already empty by the time this step ran. `employee list`/`deathCount` at the preceding blast step confirmed it directly: rumblox (this file's own overcharge, tuned to routinely kill the driller per grid 1's fire-step note) killed grid 2's driller in its own blast, so `.bs-detail-toggle` was never going to exist for this cycle's dead crew -- not a race, the file's own documented \"not always\" surfacing for real. Same `clickIfPresent` fix as grid 1's own fire step, same reasoning.",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-detail-toggle"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-detail-toggle",
+          "timeoutMs": 5000
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 5000
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 5000
         }
       ],
       "role": "player"
@@ -773,15 +763,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "employeeCount": 0,
           "vehicleCount": 0
         },
-        "note": "structural, not incidental-running-total -- grid 2's own driller/drill_rig were fired/spent before this checkpoint and grid 3's own hire/purchase happen after it, so both are deterministically 0 here regardless of event pacing."
+        "note": "#599-followup: dropped `employeeCount: 0` from this equals block -- not deterministic across modes the way the note above (still true for `vehicleCount`) claimed. Root-caused with live DOM instrumentation (a MutationObserver on #bs-employee-panel across the whole `employee fire 2` click sequence, confirmed against `employee list`/`deathCount` state dumps): command mode consistently has grid 2's driller survive the blast and get fired via this step's own dismiss click, dropping the roster array entry to 0; three independent real interaction-mode runs instead consistently show `deathCount` already 1 by the *preceding* blast step -- rumblox (this file's own overcharge, tuned to routinely kill the driller per grid 1's own fire-step note) kills them in the blast itself, and a dead employee stays in `state.employees.employees` (marked dead, not spliced out) where a *fired* one is actually removed, so the array length -- `employeeCount` -- never reaches 0 that way. Both outcomes are real per their own execution path (the same class of engine-timing gap level1-playthrough-win.json's own blast-step note documents for `deathCount`/`vehicleCount`), so `employeeCount` is not hard-asserted here; `vehicleCount` (the drill_rig, destroyed either way once its last driller is gone) still reliably reads 0 in both modes and stays exact."
       }
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 3/3 — see grid 1's own hire step for why. #553-followup: no toolbar click here -- same reason as grid 2/3's own hire step above: `employee fire 2` already opened the employees panel and the intervening `finances` step is command-only, so the panel is still open when this step runs.",
+      "description": "#553: a fresh driller for grid 3/3 — see grid 1's own hire step for why. #553-followup: no toolbar click here -- same reason as grid 2/3's own hire step above: `employee fire 2` already opened the employees panel and the intervening `finances` step is command-only, so the panel is still open when this step runs. #599-followup: switched `employeeCount` from `equals: 1` to `changedBy: 1` -- this hire's own baseline is no longer reliably 0 (see the finances checkpoint above): a mode where grid 2's driller died instead of being fired leaves their corpse in `state.employees.employees` (dead, not spliced out), so this hire can land on a roster already at 1, not 0. `changedBy` proves what this step's own action did -- exactly one hire, regardless of starting count -- without needing to pin the baseline, matching this project's own preferred convention for a running total (scenario-defs.md).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -797,7 +786,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "employeeCount": 1
         }
       }

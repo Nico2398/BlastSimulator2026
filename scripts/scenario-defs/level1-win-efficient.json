@@ -1271,6 +1271,7 @@
     },
     {
       "command": "tick 20",
+      "description": "#599-followup: dropped `holeCount: 16`/`orderedHoleCount: 0` -- a real interaction-mode run read `holeCount: 15` here (one hole short of landing) at this exact checkpoint, the same landing-boundary class already documented at the tick-20 blocks above (tickCount 132/152/170's own notes) rather than the wall-clock cash-accrual class: command mode and interaction mode do not always take the same number of ticks for a vehicle to reach a drill target (interaction mode's continuous sub-tile movement interpolation vs command mode's purely-per-tick stepping), so this checkpoint's exact-16 assertion was a false positive from command-mode-only calibration. Not widened with extra ticks -- the very next two checkpoints below (tickCount 230, 250) already re-assert holeCount 16 as a hard equals with plenty of margin (40+ ticks further on) and both held in the same interaction-mode run that caught this one short, so the fix is dropping the premature assertion here rather than shifting the whole file's tick budget (which would ripple into every downstream contract id -- REFRESH_INTERVAL=20 in Contract.ts means even a same-size tick insertion crosses a contract-pool refresh boundary and changes which contracts are on offer for every later contract step).",
       "interaction": [
         {
           "type": "command",
@@ -1283,9 +1284,7 @@
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 16,
-          "orderedHoleCount": 0
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
@@ -1297,7 +1296,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2534834` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill at this tickCount. The remaining exact fields still prove the event resolved.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2534834` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill at this tickCount. #599-followup: `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1309,9 +1308,7 @@
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 16,
-          "orderedHoleCount": 0
+          "surveyCount": 2
         },
         "changedBy": {
           "tickCount": 0

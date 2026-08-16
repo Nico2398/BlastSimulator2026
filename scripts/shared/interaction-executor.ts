@@ -13,7 +13,7 @@ import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js
 import { awaitPlacementArmed } from './tile-picker.js';
 import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './interaction-types.js';
 import type { PlayerAction } from './interaction-types.js';
-import { runAction } from './interaction-driver.js';
+import { runAction, waitForUiUpdate } from './interaction-driver.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -107,6 +107,52 @@ function describeReason(r: UnclickableReport): string {
   if (r.width === 0 || r.height === 0) return `element has zero size (${r.width}x${r.height})`;
   if (r.covering !== undefined) return `element is covered by ${r.covering}`;
   return 'element is present and looks clickable — the browser still refused it';
+}
+
+/**
+ * Poll `selector` via the page's own usability probe, then click it — the
+ * same gate `clickSelector` uses, extracted so any caller that needs a real
+ * "wait for it to actually be clickable, not merely present" can share it.
+ *
+ * `page.waitForSelector` (Puppeteer's own, DOM-presence-only) is the wrong
+ * primitive for a panel that pre-exists hidden and swaps its content instead
+ * of remounting: the old content's nodes are already in the DOM the instant
+ * the new content is still `display:none`, so a presence-only wait resolves
+ * immediately against stale, invisible elements and the follow-up click
+ * throws Puppeteer's own unnamed "Node is either not clickable or not an
+ * Element" (#599, `resolveEventIfPending` against a second event queued
+ * right behind the one just resolved — the outcome panel or a follow-up
+ * event replaces `#bs-event-dialog`'s content in place, #545's documented
+ * gap for exactly this shape of panel).
+ *
+ * Each poll pass also drives `waitForUiUpdate` rather than a bare
+ * `setTimeout`: a plain Node-side sleep does not guarantee the page's own
+ * rAF-driven `uiManager.update` actually runs while a harness sits idle
+ * between CDP round trips (headless Chrome can throttle rAF for an
+ * unpainted, `suspendDrawing`-suspended page), so a selector that only
+ * becomes usable once state changes propagate to the DOM could poll a
+ * frozen, stale render forever. `waitForUiUpdate` explicitly pumps two rAF
+ * passes from inside the page every iteration instead of hoping one lands.
+ */
+async function waitUsableAndClick(page: Page, selector: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const reason = await page.evaluate((sel: string) => {
+      const probe = (window as unknown as {
+        __probeSelector?: (s: string) => string | null;
+      }).__probeSelector;
+      if (probe === undefined) return null;
+      document.querySelector(sel)?.scrollIntoView({ block: 'center', inline: 'nearest' });
+      return probe(sel);
+    }, selector);
+    if (reason === null) break;
+    if (Date.now() > deadline) {
+      throw new Error(`"${selector}" never became usable: ${describeUnclickable(await inspectSelector(page, selector))}`);
+    }
+    await waitForUiUpdate(page);
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  await page.click(selector);
 }
 
 /**
@@ -495,15 +541,25 @@ export async function executeActionOnPage(
       });
       if (!pending) break;
 
-      // Something IS pending, so the dialog must appear — wait properly rather
-      // than probing briefly, and fail loudly if it never does.
+      // Something IS pending, so the dialog must appear — wait for it to be
+      // genuinely usable (see `waitUsableAndClick`'s own doc comment for why
+      // a bare `page.waitForSelector` is the wrong primitive here: the panel
+      // pre-exists hidden and swaps its content, so a presence-only wait can
+      // resolve instantly against the previous event's stale, invisible
+      // buttons) rather than probing briefly, and fail loudly if it never
+      // becomes usable at all.
       const evTimeout = action.timeoutMs ?? 30000;
-      await page.waitForSelector('#bs-event-dialog .bs-event-choice', { timeout: evTimeout });
-      await page.click('#bs-event-dialog .bs-event-choice');
-      // The outcome panel replaces the choices; dismiss it if it appears.
+      await waitUsableAndClick(page, '#bs-event-dialog .bs-event-choice', evTimeout);
+      // The outcome panel replaces the choices; dismiss it if it appears. Its
+      // own budget is short, not `evTimeout` — plenty of events resolve with
+      // no outcome panel at all, and `waitUsableAndClick`'s probe (unlike the
+      // old presence-only `page.waitForSelector` it replaced) correctly does
+      // NOT resolve early against stale content, so this case now genuinely
+      // waits out its full budget every time it fires; 30s of that per
+      // no-outcome event across this file's several dozen resolutions would
+      // dominate the run.
       try {
-        await page.waitForSelector('#bs-event-dialog .bs-event-dismiss', { timeout: evTimeout });
-        await page.click('#bs-event-dialog .bs-event-dismiss');
+        await waitUsableAndClick(page, '#bs-event-dialog .bs-event-dismiss', 3000);
       } catch {
         // Some events resolve without an outcome panel — not a failure.
       }
