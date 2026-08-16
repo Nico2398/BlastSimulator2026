@@ -29,6 +29,10 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   // Resolves a pending event via its dialog, deciding from game state rather
   // than DOM render timing. See InteractionStepAction.
   'resolveEventIfPending',
+  // Advances time until a named state-dump field reaches a target value,
+  // bounded by maxTicks/timeoutMs so a stall fails loudly (issue #590). See
+  // InteractionStepAction.
+  'waitUntil',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [
@@ -327,7 +331,12 @@ describe('No steps use unknown commands', () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       const unknownCommands: string[] = [];
       for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
+        const step = scenario.steps[i] as ScenarioStepDef;
+        // A waitUntil step's `command` field is descriptive only (issue #590)
+        // — command mode drives the tick loop from step.interaction instead
+        // of executing this string, so it is exempt from the known-command
+        // check that every real command string must pass.
+        if ((step.interaction ?? []).some(a => a.type === 'waitUntil')) continue;
         const cmdStr = typeof step === 'string' ? step : (step as any).command;
         const firstToken = cmdStr.trim().split(/\s+/)[0];
         if (!KNOWN_COMMANDS.includes(firstToken)) {
@@ -578,6 +587,27 @@ describe('Dual-play scenario steps — data-driven validation', () => {
           if (action.type === 'command') {
             expect(typeof action.command).toBe('string');
             expect(action.command.length).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+
+    it(`${name} — waitUntil actions have field, equals, maxTicks, and timeoutMs`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'waitUntil') {
+            expect(typeof action.field).toBe('string');
+            expect(action.field.length).toBeGreaterThan(0);
+            expect(action.equals).not.toBeUndefined();
+            expect(Number.isInteger(action.maxTicks)).toBe(true);
+            expect(action.maxTicks).toBeGreaterThan(0);
+            expect(Number.isInteger(action.timeoutMs)).toBe(true);
+            expect(action.timeoutMs).toBeGreaterThan(0);
           }
         }
       }
