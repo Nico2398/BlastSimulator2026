@@ -78,6 +78,15 @@ export interface DrillHoleActionPayload {
   durationTicks: number;
 }
 
+/** Payload carried by a queued `charge_hole` PendingAction (#554). */
+export interface ChargeHoleActionPayload {
+  holeId: string;
+  explosiveId: string;
+  amountKg: number;
+  stemmingM: number;
+  durationTicks: number;
+}
+
 /**
  * Cancel every outstanding `drill_hole` PendingAction (queued/assigned/
  * in_progress — anything not yet completed) and empty both hole pools

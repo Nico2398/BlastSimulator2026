@@ -16,8 +16,16 @@ export interface ValidationError {
   issue: string;
 }
 
-/** Validate that a blast plan is complete (all holes charged and sequenced). */
-export function validateBlastPlan(plan: BlastPlan): ValidationError[] {
+/**
+ * Validate that a blast plan is complete (all holes charged and sequenced).
+ * `loadingHoleIds`, when given, is the set of holes whose charge order has
+ * been placed but not yet loaded (#554) — TODO: implementer branches on this
+ * to distinguish "missing charge" from "charge still loading".
+ */
+export function validateBlastPlan(
+  plan: BlastPlan,
+  _loadingHoleIds?: ReadonlySet<string>,
+): ValidationError[] {
   const errors: ValidationError[] = [];
 
   for (const hole of plan.holes) {

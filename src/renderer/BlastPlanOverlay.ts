@@ -21,6 +21,11 @@ const HOLE_SEGMENTS = 8;      // low-poly cylinder
 const GHOST_HOLE_COLOR = 0x8899aa;
 const GHOST_HOLE_OPACITY = 0.35;
 
+// Ordered-but-not-loaded charge marker (#554) — mirrors the ghost-hole
+// treatment above for a charge order still queued as a `charge_hole` action.
+export const CHARGE_ORDERED_COLOR = 0xffaa00; // placeholder, implementer may tune
+export const CHARGE_ORDERED_OPACITY = 0.4;
+
 // Charge color scale (empty → max charge)
 const CHARGE_COLORS: readonly number[] = [
   0x888888, // no charge
@@ -60,6 +65,8 @@ export interface HoleOverlayData {
   predictedFragSizeCm?: number;
   /** Predicted max projection speed (m/s) — for tier-3. */
   projectionSpeed?: number;
+  /** True while this hole's charge order is queued/in-progress as a `charge_hole` action, not yet landed in `charge` (#554). */
+  chargeOrdered?: boolean;
 }
 
 export interface BlastPlanOverlayOptions {

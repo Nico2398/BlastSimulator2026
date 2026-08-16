@@ -7,7 +7,7 @@ import {
   SPAWN_TILE_SPACING,
 } from '../config/balance.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
-import type { HoleCharge } from '../mining/ChargePlan.js';
+import type { HoleCharge, PlannedCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
 import type { BlastOreReport } from '../mining/BlastOreReport.js';
 import type { BlastReport } from '../mining/BlastExecution.js';
@@ -68,7 +68,11 @@ import { createSitePolicy } from '../entities/SitePolicy.js';
 // drilling becomes work — a drill plan queues one `drill_hole` action per
 // hole instead of writing holes into state instantly). See SaveLoad.ts's
 // migrateV10ToV11 stub.
-export const SAVE_VERSION = 11;
+// v11 -> v12: GameState gained `plannedChargesByHole: Record<string,
+// PlannedCharge>` (#554 charging becomes work — a charge order queues one
+// `charge_hole` action per hole instead of writing charges into state
+// instantly). See SaveLoad.ts's migrateV11ToV12 stub.
+export const SAVE_VERSION = 12;
 
 export interface GameConfig {
   seed: number;
@@ -176,6 +180,9 @@ export interface GameState {
 
   /** Current charge plan per hole (keyed by hole ID). */
   chargesByHole: Record<string, HoleCharge>;
+
+  /** Charges ordered but not yet loaded — each queues one `charge_hole` action and lands in `chargesByHole` on completion (#554). */
+  plannedChargesByHole: Record<string, PlannedCharge>;
 
   /** Detonation sequence: hole ID → delay in ms. */
   sequenceDelays: Record<string, number>;
@@ -317,6 +324,7 @@ export function createGame(config: GameConfig): GameState {
     drillHoles: [],
     plannedDrillHoles: [],
     chargesByHole: {},
+    plannedChargesByHole: {},
     sequenceDelays: {},
     savedPlans: {},
     finances: createFinanceState(config.startingCash ?? STARTING_CASH),

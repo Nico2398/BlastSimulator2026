@@ -62,3 +62,23 @@ export function batchCharge(
   }
   return { charges, errors };
 }
+
+/** A charge ordered but not yet loaded — queues one `charge_hole` action per hole (#554), mirroring PlannedHole (#553). */
+export type PlannedCharge = HoleCharge;
+
+/**
+ * Land a planned (ordered-but-not-loaded) charge into a completed `HoleCharge`
+ * once its `charge_hole` action finishes (#554). TODO: implement.
+ */
+export function landLoadedCharge(_planned: PlannedCharge): HoleCharge {
+  throw new Error('not implemented');
+}
+
+/**
+ * Ticks to load a charge of the given amount, mirroring
+ * computeDrillHoleDurationTicks's scaling against a reference amount (#554).
+ * TODO: implement.
+ */
+export function computeChargeHoleDurationTicks(_amountKg: number): number {
+  throw new Error('not implemented');
+}
