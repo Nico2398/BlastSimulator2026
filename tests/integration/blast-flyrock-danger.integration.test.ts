@@ -45,6 +45,18 @@ function makeCtx(): MiningContext {
  * can run long enough for hunger/fatigue/breakNeed to cross a collapse
  * threshold mid-drive, an unrelated needs mechanic these tests aren't
  * exercising.
+ *
+ * Relocates the staffed driller (employee #1) well clear of the pattern once
+ * drilling finishes. Driving never used to move an employee's own x/z — only
+ * the vehicle's (#593) — so the driller's position stayed frozen wherever
+ * they originally boarded regardless of where the rig actually drove. #593
+ * fixed that: releaseVehicleReservation now leaves a dismounting driver
+ * exactly where their vehicle stopped, which for a plan finishing inside
+ * this file's 3x3 pattern is the pattern itself. These tests are about
+ * flyrock reaching the crew crewBesideTheBlast places deliberately, not
+ * about the incidental rig driver; parking them somewhere the blast can't
+ * reach keeps that RNG draw about the crew alone, same as before #593 made
+ * the driller's real position visible.
  */
 function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
   for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
@@ -54,6 +66,11 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
       emp.breakNeed = 100;
     }
     tickCommand(ctx, ['1'], {});
+  }
+  const driller = ctx.state!.employees.employees.find(e => e.id === 1);
+  if (driller) {
+    driller.x = 44;
+    driller.z = 44;
   }
 }
 

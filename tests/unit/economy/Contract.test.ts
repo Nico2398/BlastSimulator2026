@@ -6,6 +6,7 @@ import {
   acceptContract,
   deliverMaterials,
   checkDeadlines,
+  findContract,
 } from '../../../src/core/economy/Contract.js';
 
 describe('Contract system', () => {
@@ -104,5 +105,92 @@ describe('Contract system', () => {
     expect(latePenalties.length).toBe(1);
     expect(latePenalties[0]!.penalty).toBeGreaterThan(0);
     expect(state.active.length).toBe(0);
+  });
+
+  // ── findContract — stable selection across offer-pool rotation (#597) ──
+
+  describe('findContract', () => {
+    it('finds a contract by id', () => {
+      const state = createContractState();
+      generateContracts(state, new Random(42), 0);
+      const target = state.available[1]!;
+
+      expect(findContract(state.available, { id: target.id })).toBe(target);
+    });
+
+    it('finds the first contract matching type and materialId', () => {
+      const pool = [
+        { id: 1, type: 'ore_sale' as const, materialId: 'rustite' } as never,
+        { id: 2, type: 'ore_sale' as const, materialId: 'dirtite' } as never,
+        { id: 3, type: 'supply' as const, materialId: 'dirtite' } as never,
+      ];
+      const found = findContract(pool, { type: 'ore_sale', materialId: 'dirtite' });
+      expect(found).toBe(pool[1]);
+    });
+
+    it('finds the first contract matching materialId alone, regardless of type', () => {
+      const pool = [
+        { id: 1, type: 'ore_sale' as const, materialId: 'rustite' } as never,
+        { id: 2, type: 'supply' as const, materialId: 'dirtite' } as never,
+      ];
+      expect(findContract(pool, { materialId: 'dirtite' })).toBe(pool[1]);
+    });
+
+    it('finds the first contract matching type alone, regardless of materialId', () => {
+      const pool = [
+        { id: 1, type: 'rubble_disposal' as const, materialId: '' } as never,
+        { id: 2, type: 'ore_sale' as const, materialId: 'rustite' } as never,
+      ];
+      expect(findContract(pool, { type: 'ore_sale' })).toBe(pool[1]);
+    });
+
+    it('returns null when no selector field is set — nothing to search for', () => {
+      const state = createContractState();
+      generateContracts(state, new Random(42), 0);
+      expect(findContract(state.available, {})).toBeNull();
+    });
+
+    it('returns null when nothing in the pool matches', () => {
+      const pool = [{ id: 1, type: 'ore_sale' as const, materialId: 'rustite' } as never];
+      expect(findContract(pool, { type: 'ore_sale', materialId: 'absurdium' })).toBeNull();
+    });
+
+    it('an id that has rotated out of the available pool is no longer resolvable, but a type/materialId selector still is if a matching contract is still offered', () => {
+      const state = createContractState();
+      generateContracts(state, new Random(42), 0);
+      const evictedId = state.available[0]!.id;
+      const survivingType = state.available[0]!.type;
+      const survivingMaterial = state.available[0]!.materialId;
+
+      // Force the pool to fill and rotate the original entries out, the way
+      // MAX_AVAILABLE_CONTRACTS + repeated refreshes does over a scenario's
+      // real running time.
+      let tick = 0;
+      while (state.available.some(c => c.id === evictedId)) {
+        tick += 20;
+        generateContracts(state, new Random(42 + tick), tick);
+      }
+
+      expect(findContract(state.available, { id: evictedId })).toBeNull();
+      // A same-kind contract may or may not still be offered depending on
+      // what rotated in — but if one is, the selector finds it without ever
+      // having to know its (now different) id.
+      const stillOffered = state.available.find(c => c.type === survivingType && c.materialId === survivingMaterial);
+      if (stillOffered) {
+        expect(findContract(state.available, { type: survivingType, materialId: survivingMaterial })).toBe(stillOffered);
+      }
+    });
+
+    it('accepting by a material/type selector resolves the same contract accepting by its id would', () => {
+      const state = createContractState();
+      generateContracts(state, new Random(42), 0);
+      const target = state.available[0]!;
+
+      const byId = findContract(state.available, { id: target.id });
+      const bySelector = findContract(state.available, { type: target.type, materialId: target.materialId });
+
+      expect(byId).toBe(target);
+      expect(bySelector).toBe(target);
+    });
   });
 });

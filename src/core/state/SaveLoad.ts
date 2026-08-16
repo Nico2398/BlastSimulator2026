@@ -162,6 +162,9 @@ export function deserialize(json: string): GameState {
     if (typeof eventsRaw['actionCountSinceEvent'] !== 'number') {
       eventsRaw['actionCountSinceEvent'] = 0;
     }
+    if (typeof eventsRaw['cooldownMinIntervalTicks'] !== 'number') {
+      eventsRaw['cooldownMinIntervalTicks'] = null;
+    }
   }
 
   // Ensure restNeedKey exists on employees saved before the field was added.

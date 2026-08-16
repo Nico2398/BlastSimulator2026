@@ -17,7 +17,7 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome, type ExpenseCategory } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { processPayCycle } from '../../core/entities/Employee.js';
+import { processPayCycle, computeAverageMorale } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost } from '../../core/entities/Building.js';
 import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
@@ -165,9 +165,7 @@ export function tickCommand(
     }
 
     // 7. Score updates — decay + building/morale/vibration effects
-    const avgMorale = state.employees.employees.length > 0
-      ? state.employees.employees.reduce((s, e) => s + e.morale, 0) / state.employees.employees.length
-      : 50;
+    const avgMorale = computeAverageMorale(state.employees.employees);
     const scoreInputs: ScoreInputs = {
       buildings: state.buildings,
       avgMorale,
@@ -188,9 +186,14 @@ export function tickCommand(
     const firedEvents: FiredEvent[] = [];
     // Complete rests started on a prior tick before creating any new ones —
     // mirrors processShiftCycle's own complete-then-create ordering.
-    tickGeneralRestCompletion(state);
+    const restCompletion = tickGeneralRestCompletion(state);
     tickCollapse(state, firedEvents, emitter);
-    autoInsertNeedTasks(state, firedEvents, emitter);
+    // #593: an employee whose rest just completed above gets first refusal
+    // on resuming their own interrupted work (via tickEmployees, later this
+    // tick) before autoInsertNeedTasks can proactively route them right back
+    // to the same building — see that function's own doc comment.
+    const justCompletedRestEmployeeIds = new Set(restCompletion.completed.map(c => c.employeeId));
+    autoInsertNeedTasks(state, firedEvents, emitter, justCompletedRestEmployeeIds);
     processShiftCycle(state, firedEvents, emitter);
     // Emit any needs-related events via console
     for (const fe of firedEvents) {

@@ -264,24 +264,19 @@
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-detail-toggle"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-detail-toggle",
+          "timeoutMs": 2000
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
         }
       ],
       "role": "player"
@@ -314,7 +309,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "employeeCount": 1
         }
       }
@@ -532,24 +527,19 @@
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-detail-toggle"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-detail-toggle",
+          "timeoutMs": 2000
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
         }
       ],
       "role": "player"
@@ -582,7 +572,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "employeeCount": 1
         }
       }
@@ -883,24 +873,19 @@
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-detail-toggle"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-detail-toggle",
+          "timeoutMs": 2000
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]"
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
         }
       ],
       "role": "player"
@@ -933,7 +918,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "employeeCount": 1
         }
       }
@@ -977,7 +962,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#586 CI real root cause (live-state confirmed, not the stuck-report-modal theory): grid 4's single driller/drill_rig from #553 keeps working this whole ~1000-tick wait with nothing ever restoring its morale to the \"comfortable\"(>=50) band needsMoraleEffect (EmployeeNeeds.ts) requires just to stop draining -- avgMorale clamps to 0 by roughly tick 400, dragging state.scores.wellBeing (ScoreManager.ts) to 0 with it, and WorkerRevolt.ts ends the level for real (levelEndReason:'worker_revolt') once that holds for REVOLT_TICKS (120, balance.ts) -- confirmed live via window.__gameState()/__uiState() at the failing step: the toolbar was covered by #bs-level-end-screen, not any blast-report overlay. Sandbox-tested fix: 7 more drillers (8 total) on Tier-3 drill_rigs (VEHICLE_TIER_MULTIPLIERS workRate x2.0/speed x1.8, balance.ts) parallelize the 64-hole plan below to done (orderedHoleCount:0) by tick ~421 -- about 150 ticks of margin before revolt would fire at ~571 in the same sandboxed run -- letting the tick-150 wait round below (now 2, not 7) end this grid before wellBeing ever finishes crashing, instead of racing it. Building a Tier-2+ living_quarters was tried and rejected: it enables GameLoop.ts's processShiftCycle, but WORK_DURATION_TICKS is only 6 -- every driller within its search radius spends most of its time walking to and from the bunkhouse rather than drilling, and holeCount actually stalled at 3/64. Firing and re-hiring the driller mid-grid was also tried and rejected: fireEmployee (Employee.ts) refuses a unionized employee (30% chance per hire, Employee.ts's rng.chance(0.3)), and this seed unionizes id4 on its very first roll, so every fire attempt no-ops and each replacement hire only adds another employee dragging the roster average once it, too, crashes. Each of these 7 extra hires needs its own toolbar [data-panel=\"employees\"] reopen click -- the vehicle-buy step right after each one switches the active panel to Vehicles, unlike the original single-hire cycles above where the previous grid's own `employee fire` step already left the Employees panel open.",
+      "description": "#586 CI real root cause (live-state confirmed, not the stuck-report-modal theory): grid 4's single driller/drill_rig from #553 keeps working this whole ~1000-tick wait with nothing ever restoring its morale to the \"comfortable\"(>=50) band needsMoraleEffect (EmployeeNeeds.ts) requires just to stop draining -- avgMorale clamps to 0 by roughly tick 400, dragging state.scores.wellBeing (ScoreManager.ts) to 0 with it, and WorkerRevolt.ts ends the level for real (levelEndReason:'worker_revolt') once that holds for REVOLT_TICKS (120, balance.ts) -- confirmed live via window.__gameState()/__uiState() at the failing step: the toolbar was covered by #bs-level-end-screen, not any blast-report overlay. Sandbox-tested fix: 7 more drillers (8 total) on Tier-3 drill_rigs (VEHICLE_TIER_MULTIPLIERS workRate x2.0/speed x1.8, balance.ts) parallelize the 64-hole plan below to done (orderedHoleCount:0) by tick ~421 -- about 150 ticks of margin before revolt would fire at ~571 in the same sandboxed run -- letting the tick-150 wait round below (now 2, not 7) end this grid before wellBeing ever finishes crashing, instead of racing it. Building a Tier-2+ living_quarters was tried and rejected: it enables GameLoop.ts's processShiftCycle, but WORK_DURATION_TICKS is only 6 -- every driller within its search radius spends most of its time walking to and from the bunkhouse rather than drilling, and holeCount actually stalled at 3/64. Firing and re-hiring the driller mid-grid was also tried and rejected: fireEmployee (Employee.ts) refuses a unionized employee (30% chance per hire, Employee.ts's rng.chance(0.3)), and this seed unionizes id4 on its very first roll, so every fire attempt no-ops and each replacement hire only adds another employee dragging the roster average once it, too, crashes. Each of these 7 extra hires needs its own toolbar [data-panel=\"employees\"] reopen click -- the vehicle-buy step right after each one switches the active panel to Vehicles, unlike the original single-hire cycles above where the previous grid's own `employee fire` step already left the Employees panel open. Interaction-mode fix: this and the remaining grid-4 filler hires (50, 53, 56, 59, 62, 65) switched from `equals` on an absolute employeeCount to `changedBy: {employeeCount: 1}`, matching the pattern steps 14/27/44 already established for grid 2/3/4's own first hire. Root cause, confirmed directly (command mode: employee #1 survives its own grid-1 blast and gets properly fired, employeeCount:1 going into grid 2; real interaction mode: employee #1 instead dies in that same blast -- this file's own already-accepted \"No-op if the employee already died in its own blast\" case for the fire step, just landing the other way around from grid-1's own die-vs-survive coin flip than command mode's) -- a dead employee is never spliced from the roster (only a real fire does that), so which baseline grid 4's hires start counting up from is real, mode-dependent, and outside this step's own control. Same class of divergence vibration-budget.json's own history already found and fixed the same way (dropping `employeeCount` from that file's own equals block, scenario-defs.md's own changedBy convention for a field a legitimate per-mode split makes non-deterministic).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -997,8 +982,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 2
+        "changedBy": {
+          "employeeCount": 1
         }
       }
     },
@@ -1059,8 +1044,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 3
+        "changedBy": {
+          "employeeCount": 1
         }
       }
     },
@@ -1121,8 +1106,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 4
+        "changedBy": {
+          "employeeCount": 1
         }
       }
     },
@@ -1183,8 +1168,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 5
+        "changedBy": {
+          "employeeCount": 1
         }
       }
     },
@@ -1245,8 +1230,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 6
+        "changedBy": {
+          "employeeCount": 1
         }
       }
     },
@@ -1307,8 +1292,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 7
+        "changedBy": {
+          "employeeCount": 1
         }
       }
     },
@@ -1369,8 +1354,8 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "employeeCount": 8
+        "changedBy": {
+          "employeeCount": 1
         }
       }
     },

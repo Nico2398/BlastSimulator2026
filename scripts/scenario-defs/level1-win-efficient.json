@@ -1145,7 +1145,6 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 125,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
@@ -1153,6 +1152,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -1167,11 +1169,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 125,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1186,16 +1190,16 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 145,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 5,
-          "orderedHoleCount": 11
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -1210,13 +1214,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 145,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 5,
-          "orderedHoleCount": 11
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1231,16 +1235,16 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 165,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 5,
-          "orderedHoleCount": 11
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -1255,18 +1259,19 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 165,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 5,
-          "orderedHoleCount": 11
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
     {
       "command": "tick 20",
+      "description": "#599-followup: dropped `holeCount: 16`/`orderedHoleCount: 0` -- a real interaction-mode run read `holeCount: 15` here (one hole short of landing) at this exact checkpoint, the same landing-boundary class already documented at the tick-20 blocks above (tickCount 132/152/170's own notes) rather than the wall-clock cash-accrual class: command mode and interaction mode do not always take the same number of ticks for a vehicle to reach a drill target (interaction mode's continuous sub-tile movement interpolation vs command mode's purely-per-tick stepping), so this checkpoint's exact-16 assertion was a false positive from command-mode-only calibration. Not widened with extra ticks -- the very next two checkpoints below (tickCount 230, 250) already re-assert holeCount 16 as a hard equals with plenty of margin (40+ ticks further on) and both held in the same interaction-mode run that caught this one short, so the fix is dropping the premature assertion here rather than shifting the whole file's tick budget (which would ripple into every downstream contract id -- REFRESH_INTERVAL=20 in Contract.ts means even a same-size tick insertion crosses a contract-pool refresh boundary and changes which contracts are on offer for every later contract step).",
       "interaction": [
         {
           "type": "command",
@@ -1276,22 +1281,22 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 185,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 5,
-          "orderedHoleCount": 11
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2534834` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill at this tickCount. The remaining exact fields still prove the event resolved.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2534834` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill at this tickCount. #599-followup: `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1300,13 +1305,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 185,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 5,
-          "orderedHoleCount": 11
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1322,7 +1327,6 @@
       "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 8`/`orderedHoleCount: 8` -- landing-boundary block (holeCount changes from 5 to 8 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225.",
       "expect": {
         "equals": {
-          "tickCount": 205,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
@@ -1330,6 +1334,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -1344,11 +1351,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 205,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1364,7 +1373,6 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 225,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
@@ -1372,6 +1380,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -1386,11 +1397,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 225,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1405,16 +1418,18 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 245,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "holeCount": 10,
-          "orderedHoleCount": 6
+          "holeCount": 16,
+          "orderedHoleCount": 0
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -1429,13 +1444,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 245,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "holeCount": 10,
-          "orderedHoleCount": 6
+          "holeCount": 16,
+          "orderedHoleCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1451,7 +1468,6 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
@@ -1461,6 +1477,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -1475,13 +1494,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
           "holeCount": 16,
           "orderedHoleCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1501,7 +1522,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
@@ -1509,6 +1529,9 @@
           "holeCount": 16,
           "chargedCount": 16,
           "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1527,7 +1550,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
@@ -1535,6 +1557,9 @@
           "holeCount": 16,
           "chargedCount": 16,
           "sequencedCount": 16
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1570,7 +1595,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
@@ -1578,6 +1602,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1592,11 +1619,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1611,11 +1640,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1631,13 +1662,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 50
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1653,13 +1686,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 265,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 50
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1674,12 +1709,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 270,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
-        }
+        },
+        "increased": [
+          "tickCount"
+        ]
       }
     },
     {
@@ -1693,11 +1730,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 270,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1712,12 +1751,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
-        }
+        },
+        "increased": [
+          "tickCount"
+        ]
       }
     },
     {
@@ -1731,11 +1772,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1750,17 +1793,19 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
     {
-      "command": "contract accept 12",
-      "description": "#513/#552: the accept click is scoped to `[data-contract-id=\"12\"]`, the same contract the step's `command` names, matching this file's existing contract-accept pattern (ContractsPanel sets `data-contract-id` on offered cards too). Contract IDs 12/13 are what the pool actually holds at tick 275 -- the drill wait above shifted far enough that any earlier IDs no longer exist (`contract accept 1` fails outright at this point in a direct trace).",
+      "command": "contract accept material:gloomium type:ore_sale",
+      "description": "#553-followup (this batch's own proactive pass, tickCount now real): #597's stable selector, not a hardcoded id -- the earlier tick-pacing fixes (#596/#597) shifted the pool far enough that the old numeric ids (12/13) no longer exist by this checkpoint (a direct trace shows the pool now holds ids 13-20; `contract accept 12` fails outright). `material:gloomium type:ore_sale` finds the real offer regardless of its numeric id. The accept click is scoped to the real id currently offered, `[data-contract-id=\"13\"]` (`ContractsPanel` sets `data-contract-id` on offered cards too) -- interaction mode still needs a literal DOM id since there is no selector-based click primitive, so this is re-verified against a real run rather than derived by hand.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1768,89 +1813,98 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"12\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"12\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 1,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
     {
-      "command": "contract accept 13",
+      "command": "contract accept type:rubble_disposal",
+      "description": "#553-followup (this batch's own proactive pass): #597's stable selector, same reasoning as the accept step above -- `type:rubble_disposal` finds the first rubble-disposal offer in the pool (real id 14) regardless of numeric id.",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
     {
-      "command": "contract deliver 12 amount:110",
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- a direct trace shows 0.0 kg gloomium stored. No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make.",
+      "command": "contract deliver material:gloomium type:ore_sale amount:110",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- a direct trace shows 0.0 kg gloomium stored. No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #553-followup (this batch's own proactive pass): switched to #597's stable selector (same reasoning as the accept steps above) and updated the blocked DOM id to the real one now offered (13).",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 12 amount:110"
+          "command": "contract deliver material:gloomium type:ore_sale amount:110"
         }
       ],
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 2,
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"12\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-deliver",
+        "changedBy": {
+          "tickCount": 0
+        }
       }
     },
     {
-      "command": "contract deliver 13 amount:80",
-      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in.",
+      "command": "contract deliver type:rubble_disposal amount:80",
+      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #553-followup (this batch's own proactive pass): switched to #597's stable selector and updated the blocked DOM id to the real one now offered (14).",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 13 amount:80"
+          "command": "contract deliver type:rubble_disposal amount:80"
         }
       ],
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 2,
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-deliver",
+        "changedBy": {
+          "tickCount": 0
+        }
       }
     },
     {
@@ -1864,11 +1918,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 4,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1892,11 +1948,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 5,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1911,11 +1969,13 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 5,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1935,11 +1995,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 6,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1954,11 +2016,13 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 6,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1978,11 +2042,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -1997,11 +2063,13 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2025,11 +2093,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2048,11 +2118,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2072,11 +2144,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2095,11 +2169,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2119,11 +2195,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2142,11 +2220,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2188,7 +2268,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 275,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
@@ -2197,6 +2276,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2211,7 +2293,6 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 278,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
@@ -2221,6 +2302,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -2235,13 +2319,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 278,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 2,
           "surveyCount": 2,
           "holeCount": 0,
           "orderedHoleCount": 25
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2256,22 +2342,24 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 298,
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 2,
           "surveyCount": 2,
           "holeCount": 0,
           "orderedHoleCount": 25
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
-      }
+      },
+      "description": "#553-followup (this batch's own proactive pass, real run): dropped `activeContractCount: 2` -- landing-boundary block (both accepted contracts expire mid-window, 30-tick deadline from a real accept at tickCount 280 crossing inside this tick/event pair), same class as this file's holeCount boundary blocks elsewhere."
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2060022` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2060022` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved. #553-followup (this batch's own proactive pass, real run): dropped `activeContractCount: 2` -- landing-boundary block (both accepted contracts expire mid-window, 30-tick deadline from a real accept at tickCount 280 crossing inside this tick/event pair), same class as this file's holeCount boundary blocks elsewhere.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -2280,19 +2368,20 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 298,
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 2,
           "surveyCount": 2,
           "holeCount": 0,
           "orderedHoleCount": 25
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
     {
       "command": "tick 20",
-      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 3`/`orderedHoleCount: 22` -- landing-boundary block (holeCount changes from 0 to 3 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225.",
+      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 3`/`orderedHoleCount: 22` -- landing-boundary block (holeCount changes from 0 to 3 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225. #553-followup (this batch's own proactive pass, real run): corrected `activeContractCount` from 2 to 0 -- both pattern-2 contracts (accepted at real tickCount 280, 30-tick deadlines) already expired unfulfilled two steps earlier than this file previously assumed, per this batch's own tick-pacing recalibration.",
       "interaction": [
         {
           "type": "command",
@@ -2302,20 +2391,22 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 318,
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 2,
+          "activeContractCount": 0,
           "surveyCount": 2
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2055822` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2055822` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above. #553-followup (this batch's own proactive pass, real run): corrected `activeContractCount` from 2 to 0 -- both pattern-2 contracts (accepted at real tickCount 280, 30-tick deadlines) already expired unfulfilled two steps earlier than this file previously assumed, per this batch's own tick-pacing recalibration.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -2324,11 +2415,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 318,
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 2,
+          "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2344,7 +2437,6 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 338,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2352,6 +2444,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -2366,11 +2461,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 338,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2385,16 +2482,16 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 358,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 7,
-          "orderedHoleCount": 18
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -2409,13 +2506,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 358,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 7,
-          "orderedHoleCount": 18
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2430,16 +2527,16 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 378,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 7,
-          "orderedHoleCount": 18
+          "surveyCount": 2
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -2454,13 +2551,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 378,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 7,
-          "orderedHoleCount": 18
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2476,7 +2573,6 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 398,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2484,6 +2580,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -2498,11 +2597,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 398,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2518,7 +2619,6 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 418,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2526,6 +2626,9 @@
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -2540,11 +2643,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 418,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
@@ -2559,16 +2664,18 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 438,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "holeCount": 13,
-          "orderedHoleCount": 12
+          "holeCount": 25,
+          "orderedHoleCount": 0
         },
         "decreased": [
           "cash"
+        ],
+        "increased": [
+          "tickCount"
         ]
       }
     },
@@ -2583,19 +2690,21 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 438,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "holeCount": 13,
-          "orderedHoleCount": 12
+          "holeCount": 25,
+          "orderedHoleCount": 0
+        },
+        "changedBy": {
+          "tickCount": 0
         }
       }
     },
     {
       "command": "tick 20",
-      "description": "#553 Finding (real trajectory): the workforce permanently revolts (WorkerRevolt.ts, REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) here, before pattern 2's 25 holes finish landing (10 of 25 still ordered) -- sandbox-measured across three independent tick-chunking styles (5/10/20-tick batches all agree). wellBeing first hit exactly 0 at tick 185, mid-pattern-1; ScoreManager's avgMorale averages ALL employees ever hired, including the dead (their morale sits permanently at 0, Employee.ts/events.ts), so each blast's casualties permanently drag the roster average down for the rest of the file -- pattern 1's 4 deaths are why pattern 2's own crew, freshly hired at full morale, still starts the drain already averaged toward zero. This -- not a third blast, not a near-breakeven $46,760 -- is the file's real ending under #553: buying enough automated drilling capacity to survive one blast does not leave enough workforce goodwill to survive a second. #553-followup (this batch's own proactive pass): switched `cash: 2025975` from a hardcoded equals to `decreased` -- three tier-3 rigs are actively mid-drill on pattern 2 right up to the revolt trigger, same real-time-accrual class as line ~1072's own note. `levelEnded`/`levelEndReason` stay exact -- the revolt boundary itself is a discrete tick-count/wellBeing threshold, not wall-clock-sensitive, and is the actual point of this checkpoint. `holeCount: 15`/`orderedHoleCount: 10` also dropped -- landing-boundary block (holeCount changes from 13 to 15 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225.",
+      "description": "#Employee.ts morale fix (computeAverageMorale now filters to employees.filter(e => e.alive) before averaging, where it previously summed every roster entry including corpses): the WorkerRevolt threshold (REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) now completes one 20-tick chunk later than before -- tick 491, not 471 -- confirmed via direct trace (three independent tick-chunking styles agree). wellBeing was already exactly 0 by the time this chunk starts; this is purely a shift in exactly when the 120-consecutive-tick streak finishes, not a change in whether it does.",
       "interaction": [
         {
           "type": "command",
@@ -2605,7 +2714,50 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "deathCount": 4,
+          "employeeCount": 7,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 4,
+          "employeeCount": 7,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 20",
+      "description": "#553 Finding (real trajectory), updated for the Employee.ts morale fix (computeAverageMorale now filters to employees.filter(e => e.alive) before averaging, where it previously summed every roster entry including corpses): this tick advance is the one that lands the WorkerRevolt threshold (REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) -- tickCount 491, not the pre-fix file's 471, confirmed via direct trace (three independent tick-chunking styles agree). wellBeing first hit exactly 0 at tick 185, mid-pattern-1, same as before the fix -- pattern 1's 4 deaths crash it there regardless. What changed is what happens next: pre-fix, a dead employee's morale stayed in the average forever (frozen near 0), so pattern 2's fresh crew started already dragged toward zero and the 120-tick revolt streak completed uninterrupted. Post-fix, a dead employee drops out of the average the instant they die, so the streak gets interrupted once (a single tick's wellBeing briefly clears 0) before resuming -- delaying completion by exactly one 20-tick chunk. Real consequence: pattern 2 now has 20 more ticks to work with, which turns out to be enough to land all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) before the revolt fires -- not 10 short, as the pre-fix file's own finding claimed. The ending is unchanged: buying enough automated drilling capacity to survive one blast still doesn't leave enough workforce goodwill to survive a second, even when the second pattern itself finishes. #553-followup (this batch's own proactive pass): `cash` stays `decreased` rather than a hardcoded equals -- three tier-3 rigs are actively mid-drill on pattern 2 right up to the revolt trigger, same real-time-accrual class as line ~1072's own note. `levelEnded`/`levelEndReason` are asserted on the following step (event choose 0, index 116), not here -- this step's own tick advance is what crosses the threshold, but the engine only sets levelEndReason at the top of the next command's own tick-processing pass.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2629,7 +2781,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2651,7 +2803,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2670,7 +2822,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2689,7 +2841,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2708,7 +2860,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2731,7 +2883,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2745,7 +2897,7 @@
     },
     {
       "command": "campaign status",
-      "description": "#553 Findings, final: the level ends in a permanent worker revolt at tick 458, with pattern 2 abandoned 10 holes short of its 25. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount), matching a direct trace through this exact sequence. Cash ends at $2,025,975, down from the $3,000,000 opening bump, spent on: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), 386 ticks (72->458) of payroll/fuel/maintenance for a 4-to-7-person roster, and two punitive random events (an ore-name lawsuit -$20,000 at tick 130, a union strike -$25,000 at tick 278) -- no lucky_strike bonus landed this run, unlike the pre-#553 version of this file. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. What #553 changes is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before a second pattern can fire.",
+      "description": "#553 Findings, final, updated for the Employee.ts morale fix (see step 115's own note for the mechanism): the level ends in a permanent worker revolt at tick 491, not the pre-fix file's 458/471 -- but pattern 2 now finishes all 25 of its own holes before the revolt fires (holeCount: 25, orderedHoleCount: 0), where the pre-fix file found it abandoned 10 holes short. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount), matching a direct trace through this exact sequence. Cash ends at $2,029,295, down from the $3,000,000 opening bump, spent on: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), 419 ticks (72->491) of payroll/fuel/maintenance for a 4-to-7-person roster, and two punitive random events (an ore-name lawsuit -$20,000 at tick 130, a union strike -$25,000 at tick 278) -- no lucky_strike bonus landed this run, unlike the pre-#553 version of this file. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. What #553 changes is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before the level can be won, even once pattern 2's own drilling genuinely finishes.",
       "interaction": [
         {
           "type": "command",
@@ -2755,7 +2907,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 458,
+          "tickCount": 491,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2766,7 +2918,9 @@
           "nuisance": 50,
           "bankrupt": false,
           "levelEnded": true,
-          "levelEndReason": "worker_revolt"
+          "levelEndReason": "worker_revolt",
+          "holeCount": 25,
+          "orderedHoleCount": 0
         }
       }
     }

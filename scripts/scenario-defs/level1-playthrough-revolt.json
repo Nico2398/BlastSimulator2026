@@ -504,19 +504,23 @@
       ],
       "role": "setup",
       "expect": {
+        "increased": [
+          "tickCount",
+          "holeCount",
+          "wellBeing"
+        ],
+        "decreased": [
+          "orderedHoleCount"
+        ],
         "equals": {
-          "tickCount": 125,
-          "orderedHoleCount": 8,
-          "holeCount": 8,
           "ecology": 50,
           "safety": 50,
-          "wellBeing": 99.95,
           "nuisance": 50,
           "deathCount": 0,
           "bankrupt": false,
           "levelEnded": false
         },
-        "note": "#553 sandbox-measured: this file's own accumulated actions (17 non-exempt commands by this point -- MIN_EVENT_INTERVAL_ACTIONS=10, balance.ts) plus the 125 elapsed ticks (MIN_EVENT_INTERVAL_TICKS=120+random, same file) make a random event eligible mid-drain, and tickCommand's loop breaks the instant one fires (events.ts: `if (fired) break`) -- so this 283-tick request (sized to land the whole 4x4 pattern with a lone driller, same estimate blast-basic.json/tutorial-playthrough.json use) only advances 115 ticks before stopping at 8 of 16 holes. Resolved by the step below, then finished by the tick-wait after it. wellBeing is not yet the file's collapse story here -- it *rises* to 99.95 over these first 115 ticks (idle recovery, same shape the pre-#553 file's own early ticks show) and only crashes once active drilling fatigue outpaces it, later in this same wait."
+        "note": "#596/#597-followup: setupEvents idempotency + the cooldown-threshold caching fix change exactly when the first random event goes pending -- this 283-tick request now advances 165 ticks (not 115) before stopping, landing 10 of 16 holes, and the event that fires is a different one too (union_unlucky_days, not weather_minor_tremor -- #596's event-pool dedup change reorders the RNG draw). tickCount/holeCount/orderedHoleCount/wellBeing converted from chained absolutes to directional (issue #596): exactly how far a tick request gets before an event interrupts it is what these two fixes changed, so pinning a fresh absolute here just repeats the same fragility under the next timing-affecting fix. ecology/safety/nuisance/deathCount/bankrupt/levelEnded are untouched by the event-timing shift and stay exact."
       }
     },
     {
@@ -526,16 +530,15 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. weather_minor_tremor -- a real random event this time, not a defensive no-op: option 0 is a fixed, RNG-free delta (a full structural inspection following the tremor) sandbox-traced to cashDelta:-20000, scoreDelta.safety:+15. #553 root-cause note (issue #553 investigation, distinct from the rock-fragmenter-breaking.json/hauling-gate.json/tutorial-playthrough.json diameter mechanism -- applying that same diameter:0.089 fix here cascades a much larger divergence through the rest of this 91-step file than the real $12 gap CI reported, so it is not the cause here): event eligibility (isEventEligible, events.ts) depends on accumulated non-exempt action COUNT as well as elapsed ticks, and interaction mode's real click sequence can differ from command mode's literal command list in exactly how many actions register by this point in the drilling wait -- shifting by a tick or two exactly when this RNG-free event fires, and with it the driller's accumulated fuelCostPerTick by that instant. cash is no longer pinned to an exact figure here for that reason; safety/tickCount are the event's own fixed, mode-identical effect and stay exact.",
+      "description": "#596/#597-followup: this event is now union_unlucky_days, not weather_minor_tremor -- #596's event-pool dedup fix changed the RNG draw order for which event becomes eligible first. Option 0 (\"Lucky Charms\") is a fixed, RNG-free delta sandbox-traced to cashDelta:-2000, scoreDelta.wellBeing:+5 -- no safety effect, unlike the old weather_minor_tremor draw. tickCount dropped from this step's own expect: it doesn't move during an event-choose (no ticking happens here), and the tick-283 step above already covers it directionally.",
       "role": "player",
       "expect": {
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "safety": 65,
-          "tickCount": 125
-        }
+        "increased": [
+          "wellBeing"
+        ]
       }
     },
     {
@@ -548,12 +551,14 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 168
+        },
         "equals": {
-          "tickCount": 293,
           "orderedHoleCount": 0,
           "holeCount": 16,
           "ecology": 50,
-          "safety": 56.60000000000048,
+          "safety": 50,
           "wellBeing": 0,
           "nuisance": 50,
           "deathCount": 0,
@@ -561,7 +566,7 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "note": "#553 sandbox-measured: 168 more ticks (the minimal amount -- 167 leaves the last hole undrilled) lands the remaining 8 holes and completes the pattern with no further event (none is eligible again until MIN_EVENT_INTERVAL_ACTIONS resets and enough ticks pass, and this file's action count from here to the next tick block never gets there). Along the way, 12 employees' payroll with zero income anywhere in this file crosses the $5,000 threshold and BANKRUPTCY_GRACE_TICKS=100 (Bankruptcy.ts) completes at tick 209 -- bankruptcy fires mid-drill, well before this pattern finishes, let alone blasts. Ticking does not stop when levelEnded flips (tickCommand only refuses to advance on a *pending event*, confirmed by direct trace), so the drill run itself completes normally on top of an already-lost game. wellBeing also crashes from 99.95 to 0 during this stretch (fatigue collapse with no living quarters anywhere in this file) and never recovers for the rest of the run except one brief bump (see the pattern-2 gap below)."
+        "note": "#596/#597-followup: this 168-tick request completes in full (sandbox-measured: 175->343, all 168 ticks) -- tickCount converted equals->changedBy (issue #596) since the batch running to completion, not a specific running total, is this step's own point. safety drops to a plain 50 (was 56.6): the earlier event is now union_unlucky_days, which carries no safety delta, so there is no tremor bump left to decay from. Along the way, 12 employees' payroll with zero income anywhere in this file crosses the $5,000 threshold and BANKRUPTCY_GRACE_TICKS=100 (Bankruptcy.ts) completes at tick 209 -- bankruptcy fires mid-drill, well before this pattern finishes, let alone blasts. Ticking does not stop when levelEnded flips (tickCommand only refuses to advance on a *pending event*, confirmed by direct trace), so the drill run itself completes normally on top of an already-lost game. wellBeing also crashes to 0 during this stretch (fatigue collapse with no living quarters anywhere in this file) and never recovers for the rest of the run except one brief bump (see the pattern-2 gap below)."
       }
     },
     {
@@ -670,10 +675,10 @@
       "description": "#553-followup (issue #586 CI): dropped the exact `ecology: 31.9` and `nuisance: 4.75` here too -- both inherit the same real-time-accrual drift as the blast step above (see its own note).",
       "expect": {
         "equals": {
-          "safety": 56.60000000000048,
+          "safety": 50,
           "wellBeing": 0
         },
-        "note": "safety still reads the weather event's +15 bump (65, decayed to 56.6 by tick 293) here -- the five deaths' own accident penalty (recentAccidents * 5 per tick, ScoreManager.ts) only starts applying once ticking resumes."
+        "note": "#596/#597-followup: safety reads a plain 50, not a decayed tremor bump -- the earlier event is union_unlucky_days now (no safety delta), so there is nothing to decay from. The five deaths' own accident penalty (recentAccidents * 5 per tick, ScoreManager.ts) only starts applying once ticking resumes."
       }
     },
     {
@@ -686,15 +691,17 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 5
+        },
         "equals": {
-          "tickCount": 298,
           "safety": 0,
           "wellBeing": 0,
           "deathCount": 5,
           "bankrupt": true,
           "revolted": false
         },
-        "note": "#553-followup (issue #586 CI): dropped cash/ecology/nuisance -- a real CI run read cash -154384 against this file's previously-pinned -154432 ($48 off), the same real-time-accrual drift documented on the blast step above (waitForTutorialStep/waitForSelector polls before tick 293 shift the base slightly; cash/ecology/nuisance accumulate from it and never reset). safety crashes from 56.6 to 0 within these 5 ticks (five deaths' accident penalty vs tutorial-playthrough's two) and stays floored there for the rest of the run -- sandbox-confirmed exact, no drift risk once it hits the floor."
+        "note": "#596/#597-followup: this 5-tick request completes in full (sandbox-measured, 343->348) -- tickCount converted equals->changedBy (issue #596). Also dropped cash/ecology/nuisance -- a real CI run read cash -154384 against this file's previously-pinned -154432 ($48 off), the same real-time-accrual drift documented on the blast step above (waitForTutorialStep/waitForSelector polls before tick 293 shift the base slightly; cash/ecology/nuisance accumulate from it and never reset). safety crashes to 0 within these 5 ticks (five deaths' accident penalty) and stays floored there for the rest of the run -- sandbox-confirmed exact, no drift risk once it hits the floor."
       }
     },
     {
@@ -717,13 +724,15 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 5
+        },
         "equals": {
-          "tickCount": 303,
           "safety": 0,
           "wellBeing": 0,
           "deathCount": 5
         },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
+        "note": "#596/#597-followup: this 5-tick request completes in full (sandbox-measured, 348->353) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
       }
     },
     {
@@ -747,11 +756,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 303,
           "safety": 0,
           "wellBeing": 0
         },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
+        "note": "#596/#597-followup: tickCount dropped -- this observe step is downstream of the tick-5 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step above."
       }
     },
     {
@@ -782,13 +790,15 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
           "orderedHoleCount": 20,
           "holeCount": 0,
-          "tickCount": 313,
           "deathCount": 5
         },
-        "note": "#553 sandbox-measured stall proof: orderedHoleCount is unchanged from the step above after 10 full ticks -- no vehicle, no licensed spare, no cash to buy one. This is the real, permanent state for the rest of the file; every later drill_plan/charge/sequence/blast in this file is this same stall repeated at a new site. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
+        "note": "#553 sandbox-measured stall proof: orderedHoleCount is unchanged from the step above after 10 full ticks -- no vehicle, no licensed spare, no cash to buy one. This is the real, permanent state for the rest of the file; every later drill_plan/charge/sequence/blast in this file is this same stall repeated at a new site. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 353->363) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
       }
     },
     {
@@ -903,13 +913,15 @@
       ],
       "role": "setup",
       "expect": {
+        "increased": [
+          "tickCount"
+        ],
         "equals": {
-          "tickCount": 315,
           "safety": 0,
           "wellBeing": 0,
           "deathCount": 5
         },
-        "note": "#553 sandbox-measured: this 10-tick request only advances 2 ticks (313 -> 315) -- a second random event (union_rep_secretary) becomes eligible here (same MIN_EVENT_INTERVAL_ACTIONS/MIN_EVENT_INTERVAL_TICKS gates as the pattern-1 interruption) and the tick loop breaks the instant it fires, before the event's own cash/wellBeing deltas apply. Resolved by the step below. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: this 10-tick request now only advances 3 ticks (363 -> 366, not the old 313 -> 315) -- a second random event (politics_competitor_mine, not the old union_rep_secretary -- #596's event-pool dedup change reorders which event is eligible) becomes pending here and the tick loop breaks the instant it fires, before the event's own cash delta applies. Resolved by the step below. tickCount converted equals->increased (issue #596): exactly how far this batch gets before the second event interrupts it is itself timing-sensitive, the same class as the pattern-1 interruption above."
       }
     },
     {
@@ -920,12 +932,14 @@
           "command": "event choose 0"
         }
       ],
-      "description": "union_rep_secretary -- another real event: option 0 is a fixed, RNG-free delta sandbox-traced to cashDelta:-5000, scoreDelta.wellBeing:+7. wellBeing's climb from 0 to 7 resets the revolt streak (WorkerRevolt.ts: any wellBeing above 0 zeroes ticksAtZero) -- the countdown toward a real revolt restarts from wherever wellBeing next reads 0, one tick later. #553-followup (issue #586 CI): cash dropped -- the delta itself is fixed, but it lands on the same drifted base as the tick-298 step's note above, so the resulting absolute figure inherits the drift too. wellBeing:7 is the event's own fixed, RNG-free effect and stays exact. Interaction-mode finding (issue #586 CI): unlike the file's other post-bankruptcy events, this one is genuinely unreachable, not a covered-by-div race -- sandbox-reproduced (scripts/_repro_temp.ts-class harness replay, real Puppeteer clicks throughout): the tick-10 step above's own blast (0-hole ghost, same as the pattern-2/3/4 blasts throughout this file) arms BlastReportModal's 3-real-second open delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts); UIManager.update (UIManager.ts:421) defers EventModal.update entirely while that report is pending-or-visible, so the union_rep_secretary dialog never opens and #bs-event-dialog still holds stale, hidden .bs-event-choice nodes from the PREVIOUS (already-dismissed) event -- exactly the kind of stale-node trap a bare waitForSelector(selector) can't tell apart from a live dialog, which is what produced Puppeteer's own \"Node is either not clickable or not an Element\" against a display:none ancestor. Confirmed via __probeSelector that this is not a race that a longer wait fixes: right now the blast report's own Close button reads \"hidden\" (still inside its 3s delay); left running past that delay it flips to \"covered\" -- LevelEndScreen's z-index 9999 sits above BlastReportModal's shared z-index 600 (unlike the event dialog's own 10500, styles.ts), so once armed, the report can never be dismissed post-bankruptcy either, and the event stays gated behind it permanently. `blocked` proves the report's Close button (the real control standing between the player and this event) while `event choose 0` still runs directly to keep tickCount/wellBeing on the same track as the rest of the file.",
+      "description": "#596/#597-followup: this event is now politics_competitor_mine, not union_rep_secretary -- #596's event-pool dedup fix changed the RNG draw order for the second random event too. Option 0 (\"Price War\") is a fixed, RNG-free delta sandbox-traced to cashDelta:-25000, with no wellBeing effect -- unlike the old union_rep_secretary draw, wellBeing stays pinned at its floor (0) here rather than bumping to 7, so the revolt streak (WorkerRevolt.ts: any wellBeing above 0 zeroes ticksAtZero) is never interrupted by this event. tickCount dropped from this step's own expect for the same reason as the tick-283/event-choose-0 step earlier in this file -- it doesn't move during an event-choose, and the tick-10 step above already covers it directionally. Interaction-mode finding (issue #586 CI): unlike the file's other post-bankruptcy events, this one is genuinely unreachable, not a covered-by-div race -- sandbox-reproduced (scripts/_repro_temp.ts-class harness replay, real Puppeteer clicks throughout): the tick-10 step above's own blast (0-hole ghost, same as the pattern-2/3/4 blasts throughout this file) arms BlastReportModal's 3-real-second open delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts); UIManager.update (UIManager.ts:421) defers EventModal.update entirely while that report is pending-or-visible, so the event dialog never opens and #bs-event-dialog still holds stale, hidden .bs-event-choice nodes from the PREVIOUS (already-dismissed) event -- exactly the kind of stale-node trap a bare waitForSelector(selector) can't tell apart from a live dialog, which is what produced Puppeteer's own \"Node is either not clickable or not an Element\" against a display:none ancestor. Confirmed via __probeSelector that this is not a race that a longer wait fixes: right now the blast report's own Close button reads \"hidden\" (still inside its 3s delay); left running past that delay it flips to \"covered\" -- LevelEndScreen's z-index 9999 sits above BlastReportModal's shared z-index 600 (unlike the event dialog's own 10500, styles.ts), so once armed, the report can never be dismissed post-bankruptcy either, and the event stays gated behind it permanently. `blocked` proves the report's Close button (the real control standing between the player and this event) while `event choose 0` still runs directly to keep wellBeing on the same track as the rest of the file.",
       "role": "guard",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "wellBeing": 7,
-          "tickCount": 315
+          "wellBeing": 0
         },
         "blocked": ".bs-confirm-overlay [data-action=\"report-close\"]",
         "note": "#553-followup (issue #586 CI): the report-close button this proves against is present but hidden the instant the event fires (still inside BlastReportModal's 3s real-time open delay) -- a stronger, later-timed probe against the same control reads 'covered' once the delay elapses, matching the bankruptcy overlay's own z-index over every z-index:600 modal elsewhere in this file. Either reading proves the same permanent block; 'hidden' is what a probe taken this early and reliably observes."
@@ -941,13 +955,15 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
-          "tickCount": 325,
           "safety": 0,
           "wellBeing": 0,
           "deathCount": 5
         },
-        "note": "wellBeing's tick-315 bump is already gone -- back at 0 within this block, fatigue with no living quarters wins again immediately. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 366->376) -- tickCount converted equals->changedBy (issue #596). wellBeing never bumped above 0 at the previous event (politics_competitor_mine has no wellBeing delta -- see above), so there is no bump to have worn off here, unlike the pre-#596 trajectory. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -970,13 +986,15 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
-          "tickCount": 335,
           "safety": 0,
           "wellBeing": 0,
           "deathCount": 5
         },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 376->386) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1000,11 +1018,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 335,
           "safety": 0,
           "wellBeing": 0
         },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1035,13 +1052,15 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
           "orderedHoleCount": 20,
           "holeCount": 0,
-          "tickCount": 345,
           "deathCount": 5
         },
-        "note": "#553 sandbox-measured stall proof, same as pattern 2's. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#553 sandbox-measured stall proof, same as pattern 2's. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 386->396) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1156,11 +1175,13 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
-          "tickCount": 355,
           "deathCount": 5
         },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 396->406) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1183,11 +1204,13 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
-          "tickCount": 365,
           "deathCount": 5
         },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 406->416) -- tickCount converted equals->changedBy (issue #596). This is also the tick sandbox-measured to be where `revolted` actually flips true now (wellBeing's continuous zero streak since tick 343 crosses REVOLT_TICKS=120, WorkerRevolt.ts) -- earlier than the pre-#596/#597 trajectory's tick 445, since wellBeing no longer gets a tick-315 union-event bump to reset the streak (see the event-choose-0 step three checkpoints back). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1210,11 +1233,13 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
-          "tickCount": 375,
           "deathCount": 5
         },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 416->426) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1238,11 +1263,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 375,
           "safety": 0,
           "wellBeing": 0
         },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1273,13 +1297,15 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
         "equals": {
           "orderedHoleCount": 25,
           "holeCount": 0,
-          "tickCount": 385,
           "deathCount": 5
         },
-        "note": "#553 sandbox-measured stall proof, same as patterns 2 and 3's. #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#553 sandbox-measured stall proof, same as patterns 2 and 3's. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 426->436) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1394,164 +1420,174 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "tickCount": 395,
-          "deathCount": 5,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": false
+        "changedBy": {
+          "tickCount": 10
         },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
         "equals": {
-          "tickCount": 405,
-          "deathCount": 5,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": false
-        },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 415,
-          "deathCount": 5,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": false
-        },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 425,
-          "deathCount": 5,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": false
-        },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 435,
-          "deathCount": 5,
-          "employeeCount": 12,
-          "bankrupt": true,
-          "revolted": false
-        },
-        "note": "#553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "tickCount": 445,
           "deathCount": 5,
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
         },
-        "note": "#553 sandbox-confirmed: wellBeing's continuous zero streak (restarted at tick 316, right after the union event's tick-315 bump wore off) crosses REVOLT_TICKS=120 (WorkerRevolt.ts) during this block, and revolted flips true here -- this file's own premise (worker revolt) actually happens under #553, unlike the pre-#553 trajectory where it never did. levelEndReason stays 'bankruptcy' because that flag was raised first, at tick 209 (updateBankruptcy/updateRevolt both run unconditionally every tick, but GameLoop only records the reason on the first one to trip -- events.ts). #553-followup (issue #586 CI): cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 436->446) -- tickCount converted equals->changedBy (issue #596). revolted flipped false->true earlier in this file now (tick 416, three tick-10 blocks back) -- see that step's own note -- so it already reads true here, not false as in the pre-#596/#597 trajectory. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
+        "equals": {
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": true
+        },
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 446->456) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
+        "equals": {
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": true
+        },
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 456->466) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
+        "equals": {
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": true
+        },
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 466->476) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "changedBy": {
+          "tickCount": 10
+        },
+        "equals": {
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": true
+        },
+        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 476->486) -- tickCount converted equals->changedBy (issue #596). revolted stays true, flipped at tick 416 -- see that step's own note. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 496,
+          "deathCount": 5,
+          "employeeCount": 12,
+          "bankrupt": true,
+          "revolted": true
+        },
+        "note": "#596/#597-followup: this is the file's final tick-advance step, so tickCount stays a pinned absolute (issue #596's own carve-out: a checkpoint the scenario's own conclusion depends on) rather than `changedBy` -- sandbox-measured 486->496, the full 10 requested. revolted was already true well before this step (flipped at tick 416, five tick-10 blocks back -- see that step's own note) rather than flipping here: wellBeing's continuous zero streak crosses REVOLT_TICKS=120 (WorkerRevolt.ts) earlier now, since it no longer gets a tick-315 union-event bump to reset it (that event is politics_competitor_mine under #596/#597, which carries no wellBeing delta). levelEndReason stays 'bankruptcy' because that flag was raised first, at tick 209 (updateBankruptcy/updateRevolt both run unconditionally every tick, but GameLoop only records the reason on the first one to trip -- events.ts). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1575,7 +1611,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 445,
+          "tickCount": 496,
           "safety": 0,
           "wellBeing": 0,
           "deathCount": 5,
@@ -1585,7 +1621,7 @@
           "levelEndReason": "bankruptcy",
           "revolted": true
         },
-        "note": "unlike the pre-#553 file, nothing about this file's #553 event timeline is uncertain past tick 315 (direct trace confirms no third random event fires through the end). #553-followup (issue #586 CI): that no longer covers ecology/nuisance -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note) regardless of event-timeline certainty, since they accumulate from a slightly-wrong base rather than from anything decided at tick 315. Dropped here for the same reason as every tick-only checkpoint since tick 298; safety/wellBeing stay exact -- both are floored at 0 by this point, immune to base drift."
+        "note": "#596/#597-followup: tickCount corrected 445->496 -- nothing about this file's event timeline is uncertain past tick 366 (direct trace confirms no third random event fires through the end, same as before, just at the new shifted ticks). Ecology/nuisance stay dropped -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note), since they accumulate from a slightly-wrong base rather than from anything decided at any one tick. safety/wellBeing stay exact -- both are floored at 0 by this point, immune to base drift."
       }
     },
     {
@@ -1600,7 +1636,7 @@
       "expect": {
         "equals": {
           "bankrupt": true,
-          "tickCount": 445
+          "tickCount": 496
         }
       }
     },
@@ -1615,7 +1651,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 445,
+          "tickCount": 496,
           "employeeCount": 12
         }
       }
@@ -1631,7 +1667,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 445,
+          "tickCount": 496,
           "deathCount": 5,
           "employeeCount": 12,
           "bankrupt": true,
@@ -1639,7 +1675,7 @@
           "levelEndReason": "bankruptcy",
           "revolted": true
         },
-        "note": "#553: this file's premise now holds both ways at once. Drilling is real, queued, vehicle-gated work: a single driller sinks the 4x4 pattern (interrupted once by a real random event, weather_minor_tremor at tick 125) by tick 293, and 12 employees' payroll with zero income anywhere in this file crosses the bankruptcy threshold before that pattern even finishes drilling (BANKRUPTCY_GRACE_TICKS=100 completes at tick 209, per Bankruptcy.ts) -- levelEndReason is 'bankruptcy' because that fires first, same conclusion as the pre-#553 file. But pattern 1's blast, once it finally lands, is catastrophic enough (16 holes x 8kg krackle, CATASTROPHIC rating, 90.3m throw) to kill all 5 staffed employees and destroy the only drill_rig this file ever owns -- and with no vehicle, no licensed spare worth the risk, and cash already deep in the negative, patterns 2-4 order 65 more holes that can never be drilled. The survivors' well-being, pinned at 0 by fatigue collapse with no living quarters anywhere in this file (save one brief union-event bump at tick 315 that costs $5,000 and buys seven ticks), stays there long enough (REVOLT_TICKS=120, WorkerRevolt.ts) that revolted flips true too, at tick 445 -- the workforce actually revolts this time, just after the mine is already bankrupt. Pre-#553, confirming a drill plan wrote every hole in instantly, so nobody ever stood in a blast radius, nobody ever ran out of a rig, and revolted stayed false for the whole file (see the pre-#553 note this replaces)."
+        "note": "#553: this file's premise holds both ways at once. Drilling is real, queued, vehicle-gated work: a single driller sinks the 4x4 pattern (interrupted once by a real random event, union_unlucky_days as of #596/#597 -- not the pre-#596 weather_minor_tremor -- at tick 175, not the pre-#596 tick 125) by tick 343, and 12 employees' payroll with zero income anywhere in this file crosses the bankruptcy threshold before that pattern even finishes drilling (BANKRUPTCY_GRACE_TICKS=100 completes at tick 209, per Bankruptcy.ts) -- levelEndReason is 'bankruptcy' because that fires first, same conclusion as before. But pattern 1's blast, once it finally lands, is catastrophic enough (16 holes x 8kg krackle, CATASTROPHIC rating, 90.3m throw) to kill all 5 staffed employees and destroy the only drill_rig this file ever owns -- and with no vehicle, no licensed spare worth the risk, and cash already deep in the negative, patterns 2-4 order 65 more holes that can never be drilled. The survivors' well-being, pinned at 0 by fatigue collapse with no living quarters anywhere in this file, stays there long enough (REVOLT_TICKS=120, WorkerRevolt.ts) that revolted flips true too -- now at tick 416 (#596/#597: the second random event, politics_competitor_mine, carries no wellBeing delta, so unlike the old union_rep_secretary draw there is no tick-315 bump left to reset the revolt streak, and it completes earlier than the pre-#596/#597 file's tick 445) -- the workforce actually revolts this time, well after the mine is already bankrupt."
       }
     }
   ]

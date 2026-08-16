@@ -211,6 +211,42 @@ export function deliverMaterials(
   return { payment, bonus: 0, completed: false };
 }
 
+/**
+ * Criteria for locating a contract without needing its exact numeric id.
+ *
+ * `generateContracts` assigns ids by generation order and evicts the oldest
+ * `available` entries (`shift()`) once the pool is full — a scenario or
+ * player upstream of a rotation has to hardcode a fixed id like `1`, which
+ * stops naming anything real once the pool has turned over: it might be a
+ * different contract, or gone entirely (#597; PR #586 re-numbered contract
+ * ids by hand across several files chasing this — 1 → 4 → 14 in one of
+ * them). `type`/`materialId` name a contract by what it actually is instead
+ * of where it landed in generation order, so it survives the pool rotating
+ * as long as a contract of that kind is still offered.
+ */
+export interface ContractSelector {
+  id?: number;
+  type?: ContractType;
+  materialId?: string;
+}
+
+/**
+ * Find a contract in `pool` by `selector.id` if given, else by the first
+ * entry matching `selector.type`/`selector.materialId` (either or both).
+ * Null when no selector field is set (nothing to search for) or nothing in
+ * `pool` matches.
+ */
+export function findContract(pool: readonly Contract[], selector: ContractSelector): Contract | null {
+  if (selector.id !== undefined) {
+    return pool.find(c => c.id === selector.id) ?? null;
+  }
+  if (selector.type === undefined && selector.materialId === undefined) return null;
+  return pool.find(c =>
+    (selector.type === undefined || c.type === selector.type)
+    && (selector.materialId === undefined || c.materialId === selector.materialId),
+  ) ?? null;
+}
+
 /** Check and expire overdue contracts. Returns penalty amounts. */
 export function checkDeadlines(
   state: ContractState,

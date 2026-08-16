@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Event registration
 // Imports all event definitions and registers them in the global pool.
 
-import { registerEvents } from './EventPool.js';
+import { registerEvents, clearEvents } from './EventPool.js';
 
 import { UNION_EVENTS_1 } from './UnionEvents1.js';
 import { UNION_EVENTS_2 } from './UnionEvents2.js';
@@ -21,8 +21,21 @@ import { TUTORIAL_EVENTS } from './TutorialEvents.js';
 
 export { clearEvents } from './EventPool.js';
 
-/** Register all event definitions into the global pool. Call once at app init. */
+/**
+ * Register all event definitions into the global pool. Genuinely idempotent
+ * (#597): every `createRunner()` call — one per scenario engine in a batch
+ * run like `run-all-scenarios.ts` — used to call this again, and
+ * `registerEvents` unconditionally pushes, so the shared pool doubled,
+ * tripled, ... on every subsequent call in the same process. `selectEvent`'s
+ * weighted pick indexes into that pool, so which event fired ended up
+ * depending on how many *other* engines had already been created earlier in
+ * the same process — nothing to do with the scenario's own seed or pacing.
+ * Clearing first makes repeat calls converge on the same canonical set every
+ * time, matching this function's own "call once at app init" contract even
+ * though callers do not actually honor "once".
+ */
 export function setupEvents(): void {
+  clearEvents();
   registerEvents(UNION_EVENTS_1);
   registerEvents(UNION_EVENTS_2);
   registerEvents(POLITICS_EVENTS_1);

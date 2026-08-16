@@ -106,6 +106,43 @@ describe('checkGoal — decreased', () => {
   });
 });
 
+describe('checkGoal — changedBy', () => {
+  it('passes when the field moved by exactly the given amount relative to the before snapshot', async () => {
+    const page = fakePage({ gameState: { cash: 49000 } });
+    await expect(
+      checkGoal(page, { changedBy: { cash: -1000 } }, { cash: 50000 }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('throws InteractionFailure naming the field, expected delta, and actual delta', async () => {
+    const page = fakePage({ gameState: { cash: 49500 } });
+    let caught: unknown;
+    try {
+      await checkGoal(page, { changedBy: { cash: -1000 } }, { cash: 50000 });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(InteractionFailure);
+    expect((caught as Error).message).toContain('cash');
+    expect((caught as Error).message).toContain('-1000');
+    expect((caught as Error).message).toContain('-500');
+  });
+
+  it('handles a negative delta on a field that shrank', async () => {
+    const page = fakePage({ gameState: { nuisance: 50 } });
+    await expect(
+      checkGoal(page, { changedBy: { nuisance: -30 } }, { nuisance: 80 }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('treats a missing before field as 0, not a crash', async () => {
+    const page = fakePage({ gameState: { newField: 5 } });
+    await expect(
+      checkGoal(page, { changedBy: { newField: 5 } }, {}),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('checkGoal — tutorialStep', () => {
   it('passes when the tutorial card is on the expected step', async () => {
     const page = fakePage({

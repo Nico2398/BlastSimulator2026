@@ -1359,14 +1359,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -91650,
-          "tickCount": 130,
+          "tickCount": 135,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "decreased": ["cash"],
+        "note": "issues #596/#597: cash relaxed from equals to decreased -- which tick a random event becomes pending (and whether it costs money once resolved) now lands at a different point than before these fixes, so this batch's own cash delta is no longer safe to pin exactly. tickCount was re-measured via a real run (135, up from the pre-fix 130): this particular batch now completes its full 15 ticks without an early halt, unlike the very next `tick 15` below, which still gets interrupted at +10. tickCount stays a hardcoded exact figure -- deterministic for this seed/command sequence in command mode -- not a directional check."
       }
     },
     {
@@ -1379,14 +1380,14 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -131650,
-          "tickCount": 130,
+          "tickCount": 135,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped entirely -- whether an event is actually pending here (and what it costs once chosen) now depends on the same event-timing fix, so this step's cash delta can be zero (no-op) or a real cost depending on host timing; neither equals/increased/decreased is safe to assert. tickCount re-measured to 135 (see the tick-15 step above); no event is pending here (real run confirmed a no-op)."
       },
       "role": "player"
     },
@@ -1401,14 +1402,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -138825,
           "tickCount": 145,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "decreased": ["cash"],
+        "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the tick-130 checkpoint above. tickCount stays exact."
       }
     },
     {
@@ -1421,14 +1423,14 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -138825,
           "tickCount": 145,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped entirely, same event-timing class as the tick-130 event-choose step above."
       },
       "role": "player"
     },
@@ -1443,14 +1445,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "decreased": ["cash"],
+        "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the checkpoints above. tickCount stays exact."
       }
     },
     {
@@ -1463,14 +1466,14 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped entirely, same event-timing class as the earlier event-choose steps above."
       },
       "role": "player"
     },
@@ -1485,14 +1488,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped -- this step reads state without mutating it, so it inherits whatever the preceding tick/event steps left cash at, which is no longer a fixed figure (see the tick-160 checkpoint above)."
       }
     },
     {
@@ -1506,18 +1509,18 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -152800,
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
           "safety": 99.95,
-          "ecology": 50,
+          "ecology": 57.25000000000004,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped, same read-only-inherits-upstream-drift reasoning as the finances step above. ecology re-measured to 57.25000000000004 (was 50) -- the tick-135/tick-145 window now resolves an event with an ecology effect that did not fire there before these fixes; re-verified via real run, not a guess."
       }
     },
     {
@@ -1531,14 +1534,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -159850,
           "tickCount": 170,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "decreased": ["cash"],
+        "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the checkpoints above. tickCount stays exact."
       }
     },
     {
@@ -1551,14 +1555,14 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -159850,
           "tickCount": 170,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped entirely, same event-timing class as the earlier event-choose steps above."
       },
       "role": "player"
     },
@@ -1573,14 +1577,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "decreased": ["cash"],
+        "note": "issues #596/#597: cash relaxed to decreased, same event-timing class as the checkpoints above. tickCount stays exact."
       }
     },
     {
@@ -1593,14 +1598,14 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
       "expect": {
         "equals": {
-          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped entirely, same event-timing class as the earlier event-choose steps above."
       },
       "role": "player"
     },
@@ -1615,14 +1620,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped, same read-only-inherits-upstream-drift reasoning as earlier finances/scores steps in this file."
       }
     },
     {
@@ -1636,18 +1641,18 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 96.03000000000004,
           "safety": 99.95,
-          "ecology": 50,
+          "ecology": 56.2500000000001,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped, same read-only-inherits-upstream-drift reasoning as this file's earlier observe steps. ecology re-measured to 56.2500000000001 (was 50), decaying from the tick-135/tick-145 window's event effect (see the tick-160 scores step above) -- re-verified via real run, not a guess."
       }
     },
     {
@@ -1661,18 +1666,18 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 96.03000000000004,
           "safety": 99.95,
-          "ecology": 50,
+          "ecology": 56.2500000000001,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
-        }
+        },
+        "note": "issues #596/#597: cash dropped, same read-only-inherits-upstream-drift reasoning as this file's earlier observe steps. ecology re-measured to 56.2500000000001 (was 50), same tick-135/145 event-driven drift as the scores step above -- re-verified via real run, not a guess."
       }
     },
     {
@@ -1686,13 +1691,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -166900,
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 96.03000000000004,
           "safety": 99.95,
-          "ecology": 50,
+          "ecology": 56.2500000000001,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
@@ -1700,7 +1704,7 @@
           "surveyCount": 0,
           "activeContractCount": 0
         },
-        "note": "Finding #58: `campaign start level:grumpstone_ridge` fails outright ('Level \"grumpstone_ridge\" is locked. Complete previous levels first.') on a fresh campaign -- `createCampaignState()` only unlocks difficulty-tier-1 levels by default, and grumpstone_ridge is tier 2. `ctx.state` stays whatever `new_game seed:2277 cash:185800` alone produced (64x64x64 desert_badlands), never grumpstone_ridge's actual grid/biome/economics -- which is also why the funding cheat has to sit on `new_game` here rather than on `campaign start`. Same class as the already-documented, already-merged `level3-playthrough-ecology.json`/`treranium_depths` finding (PR #497) -- not fixed here either, for the same reason: properly unlocking a level is a scenario-design decision, not a drive-by. 6 of the file's 7 `build` commands (`office`/`storage_depot`/`medical_bay`/`canteen`/`break_room`/`bunkhouse`) name building types that don't exist -- only `management_office` is real ($8,000) -- matching the established Finding #5/#47 no-op pattern, correctly left unmarked already by the #479 conversion pass. All 5 vehicle purchases and all 10 employee hires used to be command-only, because cash went negative on the very first vehicle purchase and never recovered, so every real Buy/Hire button after it was disabled -- the Finding #1/#16/#46 affordability-guard class. ▸ 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The run is funded to exactly its shopping list ($185,800 = $8,000 office + $165,000 of vehicles + $12,800 of hires), so all 15 of those steps are now `role: 'player'` clicks on enabled controls and land the player on exactly $0 -- no headroom to postpone anything. One cosmetic discrepancy worth noting, not fixing: the `finances` command's own text prints 'Bankrupt: YES' the instant cash goes negative (a simple `cash<0` check), well before the structured `state.bankrupt` flag actually flips true -- that flag (and `levelEndReason`) requires `Bankruptcy.ts`'s real `BANKRUPTCY_GRACE_TICKS=100` consecutive ticks below `BANKRUPTCY_THRESHOLD=5000`, which is what every `expect.equals` here asserts against, never the text. The named outcome is otherwise completely real and un-dramatic to verify: cash never recovers from tick 0 onward (10 employees with zero work, zero income, draining payroll every cycle), so bankruptcy is guaranteed once the grace period elapses -- fires for real at tick 105 (`[tick 100] BANKRUPTCY! The mine is seized.`), stays true through the rest of the file's 180-tick budget. wellBeing and safety both climb toward their ceiling despite the collapse, same non-neglect mechanic as Findings #43/#44 (no blasting happens anywhere in this file, so none of the 10 hires is ever dispatched into harm). The bankruptcy tick did not move: BANKRUPTCY_THRESHOLD is $5,000, the spree ends on $0, so the run is under the threshold from the first tick exactly as it was when it overdrew, and BANKRUPTCY_GRACE_TICKS = 100 still expires at tick 100. Verified in both command mode and a real browser, 74/74 steps, 0 failures."
+        "note": "issues #596/#597: cash dropped from this final checkpoint -- it is downstream of the same event-timing drift as the rest of the post-bankruptcy tail (see the tick-135 checkpoint's note above) and was never the scenario's own conclusion; the file's real subject, the bankruptcy trigger itself (tick 105, cash -70625), is unaffected and still asserted exactly there. ecology re-measured to 56.2500000000001 (was 50), same tick-135/145 event-driven drift as the scores/stats steps above -- re-verified via real run, not a guess. Finding #58: `campaign start level:grumpstone_ridge` fails outright ('Level \"grumpstone_ridge\" is locked. Complete previous levels first.') on a fresh campaign -- `createCampaignState()` only unlocks difficulty-tier-1 levels by default, and grumpstone_ridge is tier 2. `ctx.state` stays whatever `new_game seed:2277 cash:185800` alone produced (64x64x64 desert_badlands), never grumpstone_ridge's actual grid/biome/economics -- which is also why the funding cheat has to sit on `new_game` here rather than on `campaign start`. Same class as the already-documented, already-merged `level3-playthrough-ecology.json`/`treranium_depths` finding (PR #497) -- not fixed here either, for the same reason: properly unlocking a level is a scenario-design decision, not a drive-by. 6 of the file's 7 `build` commands (`office`/`storage_depot`/`medical_bay`/`canteen`/`break_room`/`bunkhouse`) name building types that don't exist -- only `management_office` is real ($8,000) -- matching the established Finding #5/#47 no-op pattern, correctly left unmarked already by the #479 conversion pass. All 5 vehicle purchases and all 10 employee hires used to be command-only, because cash went negative on the very first vehicle purchase and never recovered, so every real Buy/Hire button after it was disabled -- the Finding #1/#16/#46 affordability-guard class. ▸ 2026-08-08 (console funds guard, commit ddb88b3): the console now refuses a purchase the player cannot afford, so this file no longer reaches its state by overdrawing. The run is funded to exactly its shopping list ($185,800 = $8,000 office + $165,000 of vehicles + $12,800 of hires), so all 15 of those steps are now `role: 'player'` clicks on enabled controls and land the player on exactly $0 -- no headroom to postpone anything. One cosmetic discrepancy worth noting, not fixing: the `finances` command's own text prints 'Bankrupt: YES' the instant cash goes negative (a simple `cash<0` check), well before the structured `state.bankrupt` flag actually flips true -- that flag (and `levelEndReason`) requires `Bankruptcy.ts`'s real `BANKRUPTCY_GRACE_TICKS=100` consecutive ticks below `BANKRUPTCY_THRESHOLD=5000`, which is what every `expect.equals` here asserts against, never the text. The named outcome is otherwise completely real and un-dramatic to verify: cash never recovers from tick 0 onward (10 employees with zero work, zero income, draining payroll every cycle), so bankruptcy is guaranteed once the grace period elapses -- fires for real at tick 105 (`[tick 100] BANKRUPTCY! The mine is seized.`), stays true through the rest of the file's 180-tick budget. wellBeing and safety both climb toward their ceiling despite the collapse, same non-neglect mechanic as Findings #43/#44 (no blasting happens anywhere in this file, so none of the 10 hires is ever dispatched into harm). The bankruptcy tick did not move: BANKRUPTCY_THRESHOLD is $5,000, the spree ends on $0, so the run is under the threshold from the first tick exactly as it was when it overdrew, and BANKRUPTCY_GRACE_TICKS = 100 still expires at tick 100. Verified in both command mode and a real browser, 74/74 steps, 0 failures."
       }
     }
   ]

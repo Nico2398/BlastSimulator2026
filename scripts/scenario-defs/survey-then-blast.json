@@ -651,8 +651,19 @@
     },
     {
       "command": "tick 20",
-      "description": "Fifth and final chunk, deliberately smaller than the rest -- all 9 holes should have landed by now, with margin before the worker-revolt countdown completes.",
+      "description": "Fifth chunk, deliberately smaller than the rest -- all 9 holes should have landed with margin before the worker-revolt countdown completes.",
       "interaction": [{"type": "command", "command": "tick 20"}],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [{"type": "resolveEventIfPending"}],
+      "role": "player"
+    },
+    {
+      "command": "tick 5",
+      "description": "#596/#597 follow-up: with the event cooldown's random threshold now cached once per window instead of redrawn on every 5-tick retry, an event goes pending a few ticks earlier than before, and a `tick N` batch halts the instant that happens -- so the fifth chunk above now lands a few ticks short of its requested count. This small buffer chunk (sandbox-measured, seed:42) makes up the shortfall and lands all 9 holes at tick ~300, still comfortably inside the tick ~333 worker-revolt deadline.",
+      "interaction": [{"type": "command", "command": "tick 5"}],
       "role": "setup",
       "expect": {
         "equals": {

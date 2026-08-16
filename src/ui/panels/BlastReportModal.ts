@@ -112,6 +112,29 @@ export class BlastReportModal {
 
   update(state: GameState): void {
     const report = state.lastBlastReport;
+
+    // Once the level has ended, LevelEndScreen (z-index var(--bsx-z-menu),
+    // 9999) owns the whole screen — this modal shares the .bs-confirm-overlay
+    // tier with EventModal/ConfirmModal/etc. (z-index 600, styles.ts), well
+    // underneath it. A blast landing right as the level ends (bankruptcy,
+    // worker revolt, ecological shutdown) still arms its report on the
+    // normal 3s real-time delay (#545) and opens it well after LevelEndScreen
+    // has already taken over: confirmed live (screenshot) rendering the
+    // report's stats garbled underneath LevelEndScreen's own defeat text,
+    // reachable by no click — the report's own CLOSE button included. A
+    // report nobody can close then leaves `pending`/`visible` both stuck
+    // true for the rest of the session, which is what permanently blocks
+    // EventModal too (UIManager.update's own deferral). A blast report is
+    // moot once play has stopped anyway, so never open one here, and close
+    // immediately if the level ends while one is already showing.
+    if (state.levelEndReason !== null) {
+      if (this.open) this.hide();
+      if (report) this.lastShownReport = report;
+      this.pendingReport = null;
+      this.pendingDeadlineMs = null;
+      return;
+    }
+
     // Identity, not report.tick: buildBlastReport (mining.ts) is a fresh
     // object every call, but tick is not a unique key — two blasts with no
     // tick command between them (entirely possible; nothing forces the clock

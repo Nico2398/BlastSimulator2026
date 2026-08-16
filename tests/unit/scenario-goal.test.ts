@@ -80,6 +80,70 @@ describe('checkGoalAgainstState — increased', () => {
   });
 });
 
+describe('checkGoalAgainstState — changedBy', () => {
+  it('passes when the field moved by exactly the given amount', () => {
+    const violation = checkGoalAgainstState(
+      { changedBy: { cash: -1000 } },
+      { cash: 50000 },
+      { cash: 49000 },
+    );
+    expect(violation).toBeNull();
+  });
+
+  it('fails naming the field, expected delta, actual delta, and the was → now values', () => {
+    const violation = checkGoalAgainstState(
+      { changedBy: { cash: -1000 } },
+      { cash: 50000 },
+      { cash: 49500 },
+    );
+    expect(violation).toContain('cash');
+    expect(violation).toContain('-1000');
+    expect(violation).toContain('-500');
+    expect(violation).toContain('50000 → 49500');
+  });
+
+  it('handles a negative delta (a decrease) as the expected value', () => {
+    const violation = checkGoalAgainstState(
+      { changedBy: { nuisance: -30 } },
+      { nuisance: 80 },
+      { nuisance: 50 },
+    );
+    expect(violation).toBeNull();
+  });
+
+  it('handles a positive delta on a field that grew', () => {
+    const violation = checkGoalAgainstState(
+      { changedBy: { holeCount: 3 } },
+      { holeCount: 2 },
+      { holeCount: 5 },
+    );
+    expect(violation).toBeNull();
+  });
+
+  it('treats a missing/non-numeric before or after field as 0, not a crash', () => {
+    const violation = checkGoalAgainstState(
+      { changedBy: { newField: 5 } },
+      {},
+      { newField: 5 },
+    );
+    expect(violation).toBeNull();
+  });
+
+  it('fails when the after state is null (step produced no state dump)', () => {
+    const violation = checkGoalAgainstState({ changedBy: { cash: -1000 } }, { cash: 50000 }, null);
+    expect(violation).toContain('cash');
+  });
+
+  it('fails when the field did not move at all', () => {
+    const violation = checkGoalAgainstState(
+      { changedBy: { cash: -1000 } },
+      { cash: 50000 },
+      { cash: 50000 },
+    );
+    expect(violation).toContain('changed by 0');
+  });
+});
+
 describe('checkGoalAgainstState — decreased', () => {
   it('passes when the field shrank', () => {
     const violation = checkGoalAgainstState(

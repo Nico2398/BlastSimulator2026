@@ -447,11 +447,11 @@ export async function checkGoal(
     }
   }
 
-  // One fetch (or the caller's own already-current snapshot) serves all three
-  // state-reading goal kinds below — up to three separate evaluates for a
-  // step whose expect combines increased/decreased/equals, on every step of
-  // every scenario, for state that cannot have changed between them.
-  if (goal.increased || goal.decreased || goal.equals) {
+  // One fetch (or the caller's own already-current snapshot) serves all four
+  // state-reading goal kinds below — up to four separate evaluates for a
+  // step whose expect combines increased/decreased/equals/changedBy, on every
+  // step of every scenario, for state that cannot have changed between them.
+  if (goal.increased || goal.decreased || goal.equals || goal.changedBy) {
     const state = after ?? await gameState(page);
 
     if (goal.increased) {
@@ -489,6 +489,22 @@ export async function checkGoal(
         if (state[field] !== expected) {
           throw new InteractionFailure(
             `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(state[field])}`,
+            describeAvailable(await probe(page)),
+          );
+        }
+      }
+    }
+
+    if (goal.changedBy) {
+      for (const [field, expectedDelta] of Object.entries(goal.changedBy)) {
+        const wasRaw = before[field];
+        const nowRaw = state[field];
+        const was = typeof wasRaw === 'number' ? wasRaw : 0;
+        const now = typeof nowRaw === 'number' ? nowRaw : 0;
+        const actualDelta = now - was;
+        if (actualDelta !== expectedDelta) {
+          throw new InteractionFailure(
+            `${field} should have changed by ${expectedDelta} but changed by ${actualDelta} (${was} → ${now})`,
             describeAvailable(await probe(page)),
           );
         }
