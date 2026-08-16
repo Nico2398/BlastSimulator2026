@@ -778,7 +778,7 @@
           "command": "build office at:5,5"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -798,7 +798,7 @@
           "command": "build storage_depot at:10,5"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"storage_depot\" maps to the real freight_warehouse building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"storage_depot\" maps to the real freight_warehouse building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -818,7 +818,7 @@
           "command": "build canteen at:5,10"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"canteen\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"canteen\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -1366,7 +1366,7 @@
           "tickCount": 0
         }
       },
-      "description": "#553-followup (issue #586 CI): the preceding `tick 6` makes zero progress (\"Pending event! Resolve it first\", tickCount stays 440, sandbox-confirmed) -- a lucky_strike event (+$10,000, same fixed-bonus type as level1-win-efficient.json/level3-playthrough-win.json) genuinely pends the instant this step runs, unlike the file's other post-blast tick/event pairs which are harmless no-ops. Was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast/tariff-event steps elsewhere in this file. `resolveEventIfPending`'s own `page.click('#bs-event-dialog .bs-event-choice')` has no `describeUnclickable` wrapper, so Puppeteer's bare 'Node is either not clickable or not an Element' surfaced with no selector named. Converted to guard + expect.blocked; the command still runs directly so cash still gains the $10,000 (-$340,052 → -$330,052, sandbox-confirmed). Update: EventModal now also defers behind LevelEndScreen once the level has ended (UIManager.update, matching BlastReportModal's own fix for the same z-index gap) -- its .bs-event-choice buttons are never rendered at all in that state rather than rendered-but-covered, so probing for them reports 'absent', which expect.blocked itself rejects as unprovable (scenario-goal.ts/interaction-driver.ts). Reassigned to #bs-event-dialog, the dialog's own outer overlay -- created once in EventModal's constructor and left in the DOM at display:none, so it is the one still-present, genuinely-hidden control left to assert against."
+      "description": "#553-followup (issue #586 CI): the preceding `tick 6` makes zero progress (\"Pending event! Resolve it first\", tickCount stays 440, sandbox-confirmed) -- a lucky_strike event (+$10,000, same fixed-bonus type as level1-win-efficient.json/level3-playthrough-win.json) genuinely pends the instant this step runs, unlike the file's other post-blast tick/event pairs which are harmless no-ops. Was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast/tariff-event steps elsewhere in this file. `resolveEventIfPending`'s own `page.click('#bs-event-dialog .bs-event-choice')` has no `describeUnclickable` wrapper, so Puppeteer's bare 'Node is either not clickable or not an Element' surfaced with no selector named. Converted to guard + expect.blocked; the command still runs directly so cash still gains the $10,000 (-$340,052 \u2192 -$330,052, sandbox-confirmed). Update: EventModal now also defers behind LevelEndScreen once the level has ended (UIManager.update, matching BlastReportModal's own fix for the same z-index gap) -- its .bs-event-choice buttons are never rendered at all in that state rather than rendered-but-covered, so probing for them reports 'absent', which expect.blocked itself rejects as unprovable (scenario-goal.ts/interaction-driver.ts). Reassigned to #bs-event-dialog, the dialog's own outer overlay -- created once in EventModal's constructor and left in the DOM at display:none, so it is the one still-present, genuinely-hidden control left to assert against."
     },
     {
       "command": "tick 6",
@@ -2169,7 +2169,15 @@
       "interaction": [
         {
           "type": "command",
-          "command": "tick 150"
+          "command": "tick 50"
+        },
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "command",
+          "command": "tick 50"
         }
       ],
       "role": "setup",
@@ -2183,7 +2191,8 @@
         "increased": [
           "tickCount"
         ]
-      }
+      },
+      "description": "Issue #586 CI, this PR: CI reported \"Step 96 timed out after 60000ms\" twice in a row on this exact step, though it never reproduced across 3 clean local reruns in this session's own investigation -- consistent with a genuine CPU-bound cost spike (not a render-frame cost; interaction batch runs suspend drawing) that only shows up under CI's shared/contended runner (10 concurrent Chrome instances across shards), not a single local run with full CPU access. The preceding step just ordered a fresh 30-hole drill_plan (5x6 grid); tick 150 in one call processes all of that dispatch/pathfinding in a single blocking page.evaluate, an outlier compared to the tick 20/tick 30 chunks used everywhere else in this project's scenario files. Split into 3x tick 50 -- same total simulation-tick advance, same end state, but no single command action should come as close to the 60s per-action budget under load."
     },
     {
       "command": "event choose 0",
@@ -2711,7 +2720,7 @@
           "command": "build medical_bay at:10,10"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
           "deathCount": 5,
@@ -2733,7 +2742,7 @@
           "command": "build break_room at:15,10"
         }
       ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
+      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
           "deathCount": 5,
