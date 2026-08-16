@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createCharge, batchCharge } from '../../../src/core/mining/ChargePlan.js';
-import { MIN_STEMMING_M } from '../../../src/core/config/balance.js';
+import {
+  createCharge, batchCharge, landLoadedCharge, computeChargeHoleDurationTicks,
+} from '../../../src/core/mining/ChargePlan.js';
+import type { PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
+import { MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG } from '../../../src/core/config/balance.js';
 
 describe('ChargePlan', () => {
   it('charging a hole stores explosive type and amount', () => {
@@ -78,5 +81,64 @@ describe('ChargePlan', () => {
     for (const e of errors) {
       expect(e.message.toLowerCase()).toContain('stemming');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// landLoadedCharge tests (#554)
+// ---------------------------------------------------------------------------
+
+describe('landLoadedCharge', () => {
+  it('copies a planned charge\'s fields unchanged into the returned HoleCharge', () => {
+    const planned: PlannedCharge = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+
+    const landed = landLoadedCharge(planned);
+
+    expect(landed).toEqual({ explosiveId: 'boomite', amountKg: 5, stemmingM: 2 });
+  });
+
+  it('returns a HoleCharge usable independently of the planned charge (same shape, not a reference copy issue)', () => {
+    const planned: PlannedCharge = { explosiveId: 'pop_rock', amountKg: 2, stemmingM: 1.5 };
+
+    const landed = landLoadedCharge(planned);
+
+    expect(landed.explosiveId).toBe(planned.explosiveId);
+    expect(landed.amountKg).toBe(planned.amountKg);
+    expect(landed.stemmingM).toBe(planned.stemmingM);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeChargeHoleDurationTicks tests (#554)
+// ---------------------------------------------------------------------------
+
+describe('computeChargeHoleDurationTicks', () => {
+  it('reference amount costs exactly CHARGE_HOLE_BASE_DURATION_TICKS', () => {
+    const ticks = computeChargeHoleDurationTicks(CHARGE_HOLE_REFERENCE_AMOUNT_KG);
+    expect(ticks).toBe(CHARGE_HOLE_BASE_DURATION_TICKS);
+  });
+
+  it('double the reference amount roughly doubles the duration (within rounding)', () => {
+    const base = computeChargeHoleDurationTicks(CHARGE_HOLE_REFERENCE_AMOUNT_KG);
+    const doubled = computeChargeHoleDurationTicks(CHARGE_HOLE_REFERENCE_AMOUNT_KG * 2);
+    expect(doubled).toBeGreaterThanOrEqual(base * 2 - 1);
+    expect(doubled).toBeLessThanOrEqual(base * 2 + 1);
+  });
+
+  it('a very small amount clamps to a minimum of 1 tick, never 0 or negative', () => {
+    const ticks = computeChargeHoleDurationTicks(0.001);
+    expect(ticks).toBe(1);
+  });
+
+  it('zero amount clamps to a minimum of 1 tick', () => {
+    const ticks = computeChargeHoleDurationTicks(0);
+    expect(ticks).toBe(1);
+    expect(ticks).toBeGreaterThan(0);
+  });
+
+  it('scales roughly linearly with amount for two arbitrary amounts', () => {
+    const light = computeChargeHoleDurationTicks(2);
+    const heavy = computeChargeHoleDurationTicks(8);
+    expect(heavy).toBeGreaterThan(light);
   });
 });
