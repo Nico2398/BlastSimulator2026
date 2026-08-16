@@ -49,8 +49,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -18000
+        },
         "equals": {
-          "cash": 32000,
           "buildingCount": 1
         }
       }
@@ -66,8 +68,10 @@
       ],
       "description": "role: guard (issue #515): selecting tier 2 in the catalog row's own tier dropdown is a real interaction; the Buy button is then genuinely disabled — `refreshCatalogButtons`'s `locked` check (BuildMenu.ts) is true since tier 2 is not researched — so `expect.blocked` proves the same rejection command mode shows.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 32000,
           "buildingCount": 1
         },
         "blocked": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn",
@@ -86,8 +90,10 @@
       ],
       "description": "role: guard (issue #515) — same reasoning as the tier:2 attempt above, for tier 3.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 32000,
           "buildingCount": 1
         },
         "blocked": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn",

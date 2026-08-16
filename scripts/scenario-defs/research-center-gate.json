@@ -26,7 +26,8 @@
         { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
       "expect": {
-        "equals": { "buildingCount": 1, "cash": 70000 }
+        "equals": { "buildingCount": 1 },
+        "changedBy": { "cash": -10000 }
       }
     },
     {
@@ -37,7 +38,8 @@
         { "type": "clickSelector", "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-research-btn" }
       ],
       "expect": {
-        "equals": { "buildingCount": 1, "cash": 70000 },
+        "equals": { "buildingCount": 1 },
+        "changedBy": { "cash": 0 },
         "note": "Cash unchanged and no research queued proves the click was rejected (#442's prerequisite gate), not silently swallowed."
       }
     },
@@ -53,7 +55,8 @@
         { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
       "expect": {
-        "equals": { "buildingCount": 2, "cash": 45000 }
+        "equals": { "buildingCount": 2 },
+        "changedBy": { "cash": -25000 }
       }
     },
     {
@@ -64,7 +67,7 @@
         { "type": "clickSelector", "selector": "#bs-build-panel .bs-build-placed-row[data-building-id=\"1\"] .bs-build-research-btn" }
       ],
       "expect": {
-        "equals": { "cash": 40000 },
+        "changedBy": { "cash": -5000 },
         "note": "Cash dropped by exactly the tier-2 cost-only research price ($5,000, 0 ticks, no conditions per RESEARCH_TASK_DEFS) — the task actually queued this time, purely from clicking."
       }
     },

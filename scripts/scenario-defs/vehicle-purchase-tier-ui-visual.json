@@ -48,8 +48,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 275000,
           "vehicleCount": 1
         }
       }
@@ -79,8 +81,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -50000
+        },
         "equals": {
-          "cash": 225000,
           "vehicleCount": 2
         }
       }
@@ -100,8 +104,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -50000
+        },
         "equals": {
-          "cash": 175000,
           "vehicleCount": 3
         }
       }
@@ -121,8 +127,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -140000
+        },
         "equals": {
-          "cash": 35000,
           "vehicleCount": 4
         }
       }

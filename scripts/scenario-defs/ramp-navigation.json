@@ -51,8 +51,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 49000
+        "changedBy": {
+          "cash": -1000
         },
         "note": "10m ramp x RAMP_COST_PER_METER (balance.ts) = 1000; a ramp carves the voxel grid directly rather than creating a tracked entity (no rampCount field exists to check), so a real cash deduction is the strongest state-level proof available that the build actually landed"
       }
@@ -75,9 +75,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "employeeCount": 1,
-          "cash": 47800
+          "employeeCount": 1
         },
         "note": "HIRING_COSTS.surveyor = 1200 (balance.ts)"
       }

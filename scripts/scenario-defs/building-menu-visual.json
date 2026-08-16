@@ -71,8 +71,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
         "equals": {
-          "cash": 90000,
           "buildingCount": 1
         }
       }
@@ -103,8 +105,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -8000
+        },
         "equals": {
-          "cash": 82000,
           "buildingCount": 2
         }
       }
@@ -135,8 +139,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -12000
+        },
         "equals": {
-          "cash": 70000,
           "buildingCount": 3
         }
       }
@@ -167,8 +173,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -20000
+        },
         "equals": {
-          "cash": 50000,
           "buildingCount": 4
         }
       }
@@ -204,8 +212,10 @@
       "role": "player",
       "description": "Was an unmarked command step that reached cash -$15,000: the Build panel disables a buy button on `cash < def.constructionCost` (BuildMenu.ts) so no click could place this, while the console `build` command overdrew happily. The console now refuses an unaffordable build too, and with the level funded at $100,000 there is $35,000 in hand against a $15,000 warehouse — the button is enabled and this is a genuine player click. The awaitUsable ahead of it is the affordability assertion: an underfunded run fails here instead of quietly overdrawing.",
       "expect": {
+        "changedBy": {
+          "cash": -15000
+        },
         "equals": {
-          "cash": 35000,
           "buildingCount": 5
         }
       }
@@ -241,8 +251,10 @@
       "role": "player",
       "description": "The second former overdraw step, converted the same way: $35,000 in hand against an $18,000 depot, so the catalog row is enabled and the click lands. Cash stays positive through the whole build-out, which is the point of funding the scenario instead of letting the console overdraw.",
       "expect": {
+        "changedBy": {
+          "cash": -18000
+        },
         "equals": {
-          "cash": 17000,
           "buildingCount": 6
         }
       }

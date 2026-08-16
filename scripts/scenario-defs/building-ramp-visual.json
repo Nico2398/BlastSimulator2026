@@ -67,8 +67,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 49000
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -109,8 +109,8 @@
       "role": "player",
       "description": "Ramp depth defaults to 8m and only moves via the strip's -/+ stepper (#bs-param-strip .bsx-stepper-btn, the only field this tool shows) -- two decrements land on the scenario's depth:6.",
       "expect": {
-        "equals": {
-          "cash": 48200
+        "changedBy": {
+          "cash": -800
         }
       }
     },

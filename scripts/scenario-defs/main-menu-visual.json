@@ -89,8 +89,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -114,8 +114,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         },
         "note": "confirmed via direct trace: cash stays flat with no employees/buildings/vehicles to drain it"
       }

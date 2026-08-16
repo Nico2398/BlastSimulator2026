@@ -42,10 +42,12 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "orderedHoleCount": 4,
-          "holeCount": 0,
-          "cash": 50000
+          "holeCount": 0
         }
       }
     },

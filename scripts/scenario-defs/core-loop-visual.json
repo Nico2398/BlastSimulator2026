@@ -66,8 +66,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 198800,
           "proficiencyTotal": 3
         }
       },
@@ -123,8 +125,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 195800,
           "surveyCount": 0
         },
         "note": "confirmed via direct trace: cash stays flat here -- with only 1 employee and no buildings/vehicles yet, payroll doesn't cycle within just 5 ticks"

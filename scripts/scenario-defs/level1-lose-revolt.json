@@ -37,8 +37,8 @@
       "description": "#553: crews the free rig so it's actually usable -- and, confirmed via direct trace, this is the single decision that dooms this file. Vehicle #1's shortest path from its (0,2) spawn to the first drill_plan's origin (5,5) steps onto (2,2), permanently occupied by the staffed debris_hauler (vehicle #2, no driver, never moves). EntityMovementTick.ts's occupancy check has no stuck-detection or replanning fallback for a blocked-but-pathable route (only a failed pathfind trips isMoveStuck), so vehicle #1 waits at (1,2) forever -- a 500-tick sandbox probe showed zero movement. Employee #1 is therefore permanently 'moving', never idle, draining its own needs gauges with nothing on this level to replenish them -- the first domino in this file's real conclusion (see top-level description).",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 550000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -52,8 +52,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 550000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -76,8 +76,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 549000,
           "employeeCount": 6
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -96,8 +98,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 548000,
           "employeeCount": 7
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -116,8 +120,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 547000,
           "employeeCount": 8
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -136,8 +142,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 545500,
           "employeeCount": 9
+        },
+        "changedBy": {
+          "cash": -1500
         }
       }
     },
@@ -156,8 +164,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 544700,
           "employeeCount": 10
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -176,8 +186,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 543500,
           "employeeCount": 11
+        },
+        "changedBy": {
+          "cash": -1200
         }
       }
     },
@@ -226,8 +238,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 542500,
           "employeeCount": 12
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -242,8 +256,8 @@
       "description": "#553: the drill_rig licence employee #12 needs before any drill_hole action can be assigned to them -- hiring only grants the role's own starting qualification. Left unmarked (role: bootstrap): the player-facing path is `employee train` at a driving_center, not exercised by this file.",
       "role": "bootstrap",
       "expect": {
-        "equals": {
-          "cash": 542500
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -267,8 +281,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 507500,
           "vehicleCount": 5
+        },
+        "changedBy": {
+          "cash": -35000
         }
       }
     },
@@ -287,8 +303,8 @@
       "description": "#553: employee #12 (licensed above) takes the new rig (vehicle #5).",
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 507500
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -331,8 +347,10 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 25,
-          "holeCount": 0,
-          "cash": 507500
+          "holeCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },

@@ -83,8 +83,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 25000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -189,8 +189,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 23960
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -228,8 +228,8 @@
         }
       ],
       "expect": {
-        "equals": {
-          "cash": 22960
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"

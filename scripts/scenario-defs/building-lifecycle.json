@@ -49,8 +49,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 42000,
           "buildingCount": 1
+        },
+        "changedBy": {
+          "cash": -8000
         }
       }
     },

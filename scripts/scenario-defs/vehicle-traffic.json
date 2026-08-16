@@ -48,8 +48,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 149200,
           "employeeCount": 1
         }
       }
@@ -68,8 +70,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 148400,
           "employeeCount": 2
         }
       }
@@ -88,8 +92,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 147600,
           "employeeCount": 3
         }
       }
@@ -108,8 +114,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 146800,
           "employeeCount": 4
         }
       }
@@ -133,8 +141,10 @@
       "role": "player",
       "description": "Opens the Fleet panel and buys hauler #1 by clicking its tier-1 dealership row. The three buys below reuse the open panel.",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 121800,
           "vehicleCount": 1
         }
       }
@@ -154,8 +164,10 @@
       "role": "player",
       "description": "Hauler #2, bought by clicking the same dealership row again: $121,800 in hand against $25,000. awaitUsable is the affordability assertion -- FleetPanel disables a tier row on cash < purchaseCost, so an underfunded run fails here instead of buying anyway.",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 96800,
           "vehicleCount": 2
         }
       }
@@ -175,8 +187,10 @@
       "role": "player",
       "description": "Hauler #3, same row again: $96,800 in hand against $25,000.",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 71800,
           "vehicleCount": 3
         }
       }
@@ -196,8 +210,10 @@
       "role": "player",
       "description": "Hauler #4, same row again: $71,800 in hand against $25,000. Fourth and last, and the fleet the move commands below converge.",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 46800,
           "vehicleCount": 4
         }
       }

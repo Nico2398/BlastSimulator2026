@@ -218,8 +218,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 16318,
           "vehicleCount": 4
         }
       }
@@ -259,8 +261,10 @@
       "description": "Real click path: select hauler #5 in the 3D scene (#553: the just-bought debris_hauler is the fleet's 5th vehicle under staffed:true, not its 1st), rest the cursor on the destination tile, then press the selection bar's MOVE HERE. The old description here claimed no UI drives this command and none should exist -- that is false since the SelectionBar gained `move_here` (G4), and it was only unusable with a mouse until ScenePicking started latching `.aim` separately from the live hover (47f4fef). cameraFocus sits at z=16.5, one tile past the target: at the default orbit the camera ray hits terrain about a tile short of its focus point, so the offset was calibrated in a real browser until the dispatched command read exactly `vehicle move 5 to:15,15`. Never adjust the camera focus offset arithmetically -- re-measure.",
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 16318,
           "vehicleCount": 4
         }
       }

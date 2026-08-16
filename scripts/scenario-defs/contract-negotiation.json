@@ -56,8 +56,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         },
         "note": "negotiating costs nothing and moves no count -- the only real effect is on the contract's own terms, which no state field exposes. Confirmed via direct trace (seed:42, dusty_hollow): this first attempt genuinely FAILS (deadline worsened by 11%)."
       }
@@ -73,8 +73,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -89,8 +89,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         },
         "note": "confirmed via direct trace: this second attempt genuinely SUCCEEDS (deadline improved by 8%) -- opposite of round 1, proving the file's own claim (\"observe both improved and worsened pricing outcomes\") for real rather than asserting it never happened."
       }
@@ -110,8 +110,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 50000,
           "activeContractCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         }
       },
       "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
@@ -127,8 +129,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
           "activeContractCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -143,8 +147,10 @@
       "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline, so nothing is ever in storage. A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-id=\"1\"]`, issue #513) rather than performing one.",
       "expect": {
         "equals": {
-          "cash": 50000,
           "activeContractCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
         "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
@@ -173,8 +179,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 50000,
           "activeContractCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     }

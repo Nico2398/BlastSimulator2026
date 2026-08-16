@@ -396,19 +396,14 @@
     },
     {
       "command": "finances",
+      "description": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. #596: cash dropped from this checkpoint's own equals (was a hand-derived 207286) — the same incidental-running-total class this file's own cycle-2/cycle-3 finances checkpoints already treat this way (see their own notes): a read-only `finances` query doesn't move cash itself (before==after for the step), so neither an exact changedBy nor a directional decreased/increased belongs here — the spend already happened in the hire/purchase/tick steps above, which is where a cash assertion belongs.",
       "interaction": [
         {
           "type": "command",
           "command": "finances"
         }
       ],
-      "role": "observe",
-      "expect": {
-        "equals": {
-          "cash": 207286
-        },
-        "note": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. diameter:0.089 added there; this checkpoint's cash corrected from 207232 to the now-exact 207286."
-      }
+      "role": "observe"
     },
     {
       "command": "employee hire role:driller",

@@ -112,8 +112,8 @@
       "role": "player",
       "expect": {
         "increased": ["buildingCount"],
-        "equals": {
-          "cash": 21544
+        "changedBy": {
+          "cash": -8000
         },
         "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost) off the $29,544 the site had left after the #553 drilling wait. $29,544, not $29,356: the drill_plan command above now passes diameter:0.089, matching the Drill panel's own DEFAULT_DIAMETER_M (Drill.ts) that the click always used — computeDrillHoleDurationTicks (DrillPlan.ts) scales duration by diameter, so the console text used to drill each hole ~2 ticks slower than the click's real grid (0.15m default vs 0.089m), leaving the drill_rig busy (fuelCostPerTick+maintenanceCostPerTick, balance.ts) for 18 more ticks across all 9 holes and draining $188 more than the real click ever did."
       }
@@ -150,8 +150,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 20544
+        "changedBy": {
+          "cash": -1000
         },
         "note": "confirmed against the real state dump (1000 for this 10-tile ramp), not computed from the pricing formula. 20544 carries forward the +188 diameter fix from the office step above (21544-1000)."
       }

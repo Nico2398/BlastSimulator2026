@@ -81,9 +81,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "employeeCount": 1,
-          "cash": 198800
+          "employeeCount": 1
         }
       }
     },
@@ -101,9 +103,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "employeeCount": 2,
-          "cash": 197800
+          "employeeCount": 2
         }
       }
     },
@@ -121,9 +125,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
         "equals": {
-          "employeeCount": 3,
-          "cash": 196300
+          "employeeCount": 3
         }
       }
     },

@@ -34,12 +34,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 3000000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -54,7 +56,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 3000000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
@@ -64,6 +65,9 @@
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -78,12 +82,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 3000000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 0,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -106,12 +112,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2998800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": -1200
         }
       }
     },
@@ -127,12 +135,14 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 2998800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -147,12 +157,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2998800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -167,12 +179,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2998800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -211,12 +225,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2998000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -251,12 +267,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2995000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": -3000
         }
       }
     },
@@ -271,12 +289,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2995000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -291,12 +311,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2995000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -311,13 +333,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2994180,
           "tickCount": 10,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
-        }
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -331,12 +355,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2994180,
           "tickCount": 10,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -351,13 +377,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2993360,
           "tickCount": 20,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
-        }
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -371,12 +399,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2993360,
           "tickCount": 20,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -391,13 +421,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2992540,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
-        }
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -411,12 +443,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2992540,
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -431,13 +465,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2991720,
           "tickCount": 40,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
-        }
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -451,12 +487,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2991720,
           "tickCount": 40,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -471,12 +509,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2991720,
           "tickCount": 40,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -491,12 +531,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2991720,
           "tickCount": 40,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -511,12 +553,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2991720,
           "tickCount": 48,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -531,12 +575,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2991720,
           "tickCount": 48,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -551,13 +597,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2990900,
           "tickCount": 56,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 1
-        }
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -571,12 +619,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2990900,
           "tickCount": 56,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -591,13 +641,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2990080,
           "tickCount": 64,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 1
-        }
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -611,12 +663,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2990080,
           "tickCount": 64,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -631,13 +685,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 2989260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 2
-        }
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -651,12 +707,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2989260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -672,12 +730,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2989260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -692,12 +752,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 2989260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -721,12 +783,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2988260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 2,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -742,12 +806,14 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 2988260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 2,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -767,12 +833,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2987260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 3,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -787,12 +855,14 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 2987260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 3,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -812,12 +882,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2986260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -832,12 +904,14 @@
       "role": "bootstrap",
       "expect": {
         "equals": {
-          "cash": 2986260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -861,12 +935,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2846260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": -140000
         }
       }
     },
@@ -885,12 +961,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2846260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -910,12 +988,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2706260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": -140000
         }
       }
     },
@@ -934,12 +1014,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2706260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -959,12 +1041,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2566260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": -140000
         }
       }
     },
@@ -983,12 +1067,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2566260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1030,7 +1116,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 2566260,
           "tickCount": 72,
           "deathCount": 0,
           "employeeCount": 4,
@@ -1040,6 +1125,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },

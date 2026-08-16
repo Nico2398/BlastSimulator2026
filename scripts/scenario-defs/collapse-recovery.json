@@ -59,10 +59,12 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
           "employeeCount": 1,
-          "collapsedCount": 0,
-          "cash": 49000
+          "collapsedCount": 0
         },
         "note": "HIRING_COSTS.driller = 1000 (balance.ts)"
       }
@@ -98,9 +100,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
         "equals": {
-          "buildingCount": 1,
-          "cash": 39000
+          "buildingCount": 1
         },
         "note": "living_quarters T1 constructionCost = 10000 (balance.ts)"
       }

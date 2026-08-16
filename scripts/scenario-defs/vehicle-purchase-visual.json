@@ -51,8 +51,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 75000,
           "vehicleCount": 1
         },
         "note": "real click on the Fleet panel's debris_hauler tier-1 row -- vehicle buy debris_hauler with no tier: arg defaults to tier 1 too (parseVehicleTierArg, vehicle.ts), so command mode and this click target the same purchase"
@@ -101,8 +103,10 @@
       "role": "player",
       "description": "A second real purchase from the same open panel: $75,000 in hand against a $35,000 drill rig, so the dealership row is enabled and clicking it buys the rig. The awaitUsable ahead of the click is the affordability assertion -- the Fleet panel disables a tier row whenever cash < purchaseCost (setTierButtonAffordable, FleetPanel.ts), so a run that had underfunded this step would fail here rather than quietly buying anyway. No toolbar click: the Vehicles panel is already open from the hauler purchase, and re-clicking the toolbar entry would close it.",
       "expect": {
+        "changedBy": {
+          "cash": -35000
+        },
         "equals": {
-          "cash": 40000,
           "vehicleCount": 2
         },
         "note": "$75,000 - $35,000; both purchases stay in the black, which is the whole point of funding the level properly instead of overdrawing"
@@ -133,8 +137,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 40000,
           "vehicleCount": 2
         }
       }

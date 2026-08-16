@@ -36,7 +36,8 @@
         { "type": "wait", "durationMs": 500 }
       ],
       "expect": {
-        "equals": { "cash": 192000, "buildingCount": 1 }
+        "changedBy": { "cash": -8000 },
+        "equals": { "buildingCount": 1 }
       }
     },
     {
@@ -49,7 +50,8 @@
         { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
       ],
       "expect": {
-        "equals": { "cash": 191000, "employeeCount": 1 }
+        "changedBy": { "cash": -1000 },
+        "equals": { "employeeCount": 1 }
       }
     },
     {
@@ -59,7 +61,7 @@
         { "type": "command", "command": "corrupt target:witness" }
       ],
       "expect": {
-        "equals": { "cash": 181000 }
+        "changedBy": { "cash": -10000 }
       },
       "role": "bootstrap"
     },
@@ -70,7 +72,7 @@
         { "type": "command", "command": "corrupt target:witness" }
       ],
       "expect": {
-        "equals": { "cash": 171000 }
+        "changedBy": { "cash": -10000 }
       },
       "role": "bootstrap"
     },
@@ -81,7 +83,7 @@
         { "type": "command", "command": "corrupt target:witness" }
       ],
       "expect": {
-        "equals": { "cash": 161000 }
+        "changedBy": { "cash": -10000 }
       },
       "role": "bootstrap"
     },

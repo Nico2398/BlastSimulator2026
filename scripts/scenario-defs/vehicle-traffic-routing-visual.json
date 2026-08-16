@@ -39,8 +39,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 149200,
           "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -59,8 +61,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 148400,
           "employeeCount": 2
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -79,8 +83,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 147600,
           "employeeCount": 3
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -99,8 +105,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 146800,
           "employeeCount": 4
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -124,8 +132,10 @@
       "description": "Opens the Fleet panel and buys hauler #1 by clicking its tier-1 dealership row. The three buys below reuse the open panel.",
       "expect": {
         "equals": {
-          "cash": 121800,
           "vehicleCount": 1
+        },
+        "changedBy": {
+          "cash": -25000
         }
       }
     },
@@ -145,8 +155,10 @@
       "description": "Hauler #2, bought by clicking the same dealership row again: $121,800 in hand against $25,000. awaitUsable is the affordability assertion -- FleetPanel disables a tier row on cash < purchaseCost, so an underfunded run fails here instead of buying anyway.",
       "expect": {
         "equals": {
-          "cash": 96800,
           "vehicleCount": 2
+        },
+        "changedBy": {
+          "cash": -25000
         }
       }
     },
@@ -166,8 +178,10 @@
       "description": "Hauler #3, same row again: $96,800 in hand against $25,000.",
       "expect": {
         "equals": {
-          "cash": 71800,
           "vehicleCount": 3
+        },
+        "changedBy": {
+          "cash": -25000
         }
       }
     },
@@ -187,8 +201,10 @@
       "description": "Hauler #4, same row again: $71,800 in hand against $25,000. This is the vehicle that makes the jam reachable -- detectTrafficJam needs 3 vehicles waiting on a tile a 4th already occupies.",
       "expect": {
         "equals": {
-          "cash": 46800,
           "vehicleCount": 4
+        },
+        "changedBy": {
+          "cash": -25000
         }
       }
     },

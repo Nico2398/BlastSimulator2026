@@ -49,8 +49,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 205000,
           "buildingCount": 1
         }
       }
@@ -66,8 +68,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 205000,
           "buildingCount": 1
         },
         "blocked": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn",
@@ -94,8 +98,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 200000
+        "changedBy": {
+          "cash": -5000
         }
       }
     },
@@ -119,8 +123,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 200000,
           "buildingCount": 1
         },
         "note": "rejected: tier 2 research is only queued, not yet completed"

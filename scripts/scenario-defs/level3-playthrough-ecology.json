@@ -42,12 +42,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 50000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -71,12 +73,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 60000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 10000
         }
       }
     },
@@ -100,12 +104,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 80000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 20000
         }
       }
     },
@@ -129,12 +135,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 92800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 12800
         }
       }
     },
@@ -150,12 +158,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 92800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -170,12 +180,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 92800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -190,7 +202,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 92800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -200,6 +211,9 @@
           "nuisance": 50,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -214,12 +228,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 92800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -261,7 +277,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 92800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -271,6 +286,9 @@
           "sequencedCount": 0,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -311,13 +329,15 @@
       "expect": {
         "equals": {
           "tickCount": 20,
-          "cash": 87212,
           "holeCount": 1,
           "orderedHoleCount": 19,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -357,13 +377,15 @@
       "expect": {
         "equals": {
           "tickCount": 40,
-          "cash": 81612,
           "holeCount": 4,
           "orderedHoleCount": 16,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -403,13 +425,15 @@
       "expect": {
         "equals": {
           "tickCount": 60,
-          "cash": 76060,
           "holeCount": 5,
           "orderedHoleCount": 15,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -449,13 +473,15 @@
       "expect": {
         "equals": {
           "tickCount": 80,
-          "cash": 70508,
           "holeCount": 8,
           "orderedHoleCount": 12,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -495,13 +521,15 @@
       "expect": {
         "equals": {
           "tickCount": 100,
-          "cash": 64882,
           "holeCount": 9,
           "orderedHoleCount": 11,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -541,13 +569,15 @@
       "expect": {
         "equals": {
           "tickCount": 120,
-          "cash": 59378,
           "holeCount": 10,
           "orderedHoleCount": 10,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -587,13 +617,15 @@
       "expect": {
         "equals": {
           "tickCount": 140,
-          "cash": 53790,
           "holeCount": 12,
           "orderedHoleCount": 8,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -633,13 +665,15 @@
       "expect": {
         "equals": {
           "tickCount": 160,
-          "cash": 48066,
           "holeCount": 13,
           "orderedHoleCount": 7,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -679,13 +713,15 @@
       "expect": {
         "equals": {
           "tickCount": 180,
-          "cash": 42464,
           "holeCount": 15,
           "orderedHoleCount": 5,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -725,13 +761,15 @@
       "expect": {
         "equals": {
           "tickCount": 200,
-          "cash": 36894,
           "holeCount": 16,
           "orderedHoleCount": 4,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -771,13 +809,15 @@
       "expect": {
         "equals": {
           "tickCount": 220,
-          "cash": 31360,
           "holeCount": 18,
           "orderedHoleCount": 2,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -817,13 +857,15 @@
       "expect": {
         "equals": {
           "tickCount": 240,
-          "cash": 25588,
           "holeCount": 20,
           "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -863,13 +905,15 @@
       "expect": {
         "equals": {
           "tickCount": 260,
-          "cash": 20088,
           "holeCount": 20,
           "orderedHoleCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -893,7 +937,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 19088,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -901,6 +944,9 @@
           "employeeCount": 6,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -919,7 +965,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 18088,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -927,6 +972,9 @@
           "employeeCount": 7,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -945,7 +993,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 17088,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -953,6 +1000,9 @@
           "employeeCount": 8,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -971,7 +1021,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 15588,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -979,6 +1028,9 @@
           "employeeCount": 9,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
         }
       }
     },
@@ -997,7 +1049,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 14088,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -1005,6 +1056,9 @@
           "employeeCount": 10,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
         }
       }
     },
@@ -1023,7 +1077,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 12588,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -1031,6 +1084,9 @@
           "employeeCount": 11,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -1500
         }
       }
     },
@@ -1049,7 +1105,6 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 11788,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -1057,6 +1112,9 @@
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": -800
         }
       }
     },
@@ -1071,7 +1129,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11788,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -1079,6 +1136,9 @@
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1093,7 +1153,6 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "cash": 11788,
           "tickCount": 260,
           "holeCount": 20,
           "orderedHoleCount": 0,
@@ -1101,6 +1160,9 @@
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
+        },
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -1116,7 +1178,6 @@
       "expect": {
         "equals": {
           "tickCount": 265,
-          "cash": 11768,
           "holeCount": 20,
           "orderedHoleCount": 0,
           "deathCount": 0,
@@ -1124,6 +1185,9 @@
           "levelEnded": false,
           "levelEndReason": null
         },
+        "decreased": [
+          "cash"
+        ],
         "note": "#553: payroll for all 12 employees is now live. This tick lands mid-event (5 of the requested 20 ticks -- \"Advanced 5 of 20 requested ticks\") because a real event fires at tick 265; the event choose 0 step right after resolves it before the next tick block can run."
       }
     },

@@ -37,8 +37,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "cash": 49000,
           "employeeCount": 1
         }
       }
@@ -73,8 +75,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -10000
+        },
         "equals": {
-          "cash": 39000,
           "buildingCount": 1
         }
       }
@@ -89,8 +93,10 @@
       ],
       "description": "role: player (issue #515): building #1's Upgrade button is present and ENABLED — `upgradeBtn.disabled` (BuildMenu.ts) only checks `nextTier === null` or affordability, not the research lock. A real click intercepts client-side and never even issues `build upgrade 1` — the same observable outcome (buildingCount/cash unchanged) as the console command's own rejection. Not `guard`: the button is reachable, just ineffective while locked.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 39000,
           "buildingCount": 1
         },
         "note": "rejected: Tier 2 living_quarters is not researched — this is Finding #27's root cause, confirmed here in state too"
@@ -115,8 +121,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 39000
+        "changedBy": {
+          "cash": 0
         },
         "note": "the policy applies for real (confirmed via a real dump: 'Policy updated: mode=shift_8h hunger=40 fatigue=25 social=20'), but has no shift-cycle effect to observe since the tier-2 bunkhouse gate is never met (Finding #27)"
       }
@@ -131,8 +137,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 39000,
           "employeeCount": 1
         }
       },

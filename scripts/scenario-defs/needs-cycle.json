@@ -47,8 +47,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 49000,
           "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": -1000
         }
       }
     },
@@ -63,8 +65,10 @@
       "description": "Left unmarked: \"hauler\" isn't a real hire role (commandOutput: \"Usage: employee hire role:(driller|blaster|driver|surveyor|manager)\") -- there is no hire button for it, this step is a genuine no-op in both modes.",
       "expect": {
         "equals": {
-          "cash": 49000,
           "employeeCount": 1
+        },
+        "changedBy": {
+          "cash": 0
         },
         "note": "confirms the fake-role hire is a real no-op, not a silent success"
       },
@@ -85,8 +89,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 47800,
           "employeeCount": 2
+        },
+        "changedBy": {
+          "cash": -1200
         }
       }
     },
@@ -121,8 +127,10 @@
       "description": "Per #526: was `build canteen at:5,5`, a phantom BuildingType (commandOutput: \"Unknown subcommand or building type\") with no catalog row to click -- \"canteen\" maps to the real living_quarters building, which is what all three need gauges (hunger, fatigue, breakNeed) actually replenish against (NEED_REST_BUILDING_TYPES, balance.ts). Converted to a real player click on the Build panel, following building-menu-visual.json's pickTile pattern.",
       "expect": {
         "equals": {
-          "cash": 37800,
           "buildingCount": 1
+        },
+        "changedBy": {
+          "cash": -10000
         },
         "note": "cash 47800 - living_quarters tier-1 constructionCost 10000 (BuildingDefs.ts) = 37800"
       },

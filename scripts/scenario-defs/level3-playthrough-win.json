@@ -41,8 +41,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -62,8 +64,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -83,8 +87,10 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -103,8 +109,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -127,8 +135,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 220000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 5,
@@ -155,8 +165,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "cash": 218800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 6,
@@ -180,8 +192,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "cash": 217600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 7,
@@ -204,8 +218,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "cash": 216600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 8,
@@ -228,8 +244,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "cash": 215600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 9,
@@ -252,8 +270,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "cash": 214600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 10,
@@ -276,8 +296,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
         "equals": {
-          "cash": 213100,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 11,
@@ -300,8 +322,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
         "equals": {
-          "cash": 211600,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
@@ -324,8 +348,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 210800,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 13,
@@ -348,8 +374,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 210000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 14,
@@ -372,8 +400,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -2000
+        },
         "equals": {
-          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -392,8 +422,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -413,8 +445,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -434,8 +468,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -454,8 +490,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 208000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -498,8 +536,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -3000
+        },
         "equals": {
-          "cash": 205000,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -538,8 +578,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 204200,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -578,8 +620,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
         "equals": {
-          "cash": 202700,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -598,8 +642,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 202700,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -618,8 +664,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 202700,
           "tickCount": 0,
           "deathCount": 0,
           "employeeCount": 15,
@@ -638,8 +686,10 @@
       ],
       "role": "setup",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 202572,
           "tickCount": 8,
           "deathCount": 0,
           "employeeCount": 15,
@@ -658,8 +708,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 202572,
           "tickCount": 8,
           "deathCount": 0,
           "employeeCount": 15,
@@ -679,8 +731,10 @@
       ],
       "role": "setup",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 192594,
           "tickCount": 16,
           "deathCount": 0,
           "employeeCount": 15,
@@ -698,8 +752,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 192594,
           "tickCount": 16,
           "deathCount": 0,
           "employeeCount": 15,
@@ -719,8 +775,10 @@
       ],
       "role": "setup",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 182616,
           "tickCount": 24,
           "deathCount": 0,
           "employeeCount": 15,
@@ -738,8 +796,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 182616,
           "tickCount": 24,
           "deathCount": 0,
           "employeeCount": 15,
@@ -759,8 +819,10 @@
       ],
       "role": "setup",
       "expect": {
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -778,8 +840,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -799,8 +863,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -819,8 +885,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -839,8 +907,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -860,8 +930,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -881,8 +953,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -902,8 +976,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -923,8 +999,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -944,8 +1022,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -965,8 +1045,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -985,8 +1067,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 172638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1013,8 +1097,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -50000
+        },
         "equals": {
-          "cash": 122638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1038,8 +1124,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 97638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1063,8 +1151,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -35000
+        },
         "equals": {
-          "cash": 62638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1088,8 +1178,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -30000
+        },
         "equals": {
-          "cash": 32638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1113,8 +1205,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -25000
+        },
         "equals": {
-          "cash": 7638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1134,8 +1228,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 7638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1154,8 +1250,10 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 7638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1174,8 +1272,10 @@
       ],
       "role": "bootstrap",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 7638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1199,8 +1299,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 7638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1246,8 +1348,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 7638,
           "tickCount": 32,
           "deathCount": 0,
           "employeeCount": 15,
@@ -1560,9 +1664,11 @@
       ],
       "role": "guard",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -387412,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1585,9 +1691,11 @@
       ],
       "role": "guard",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -387412,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1610,9 +1718,11 @@
       ],
       "role": "guard",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -387412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1635,9 +1745,11 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -387412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1655,9 +1767,11 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -387412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1675,9 +1789,11 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -387412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1700,9 +1816,11 @@
       ],
       "role": "setup",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -387412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1721,9 +1839,11 @@
       ],
       "role": "guard",
       "expect": {
+        "changedBy": {
+          "cash": 10000
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -377412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1743,9 +1863,11 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -377412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1763,9 +1885,11 @@
       ],
       "role": "guard",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -377412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 1,
@@ -1785,9 +1909,11 @@
       ],
       "role": "guard",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -377412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 1,
@@ -1807,9 +1933,11 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -377412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 1,
@@ -1827,9 +1955,11 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
           "tickCount": 410,
-          "cash": -377412,
           "deathCount": 11,
           "employeeCount": 15,
           "activeContractCount": 1,

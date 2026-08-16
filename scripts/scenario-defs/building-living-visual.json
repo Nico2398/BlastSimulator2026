@@ -51,8 +51,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 175000,
           "buildingCount": 1
+        },
+        "changedBy": {
+          "cash": -25000
         }
       }
     },
@@ -83,8 +85,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "cash": 165000,
           "buildingCount": 2
+        },
+        "changedBy": {
+          "cash": -10000
         }
       }
     },
@@ -107,8 +111,8 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "cash": 160000
+        "changedBy": {
+          "cash": -5000
         }
       }
     },

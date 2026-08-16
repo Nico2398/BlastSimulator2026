@@ -61,9 +61,11 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
         "equals": {
-          "employeeCount": 1,
-          "cash": 49000
+          "employeeCount": 1
         }
       }
     },

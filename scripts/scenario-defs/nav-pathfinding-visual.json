@@ -163,8 +163,8 @@
         }
       ],
       "expect": {
-        "equals": {
-          "cash": 25000
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "bootstrap"

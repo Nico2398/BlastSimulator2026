@@ -47,8 +47,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "cash": 48800,
           "employeeCount": 1
         }
       }
@@ -68,8 +70,10 @@
       ],
       "role": "player",
       "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
         "equals": {
-          "cash": 47600,
           "employeeCount": 2
         }
       }
@@ -181,11 +185,10 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": [
-          "cash"
-        ],
+        "changedBy": {
+          "cash": -800
+        },
         "equals": {
-          "cash": 45200,
           "pendingActionCount": 3,
           "surveyCount": 0
         },

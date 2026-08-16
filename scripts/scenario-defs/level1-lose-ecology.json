@@ -214,8 +214,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 5042800
+        "changedBy": {
+          "cash": 0
         }
       }
     },

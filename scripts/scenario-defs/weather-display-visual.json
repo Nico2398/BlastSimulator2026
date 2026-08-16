@@ -27,8 +27,8 @@
       ],
       "role": "setup",
       "expect": {
-        "equals": {
-          "cash": 50000
+        "changedBy": {
+          "cash": 0
         }
       }
     },
@@ -251,9 +251,11 @@
       ],
       "role": "observe",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "weather": "cold_snap",
-          "cash": 50000
+          "weather": "cold_snap"
         }
       }
     }
