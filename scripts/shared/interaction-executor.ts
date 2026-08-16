@@ -81,6 +81,31 @@ async function inspectSelector(page: Page, selector: string): Promise<Unclickabl
   }, selector);
 }
 
+/**
+ * Click a selector that can vanish and reappear between the wait and the
+ * click — a panel re-rendering under the game's own real-time, unpaused loop
+ * (the same class of race already fixed elsewhere via `clickIfPresent` for
+ * optional clicks; this one is not optional, so it retries instead of
+ * skipping). `page.click`'s own locate-then-click is not atomic: a DOM
+ * update in that window throws Puppeteer's unnamed "Node is either not
+ * clickable or not an Element" (#593 CI backlog, first seen on the event
+ * dialog's own choice button). Re-wait and re-click instead of failing on
+ * the first race.
+ */
+async function clickResilient(page: Page, selector: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      await page.waitForSelector(selector, { timeout: Math.max(1000, deadline - Date.now()) });
+      await page.click(selector);
+      return;
+    } catch (err) {
+      if (Date.now() > deadline) throw err;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+}
+
 /** Turn an inspection into one line a human can act on. */
 function describeUnclickable(r: UnclickableReport): string {
   const context = [
@@ -498,12 +523,11 @@ export async function executeActionOnPage(
       // Something IS pending, so the dialog must appear — wait properly rather
       // than probing briefly, and fail loudly if it never does.
       const evTimeout = action.timeoutMs ?? 30000;
-      await page.waitForSelector('#bs-event-dialog .bs-event-choice', { timeout: evTimeout });
-      await page.click('#bs-event-dialog .bs-event-choice');
+      await clickResilient(page, '#bs-event-dialog .bs-event-choice', evTimeout);
       // The outcome panel replaces the choices; dismiss it if it appears.
       try {
         await page.waitForSelector('#bs-event-dialog .bs-event-dismiss', { timeout: evTimeout });
-        await page.click('#bs-event-dialog .bs-event-dismiss');
+        await clickResilient(page, '#bs-event-dialog .bs-event-dismiss', evTimeout);
       } catch {
         // Some events resolve without an outcome panel — not a failure.
       }
