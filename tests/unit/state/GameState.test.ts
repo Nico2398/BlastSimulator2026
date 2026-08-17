@@ -449,11 +449,12 @@ describe('buildGameNavGrid (task 6.10)', () => {
 // apart on a single row — close enough that one vehicle's very first move
 // could land it on the immediate next path cell of another, permanently
 // blocking it (the occupancy-reroute bug this issue also fixes). The correct
-// formula spreads them across a SPAWN_RING_SIZE(=3)-wide/SPAWN_TILE_SPACING(=3)
-// ring, matching the `vehicle buy` spawn-placement convention.
+// formula spaces them SPAWN_TILE_SPACING(=3) cells apart along a single row
+// (spawnX = i * SPAWN_TILE_SPACING, spawnZ = 2), matching the `vehicle buy`
+// spawn-placement convention.
 
 describe('createGame — applyStaffedComposition vehicle spawn placement (issue #591)', () => {
-  it('spreads the 4 staffed vehicles across a 3-wide, 3-spaced ring instead of stacking every 2 cells on one row', () => {
+  it('spaces the 4 staffed vehicles 3 cells apart on one row instead of stacking every 2 cells', () => {
     const state = createGame({ seed: 42, staffed: true });
 
     const positions = state.vehicles.vehicles.map(v => [v.x, v.z]);
@@ -463,7 +464,7 @@ describe('createGame — applyStaffedComposition vehicle spawn placement (issue 
       [0, 2],
       [3, 2],
       [6, 2],
-      [0, 5],
+      [9, 2],
     ]);
   });
 
