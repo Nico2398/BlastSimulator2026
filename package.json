@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "console": "tsx src/console.ts",
+    "long": "tsx scripts/long-run.ts",
     "validate": "tsc --noEmit && npm run test:coverage && npm run test:integration && npm run test:scenarios && vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit --project scripts/tsconfig.json",
     "test:coverage": "vitest run --coverage",

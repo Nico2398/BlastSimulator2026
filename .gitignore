@@ -37,3 +37,6 @@ npm-debug.log*
 
 # Save files (local persistence)
 saves/
+
+# `npm run long` handles — runner-local pid/log/exit files, never a deliverable
+.agentic/
