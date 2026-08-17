@@ -22,6 +22,41 @@ const PER_PAGE = 100;
  */
 const MAX_PAGES = 20;
 
+/**
+ * Statuses worth asking a second time, and how many times to ask.
+ *
+ * Not a verdict on anything — the verdict is whatever the call finally returns.
+ * This is the network backoff `agentic-workflow-edition` allows, the same
+ * mechanism as `agentic-rescue`'s retried push, applied to reads instead.
+ *
+ * The incident: on 17 Aug 2026 three dispatches of `agentic-trigger.yml` in a
+ * row skipped every `ready` issue with "deliverable PRs could not be read
+ * (503)". One degraded API response per candidate parked the whole queue, and
+ * issue #554 sat unassigned while every run reported success.
+ */
+const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const RETRY_ATTEMPTS = 3;
+const RETRY_BASE_MS = 1000;
+
+/** Network faults arrive with no status at all; a 404 or a 403 is an answer. */
+function isTransient(error) {
+  const status = error?.status ?? 0;
+  if (status) return TRANSIENT_STATUSES.has(status);
+  return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up/i.test(
+    error?.message ?? ''
+  );
+}
+
+/**
+ * A PR body that closes this issue, as GitHub itself reads one.
+ *
+ * The fallback path only — see `closersFromTimeline`. Deliberately the keyword
+ * form and nothing else: a bare `#N` in prose is a mention, and reading one as a
+ * deliverable is what disarmed run #133 (#568).
+ */
+const closingKeyword = (number) =>
+  new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s+#${number}\\b`, 'i');
+
 /** Labels arrive as strings from some endpoints and objects from others. */
 const labelNames = (issue) =>
   (issue.labels || []).map((label) => (typeof label === 'string' ? label : label.name));
@@ -60,47 +95,114 @@ async function readAllPages(fetchPage) {
 
 /**
  * @param {object} github  authenticated octokit, as `actions/github-script` supplies
- * @param {{owner: string, repo: string, log?: (m: string) => void}} context
+ * @param {{owner: string, repo: string, log?: (m: string) => void,
+ *          sleep?: (ms: number) => Promise<void>}} context
  */
-function createIssueApi(github, { owner, repo, log = () => {} }) {
+function createIssueApi(
+  github,
+  { owner, repo, log = () => {}, sleep = (ms) => new Promise((done) => setTimeout(done, ms)) }
+) {
   const timelines = new Map();
   const issues = new Map();
   const dependencies = new Map();
   const deliverables = new Map();
 
+  /**
+   * Runs one read, asking again when the failure is a transient one.
+   *
+   * Every rule downstream fails closed on an unreadable fact, so a single 503
+   * costs an entire pass of the queue. Retrying costs seconds; the alternative
+   * is the pipeline stopping until a human dispatches it again — which on
+   * 17 Aug 2026 failed three times in a row for the same reason.
+   */
+  const read = async (what, call) => {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await call();
+      } catch (error) {
+        if (attempt >= RETRY_ATTEMPTS || !isTransient(error)) throw error;
+        log(`${what}: ${error.status ?? error.message} — asking again (${attempt}/${RETRY_ATTEMPTS - 1}).`);
+        await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
+      }
+    }
+  };
+
   /** One timeline read per issue per run — several rules ask about the same one. */
   const timeline = async (number) => {
     if (!timelines.has(number)) {
-      const read = await readAllPages((page) =>
-        github.rest.issues.listEventsForTimeline({
-          owner,
-          repo,
-          issue_number: number,
-          per_page: PER_PAGE,
-          page,
-        })
+      const events = await readAllPages((page) =>
+        read(`#${number}: timeline`, () =>
+          github.rest.issues.listEventsForTimeline({
+            owner,
+            repo,
+            issue_number: number,
+            per_page: PER_PAGE,
+            page,
+          })
+        )
       );
-      if (!read.complete) {
+      if (!events.complete) {
         log(`#${number}: timeline exceeds ${MAX_PAGES * PER_PAGE} events — read as incomplete.`);
       }
-      timelines.set(number, read);
+      timelines.set(number, events);
     }
     return timelines.get(number);
+  };
+
+  /**
+   * The closing pull requests, reconstructed from the REST timeline.
+   *
+   * Stands in for `closedByPullRequestsReferences` when that field is
+   * unavailable — the 503 of 17 Aug 2026, which no retry cleared and which left
+   * the queue with no way back except a code change. GitHub's own link is still
+   * the authority; this reproduces the half of it that a body carries, and
+   * applies the same `includeClosedPrs: false` filter the query asks for.
+   *
+   * Narrower than the field on purpose: a pull request linked by hand in the
+   * sidebar writes no keyword and is invisible here. That is the one case this
+   * path can miss, and it is worth an assignable queue — the alternative is
+   * every issue skipped at once, which is not a state the pipeline recovers from
+   * on its own.
+   */
+  const closersFromTimeline = async (number) => {
+    let events;
+    try {
+      events = await timeline(number);
+    } catch (error) {
+      log(`#${number}: timeline could not be read either (${error.status ?? error.message}).`);
+      return { closers: [], unknown: true };
+    }
+    if (!events.complete) return { closers: [], unknown: true };
+
+    const keyword = closingKeyword(number);
+    const found = new Map();
+    for (const event of events.items) {
+      const source = event.event === 'cross-referenced' ? event.source?.issue : null;
+      if (!source?.pull_request || !Number.isInteger(source.number)) continue;
+      const merged = Boolean(source.pull_request.merged_at);
+      if (!merged && source.state !== 'open') continue; // `includeClosedPrs: false`
+      if (!keyword.test(source.body || '')) continue; // a mention is not a link
+      found.set(source.number, { number: source.number, merged });
+    }
+    log(`#${number}: closing pull requests read off the timeline instead — ${found.size} found.`);
+    return { closers: [...found.values()], unknown: false };
   };
 
   return {
     async listIssuesByLabel(label) {
       const { items } = await readAllPages((page) =>
-        github.rest.issues.listForRepo({
-          owner,
-          repo,
-          labels: label,
-          state: 'open',
-          sort: 'created',
-          direction: 'asc',
-          per_page: PER_PAGE,
-          page,
-        })
+        read(`\`${label}\` listing`, () =>
+          github.rest.issues.listForRepo({
+            owner,
+            repo,
+            labels: label,
+            state: 'open',
+            sort: 'created',
+            direction: 'asc',
+            per_page: PER_PAGE,
+            page,
+          })
+        )
       );
       return items.map(normalise);
     },
@@ -112,8 +214,9 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
      */
     async getIssue(number) {
       if (issues.has(number)) return issues.get(number);
-      const result = await github.rest.issues
-        .get({ owner, repo, issue_number: number })
+      const result = await read(`#${number}`, () =>
+        github.rest.issues.get({ owner, repo, issue_number: number })
+      )
         .then(({ data }) => normalise(data))
         .catch((error) => {
           log(`#${number}: could not be read (${error.status ?? error.message}).`);
@@ -139,8 +242,14 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
      *              PR body, or linked by hand). Open and merged only,
      *              `includeClosedPrs: false`.
      *
-     * `unknown: true` means a read failed. Callers fail closed on it — a 500
-     * must never read as "this issue has no pull request".
+     * The two are read independently, and the closers read has a REST fallback
+     * (`closersFromTimeline`), because a queue must not be parked by one API
+     * surface being degraded — 17 Aug 2026, when the GraphQL field answered 503
+     * for every candidate and three dispatches in a row assigned nothing.
+     *
+     * `unknown: true` means a read failed and its fallback failed too. Callers
+     * fail closed on it — a 500 must never read as "this issue has no pull
+     * request".
      *
      * @returns {Promise<{pipeline: {number: number, merged: boolean}|null,
      *                    closers: {number: number, merged: boolean}[],
@@ -149,44 +258,63 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
     async deliverableFor(number) {
       if (deliverables.has(number)) return deliverables.get(number);
 
-      let result;
+      let pipeline = null;
+      let unknown = false;
       try {
-        const { data: headPrs } = await github.rest.pulls.list({
-          owner,
-          repo,
-          state: 'all',
-          head: `${owner}:pipeline/feature-${number}`,
-          per_page: 20,
-        });
+        const { data: headPrs } = await read(`#${number}: pipeline branch`, () =>
+          github.rest.pulls.list({
+            owner,
+            repo,
+            state: 'all',
+            head: `${owner}:pipeline/feature-${number}`,
+            per_page: 20,
+          })
+        );
         const fromPipeline = headPrs.find((pr) => pr.state === 'open' || pr.merged_at);
+        pipeline = fromPipeline
+          ? { number: fromPipeline.number, merged: Boolean(fromPipeline.merged_at) }
+          : null;
+      } catch (error) {
+        log(
+          `#${number}: the pipeline branch's pull requests could not be read (${error.status ?? error.message}).`
+        );
+        unknown = true;
+      }
 
-        const linked = await github.graphql(
-          `query($owner: String!, $repo: String!, $number: Int!) {
-             repository(owner: $owner, name: $repo) {
-               issue(number: $number) {
-                 closedByPullRequestsReferences(first: 50, includeClosedPrs: false) {
-                   nodes { number merged }
+      let closing;
+      try {
+        const linked = await read(`#${number}: closing pull requests`, () =>
+          github.graphql(
+            `query($owner: String!, $repo: String!, $number: Int!) {
+               repository(owner: $owner, name: $repo) {
+                 issue(number: $number) {
+                   closedByPullRequestsReferences(first: 50, includeClosedPrs: false) {
+                     nodes { number merged }
+                   }
                  }
                }
-             }
-           }`,
-          { owner, repo, number }
+             }`,
+            { owner, repo, number }
+          )
         );
-        const closers = (linked?.repository?.issue?.closedByPullRequestsReferences?.nodes ?? [])
-          .filter((node) => node && Number.isInteger(node.number))
-          .map((node) => ({ number: node.number, merged: Boolean(node.merged) }));
-
-        result = {
-          pipeline: fromPipeline
-            ? { number: fromPipeline.number, merged: Boolean(fromPipeline.merged_at) }
-            : null,
-          closers,
+        closing = {
+          closers: (linked?.repository?.issue?.closedByPullRequestsReferences?.nodes ?? [])
+            .filter((node) => node && Number.isInteger(node.number))
+            .map((node) => ({ number: node.number, merged: Boolean(node.merged) })),
           unknown: false,
         };
       } catch (error) {
-        log(`#${number}: deliverable PRs could not be read (${error.status ?? error.message}).`);
-        result = { pipeline: null, closers: [], unknown: true };
+        log(
+          `#${number}: closing pull requests could not be read from GraphQL (${error.status ?? error.message}).`
+        );
+        closing = await closersFromTimeline(number);
       }
+
+      const result = {
+        pipeline,
+        closers: closing.closers,
+        unknown: unknown || closing.unknown,
+      };
 
       deliverables.set(number, result);
       return result;
@@ -248,13 +376,12 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
       let result;
       try {
         const { items } = await readAllPages((page) =>
-          github.request('GET /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by', {
-            owner,
-            repo,
-            issue_number: number,
-            per_page: PER_PAGE,
-            page,
-          })
+          read(`#${number}: blocked-by relationships`, () =>
+            github.request(
+              'GET /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by',
+              { owner, repo, issue_number: number, per_page: PER_PAGE, page }
+            )
+          )
         );
         result = {
           numbers: items.map((item) => item.number).filter((n) => Number.isInteger(n)),
@@ -283,14 +410,16 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
      * brake. `null` when it never has.
      */
     async latestPipelineMergeAt() {
-      const { data } = await github.rest.pulls.list({
-        owner,
-        repo,
-        state: 'closed',
-        sort: 'updated',
-        direction: 'desc',
-        per_page: PER_PAGE,
-      });
+      const { data } = await read('the last pipeline merge', () =>
+        github.rest.pulls.list({
+          owner,
+          repo,
+          state: 'closed',
+          sort: 'updated',
+          direction: 'desc',
+          per_page: PER_PAGE,
+        })
+      );
       const stamps = data
         .filter((pr) => pr.merged_at && (pr.head?.ref || '').startsWith('pipeline/'))
         .map((pr) => Date.parse(pr.merged_at))
@@ -300,4 +429,15 @@ function createIssueApi(github, { owner, repo, log = () => {} }) {
   };
 }
 
-module.exports = { createIssueApi, labelNames, normalise, readAllPages, MAX_PAGES, PER_PAGE };
+module.exports = {
+  createIssueApi,
+  closingKeyword,
+  isTransient,
+  labelNames,
+  normalise,
+  readAllPages,
+  MAX_PAGES,
+  PER_PAGE,
+  RETRY_ATTEMPTS,
+  TRANSIENT_STATUSES,
+};

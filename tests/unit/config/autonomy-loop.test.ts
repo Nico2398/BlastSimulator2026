@@ -14,7 +14,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'fs';
+import { createRequire } from 'module';
 import { join } from 'path';
+
+const require = createRequire(import.meta.url);
 
 const ROOT = join(import.meta.dirname, '../../..');
 const workflow = (name: string): string =>
@@ -205,7 +208,6 @@ describe('a mention is never a deliverable', () => {
     '.github/workflows/agentic-watchdog.yml',
     '.github/actions/agentic-run-state/action.yml',
     '.github/actions/agentic-assign/action.yml',
-    '.github/scripts/issue-api.cjs',
     '.github/scripts/assignability.cjs',
   ])('%s never reads a cross-reference as a pull request', (file) => {
     const code = readFileSync(join(ROOT, file), 'utf8')
@@ -216,6 +218,36 @@ describe('a mention is never a deliverable', () => {
       })
       .join('\n');
     expect(code).not.toContain("'cross-referenced'");
+  });
+
+  // `issue-api.cjs` is the one file that may touch a cross-reference at all, and
+  // only inside the fallback that stands in for `closedByPullRequestsReferences`
+  // when that field is down (the 503 of 17 Aug 2026, which skipped every ready
+  // issue on three dispatches). The fallback is safe for exactly one reason: it
+  // demands a closing keyword, so a PR that merely cites the issue — #561's
+  // mention of #547, the case #568 was opened for — still counts for nothing.
+  // Drop the keyword filter and the fallback becomes the mention predicate again.
+  it('reads a cross-reference only behind a closing keyword', () => {
+    const source = readFileSync(join(ROOT, '.github/scripts/issue-api.cjs'), 'utf8');
+    const code = source
+      .split('\n')
+      .filter((line) => {
+        const trimmed = line.trim();
+        return !trimmed.startsWith('//') && !trimmed.startsWith('*');
+      })
+      .join('\n');
+
+    expect(code.match(/'cross-referenced'/g) ?? []).toHaveLength(1);
+    const fallback = code.slice(code.indexOf('const closersFromTimeline'));
+    expect(fallback.indexOf("'cross-referenced'")).toBeGreaterThan(-1);
+    expect(fallback).toContain('keyword.test');
+
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    const { closingKeyword } = require(join(ROOT, '.github/scripts/issue-api.cjs')) as any;
+    expect(closingKeyword(547).test('Closes #547')).toBe(true);
+    expect(closingKeyword(547).test('resolves #547')).toBe(true);
+    expect(closingKeyword(547).test('follow-up to #547, see the thread')).toBe(false);
+    expect(closingKeyword(547).test('Closes #5470')).toBe(false);
   });
 });
 
@@ -755,6 +787,37 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   });
 });
 
+// "Nothing assigned" is written by two opposite states: a queue that was read
+// and holds nothing eligible, and a queue that could not be read at all. On
+// 17 Aug 2026 the second one was reported as the first — three dispatches of
+// `agentic-trigger.yml`, every ready issue skipped on a 503 from the closing-PR
+// read, three green runs, and issue #554 waiting on a success that never
+// happened. A green Actions row is the only thing a human sees of this step.
+describe('an unread queue is reported as a failure', () => {
+  const assign = readFileSync(join(ROOT, '.github/actions/agentic-assign/action.yml'), 'utf8');
+
+  it('fails the step when every candidate was skipped on an unreadable fact', () => {
+    expect(assign).toMatch(/if \(unreadable && unreadable\.length > 0\) \{\s*\n\s*core\.setFailed\(/);
+  });
+
+  // The rules have to hand the step that distinction, or it has nothing to fail
+  // on: a refusal carries whether the fact behind it was read or missing.
+  it('distinguishes an unreadable refusal from an ineligible one', () => {
+    const rules = readFileSync(join(ROOT, '.github/scripts/assignability.cjs'), 'utf8');
+    expect(rules).toContain('const no = (reason, unreadable = false)');
+    expect(rules).toContain('if (verdict.unreadable) unreadable.push(');
+  });
+
+  // The other half: one degraded API surface must not be able to park the queue
+  // in the first place. The closing-PR read retries, then falls back to REST.
+  it('retries a transient read and falls back rather than parking the queue', () => {
+    const api = readFileSync(join(ROOT, '.github/scripts/issue-api.cjs'), 'utf8');
+    expect(api).toContain('TRANSIENT_STATUSES');
+    expect(api).toContain('closing pull requests could not be read from GraphQL');
+    expect(api).toContain('closing = await closersFromTimeline(number)');
+  });
+});
+
 // Only two comments in the system may carry a mention, and both are written by
 // a workflow rather than by a session. Anything else that comments would wake a
 // run nobody asked for.
@@ -840,9 +903,9 @@ describe('no verdict in the Actions layer is decided on a duration', () => {
     '.github/actions/agentic-run-state/action.yml': 'job budget for a retry',
     // Backoff between retries of a failed push. The verdict is the push result.
     '.github/actions/agentic-rescue/action.yml': 'network backoff',
-    // Ordering of two events, and the fallback window when no merge exists to
-    // anchor the cascade brake against.
-    '.github/scripts/issue-api.cjs': 'event ordering',
+    // Ordering of two events, plus the backoff between retries of a failed
+    // read — the verdict is the read's own result, never how long it took.
+    '.github/scripts/issue-api.cjs': 'event ordering + network backoff',
     '.github/scripts/assignability.cjs': 'event ordering + brake anchor',
   };
 
