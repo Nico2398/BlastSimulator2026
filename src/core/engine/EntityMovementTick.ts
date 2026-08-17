@@ -89,6 +89,14 @@ function tickVehicleDirectLine(state: GameState, vehicle: Vehicle): void {
 
 /** NavGrid-aware stepper: routes via A*, respects move costs, tracks stuck state. */
 function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
+  // Captured before the top-level findPath/advanceAlongPath call below, which
+  // always succeeds here (findPath ignores vehicle occupancy) and so always
+  // resets vehicle.isMoveStuck to false via outcome.isStuck — clobbering any
+  // stuck state set by a PRIOR tick's occupancy-escalation branch before this
+  // tick's own occupancy check gets a chance to read it. Without this capture,
+  // the rising-edge guard below always reads false and re-emits every tick.
+  const wasStuckBeforeTick = vehicle.isMoveStuck;
+
   const path = findPath(state.navGrid!, {
     agentId: vehicle.id,
     fromX: vehicle.x,
@@ -156,9 +164,12 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
 
       // No route avoids the obstacle either — escalate to stuck, same
       // rising-edge emit pattern as the !outcome.pathFound branch above.
-      const wasStuck = vehicle.isMoveStuck;
+      // Uses wasStuckBeforeTick (captured before the top-level pathfind call
+      // above reset vehicle.isMoveStuck to false), not vehicle.isMoveStuck
+      // read here — the latter is always false at this point regardless of
+      // whether this vehicle was already stuck from a prior tick.
       vehicle.isMoveStuck = true;
-      if (!wasStuck) {
+      if (!wasStuckBeforeTick) {
         emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
       }
     }
