@@ -345,7 +345,7 @@ export function getLivingEmployees(employees: readonly Employee[]): Employee[] {
  * zero-employee default the caller already relied on.
  */
 export function computeAverageMorale(employees: readonly Employee[]): number {
-  const living = employees.filter(e => e.alive);
+  const living = getLivingEmployees(employees);
   if (living.length === 0) return 50;
   return living.reduce((sum, e) => sum + e.morale, 0) / living.length;
 }

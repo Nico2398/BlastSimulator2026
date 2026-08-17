@@ -29,6 +29,7 @@ import { regenerateGrid, restoreGrid, terrainGenDatum, DEFAULT_GRID_SIZE } from 
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
+import { getLivingEmployees } from './core/entities/Employee.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { ScenePicking } from './ui/scene/ScenePicking.js';
@@ -533,6 +534,7 @@ window.__gameConsole = (cmd: string) => runGameCommand(cmd);
 window.__gameState = () => {
   if (!ctx.state) return null;
   const s = ctx.state;
+  const livingEmployees = getLivingEmployees(s.employees.employees);
   return {
     seed: s.seed,
     time: s.time,
@@ -566,19 +568,23 @@ window.__gameState = () => {
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
+    // Raw roster size, dead included — deliberate: `killEmployee` never
+    // splices `employees` (only `fireEmployee` does), so this stays a
+    // total-ever-hired count. `deathCount` tracks how many of them died; the
+    // six fields below this one filter to the living roster instead.
     employeeCount: s.employees.employees.length,
     // Qualifications the roster holds, so an interaction-mode check can prove
     // a skill was actually obtained rather than that a button merely looked clickable.
-    qualificationCount: s.employees.employees
+    qualificationCount: livingEmployees
       .reduce((n, e) => n + e.qualifications.length, 0),
-    proficiencyTotal: s.employees.employees
+    proficiencyTotal: livingEmployees
       .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
-    trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
+    trainingCount: livingEmployees.filter(e => e.trainingState !== null).length,
     // Needs mechanics: proves fatigue actually built up and collapse actually
     // fired, rather than a scenario guessing at it from a screenshot alone.
-    collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
-    minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
-    stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
+    collapsedCount: livingEmployees.filter(e => e.collapsing).length,
+    minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,

@@ -5,6 +5,7 @@ import { createRunner, type RunnerWithContext } from './console/createRunner.js'
 import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
+import { getLivingEmployees } from './core/entities/Employee.js';
 
 export { createRunner };
 export type { RunnerWithContext, CommandResult, MiningContext };
@@ -44,6 +45,7 @@ export interface SerializableGameState {
   pendingActionCount: number;
   buildingCount: number;
   vehicleCount: number;
+  /** Raw roster size, dead included — deliberate: `killEmployee` never splices `employees` (only `fireEmployee` does), so this stays a total-ever-hired count. `deathCount` tracks how many of them died; the six fields below this one filter to the living roster instead. */
   employeeCount: number;
   /** Qualifications the roster holds — proves a skill was actually obtained, not just clicked at. */
   qualificationCount: number;
@@ -82,6 +84,7 @@ export interface SerializableGameState {
 export function serializeGameState(ctx: MiningContext): SerializableGameState | null {
   const s = ctx.state;
   if (!s) return null;
+  const livingEmployees = getLivingEmployees(s.employees.employees);
   return {
     seed: s.seed,
     time: s.time,
@@ -107,14 +110,14 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     buildingCount: s.buildings.buildings.length,
     vehicleCount: s.vehicles.vehicles.length,
     employeeCount: s.employees.employees.length,
-    qualificationCount: s.employees.employees
+    qualificationCount: livingEmployees
       .reduce((n, e) => n + e.qualifications.length, 0),
-    proficiencyTotal: s.employees.employees
+    proficiencyTotal: livingEmployees
       .reduce((n, e) => n + e.qualifications.reduce((m, q) => m + q.proficiencyLevel, 0), 0),
-    trainingCount: s.employees.employees.filter(e => e.trainingState !== null).length,
-    collapsedCount: s.employees.employees.filter(e => e.collapsing).length,
-    minFatigue: s.employees.employees.reduce((m, e) => Math.min(m, e.fatigue), 100),
-    stuckEmployeeCount: s.employees.employees.filter(e => e.isMoveStuck).length,
+    trainingCount: livingEmployees.filter(e => e.trainingState !== null).length,
+    collapsedCount: livingEmployees.filter(e => e.collapsing).length,
+    minFatigue: livingEmployees.reduce((m, e) => Math.min(m, e.fatigue), 100),
+    stuckEmployeeCount: livingEmployees.filter(e => e.isMoveStuck).length,
     activeContractCount: s.contracts.active.length,
     deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,
