@@ -2939,6 +2939,7 @@
     },
     {
       "command": "scores",
+      "description": "#592: ecology dropped from 50 to 44.99999999999943 -- ActionSelection.ts's living-quarters overcapacity multiplier is now computed against living headcount rather than raw headcount (issue #592), which shifts task durations (and so tick-by-tick timing of blast/vibration events) whenever a living-quarters building was near bed capacity and an employee died -- exactly this run's own trajectory, with 4 deaths against a small crew. tickCount/deathCount/employeeCount stay unchanged (491/4/7): the fix reshuffles *when* things happen inside those same 491 ticks, not the final headcount or death toll. wellBeing/safety/nuisance stay exact -- confirmed unaffected by direct trace.",
       "interaction": [
         {
           "type": "command",
@@ -2955,13 +2956,14 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 50,
+          "ecology": 44.99999999999943,
           "nuisance": 50
         }
       }
     },
     {
       "command": "stats",
+      "description": "#592: ecology dropped here too -- same reasoning and same reused snapshot as the scores step just above.",
       "interaction": [
         {
           "type": "command",
@@ -2978,14 +2980,14 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 50,
+          "ecology": 44.99999999999943,
           "nuisance": 50
         }
       }
     },
     {
       "command": "campaign status",
-      "description": "#553 Findings, final, updated for the Employee.ts morale fix (see step 115's own note for the mechanism): the level ends in a permanent worker revolt at tick 491, not the pre-fix file's 458/471 -- but pattern 2 now finishes all 25 of its own holes before the revolt fires (holeCount: 25, orderedHoleCount: 0), where the pre-fix file found it abandoned 10 holes short. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount), matching a direct trace through this exact sequence. Cash ends at $2,029,295, down from the $3,000,000 opening bump, spent on: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), 419 ticks (72->491) of payroll/fuel/maintenance for a 4-to-7-person roster, and two punitive random events (an ore-name lawsuit -$20,000 at tick 130, a union strike -$25,000 at tick 278) -- no lucky_strike bonus landed this run, unlike the pre-#553 version of this file. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. What #553 changes is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before the level can be won, even once pattern 2's own drilling genuinely finishes.",
+      "description": "#553 Findings, final, updated for the Employee.ts morale fix (see step 115's own note for the mechanism): the level ends in a permanent worker revolt at tick 491, not the pre-fix file's 458/471 -- but pattern 2 now finishes all 25 of its own holes before the revolt fires (holeCount: 25, orderedHoleCount: 0), where the pre-fix file found it abandoned 10 holes short. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount), matching a direct trace through this exact sequence. Cash ends at $2,029,295, down from the $3,000,000 opening bump, spent on: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), 419 ticks (72->491) of payroll/fuel/maintenance for a 4-to-7-person roster, and two punitive random events (an ore-name lawsuit -$20,000 at tick 130, a union strike -$25,000 at tick 278) -- no lucky_strike bonus landed this run, unlike the pre-#553 version of this file. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. What #553 changes is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before the level can be won, even once pattern 2's own drilling genuinely finishes. #592: ecology dropped from 50 to 44.99999999999943 -- same living-quarters-overcapacity-multiplier trajectory shift as the scores/stats steps above; tickCount/deathCount/employeeCount/holeCount/orderedHoleCount and the level's own outcome (worker_revolt at 491) are all unchanged, only the intermediate tick-by-tick timing that ecology's decay/vibration deltas landed on.",
       "interaction": [
         {
           "type": "command",
@@ -3002,7 +3004,7 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 50,
+          "ecology": 44.99999999999943,
           "nuisance": 50,
           "bankrupt": false,
           "levelEnded": true,

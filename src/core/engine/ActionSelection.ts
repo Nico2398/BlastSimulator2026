@@ -6,6 +6,7 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
+import { getLivingEmployees } from '../entities/Employee.js';
 import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
@@ -53,7 +54,7 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     : undefined;
   const level = qual?.proficiencyLevel ?? 1;
   const needMult = getNeedMultiplier(employee);
-  const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, state.employees.employees.length);
+  const lqMult = getLivingQuartersWellbeingMultiplier(state.buildings, getLivingEmployees(state.employees.employees).length);
   return computeTaskDuration(BASE_TASK_DURATION_TICKS, level, needMult, lqMult, 1);
 }
 

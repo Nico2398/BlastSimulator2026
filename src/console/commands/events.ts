@@ -17,7 +17,7 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense, addIncome, type ExpenseCategory } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { processPayCycle, computeAverageMorale } from '../../core/entities/Employee.js';
+import { processPayCycle, computeAverageMorale, getLivingEmployees } from '../../core/entities/Employee.js';
 import { tickTraining } from '../../core/entities/EmployeeTraining.js';
 import { tickResearch, getTotalOperatingCost } from '../../core/entities/Building.js';
 import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
@@ -67,11 +67,11 @@ function deductExpense(
 }
 
 /** Build the EventContext from the current GameState. */
-function buildEventContext(ctx: GameContext): EventContext {
+export function buildEventContext(ctx: GameContext): EventContext {
   const s = ctx.state!;
   return {
     scores: s.scores,
-    employeeCount: s.employees.employees.length,
+    employeeCount: getLivingEmployees(s.employees.employees).length,
     deathCount: s.damage.deathCount,
     corruptionLevel: s.corruption.level,
     hasBuilding: (type: string) => s.buildings.buildings.some(b => b.type === type),

@@ -23,9 +23,10 @@ import {
 } from '../../../src/core/engine/ActionSelection.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
-import { createEmployeeState, hireEmployee, assignSkill, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
+import { createEmployeeState, hireEmployee, killEmployee, assignSkill, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS } from '../../../src/core/config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
 
 // ── NavGrid helpers (mirrors tests/unit/nav/Pathfinding.test.ts) ───────────
 
@@ -463,6 +464,36 @@ describe('computeActionWorkTicks (#549)', () => {
     const ticks = computeActionWorkTicks(state, employee, action);
 
     expect(ticks).toBe(BASE_TASK_DURATION_TICKS);
+  });
+
+  it('does not apply the living-quarters overcapacity penalty from a corpse still counted in the raw headcount (#592)', () => {
+    const state = makeGame();
+    // Tier 1 living_quarters — 20-bed capacity (BUILDING_DEFS).
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100);
+
+    const rng = new Random(SEED);
+    const { employee: testSubject } = hireEmployee(state.employees, 'driller', rng);
+    for (let i = 0; i < 19; i++) {
+      hireEmployee(state.employees, 'driller', rng);
+    }
+    // One more hire, then killed — the raw (alive+dead) headcount is now 21,
+    // over the 20-bed capacity, but the LIVING headcount is still exactly 20
+    // (at capacity, not over it). computeActionWorkTicks must pass the LIVING
+    // count into getLivingQuartersWellbeingMultiplier, not
+    // state.employees.employees.length.
+    const { employee: corpse } = hireEmployee(state.employees, 'driller', rng);
+    killEmployee(state.employees, corpse.id);
+    expect(state.employees.employees).toHaveLength(21);
+
+    const action = makeWorkAction({ type: 'general_work', requiredSkill: 'blasting' });
+    const ticks = computeActionWorkTicks(state, testSubject, action);
+
+    // Non-overcapacity tier-1 multiplier (0.90):
+    // ceil(20 * 1.00 / (1.0 * 0.90 * 1)) = 23. The overcapacity-buggy value
+    // (raw 21 > 20 beds, penalty applied, multiplier 0.80) would instead
+    // compute ceil(20 / 0.80) = 25.
+    const expectedTicks = Math.max(1, Math.ceil(BASE_TASK_DURATION_TICKS / LIVING_QUARTERS_WELLBEING_MULTIPLIERS.t1));
+    expect(ticks).toBe(expectedTicks);
   });
 });
 

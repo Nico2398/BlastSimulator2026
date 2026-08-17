@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
 import type { MiningContext } from '../../src/console-api.js';
+import { killEmployee } from '../../src/core/entities/Employee.js';
 
 /**
  * Field set window.__gameState() emits, restricted to the state-derived
@@ -306,6 +307,46 @@ describe('console-api', () => {
 
       expect(state.deathCount).toBe(1);
       expect(state.employeeCount).toBe(1);
+    });
+
+    it('computes qualificationCount/proficiencyTotal/trainingCount/collapsedCount/minFatigue/stuckEmployeeCount over the living roster only, excluding a corpse\'s frozen state (#592)', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.runner.run('employee hire role:driller');
+      runner.runner.run('employee hire role:driller');
+      const [survivor, corpse] = runner.ctx.state!.employees.employees;
+
+      // Survivor: alive, ordinary fatigue, only its starting qualification —
+      // none of the extra states below.
+      survivor!.fatigue = 40;
+
+      // Corpse: carries every one of these states at the moment of death — a
+      // second qualification, an in-progress training course, collapsing,
+      // near-zero fatigue, and stuck pathfinding — then killEmployee flips
+      // alive:false without clearing any of it (killEmployee, Employee.ts,
+      // only touches alive/injured). A reader that doesn't filter to the
+      // living roster keeps counting all of this forever, exactly like the
+      // avgMorale bug this issue is a sibling of.
+      runner.runner.run(`employee assign_skill ${corpse!.id} skill:geology level:3`);
+      corpse!.trainingState = { buildingId: 1, skill: 'blasting', ticksRemaining: 5, fee: 500 };
+      corpse!.collapsing = true;
+      corpse!.fatigue = 5;
+      corpse!.isMoveStuck = true;
+      killEmployee(runner.ctx.state!.employees, corpse!.id);
+
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      // employeeCount is intentionally NOT filtered — the flat headcount
+      // includes the corpse.
+      expect(state.employeeCount).toBe(2);
+      // Every other aggregate below should reflect the survivor alone.
+      expect(state.qualificationCount).toBe(survivor!.qualifications.length);
+      expect(state.proficiencyTotal).toBe(
+        survivor!.qualifications.reduce((sum, q) => sum + q.proficiencyLevel, 0),
+      );
+      expect(state.trainingCount).toBe(0);
+      expect(state.collapsedCount).toBe(0);
+      expect(state.minFatigue).toBe(40);
+      expect(state.stuckEmployeeCount).toBe(0);
     });
 
     it('reports zero surveyCount for a fresh game with no surveys run', () => {
