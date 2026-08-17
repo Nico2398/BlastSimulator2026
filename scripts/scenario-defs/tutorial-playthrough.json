@@ -535,8 +535,8 @@
       "role": "bootstrap"
     },
     {
-      "command": "contract accept 5",
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #5 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it.",
+      "command": "contract accept 12",
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"12\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #12 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554: id renumbered from the file's original 5 -- `charge hole:*` is now queued, real-time work, so by this point in the run the tick clock is far past where it used to be, and the contract-offer pool (`REFRESH_INTERVAL`/`MAX_AVAILABLE`, Contract.ts) has cycled past id 5 entirely. #12 is the live id verified against `contract list` at this file's real tick count (251) -- a rubble_disposal contract, same type as the original.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -544,11 +544,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"12\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"12\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -559,20 +559,20 @@
       }
     },
     {
-      "command": "contract deliver 5 amount:5000",
+      "command": "contract deliver 12 amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 5 amount:5000"
+          "command": "contract deliver 12 amount:5000"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 430 kg contract. Still true post-#552 (self-dispatching hauling): no debris_hauler exists yet at this point in the file (bought only much later, step 23) -- there is nothing for auto-dispatch to claim with yet, manual or otherwise. The console command is no better: it returns success:false (\"Not enough stored material: 0.0 kg available\") and command mode only fails a step on a thrown exception, so `contract deliver 5 amount:5000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against a 340 kg contract (#554 renumber: was contract #5/430kg -- see the accept step above for why the id moved). Still true post-#552 (self-dispatching hauling): no debris_hauler exists yet at this point in the file (bought only much later, step 28) -- there is nothing for auto-dispatch to claim with yet, manual or otherwise. The console command is no better: it returns success:false (\"Not enough stored material: 0.0 kg available\") and command mode only fails a step on a thrown exception, so `contract deliver 12 amount:5000` is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
       "expect": {
         "equals": {
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"12\"] .bs-contract-deliver",
         "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery."
       },
       "role": "guard"
@@ -715,7 +715,7 @@
       "role": "player"
     },
     {
-      "command": "contract accept 10",
+      "command": "contract accept 13",
       "interaction": [
         {
           "type": "clickSelector",
@@ -723,11 +723,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -736,23 +736,23 @@
           "activeContractCount": 2
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"10\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #10 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"13\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #13 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554: id renumbered from the file's original 10 -- same stale-id cause as the first accept step above, re-verified against `contract list` at this file's real tick count (still 251 -- nothing between the two accept steps consumes a tick). #13 is a sparkium ore_sale contract, same material the original id happened to be too."
     },
     {
-      "command": "contract deliver 10 amount:5000",
+      "command": "contract deliver 13 amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 10 amount:5000"
+          "command": "contract deliver 13 amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble #1, sparkium #2), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. Still true post-#552: the debris_hauler, its licensed driver, and the freight_warehouse are all in place by now (steps 21-25), so a haul_debris PendingAction could in principle be claimed automatically -- but no `tick` step runs anywhere between the warehouse going up and this step, so the simulation has had zero ticks in which to actually drive/load/deliver anything. Storage is still genuinely empty, not merely un-ordered. The console command returns success:false (\"Not enough sparkium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards at 0.0 kg stored (rubble #12, sparkium #13 -- #554 renumber, see the two accept steps above), so ContractsPanel disables the amount box, MAX and DELIVER on every one of them. Still true post-#552: the debris_hauler, its licensed driver, and the freight_warehouse are all in place by now (steps 26-30), so a haul_debris PendingAction could in principle be claimed automatically -- but no `tick` step runs anywhere between the warehouse going up and this step, so the simulation has had zero ticks in which to actually drive/load/deliver anything. Storage is still genuinely empty, not merely un-ordered. The console command returns success:false (\"Not enough sparkium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard instead of faking a click no player could make.",
       "expect": {
         "equals": {
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"10\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -837,7 +837,7 @@
       }
     },
     {
-      "command": "contract accept 11",
+      "command": "contract accept 14",
       "interaction": [
         {
           "type": "clickSelector",
@@ -845,11 +845,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -858,23 +858,23 @@
           "activeContractCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"11\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #11 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"14\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #14 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554: id renumbered from the file's original 11 -- same stale-id cause as the two accept steps above, re-verified against `contract list` at this file's real tick count (still 251). #14 is a gloomium ore_sale contract; the original id's material (rustite) is no longer in the offered pool by this point in the run."
     },
     {
-      "command": "contract deliver 11 amount:5000",
+      "command": "contract deliver 14 amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 11 amount:5000"
+          "command": "contract deliver 14 amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 25) and here either. The console command returns success:false (\"Not enough rustite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 30) and here either. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard. #554: id renumbered from the file's original 11 -- see the accept step above.",
       "expect": {
         "equals": {
           "activeContractCount": 3
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -1218,6 +1218,7 @@
     },
     {
       "command": "campaign status",
+      "description": "#554: activeContractCount corrected from 3 to 0 -- direct trace confirms all three contracts accepted above (steps 23, 31, 37) have expired by this point, not merely stayed undelivered. All three were accepted at the same tick (251, since nothing between accept steps consumes a tick), and their deadlines (randomly generated 30-100 ticks, ContractGen.ts) are all well under the 100 ticks that elapse before this step (tickCount 351 at this point) -- the second drill/charge/blast cycle above is now real, queued work (#553/#554) and pushes the clock this far past acceptance, whereas the pre-#554 instant-charge schedule finished the file long before any accepted contract's deadline could pass. `checkDeadlines` (Contract.ts) applies the penalty and drops each from `active` every tick once overdue -- confirmed via direct trace (cash swings sharply negative during the `tick 60` wait above from the combined penalties). No contract selection at the three accept steps could have avoided this: the offered pool's maximum possible deadline is 100 ticks, exactly the margin already consumed by the time this step runs.",
       "interaction": [
         {
           "type": "command",
@@ -1228,7 +1229,7 @@
       "expect": {
         "equals": {
           "deathCount": 3,
-          "activeContractCount": 3,
+          "activeContractCount": 0,
           "employeeCount": 5,
           "vehicleCount": 1,
           "holeCount": 0

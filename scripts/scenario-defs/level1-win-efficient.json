@@ -1920,8 +1920,8 @@
       }
     },
     {
-      "command": "contract accept material:gloomium type:ore_sale",
-      "description": "#553-followup (this batch's own proactive pass, tickCount now real): #597's stable selector, not a hardcoded id -- the earlier tick-pacing fixes (#596/#597) shifted the pool far enough that the old numeric ids (12/13) no longer exist by this checkpoint (a direct trace shows the pool now holds ids 13-20; `contract accept 12` fails outright). `material:gloomium type:ore_sale` finds the real offer regardless of its numeric id. The accept click is scoped to the real id currently offered, `[data-contract-id=\"13\"]` (`ContractsPanel` sets `data-contract-id` on offered cards too) -- interaction mode still needs a literal DOM id since there is no selector-based click primitive, so this is re-verified against a real run rather than derived by hand.",
+      "command": "contract accept type:ore_sale",
+      "description": "#554: dropped `material:gloomium` -- the queued charge action (this issue's own migration, see the `wait_until field:orderedChargeCount` step earlier) burns ~69 real ticks the pre-#554 file never spent, pushing this checkpoint from tick ~280 to tick 349 and landing on a different contract-refresh RNG draw: a direct trace of `contract list` at this exact tick shows the pool holds ore_sale offers for dirtite/treranium/sparkium only, no gloomium (gloomium is just one of eight materials `generateOneContract` can roll -- CONTRACT_ORES in Contract.ts -- never guaranteed present). `type:ore_sale` alone, the same style already used for the rubble_disposal accept below, finds the first ore_sale offer regardless of which material it happens to be -- robust to the pool rotating instead of pinned to one material that may not be on offer. The accept click is scoped to the real id currently offered, `[data-contract-id=\"18\"]` (the first ore_sale entry in a direct `contract list` trace at this tick, dirtite).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1929,11 +1929,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"18\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"18\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1951,15 +1951,15 @@
     },
     {
       "command": "contract accept type:rubble_disposal",
-      "description": "#553-followup (this batch's own proactive pass): #597's stable selector, same reasoning as the accept step above -- `type:rubble_disposal` finds the first rubble-disposal offer in the pool (real id 14) regardless of numeric id.",
+      "description": "#554: `type:rubble_disposal` finds the first rubble-disposal offer in the pool -- a direct trace at this tick shows the real id is 16, not the pre-#554 file's 14 (same tick-shift-changes-the-pool reasoning as the ore_sale accept above).",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"16\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"16\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1976,12 +1976,12 @@
       }
     },
     {
-      "command": "contract deliver material:gloomium type:ore_sale amount:110",
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- a direct trace shows 0.0 kg gloomium stored. No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #553-followup (this batch's own proactive pass): switched to #597's stable selector (same reasoning as the accept steps above) and updated the blocked DOM id to the real one now offered (13).",
+      "command": "contract deliver type:ore_sale amount:110",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- a direct trace shows 0.0 kg stored of the accepted ore (dirtite). No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #554: dropped the `material:gloomium` filter (same reasoning as the accept step above -- the active contract is whichever ore_sale offer actually got accepted, dirtite here, not gloomium) and updated the blocked DOM id to the real one now offered (18).",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver material:gloomium type:ore_sale amount:110"
+          "command": "contract deliver type:ore_sale amount:110"
         }
       ],
       "role": "guard",
@@ -1993,7 +1993,7 @@
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"13\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"18\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -2001,7 +2001,7 @@
     },
     {
       "command": "contract deliver type:rubble_disposal amount:80",
-      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #553-followup (this batch's own proactive pass): switched to #597's stable selector and updated the blocked DOM id to the real one now offered (14).",
+      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #554: updated the blocked DOM id to the real one now offered (16).",
       "interaction": [
         {
           "type": "command",
@@ -2017,7 +2017,7 @@
           "surveyCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"16\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -2460,6 +2460,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
+          "activeContractCount": 2,
           "surveyCount": 2,
           "holeCount": 0,
           "orderedHoleCount": 25
@@ -2471,11 +2472,11 @@
           "tickCount"
         ]
       },
-      "description": "#553-followup (this batch's own proactive pass, real run): dropped `activeContractCount: 2` -- landing-boundary block (both accepted contracts expire mid-window, 30-tick deadline from a real accept at tickCount 280 crossing inside this tick/event pair), same class as this file's holeCount boundary blocks elsewhere."
+      "description": "#554: re-added `activeContractCount: 2` (previously dropped as a false landing-boundary concern) -- neither contract has reached its deadline yet at this real tickCount (accepted at real tick 349; ore deadline 63, rubble deadline 95), confirmed via direct trace. activeContractCount stays a hard equals, always re-verified against the real number, never omitted."
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2060022` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved. #553-followup (this batch's own proactive pass, real run): dropped `activeContractCount: 2` -- landing-boundary block (both accepted contracts expire mid-window, 30-tick deadline from a real accept at tickCount 280 crossing inside this tick/event pair), same class as this file's holeCount boundary blocks elsewhere.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2060022` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved. #554: re-added `activeContractCount: 2` -- same reasoning as the tick step just above, confirmed via direct trace.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -2486,6 +2487,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
+          "activeContractCount": 2,
           "surveyCount": 2,
           "holeCount": 0,
           "orderedHoleCount": 25
@@ -2497,7 +2499,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 3`/`orderedHoleCount: 22` -- landing-boundary block (holeCount changes from 0 to 3 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225. #553-followup (this batch's own proactive pass, real run): corrected `activeContractCount` from 2 to 0 -- both pattern-2 contracts (accepted at real tickCount 280, 30-tick deadlines) already expired unfulfilled two steps earlier than this file previously assumed, per this batch's own tick-pacing recalibration.",
+      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 3`/`orderedHoleCount: 22` -- landing-boundary block (holeCount changes from 0 to 3 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225. #554: `activeContractCount` corrected to 2, not 0 -- a direct trace shows both accepted contracts (accepted at real tickCount 349, not the pre-#554 file's assumed 280) are still well inside their deadlines (63/95 ticks) at this real tickCount (~391); the pre-#554 file's own '30-tick deadline' premise no longer matches this run's contract pool at all.",
       "interaction": [
         {
           "type": "command",
@@ -2509,7 +2511,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 2,
           "surveyCount": 2
         },
         "decreased": [
@@ -2522,7 +2524,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2055822` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above. #553-followup (this batch's own proactive pass, real run): corrected `activeContractCount` from 2 to 0 -- both pattern-2 contracts (accepted at real tickCount 280, 30-tick deadlines) already expired unfulfilled two steps earlier than this file previously assumed, per this batch's own tick-pacing recalibration.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2055822` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above. #554: `activeContractCount` corrected to 2 -- same reasoning as the tick step just above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -2533,7 +2535,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 2,
           "surveyCount": 2
         },
         "changedBy": {
@@ -2543,7 +2545,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 7`/`orderedHoleCount: 18` -- landing-boundary block (holeCount changes from 3 to 7 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225.",
+      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 7`/`orderedHoleCount: 18` -- landing-boundary block (holeCount changes from 3 to 7 within this window), same class as the confirmed interaction-mode failure documented at tickCount 225. #554: `activeContractCount` corrected to 2 -- a direct trace at this real tickCount (~411) shows the ore contract's 63-tick deadline (accepted at real tick 349) has not yet elapsed (elapsed 62 <= 63), still active.",
       "interaction": [
         {
           "type": "command",
@@ -2555,7 +2557,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 2,
           "surveyCount": 2
         },
         "decreased": [
@@ -2568,7 +2570,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2049765` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2049765` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above. #554: `activeContractCount` corrected to 2 -- same reasoning as the tick step just above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -2579,7 +2581,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 2,
           "surveyCount": 2
         },
         "changedBy": {
@@ -2589,6 +2591,7 @@
     },
     {
       "command": "tick 20",
+      "description": "#554: `activeContractCount` corrected to 1, not 0 -- a direct trace at this real tickCount (~431) shows the ore contract (63-tick deadline, accepted at real tick 349) has now expired unfulfilled (elapsed 82 > 63, removed with its $361 penalty), but the rubble contract (95-tick deadline) has not (elapsed 82 <= 95), still active. Genuine landing boundary within this 20-tick window -- one contract expires mid-window while the other survives it.",
       "interaction": [
         {
           "type": "command",
@@ -2600,7 +2603,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "decreased": [
@@ -2613,7 +2616,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2045925` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2045925` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill on pattern 2 at this tickCount. The remaining exact fields still prove the event resolved. #554: `activeContractCount` corrected to 1 -- same reasoning as the tick step just above.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -2624,7 +2627,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "changedBy": {
@@ -2863,7 +2866,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#553 Finding (real trajectory), updated for the Employee.ts morale fix (computeAverageMorale now filters to employees.filter(e => e.alive) before averaging, where it previously summed every roster entry including corpses): this tick advance is the one that lands the WorkerRevolt threshold (REVOLT_TICKS=120 consecutive ticks at wellBeing<=0) -- tickCount 491, not the pre-fix file's 471, confirmed via direct trace (three independent tick-chunking styles agree). wellBeing first hit exactly 0 at tick 185, mid-pattern-1, same as before the fix -- pattern 1's 4 deaths crash it there regardless. What changed is what happens next: pre-fix, a dead employee's morale stayed in the average forever (frozen near 0), so pattern 2's fresh crew started already dragged toward zero and the 120-tick revolt streak completed uninterrupted. Post-fix, a dead employee drops out of the average the instant they die, so the streak gets interrupted once (a single tick's wellBeing briefly clears 0) before resuming -- delaying completion by exactly one 20-tick chunk. Real consequence: pattern 2 now has 20 more ticks to work with, which turns out to be enough to land all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) before the revolt fires -- not 10 short, as the pre-fix file's own finding claimed. The ending is unchanged: buying enough automated drilling capacity to survive one blast still doesn't leave enough workforce goodwill to survive a second, even when the second pattern itself finishes. #553-followup (this batch's own proactive pass): `cash` stays `decreased` rather than a hardcoded equals -- three tier-3 rigs are actively mid-drill on pattern 2 right up to the revolt trigger, same real-time-accrual class as line ~1072's own note. `levelEnded`/`levelEndReason` are asserted on the following step (event choose 0, index 116), not here -- this step's own tick advance is what crosses the threshold, but the engine only sets levelEndReason at the top of the next command's own tick-processing pass.",
+      "description": "#554 Finding (real trajectory, supersedes the pre-#554 tickCount-491 calibration): worker_revolt no longer fires here at all -- it already fired much earlier, during pattern 1's own `wait_until field:orderedChargeCount` step (charging is now real, queued work, ~69 ticks), well before pattern 1's blast even happens. wellBeing crashes to 0 mid-pattern-1-drilling (well before any death) and stays there uninterrupted long enough for the REVOLT_TICKS=120 streak to complete during that charge wait, so `levelEnded`/`levelEndReason` are already `true`/`worker_revolt` from that point on -- this step doesn't newly trigger anything, it just keeps observing an already-ended level. What #554 actually changes here is `tickCount`: the queued charge action's own real elapsed time shifts every fixed-size `tick N` step after it forward by a constant ~60 ticks relative to the pre-#554 file (charging used to be instant), so this checkpoint reads 551, not 491, purely from that uniform shift -- not from any change in when the revolt itself fires. Real consequence unchanged from the pre-#554 file: pattern 2 still lands all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended. `cash` stays `decreased` rather than a hardcoded equals -- three tier-3 rigs are actively mid-drill on pattern 2 right up to this checkpoint, same real-time-accrual class as line ~1072's own note.",
       "interaction": [
         {
           "type": "command",
@@ -2873,7 +2876,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2897,7 +2900,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2919,7 +2922,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2938,7 +2941,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2957,7 +2960,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
@@ -2967,7 +2970,7 @@
     },
     {
       "command": "scores",
-      "description": "#592: ecology dropped from 50 to 44.99999999999943 -- ActionSelection.ts's living-quarters overcapacity multiplier is now computed against living headcount rather than raw headcount (issue #592), which shifts task durations (and so tick-by-tick timing of blast/vibration events) whenever a living-quarters building was near bed capacity and an employee died -- exactly this run's own trajectory, with 4 deaths against a small crew. tickCount/deathCount/employeeCount stay unchanged (491/4/7): the fix reshuffles *when* things happen inside those same 491 ticks, not the final headcount or death toll. wellBeing/safety/nuisance stay exact -- confirmed unaffected by direct trace.",
+      "description": "#554: ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the queued-charge migration's own ~60-tick uniform shift (see the tickCount-551 note on the earlier tick-20/worker_revolt checkpoint) pushes this observation 60 ticks further into ecology's own decay/recovery curve than before, past the point where the #592 living-quarters-overcapacity dip had already recovered back to baseline. `nuisance` also corrected, from 50 to 46.649999999999395 -- the same 60-tick shift lands this observation mid-decay on nuisance's own curve instead of at a point where it happened to read baseline. tickCount/deathCount/employeeCount stay 551/4/7. wellBeing/safety stay exact -- confirmed unaffected by direct trace.",
       "interaction": [
         {
           "type": "command",
@@ -2977,15 +2980,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 44.99999999999943,
-          "nuisance": 50
+          "ecology": 50,
+          "nuisance": 46.649999999999395
         }
       }
     },
@@ -3001,21 +3004,21 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 44.99999999999943,
-          "nuisance": 50
+          "ecology": 50,
+          "nuisance": 46.649999999999395
         }
       }
     },
     {
       "command": "campaign status",
-      "description": "#553 Findings, final, updated for the Employee.ts morale fix (see step 115's own note for the mechanism): the level ends in a permanent worker revolt at tick 491, not the pre-fix file's 458/471 -- but pattern 2 now finishes all 25 of its own holes before the revolt fires (holeCount: 25, orderedHoleCount: 0), where the pre-fix file found it abandoned 10 holes short. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount), matching a direct trace through this exact sequence. Cash ends at $2,029,295, down from the $3,000,000 opening bump, spent on: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), 419 ticks (72->491) of payroll/fuel/maintenance for a 4-to-7-person roster, and two punitive random events (an ore-name lawsuit -$20,000 at tick 130, a union strike -$25,000 at tick 278) -- no lucky_strike bonus landed this run, unlike the pre-#553 version of this file. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. What #553 changes is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before the level can be won, even once pattern 2's own drilling genuinely finishes. #592: ecology dropped from 50 to 44.99999999999943 -- same living-quarters-overcapacity-multiplier trajectory shift as the scores/stats steps above; tickCount/deathCount/employeeCount/holeCount/orderedHoleCount and the level's own outcome (worker_revolt at 491) are all unchanged, only the intermediate tick-by-tick timing that ecology's decay/vibration deltas landed on.",
+      "description": "#554 Findings, final (supersedes the pre-#554 tickCount-491 calibration): the level still ends in a permanent worker revolt, but far earlier in real terms than any prior calibration found -- during pattern 1's own queued-charge wait (`wait_until field:orderedChargeCount`, ~69 real ticks), before pattern 1's blast even happens, not at any of tickCount 458/471/491. Pattern 2 still finishes all 25 of its own holes (holeCount: 25, orderedHoleCount: 0) despite the level having already ended before pattern 2's crew was even hired -- WorkerRevolt.ts flags the level ended but never stops task dispatch outright. deathCount stays at 4 (all from blast 1) -- the revolt is a mass walkout, not a mass casualty (WorkerRevolt.ts never touches damage.deathCount). tickCount reads 551 here, not 491 -- the queued charge action's own real elapsed time (charging used to be instant pre-#554) shifts every fixed-size `tick N` step after it forward by a constant ~60 ticks; this is a uniform pacing shift, not a change in when the revolt itself completes. Cash ends lower than the pre-#554 file's $2,029,295, reflecting 60 more ticks (491->551) of payroll/fuel/maintenance for a 4-to-7-person roster on top of the same spend: 6 tier-3 drill_rigs ($840,000), 6 driller hires + 1 surveyor ($7,200), and two punitive random events (an ore-name lawsuit -$20,000, a union strike -$25,000) -- no lucky_strike bonus landed this run. Like every other file in this batch, no hauling vehicle (debris_hauler, rock_digger, rock_fragmenter, building_destroyer) is ever bought, so both accepted contracts sit at 0.0 kg stored the whole file and expire for their full penalty before pattern 2 even lands its third hole -- the file's other, narrower point ('no hauling infrastructure means no delivery ever succeeds') holds exactly as before. Ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the same ~60-tick uniform shift pushes this observation past the point where the #592 living-quarters-overcapacity dip had already recovered to baseline. What #553/#554 together change is the premise one level up: this was never going to be an efficient $80,000 win, and it is no longer even a survivable one -- automated drilling costs enough goodwill, on top of enough cash, that the workforce quits before the level can be won, even once pattern 2's own drilling genuinely finishes.",
       "interaction": [
         {
           "type": "command",
@@ -3025,15 +3028,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 491,
+          "tickCount": 551,
           "deathCount": 4,
           "employeeCount": 7,
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 44.99999999999943,
-          "nuisance": 50,
+          "ecology": 50,
+          "nuisance": 46.649999999999395,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

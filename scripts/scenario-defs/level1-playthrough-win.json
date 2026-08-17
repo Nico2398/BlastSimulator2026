@@ -143,7 +143,7 @@
           "selector": "#bs-selection-bar [data-action=\"move_here\"]"
         }
       ],
-      "description": "The second blocker in line -- clearing #2 alone only reveals rock_digger (#3) welded to the next cell over, confirmed directly. Panel already open from the step above; re-clicking the toolbar tab here would toggle it closed (UIManager.togglePanel, the same trap #552's contract-deliver note already documents), so this step does not. Root-cause finding (real interaction-mode CI failure, 'orderedHoleCount should be 12 but is 16'): rock_digger's card has no load gauge (debris_hauler-only, makeLoadGauge), so it's shorter than #2's card, and a click on the bare `[data-vehicle-id=\"3\"]` row lands dead-center on the driver-assign control -- FleetPanel.ts's row handler treats that as a control click, not a select, and never fires onSelectVehicleCb. Confirmed directly: `#bs-selection-bar .bsx-mono` still read \"#2 · Idle\" after this click, so the whole rest of the step (cameraFocus/move_here) silently re-issued vehicle #2's own move again -- vehicle #3 never received a move order, the corridor stayed blocked, and the driller deadlocked with 0 holes landed. A prior fix pass (commit c44d23e) diagnosed this as a stale drag-rectangle/spacing-stepper mismatch on the drill_plan step and left this step's selector untouched -- that diagnosis was wrong for this file (the drill_plan grid math here was already correct: dragTiles 15,15->25,25 at the grid tool's own 3m default spacing yields exactly the declared 4x4). Fixed by scoping the click to the card's nameCol (`> div:first-child > div:nth-child(2)`), a plain non-interactive block present on every card regardless of height and never replaced by FleetPanel.ts's incremental refresh path (unlike `.bs-fleet-hp`/`.bs-fleet-status`, which are, and raced Puppeteer's click when tried first), so the click always lands on open card space and reaches the row's own select handler. Second, independent bug hiding behind the first: once selection genuinely reached vehicle #3, screen-center `mousemove x:640` still failed to move it -- a screenshot taken mid-step (`__renderFrame`-forced, matching the camera's real state) shows the cursor's own hover tooltip reading \"Rock Digger / Idle · HP 150\" AT screen center, i.e. `cameraFocus(4.5,6.5,25)` points the ray straight through rock_digger's own body (still parked at (4,2), same X as its target) before it ever reaches the ground at (4.5,6.5) -- `scenePicking.aim.terrain` resolves to nothing (a vehicle was hit, not terrain), so `move_here`'s `if (!terrain)` guard fires a silent `no_move_target` toast and no console command is ever dispatched. Confirmed directly: `vehicle list` right after this click still showed rock_digger `task: idle` at its start position -- 0 ticks had even elapsed, so any successful move would already read `task: moving`, exactly like #2's own vehicle-list check one step earlier. Moving the mouse pixel off-center (`x:750`) instead of the camera target clears the occlusion (`vehicle list` shows `task: moving`); a raycast that far off-center, this close to the camera, lands on a wildly different world point at this perspective/pitch (confirmed directly: resolves to (10,-2), nowhere near (4,6)) -- fine for this step's own purpose (get rock_digger off the corridor, cash unaffected, nothing else asserts its landing tile) and, confirmed directly by running the full scenario to its end, this landing spot does not sit in any other vehicle's later path. An intermediate attempt tried shifting the *camera focus target* by one metre in X instead (keeping the cursor dead-center) to land closer to the declared tile -- it broke the occlusion too and landed nearer (5,9) -- but that spot turned out to sit squarely in debris_hauler #2's own hauling route: `contract deliver` below stalled forever (`storedMassKg` stuck at 0, debris_hauler frozen mid-tile at (4.12,8.12) for 10+ ticks, task still reading `moving`), the same occupancy-blocks-pathing class of bug the file's own vehicle-deadlock finding already documents, just triggered by a well-meaning `vehicle move` destination instead of staffed:true's own spawn layout. Reverted to the cursor-offset landing since a `vehicle move` step's own destination precision is not itself under test here, only that the corridor clears and nothing downstream gets blocked -- confirmed by a full scenario run reaching `contract deliver` successfully with this landing tile.",
+      "description": "The second blocker in line -- clearing #2 alone only reveals rock_digger (#3) welded to the next cell over, confirmed directly. Panel already open from the step above; re-clicking the toolbar tab here would toggle it closed (UIManager.togglePanel, the same trap #552's contract-deliver note already documents), so this step does not. Root-cause finding (real interaction-mode CI failure, 'orderedHoleCount should be 12 but is 16'): rock_digger's card has no load gauge (debris_hauler-only, makeLoadGauge), so it's shorter than #2's card, and a click on the bare `[data-vehicle-id=\"3\"]` row lands dead-center on the driver-assign control -- FleetPanel.ts's row handler treats that as a control click, not a select, and never fires onSelectVehicleCb. Confirmed directly: `#bs-selection-bar .bsx-mono` still read \"#2 \u00b7 Idle\" after this click, so the whole rest of the step (cameraFocus/move_here) silently re-issued vehicle #2's own move again -- vehicle #3 never received a move order, the corridor stayed blocked, and the driller deadlocked with 0 holes landed. A prior fix pass (commit c44d23e) diagnosed this as a stale drag-rectangle/spacing-stepper mismatch on the drill_plan step and left this step's selector untouched -- that diagnosis was wrong for this file (the drill_plan grid math here was already correct: dragTiles 15,15->25,25 at the grid tool's own 3m default spacing yields exactly the declared 4x4). Fixed by scoping the click to the card's nameCol (`> div:first-child > div:nth-child(2)`), a plain non-interactive block present on every card regardless of height and never replaced by FleetPanel.ts's incremental refresh path (unlike `.bs-fleet-hp`/`.bs-fleet-status`, which are, and raced Puppeteer's click when tried first), so the click always lands on open card space and reaches the row's own select handler. Second, independent bug hiding behind the first: once selection genuinely reached vehicle #3, screen-center `mousemove x:640` still failed to move it -- a screenshot taken mid-step (`__renderFrame`-forced, matching the camera's real state) shows the cursor's own hover tooltip reading \"Rock Digger / Idle \u00b7 HP 150\" AT screen center, i.e. `cameraFocus(4.5,6.5,25)` points the ray straight through rock_digger's own body (still parked at (4,2), same X as its target) before it ever reaches the ground at (4.5,6.5) -- `scenePicking.aim.terrain` resolves to nothing (a vehicle was hit, not terrain), so `move_here`'s `if (!terrain)` guard fires a silent `no_move_target` toast and no console command is ever dispatched. Confirmed directly: `vehicle list` right after this click still showed rock_digger `task: idle` at its start position -- 0 ticks had even elapsed, so any successful move would already read `task: moving`, exactly like #2's own vehicle-list check one step earlier. Moving the mouse pixel off-center (`x:750`) instead of the camera target clears the occlusion (`vehicle list` shows `task: moving`); a raycast that far off-center, this close to the camera, lands on a wildly different world point at this perspective/pitch (confirmed directly: resolves to (10,-2), nowhere near (4,6)) -- fine for this step's own purpose (get rock_digger off the corridor, cash unaffected, nothing else asserts its landing tile) and, confirmed directly by running the full scenario to its end, this landing spot does not sit in any other vehicle's later path. An intermediate attempt tried shifting the *camera focus target* by one metre in X instead (keeping the cursor dead-center) to land closer to the declared tile -- it broke the occlusion too and landed nearer (5,9) -- but that spot turned out to sit squarely in debris_hauler #2's own hauling route: `contract deliver` below stalled forever (`storedMassKg` stuck at 0, debris_hauler frozen mid-tile at (4.12,8.12) for 10+ ticks, task still reading `moving`), the same occupancy-blocks-pathing class of bug the file's own vehicle-deadlock finding already documents, just triggered by a well-meaning `vehicle move` destination instead of staffed:true's own spawn layout. Reverted to the cursor-offset landing since a `vehicle move` step's own destination precision is not itself under test here, only that the corridor clears and nothing downstream gets blocked -- confirmed by a full scenario run reaching `contract deliver` successfully with this landing tile.",
       "role": "player",
       "expect": {
         "changedBy": {
@@ -710,6 +710,237 @@
       }
     },
     {
+      "command": "drill_plan remove hole:H5",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      },
+      "description": "#554/new finding: charging is now real, queued work (one `charge_hole` action per hole, landed by a blaster physically walking to the hole) -- draining the charge queue below takes dozens of real ticks, during which drill_rig #1 (still holding 12 more ordered holes) keeps drilling regardless, landing 4 more holes inside that same window (confirmed directly: sandbox trace, holeCount 4->8 across the charge-wait alone). `sequence auto` sequences every currently-drilled hole unconditionally (autoVPattern over ctx.state.drillHoles, DrillPlan.ts) and `blast`'s own validateBlastPlan (BlastPlan.ts) requires a charge AND a sequence delay for every drilled hole with no partial-pattern option -- so any hole that lands after the charge order was placed can never be blasted without re-charging it, and re-charging costs further real ticks that let the driller land still more holes, a divergence that only resolves once the full 16-hole pattern is drilled (confirmed directly, sandbox trace across 3 recharge rounds: holeCount 4->8->12->15 and climbing), busting this file's own already-documented bankruptcy runway long before a second blast could ever happen. #553's own drilling-time budget and #554's own charging-time budget were each individually calibrated against an INSTANT partner action; wired together, the driller has nothing to stop it from outrunning the deliberately-truncated 4-hole pattern the instant charging needs its own real time too. Fixed the same way a player would: cancelling the 12 still-ordered (never-drilled) holes right after the tick-60 cutoff and before charging starts, via the Drill panel's own per-hole delete button (`drill_plan remove hole:<id>`, Drill.ts's `makeOrderedHoleRow` -- a real, player-clickable control, not a console-only shortcut). With nothing left ordered, the driller has no more work once its current in-flight hole (if any) finishes, so no ticks spent waiting on the charge queue ever grow holeCount past 4 again -- holeCount/chargedCount/sequencedCount converge cleanly at 4 instead of chasing a moving target. Ordered rows render before drilled rows in the panel (DrillStep.render, `...ordered.map(...), ...holes.map(...)`), so the SAME selector, clicked repeatedly, always removes the first remaining ORDERED hole -- never one of the 4 already-drilled ones -- letting this single selector serve for all 12 clicks. New finding: the driller (and any other blasting-qualified employee freed up once its own task ends) gets auto-dispatched to charge a hole in person and doesn't proactively leave once done -- so unlike the pre-#554 file (deathCount 1, only the surveyor near the survey tile), several of the employees who physically loaded a charge are still standing on their hole when it fires. See the blast step below for the resulting death toll, sandbox-confirmed and now hard-asserted for real."
+    },
+    {
+      "command": "drill_plan remove hole:H6",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H7",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H8",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H9",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H10",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H11",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H12",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H13",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H14",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H15",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "orderedHoleCount"
+        ]
+      }
+    },
+    {
+      "command": "drill_plan remove hole:H16",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"remove-hole\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      },
+      "description": "Last of the 12 cancellations -- drill plan now holds exactly the 4 already-landed holes and nothing more, matching this file's original, deliberately-truncated pattern."
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
@@ -741,7 +972,7 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. `charge-all` only ever reaches the 4 already-drilled holes -- the 12 still-ordered ones are not chargeable yet, matching chargedCount below.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. `charge-all` only ever reaches the 4 already-drilled holes -- the 12 still-ordered ones are not chargeable yet, matching chargedCount below.",
       "role": "player",
       "expect": {
         "increased": [
@@ -823,14 +1054,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). Real root cause of the command-vs-interaction split previously documented here (deathCount 2 vs 1, vehicleCount 3 vs 4): the drill_plan step above was missing `diameter:` -- the same class of bug vibration-budget.json's own history already found and fixed (see that file's finances-step note) -- so command mode's `drill_hole` actions ran at mining.ts's console-only fallback diameter (0.15m) while interaction mode's real grid-tool click always sends the panel's own DEFAULT_DIAMETER_M (0.089m, Drill.ts); computeDrillHoleDurationTicks scales duration by diameter, so the smaller real diameter drills measurably faster. With no diameter: specified, command mode's driller had less spare time left in this file's 60-tick drilling window and stayed idle at (22,15), parked among the holes it just drilled and inside this blast's radius; drill_rig #1 (and its driver, employee #1, mid rest-cycle and dismounted onto the vehicle's own position by #593's fix) died with it there. Fixed by adding diameter:0.089 to the drill_plan command, matching the real click exactly -- confirmed directly (full state diff, zero fields differing) that both modes now finish the same 4 holes with identical spare time and drive the rig on toward H5 (drill_rig #1 lands at (15, 17.2666...), 75% of the way from H1 to H5, bit-identical between modes and across repeated runs) -- outside this blast's radius in both. `deathCount`/`vehicleCount` now agree and are both hard-asserted; this was a scenario-authoring gap (a missing UI-matching argument), not an engine timing gap.",
+      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). Real root cause of the command-vs-interaction split previously documented here (deathCount 2 vs 1, vehicleCount 3 vs 4): the drill_plan step above was missing `diameter:` -- the same class of bug vibration-budget.json's own history already found and fixed (see that file's finances-step note) -- so command mode's `drill_hole` actions ran at mining.ts's console-only fallback diameter (0.15m) while interaction mode's real grid-tool click always sends the panel's own DEFAULT_DIAMETER_M (0.089m, Drill.ts); computeDrillHoleDurationTicks scales duration by diameter, so the smaller real diameter drills measurably faster. With no diameter: specified, command mode's driller had less spare time left in this file's 60-tick drilling window and stayed idle at (22,15), parked among the holes it just drilled and inside this blast's radius. Fixed by adding diameter:0.089 to the drill_plan command, matching the real click exactly. `deathCount` updated for #554 (renumbered again): drill_rig #1 itself still survives (its driver, employee #1, was mid rest-cycle and dismounted onto the vehicle's own position at (15, 17.2666...) by #593's fix, then the 12 hole-cancellation steps above froze it there for good -- outside this blast's radius, matching `vehicleCount`:4 below) -- but charging is now real, in-person work (#554): every blasting-qualified employee the game auto-dispatched to load one of the 4 charges (employee #1 once its drilling task ended, staffed:true's own free blaster #2, and two of the hand-hired blasters/drillers) walked to that hole and stayed there once done, with the hired surveyor #6 from the original finding above. Five employees standing on live charges when they fire -- sandbox-confirmed directly (`employees.filter(e => !e.alive)`: #1 at H2's (18,15), #2 at H1's (15,15), #6 at (15,15), plus two more hired blasters at H2/H4) -- is the real, reproducible toll now, not an authoring gap.",
       "role": "player",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 1,
+          "deathCount": 5,
           "vehicleCount": 4
         }
       }
@@ -843,9 +1074,9 @@
           "command": "scores"
         }
       ],
+      "description": "wellBeing dropped from this equals block (issue #596's own rule): it settles wherever the charge-wait above (#554, real ticks now) happened to leave it, not a value this step's own read-only `scores` call moves or that the scenario's narrative depends on -- exactly the incidental-checkpoint case the rule calls out, so it is not re-captured as another precise float. safety/ecology/nuisance are still the file's own point here (unaffected by the blast at this exact instant, before any post-blast events fire) and stay hard-asserted.",
       "expect": {
         "equals": {
-          "wellBeing": 91.68692307692326,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
@@ -871,10 +1102,10 @@
           "command": "tick 10"
         }
       ],
-      "description": "#553/new: a `lucky_strike` event is already pending the instant this tick is requested (fired as a side effect of the blast above) -- 0 of the 10 requested ticks advance; the tick command itself refuses until the event is resolved, same as every other pending-event guard in this file.",
+      "description": "#553/new: a `lucky_strike` event is already pending the instant this tick is requested (fired as a side effect of the blast above) -- 0 of the 10 requested ticks advance; the tick command itself refuses until the event is resolved, same as every other pending-event guard in this file. tickCount converted to `changedBy` (issue #596): its own point is that the pending event blocks the whole batch, not a specific running total -- robust to the charge-wait above (#554) landing on a different real-tick total.",
       "expect": {
-        "equals": {
-          "tickCount": 66
+        "changedBy": {
+          "tickCount": 0
         }
       },
       "role": "setup"
@@ -895,7 +1126,7 @@
       }
     },
     {
-      "command": "contract accept 2",
+      "command": "contract accept 4",
       "interaction": [
         {
           "type": "clickSelector",
@@ -903,14 +1134,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
         }
       ],
-      "description": "Finding #48 (unchanged): the Fleet panel's Haul button always sends the vehicle to `findReachableGroundFragment` -- the NEAREST reachable, non-oversized fragment, with no regard for ore content -- and #552 self-dispatches hauling automatically, so a player cannot target a specific fragment by ore at all. The contract must match what the hauler will actually claim, not the reverse: this cycle's nearest reachable fragment carries no named ore, so contract #2 (rubble disposal, materialId '') is the one it can satisfy, confirmed by replaying this file's own exact command sequence. New finding, real interaction-mode CI: this step used to sit right after `contract list`, before the tick-10/event-choose pair above -- but `lucky_strike` (fired as a side effect of the blast, several steps up) is already pending by then, and unlike command mode, where a pending event is just state until something reads it, a real browser shows its modal (`.bs-confirm-overlay`) the instant it goes pending, sitting over the whole shell and blocking this step's own toolbar click (confirmed directly: `clickSelector` failed with \"covered by div.bs-confirm-overlay\"). Moved to after the tick-10/event-choose pair instead, which the file was already going to run anyway -- `lucky_strike` is resolved for real by the time this step's click reaches the toolbar, in both modes, and every tickCount checkpoint from here on is untouched: the tick-10 call this step now follows was going to advance 0 ticks regardless of where `contract accept` sat around it, so the hauling window `contract deliver` below still measures (#552, 20 real ticks: two full tick-10 calls, the third being this reordered pair's own already-blocked one) is unchanged.",
+      "description": "Finding #48 (unchanged): the Fleet panel's Haul button always sends the vehicle to `findReachableGroundFragment` -- the NEAREST reachable, non-oversized fragment, with no regard for ore content -- and #552 self-dispatches hauling automatically, so a player cannot target a specific fragment by ore at all. The contract must match what the hauler will actually claim, not the reverse: this cycle's nearest reachable fragment carries no named ore, so the rubble-disposal contract (materialId '') is the one it can satisfy, confirmed by replaying this file's own exact command sequence. #554/new: contract id renumbered 2->4 -- the charge-wait above (real, queued `charge_hole` work, dozens of extra ticks) consumes a longer slice of the contract-generation RNG stream than the old instant-charge timing did, so by the time this step runs the generator has moved on to a later id for the same rubble-disposal contract type (`contract list` right before this step confirms it: `[4] Dispose of rubble`). Re-verified directly, not guessed -- an id shift here is exactly the kind of downstream consequence #554's own timing change forces. New finding, real interaction-mode CI: this step used to sit right after `contract list`, before the tick-10/event-choose pair above -- but `lucky_strike` (fired as a side effect of the blast, several steps up) is already pending by then, and unlike command mode, where a pending event is just state until something reads it, a real browser shows its modal (`.bs-confirm-overlay`) the instant it goes pending, sitting over the whole shell and blocking this step's own toolbar click (confirmed directly: `clickSelector` failed with \"covered by div.bs-confirm-overlay\"). Moved to after the tick-10/event-choose pair instead, which the file was already going to run anyway -- `lucky_strike` is resolved for real by the time this step's click reaches the toolbar, in both modes.",
       "role": "player"
     },
     {
@@ -921,9 +1152,10 @@
           "command": "tick 10"
         }
       ],
+      "description": "tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning -- robust to the charge-wait above (#554) landing on a different real-tick total.",
       "expect": {
-        "equals": {
-          "tickCount": 76
+        "changedBy": {
+          "tickCount": 10
         },
         "decreased": [
           "cash"
@@ -949,9 +1181,10 @@
           "command": "tick 10"
         }
       ],
+      "description": "tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning -- robust to the charge-wait above (#554) landing on a different real-tick total.",
       "expect": {
-        "equals": {
-          "tickCount": 86
+        "changedBy": {
+          "tickCount": 10
         },
         "decreased": [
           "cash"
@@ -970,27 +1203,29 @@
       "role": "player"
     },
     {
-      "command": "contract deliver 2 amount:260",
+      "command": "contract deliver 4 amount:260",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-amount"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-amount"
         },
         {
           "type": "set",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-amount",
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-amount",
           "value": "260"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
         }
       ],
-      "description": "#552: hauling self-dispatched automatically once debris_hauler #2 (relocated close to the blast site, not off-map -- see the vehicle-move steps above) had somewhere to go; 30 ticks (the 3 tick-10 steps above) was enough for a full round trip and back, confirmed directly (storedMassKg > 260 by this point). One haul is enough to complete this 260kg contract outright, same as the pre-#552 flow's own single-haul sizing.",
+      "description": "#552: hauling self-dispatched automatically once debris_hauler #2 (relocated close to the blast site, not off-map -- see the vehicle-move steps above) had somewhere to go; 30 ticks (the 3 tick-10 steps above) was enough for a full round trip and back, confirmed directly (storedMassKg > 260 by this point). One haul is enough to complete this 260kg contract outright, same as the pre-#552 flow's own single-haul sizing. Contract id renumbered 2->4 (see the `contract accept` step's own #554 finding); tickCount converted to `changedBy: 0` (issue #596) -- this step is itself a non-ticking console call, its own point is that delivery doesn't advance the clock, not a specific running total. deathCount updated 1->5, matching the blast step's own #554 finding (charging-in-person casualties).",
       "expect": {
+        "changedBy": {
+          "tickCount": 0
+        },
         "equals": {
-          "tickCount": 86,
-          "deathCount": 1
+          "deathCount": 5
         },
         "increased": [
           "cash"
@@ -1006,9 +1241,10 @@
           "command": "tick 10"
         }
       ],
+      "description": "tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning -- robust to upstream timing shifting the real-tick total this step starts from.",
       "expect": {
-        "equals": {
-          "tickCount": 96
+        "changedBy": {
+          "tickCount": 10
         },
         "decreased": [
           "cash"
@@ -1034,10 +1270,11 @@
           "command": "tick 10"
         }
       ],
+      "description": "Sandbox-confirmed: only 1 of the 10 requested ticks advances here -- a spontaneous event goes pending mid-batch (same `tick` guard as every other pending-event interruption in this file) after just 1 tick rather than after the full 10, unlike the other `tick 10` steps in this stretch. Left as `increased` rather than a pinned `changedBy` count -- the exact tick this particular event happens to interrupt on is incidental to what this step is testing (that the clock keeps moving at all), not the step's own subject.",
       "expect": {
-        "equals": {
-          "tickCount": 106
-        },
+        "increased": [
+          "tickCount"
+        ],
         "decreased": [
           "cash"
         ]
@@ -1062,10 +1299,10 @@
           "command": "tick 10"
         }
       ],
-      "description": "#553/new: the mine is seized by bankruptcy inside this window (ticksBelowThreshold reaches BANKRUPTCY_GRACE_TICKS=100 at cumulative tick 119, Bankruptcy.ts) -- cash has stayed under the $5,000 threshold continuously since shortly after setup, and the one contract delivery above was nowhere near enough to pull it back above that line. See the file description's bankruptcy finding for why no crew configuration sandbox-tested for this file avoids this.",
+      "description": "#553/new: the mine is seized by bankruptcy inside this window (ticksBelowThreshold reaches BANKRUPTCY_GRACE_TICKS=100 at cumulative tick 119, Bankruptcy.ts) -- cash has stayed under the $5,000 threshold continuously since shortly after setup, and the one contract delivery above was nowhere near enough to pull it back above that line. See the file description's bankruptcy finding for why no crew configuration sandbox-tested for this file avoids this. tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning.",
       "expect": {
-        "equals": {
-          "tickCount": 116
+        "changedBy": {
+          "tickCount": 10
         },
         "decreased": [
           "cash"
@@ -1106,11 +1343,11 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. `weather_geomagnetic_storm`'s option 0 (Faraday Cages) costs a further $18,000 -- deterministic under this file's fixed seed, and by this point purely academic: the mine is already bankrupt. New finding, real interaction-mode CI: `safety` and `ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). A surviving rig is a real piece of equipment several score dimensions weigh differently, not a scenario-authoring gap -- confirmed directly (`safety` 2.95 rather than command mode's 10; `ecology` 65 rather than 50). `wellBeing` is unaffected and stays hard-asserted.",
+      "description": "Resolved through the event dialog's own buttons. `weather_geomagnetic_storm`'s option 0 (Faraday Cages) costs a further $18,000 -- deterministic under this file's fixed seed, and by this point purely academic: the mine is already bankrupt. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). `wellBeing` re-verified for #554 (renumbered again): 99.95 -> 94.67250000000006 -- the 5-casualty toll (charging-in-person, see the blast step's own #554 finding) and the extra real ticks the charge-wait consumes both feed into it directly, so the old pre-#554 figure no longer applies; still the file's own genuine subject here, so it stays a hard-asserted equals rather than loosened to a direction.",
       "role": "player",
       "expect": {
         "equals": {
-          "wellBeing": 99.95,
+          "wellBeing": 94.67250000000006,
           "nuisance": 50
         }
       }
@@ -1123,19 +1360,19 @@
           "command": "campaign status"
         }
       ],
-      "description": "#596/#597: tickCount updated 125->126, matching the `tick 10` step above -- setupEvents idempotency + cooldown-threshold caching moved when weather_geomagnetic_storm goes pending, so this final batch now completes uninterrupted (see that step's own finding). Genuine terminal checkpoint (bankruptcy shutdown) -- stays a pinned absolute, per issue #596's own carve-out, just re-verified against the real current number rather than converted. Findings #45-51 (unchanged) plus two new ones (see file description): the vehicle-pathing deadlock that staffed:true's own vehicle-spawn layout creates on dusty_hollow's terrain, and the bankruptcy that #553's real drilling time forces on this file's budget once that deadlock is worked around. This file's original sequence could never reach its named $80k profit target even before #553 (building types that don't exist, no vehicle ever bought, silently-rejected assign_skill syntax); under #553 the target isn't just distant, it's structurally unreachable -- sandbox-measured across six crew configurations, landing all 16 holes of even the first pattern keeps cash under the bankruptcy threshold for well over the 100-tick grace period no matter how the crew is sized, and buying a second drill_rig only makes the runway shorter. What this file proves instead: blasting with a genuinely truncated 4-of-16 pattern still rates PERFECT and produces hundreds of fragments, so drilling, charging, sequencing, blasting, one real death, surviving-rig follow-up drilling, self-dispatched hauling (#552), and one full contract cycle all still get exercised for real, once. The mine is seized by bankruptcy shortly after -- the second pattern, second contract cycle, and the $80k target are never reached, not from an authoring mistake but because this cycle's $10,519.97 in windfall-plus-contract income was never going to offset 13 employees and a warehouse. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects, unrelated to the drilling-diameter fix below. Update: `vehicleCount`/`holeCount`/`orderedHoleCount` -- previously not hard-asserted here (\"a genuine, reproducible command-vs-interaction drilling-speed divergence\") -- are hard-asserted again. Real root cause, confirmed directly (full state diff between modes right before the blast step's own `tick 60`, zero fields differing once fixed): the blast step's own drill_plan command was missing `diameter:` -- the same class of bug vibration-budget.json's own history already found -- so command mode's holes drilled at mining.ts's console-only fallback diameter (0.15m) while interaction mode's real grid-tool click always sends DEFAULT_DIAMETER_M (0.089m, Drill.ts), and computeDrillHoleDurationTicks scales duration by diameter, so command mode's driller had measurably less spare time in the shared 60-tick window, stayed parked inside the blast radius, and lost the rig where interaction mode's driller had already moved clear. Fixed by adding diameter:0.089 to that drill_plan command; both modes now finish the same 4 holes with identical spare time, drive the surviving rig on to keep drilling through every `tick 10` afterward, and land here at identical `holeCount`/`orderedHoleCount`/`vehicleCount`/`deathCount` (verified twice, command and interaction, both fresh runs) -- a scenario-authoring gap, not an engine-timing one.",
+      "description": "#554: tickCount, deathCount, holeCount, and orderedHoleCount all updated for the fix above (12 hole-cancellation steps right after the tick-60 cutoff, so charging's own real time never lets the driller outrun the deliberately-truncated 4-hole pattern -- see the blast step's own #554 finding). tickCount 126->160: the charge-wait alone (draining 4 real `charge_hole` orders) now costs dozens of real ticks that the pre-#554 instant-charge file never spent, on top of which one `tick 10` batch in this stretch is only ever able to advance 1 tick before a fresh event interrupts it (see that step's own finding) rather than the smooth 10. Still a genuine terminal checkpoint (bankruptcy shutdown) -- stays a pinned absolute, per issue #596's own carve-out, just re-verified against the real current number rather than converted. holeCount/orderedHoleCount both settle at 0 rather than the old 5/7: with every hole beyond the first 4 cancelled before charging ever starts, nothing is ever ordered again after the blast, so there is no further drilling left to land. deathCount 1->5: charging is now real, in-person work (#554) -- every blasting-qualified employee auto-dispatched to load one of the 4 charges stayed on their hole once done, so 5 employees (the original surveyor plus 4 who charged holes) are lost, not 1; see the blast step's own finding for the roster. Findings #45-51 (unchanged) plus two new ones (see file description): the vehicle-pathing deadlock that staffed:true's own vehicle-spawn layout creates on dusty_hollow's terrain, and the bankruptcy that #553's real drilling time forces on this file's budget once that deadlock is worked around. This file's original sequence could never reach its named $80k profit target even before #553 (building types that don't exist, no vehicle ever bought, silently-rejected assign_skill syntax); under #553/#554 the target isn't just distant, it's structurally unreachable. What this file proves instead: blasting with a genuinely truncated 4-of-16 pattern still rates PERFECT and produces hundreds of fragments, so drilling, charging, sequencing, blasting, five real deaths, self-dispatched hauling (#552), and one partial contract delivery all still get exercised for real, once. The mine is seized by bankruptcy shortly after -- the second pattern, second contract cycle, and the $80k target are never reached. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
       "expect": {
         "equals": {
-          "tickCount": 126,
-          "deathCount": 1,
+          "tickCount": 160,
+          "deathCount": 5,
           "employeeCount": 13,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy",
           "surveyCount": 1,
           "vehicleCount": 4,
-          "holeCount": 5,
-          "orderedHoleCount": 7
+          "holeCount": 0,
+          "orderedHoleCount": 0
         }
       },
       "role": "setup"

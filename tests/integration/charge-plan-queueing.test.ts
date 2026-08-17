@@ -271,3 +271,59 @@ describe('drill_plan clear / remove — cancel outstanding charge_hole actions t
     expect(state.plannedChargesByHole[second!]).toBeDefined();
   });
 });
+
+// The player's other cancel path — the Operations panel's Work Queue cancel
+// button (OperationsPanel.ts) issues `employee cancel <id>` directly, not
+// `drill_plan clear`/`remove`. That command calls the generic `cancelAction`
+// (TaskDispatch.ts) alone, which is deliberately ignorant of mining-specific
+// state so it can cancel any action type — so without its own cleanup this
+// path left a permanent ghost in plannedChargesByHole/plannedDrillHoles even
+// though `cancelAction` itself reported success (#554 code review, found by
+// @semantic-reviewer, reproduced live before this fix).
+describe('employee cancel <id> — the generic cancel path also releases the planned-hole ghost (#554)', () => {
+  it('cancelling a charge_hole action via employee cancel clears plannedChargesByHole, not just the PendingAction', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+    drillAndLand(run, state, 'rows:1 cols:1 spacing:5 depth:8 start:14,14');
+    const holeId = state.drillHoles[0]!.id;
+
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+    const action = state.pendingActions.find(a => a.type === 'charge_hole');
+    expect(action).toBeDefined();
+    expect(state.plannedChargesByHole[holeId]).toBeDefined();
+
+    const result = run(`employee cancel ${action!.id}`);
+    expect(result.success).toBe(true);
+
+    expect(state.pendingActions.filter(a => a.type === 'charge_hole')).toHaveLength(0);
+    expect(state.plannedChargesByHole[holeId]).toBeUndefined();
+
+    // Self-healing follow-up charge must still work cleanly on the
+    // now-properly-released hole.
+    expect(run(`charge hole:${holeId} explosive:boomite amount:5 stemming:2`).success).toBe(true);
+    expect(state.plannedChargesByHole[holeId]).toBeDefined();
+  });
+
+  it('cancelling a drill_hole action via employee cancel clears plannedDrillHoles too (#553 shared the same gap)', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    const state = ctx.state!;
+
+    expect(run('drill_plan grid rows:1 cols:1 spacing:5 depth:8 start:14,14').success).toBe(true);
+    expect(state.plannedDrillHoles).toHaveLength(1);
+    const action = state.pendingActions.find(a => a.type === 'drill_hole');
+    expect(action).toBeDefined();
+
+    const result = run(`employee cancel ${action!.id}`);
+    expect(result.success).toBe(true);
+
+    expect(state.pendingActions.filter(a => a.type === 'drill_hole')).toHaveLength(0);
+    expect(state.plannedDrillHoles).toHaveLength(0);
+    expect(state.drillHoles).toHaveLength(0);
+  });
+});

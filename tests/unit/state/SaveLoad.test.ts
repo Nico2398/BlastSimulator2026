@@ -330,6 +330,55 @@ describe('deserialize — v10→v11 migration for GameState.plannedDrillHoles (#
   });
 });
 
+describe('deserialize — v11→v12 migration for GameState.plannedChargesByHole (#554)', () => {
+  it('a v11 save without plannedChargesByHole migrates to v12 with plannedChargesByHole: {}', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 11;
+    delete parsed['plannedChargesByHole'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.plannedChargesByHole).toEqual({});
+  });
+
+  it('a v10 (or earlier) save without plannedChargesByHole also migrates cleanly (migration chain)', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 10;
+    delete parsed['plannedChargesByHole'];
+    delete parsed['plannedDrillHoles'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.plannedChargesByHole).toEqual({});
+    expect(restored.plannedDrillHoles).toEqual([]);
+  });
+
+  it('a v12+ save with plannedChargesByHole populated round-trips serialize/deserialize unchanged', () => {
+    const state = createGame({ seed: 42 });
+    state.plannedChargesByHole['H1'] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.plannedChargesByHole).toEqual({
+      H1: { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 },
+    });
+  });
+
+  it('an empty v12+ save (no planned charges) round-trips to an empty object (boundary)', () => {
+    const state = createGame({ seed: 42 });
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.plannedChargesByHole).toEqual({});
+  });
+});
+
 describe('serialize / deserialize', () => {
   it('round-trip produces an equivalent state', () => {
     const state = createGame({ seed: 42 });

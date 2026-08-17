@@ -3,7 +3,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
-import type { GameState } from '../../core/state/GameState.js';
+import type { GameState, PendingAction } from '../../core/state/GameState.js';
 import {
   createGridPlan, addHole, removeHole, resetHoleIds,
   computeDrillHoleDurationTicks,
@@ -123,6 +123,42 @@ export function clearDrillPlan(ctx: MiningContext): number {
 function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
   const action = state.pendingActions.find(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId);
   if (action) cancelAction(state, action.id);
+}
+
+/**
+ * Removes a cancelled `drill_hole`/`charge_hole` action's own ghost from the
+ * "ordered but not yet landed" pool it was tracked in (`plannedDrillHoles`/
+ * `plannedChargesByHole`) — `cancelAction` (`TaskDispatch.ts`) only removes
+ * the generic `PendingAction`/`ghostPreviews` record, deliberately staying
+ * ignorant of mining-specific state so it can cancel any action type; the
+ * planned-pool entry is this module's own bookkeeping and has to be cleared
+ * here.
+ *
+ * `drillPlanCommand`'s `remove hole:<id>` and `clearDrillPlan` above already
+ * call `cancelAction` immediately alongside their own splice/delete of the
+ * matching planned entry, so they need nothing further. The gap this closes
+ * is the *other* way a player cancels an order: the Operations panel's Work
+ * Queue cancel button, which reaches `cancelAction` only through the generic
+ * `employee cancel <id>` command (`employees.ts`) with no mining-specific
+ * cleanup of its own — leaving a permanent, un-clearable ghost on the hole
+ * (#554's code review, reproduced live: `orderedChargeCount`/
+ * `plannedChargesByHole` still carried the cancelled hole after
+ * `employee cancel <id>` reported success). The issue's own text is explicit
+ * that cancelling a charge order removes its ghost; this generic path is
+ * exactly where that promise broke, and — since `plannedDrillHoles` is
+ * populated at order time the same way (#553) — the identical gap existed
+ * for a cancelled drill order too.
+ */
+export function releasePlannedHoleForCancelledAction(state: GameState, action: PendingAction): void {
+  const holeId = action.payload['holeId'];
+  if (typeof holeId !== 'string') return;
+
+  if (action.type === 'drill_hole') {
+    const idx = state.plannedDrillHoles.findIndex(h => h.id === holeId);
+    if (idx !== -1) state.plannedDrillHoles.splice(idx, 1);
+  } else if (action.type === 'charge_hole') {
+    delete state.plannedChargesByHole[holeId];
+  }
 }
 
 // ── Drill plan commands ──

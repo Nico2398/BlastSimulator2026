@@ -23,7 +23,7 @@ const GHOST_HOLE_OPACITY = 0.35;
 
 // Ordered-but-not-loaded charge marker (#554) — mirrors the ghost-hole
 // treatment above for a charge order still queued as a `charge_hole` action.
-export const CHARGE_ORDERED_COLOR = 0xffaa00; // placeholder, implementer may tune
+export const CHARGE_ORDERED_COLOR = 0xffaa00; // matches ChargeHoleList's own amber "ordered" row (var(--bsx-amber))
 export const CHARGE_ORDERED_OPACITY = 0.4;
 
 // Charge color scale (empty → max charge)

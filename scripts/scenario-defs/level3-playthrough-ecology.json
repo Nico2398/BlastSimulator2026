@@ -1595,7 +1595,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. Finding (this pass): charging 20 holes for real now costs 76 more ticks (360 -> 436) on top of #553's already-queued drilling, and payroll for all 12 employees keeps accruing the whole time -- BANKRUPTCY_GRACE_TICKS runs out and levelEndReason flips to 'bankruptcy' during this very wait, before pattern 1's blast ever fires. tickCount itself is no longer pinned here (it is an artifact of how long charging took, not this step's subject); orderedChargeCount:0 and chargedCount:20 are.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1608,16 +1608,11 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "holeCount": 20,
-          "orderedHoleCount": 0,
+          "orderedChargeCount": 0,
           "chargedCount": 20,
-          "sequencedCount": 0,
           "deathCount": 0,
-          "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null,
-          "orderedChargeCount": 0
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         }
       }
     },
@@ -1653,18 +1648,14 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "holeCount": 20,
-          "orderedHoleCount": 0,
-          "chargedCount": 20,
           "sequencedCount": 20,
           "deathCount": 0,
-          "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         }
       }
     },
@@ -1696,23 +1687,23 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). #593 (autoInsertNeedTasks no longer preempts an employee's own interrupted work the instant rest completes; releaseVehicleReservation now syncs a dismounting driver's position to the vehicle's real location instead of freezing it at the old boarding point) changes who is standing where at fire time: Finding: all 5 of the original staffed employees die (deathCount 0 -> 5) -- employees #1 (Gus Rubble, the driller who just spent 260-345 ticks physically working every hole in this pattern), #2 (Walt Rockwell, the staffed blaster), #3 (Earl Boulder), #4 (Pete Quartzman) and #5 (Walt Quartzman, the staffed drivers) are all standing close enough to the pattern for Damage.ts's DEATH_THRESHOLD (2000 kJ) to be met -- #4 no longer stays frozen at a safe boarding-point position under the old bug and now dies alongside the rest; all 7 hand-hired employees (#6-#12, hired at tick 260 and never dispatched anywhere near the pattern) survive. The drill_rig (vehicle #1) survives too, thanks to the relocate step above. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty).",
+      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked; the level having already ended in bankruptcy per the wait_until step above, per Finding this pass, does not block it either -- the console has no such gate). #554: with charging now real, queued work, 76 more ticks elapse than the pre-#554 file needed, and by fire time the mine has been bankrupt for tens of ticks -- more employees have drifted near the pattern in that extra time than the old 5. Finding (this pass): 11 of the 12 employees die (deathCount 0 -> 11), not the pre-#554 file's 5 -- only one hand-hired employee survives clear of the pattern. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty, unchanged from the pre-#554 figure -- vibration is a function of the charge/pattern, not of who was standing nearby). The drill_rig (vehicle #1) survives too, thanks to the relocate step above.",
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 360,
           "holeCount": 0,
           "orderedHoleCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
           "vehicleCount": 1,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         }
       }
     },
@@ -1727,14 +1718,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         }
       }
     },
@@ -1749,18 +1740,18 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 36.982000000000184,
+          "wellBeing": 7.537000000000062,
           "safety": 50,
           "ecology": 29.53,
           "nuisance": 0,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         }
       }
     },
@@ -1798,18 +1789,18 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 360,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         }
       }
     },
@@ -1825,18 +1816,18 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
       }
@@ -1853,18 +1844,18 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
       }
@@ -1877,22 +1868,22 @@
           "command": "blast"
         }
       ],
-      "description": "Left as a command: with nothing drilled, charged or sequenced there is no Fire step to reach, let alone execute. The command itself does not throw -- it produces a hollow, \"BAD\"-rated report (0 cleared voxels, 0 fragments, $0 ore value) and leaves every count at 0. No employee is anywhere near a blast that never really happens: deathCount stays at 4, ecology stays at 29.54.",
+      "description": "Left as a command: with nothing drilled, charged or sequenced there is no Fire step to reach, let alone execute. The command itself does not throw -- it produces a hollow, \"BAD\"-rated report (0 cleared voxels, 0 fragments, $0 ore value) and leaves every count at 0. No employee is anywhere near a blast that never really happens: deathCount and ecology are unchanged from the real blast above.",
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
@@ -1908,14 +1899,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         }
       }
     },
@@ -1930,18 +1921,18 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 36.982000000000184,
+          "wellBeing": 7.537000000000062,
           "safety": 50,
           "ecology": 29.53,
           "nuisance": 0,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
-          "cash": 0
+          "cash": 0,
+          "tickCount": 0
         }
       }
     },
@@ -1953,14 +1944,14 @@
           "command": "tick 20"
         }
       ],
-      "description": "Finding #63 (this pass) -- the file's real ending under #553: cash first crossed BANKRUPTCY_THRESHOLD ($5,000) around tick 280 (see the tick block after the hire above) and has been below it ever since; BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) runs out at tick 369, inside this block (\"Advanced 20 tick(s)\" landing at 380, with the \"BANKRUPTCY! The mine is seized.\" line logged at tick 369). levelEndReason becomes 'bankruptcy', not 'ecological_shutdown': ecology only ever reached 29.54 (this file's one real blast, above) and EcologicalDisaster.ts's shutdown needs ecology <= 0 held for ECOLOGICAL_SHUTDOWN_TICKS (150) straight -- a threshold this file's economics never let it reach even once, let alone hold. This was tested exhaustively, not assumed: single vs. paired drill_rig crews, hiring the 7 hand-hires immediately vs. deferred, with and without scrapping the unused staffed fleet, with and without the relocate-before-blast maneuver that saves vehicle #1 above -- every combination this pass tried goes bankrupt at or within one pattern of the first blast, because BANKRUPTCY_GRACE_TICKS (~100-370 ticks of runway from a $50,000-$92,800 start with zero income anywhere in this file) is an order of magnitude smaller than the 900+ ticks three more single-driller-paced patterns (the minimum the pre-#553 file needed to first reach ecology<=0) would now cost under #553's queued, vehicle-gated drilling. The named premise (\"ecology collapse triggering the ecological shutdown\") no longer holds; the mine's own payroll ends it first, the same class of finding as Finding #24's pre-existing locked-level cascade elsewhere in this file's history. #553-followup round 3 (issue #586 CI): `cash` dropped from this step's equality check and every remaining step's below, all first reached in interaction mode this round (the two bugs fixed earlier in this same pass had blocked every prior attempt before this point). `move_here`'s target tile (main.ts's move_here handler) comes from `scenePicking.aim.terrain` -- wherever the mouse is actually hovering over the rendered 3D scene at click time -- not from this step's literal `to:35,35` coordinate; command mode's `vehicle move 1 to:35,35` and the click-driven `cameraFocus(35.5,35.5,25)` + `mousemove(640,360)` land on the same tile almost always, but a sub-tile projection/rounding difference is possible and, once it shifts the rig's travel distance during the ~15-20 available ticks, changes exactly which tick it stops moving and drops off the `moving`-task fuel cost (Vehicle.ts) -- sandbox-confirmed (a debug run against a live dev server, literal commands only, reproduced the exact command-mode figure to the dollar; the real interaction-mode click path reproducibly landed $6 lower in fuel spend, deathCount/tickCount/holeCount/employeeCount/levelEndReason all still exact). Same class of camera-dependent divergence already audited and relaxed elsewhere in this batch (level1-win-efficient's host-timing-sensitive checkpoints) -- `cash` isn't a meaningful pass/fail signal once a step's own actions include a real click that resolves through the render camera, so the fields that are (tick/hole/death/employee counts, level-end state) stay exact.",
+      "description": "Finding #63 (this pass), rewritten for #554: the file's real ending is no longer set here. #554 makes charging real, queued work -- 76 more ticks (360 -> 436) elapse during the wait_until step that drains it, and BANKRUPTCY_GRACE_TICKS (100, Bankruptcy.ts) runs out during that very wait, before pattern 1's blast even fires (see that step's own finding). By the time this block runs, levelEnded/levelEndReason ('bankruptcy') are already set and have been since tick 436. This tick 20 request only advances 1 tick (436 -> 437, \"Advanced 1 of 20 requested ticks\") because a real event fires immediately and pauses the clock (tickCommand's own event-pause, events.ts) -- the event choose 0 step right after resolves it. Every combination this pass re-tested (single vs. paired drill_rig crews, hiring the 7 hand-hires immediately vs. deferred, with and without scrapping the unused staffed fleet, with and without the relocate-before-blast maneuver) still goes bankrupt at or before the first blast now that charging itself costs real ticks on top of #553's drilling -- the named premise (\"ecology collapse triggering the ecological shutdown\") still does not hold; the mine's own payroll ends it, now even earlier than the pre-#554 pass found. `cash` stays out of every remaining step's equality check for the same host-timing-sensitive reasons as the pre-#554 pass established (see the `move_here` step's own note) -- tick/hole/death/employee counts and level-end state stay exact.",
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 380,
+          "tickCount": 437,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1974,15 +1965,19 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "No pending event at this tick -- a safe no-op, same convention as every other event choose 0 step in this file.",
+      "description": "Finding (this pass, rewritten for #554): a real event fires here -- this is the event that paused the tick 20 block above 1 tick in -- not a no-op as the pre-#554 file found at this position; resolved through its own first option, same convention as every other event choose 0 step in this file.",
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 380,
+          "tickCount": 437,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
+          "wellBeing": 14.257000000000062,
+          "safety": 0,
+          "ecology": 29.580000000000002,
+          "nuisance": 0,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         }
@@ -1999,8 +1994,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 380,
-          "deathCount": 5,
+          "tickCount": 437,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -2018,12 +2013,12 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 380,
-          "deathCount": 5,
+          "tickCount": 437,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 56.98200000000017,
+          "wellBeing": 14.257000000000062,
           "safety": 0,
-          "ecology": 30.530000000000015,
+          "ecology": 29.580000000000002,
           "nuisance": 0,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -2041,12 +2036,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 380,
-          "deathCount": 5,
+          "tickCount": 437,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 56.98200000000017,
+          "wellBeing": 14.257000000000062,
           "safety": 0,
-          "ecology": 30.530000000000015,
+          "ecology": 29.580000000000002,
           "nuisance": 0,
           "levelEnded": true,
           "levelEndReason": "bankruptcy",
