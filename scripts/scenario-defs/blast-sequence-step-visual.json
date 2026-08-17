@@ -17,7 +17,7 @@
     {
       "command": "new_game seed:42 size:32 staffed:true",
       "timeout": 30,
-      "description": "Setup: a fresh site. Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open \u2014 #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Setup: a fresh site. Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
@@ -35,7 +35,7 @@
     {
       "command": "drill_plan grid origin:10,10 rows:2 cols:2 spacing:3 depth:6",
       "timeout": 30,
-      "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) \u2014 giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles \u2014 none drilled yet, so holeCount stays 0 right after confirm.",
+      "description": "role: bootstrap (issue #515): the Charge step right after this one is the panel's own designated first-open (`#bs-toolbar [data-panel=\"blast\"]`, a toggle) — giving this step its own panel-open click would leave the panel open here and then CLOSE it when the charge step's click ran. #553: confirming the grid queues 4 drill_hole PendingActions and pushes 4 PlannedHoles into plannedDrillHoles — none drilled yet, so holeCount stays 0 right after confirm.",
       "interaction": [
         {
           "type": "command",
@@ -52,7 +52,7 @@
     },
     {
       "command": "tick 50",
-      "description": "#553: drain the ordered plan \u2014 the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 43).",
+      "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 43).",
       "interaction": [
         {
           "type": "command",
@@ -100,8 +100,31 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 4,
           "sequencedCount": 0
+        },
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "sequencedCount": 0,
+          "orderedChargeCount": 0
         }
       }
     },

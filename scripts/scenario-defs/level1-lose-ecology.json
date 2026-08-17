@@ -1394,8 +1394,28 @@
       "role": "player",
       "description": "Max krackle (10kg, the level's strongest available explosive) at minimum stemming (1.0m) -- catastrophic overcharge, exactly the file's own point.",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 49
+          "chargedCount": 49,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -1813,13 +1833,13 @@
       "expect": {
         "equals": {
           "ecology": 0,
-          "tickCount": 380,
+          "tickCount": 685,
           "ecologicalShutdown": true,
           "levelEnded": true,
           "levelEndReason": "ecological_shutdown",
           "revolted": false
         },
-        "note": "Final state confirms the government shutdown -- fired for real at tick 380, exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above -- and that worker_revolt's own, independently-running streak (still short of REVOLT_TICKS=120 at this point) never got the chance to overwrite it. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself."
+        "note": "Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 685 (up from 380, #554: charging is real work now -- the 49-hole charge order above, drained by its own wait step, pushes the blast itself, and everything timed from it, later by the same amount) -- and that worker_revolt's own, independently-running streak (still short of REVOLT_TICKS=120 at this point) never got the chance to overwrite it. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself."
       }
     }
   ]

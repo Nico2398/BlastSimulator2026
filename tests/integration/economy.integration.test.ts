@@ -137,6 +137,21 @@ function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
   }
 }
 
+/**
+ * Ticks until every charge ordered by the last `charge hole:*` has landed in
+ * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
+ */
+function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 // ── Economy ──────────────────────────────────────────────────────────────────
 
 describe('Economy', () => {
@@ -702,6 +717,7 @@ describe('Economy', () => {
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
+    driveChargePlanToCompletion(ctx);
 
     const seqResult = sequenceCommand(ctx as any, ['auto'], {});
     expect(seqResult.success).toBe(true);

@@ -148,6 +148,16 @@ describe('Tutorial pause behaviour (#371)', () => {
       runner.run('tick 1');
     }
     expect(runner.run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    // #554: charging is real work too — drain the ordered charges the same
+    // way the drill plan above was drained before blasting.
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      runner.run('tick 1');
+    }
     expect(runner.run('sequence auto delay_step:25').success).toBe(true);
     expect(runner.run('blast').success).toBe(true);
 

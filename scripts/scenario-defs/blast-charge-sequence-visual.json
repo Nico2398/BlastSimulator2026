@@ -111,15 +111,15 @@
       "description": "#554: this click queues one charge_hole PendingAction per hole (requiredSkill: 'blasting', requiredVehicleRole: null — on foot, unlike drilling's drill_rig gate). None of the 6 lands the instant the button is clicked; the wait_until steps right after this one drive the blaster through the queue."
     },
     {
-      "command": "wait_until field:chargedCount equals:3 max_ticks:300",
-      "description": "#554/#590: the single staffed blaster claims the nearest ordered hole and loads it, one at a time. Screenshot taken here on purpose, halfway through the batch: 3 holes show the loaded charge visuals while the other 3 (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — proving the two are visually distinct. maxTicks is a provisional budget (a single on-foot blaster, no vehicle travel) pending real measurement once #554 lands.",
+      "command": "wait_until field:chargedCount equals:3 max_ticks:3000",
+      "description": "#554/#590: the single staffed blaster claims the nearest ordered hole and loads it, one at a time. Screenshot taken here on purpose, halfway through the batch: 3 holes show the loaded charge visuals while the other 3 (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — proving the two are visually distinct. maxTicks/timeoutMs widened to the implementer's own calibrated per-order wait budget (#554 landed).",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 3,
-          "maxTicks": 300,
-          "timeoutMs": 90000
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         },
         {
           "type": "screenshot"
@@ -134,15 +134,15 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:6 max_ticks:300",
-      "description": "#554/#590: drain the rest of the Charge All order.",
+      "command": "wait_until field:chargedCount equals:6 max_ticks:6000",
+      "description": "#554/#590: drain the rest of the Charge All order. Budget doubled off the implementer's single-order figure to cover the remaining sequential loads.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 6,
-          "maxTicks": 300,
-          "timeoutMs": 90000
+          "maxTicks": 6000,
+          "timeoutMs": 240000
         }
       ],
       "role": "setup",

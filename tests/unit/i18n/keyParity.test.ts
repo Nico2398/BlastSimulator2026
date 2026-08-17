@@ -111,10 +111,16 @@ describe('en.json / fr.json — key-set parity', () => {
     // driller's own row open -- an unreachable gate, not a difficulty setting.
     // tutorial.stage.expand_driller names the real intermediate click, in
     // both locales.
+    // Baseline is now 3266 (up from 3264): #554 (charging is real work) added
+    // ui.blast_workshop.charge.hole_ordered (the Loading… row state for a
+    // charge still queued as a `charge_hole` action) and
+    // ui.blast_workshop.preflight.warn_charge_loading (the Preflight modal's
+    // warning when a targeted hole's charge is still loading), both locales
+    // translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3264);
+    expect(Object.keys(en).length).toBe(3266);
   });
 });
 

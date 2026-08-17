@@ -245,15 +245,15 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:1 max_ticks:200",
-      "description": "#554/#590: the blaster claims the nearest of the three ordered holes and finishes loading it — the first entry moves from plannedChargesByHole into chargesByHole. Screenshot taken right here on purpose: exactly one hole shows the loaded charge visuals while the other two (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — this is the shot that proves the two are visually distinct. maxTicks is a provisional budget (a single on-foot blaster, no vehicle travel) pending real measurement once #554 lands.",
+      "command": "wait_until field:chargedCount equals:1 max_ticks:3000",
+      "description": "#554/#590: the blaster claims the nearest of the three ordered holes and finishes loading it — the first entry moves from plannedChargesByHole into chargesByHole. Screenshot taken right here on purpose: exactly one hole shows the loaded charge visuals while the other two (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — this is the shot that proves the two are visually distinct. maxTicks/timeoutMs widened to the implementer's own calibrated per-order wait budget (#554 landed).",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 1,
-          "maxTicks": 200,
-          "timeoutMs": 90000
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         },
         {
           "type": "screenshot"
@@ -268,15 +268,15 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:3 max_ticks:400",
-      "description": "#554/#590: drain the remaining two ordered charges (H2, H3) one at a time — a single blaster never loads two holes simultaneously.",
+      "command": "wait_until field:chargedCount equals:3 max_ticks:6000",
+      "description": "#554/#590: drain the remaining two ordered charges (H2, H3) one at a time — a single blaster never loads two holes simultaneously. Budget doubled off the implementer's single-order figure to cover two sequential loads.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 3,
-          "maxTicks": 400,
-          "timeoutMs": 90000
+          "maxTicks": 6000,
+          "timeoutMs": 240000
         }
       ],
       "role": "setup",
@@ -337,15 +337,15 @@
       "description": "Charge All commits whatever the steppers currently show, and the H3 row above left them at 5kg/1.0m — so reaching this step's declared 5kg/2m needs 5 stemming increments (1.0 -> 2.0m) before the click. Without them the click would silently order every hole at 1.0m stemming while the command field claimed 2m: exactly the class of drift the amount/stemming asserts are here to fail loudly on. #554: this orders 9 fresh charge_hole actions (one per hole, cancelling/replacing H1/H2/H3's already-landed entries with a new pending order and queuing H4-H9 for the first time) — none of the 9 lands the instant the button is clicked."
     },
     {
-      "command": "wait_until field:chargedCount equals:6 max_ticks:500",
-      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (6 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts.",
+      "command": "wait_until field:chargedCount equals:6 max_ticks:9000",
+      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (6 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. Budget widened to cover up to 6 sequential loads at the implementer's own per-order figure.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 6,
-          "maxTicks": 500,
-          "timeoutMs": 120000
+          "maxTicks": 9000,
+          "timeoutMs": 300000
         },
         {
           "type": "screenshot"
@@ -360,15 +360,15 @@
       }
     },
     {
-      "command": "wait_until field:chargedCount equals:9 max_ticks:500",
+      "command": "wait_until field:chargedCount equals:9 max_ticks:9000",
       "description": "#554/#590: drain the rest of the Charge All order — every hole is now loaded.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "chargedCount",
           "equals": 9,
-          "maxTicks": 500,
-          "timeoutMs": 120000
+          "maxTicks": 9000,
+          "timeoutMs": 300000
         }
       ],
       "role": "setup",
@@ -449,6 +449,26 @@
           "chargedCount": 9
         },
         "note": "count is unchanged — H5 was already loaded by Charge All; this step proves one row can re-order one hole without disturbing the other 8, and that the re-order doesn't land instantly either"
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554/#590: drain H5's re-order before the scenario ends, leaving the site in a fully-landed state rather than one hole still mid-load.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
       }
     }
   ],

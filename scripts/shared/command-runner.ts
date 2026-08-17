@@ -23,6 +23,23 @@ import { checkGoalAgainstState } from './scenario-goal.js';
  * each tick, up to `maxTicks`. A budget exhausted without a match is a
  * scenario failure naming the field, its last-seen value, and the budget,
  * not a silent pass-through to whatever assertion comes next.
+ *
+ * Auto-resolves a pending event with its first option each time one fires
+ * (#554 finding): `tickCommand` itself refuses to advance at all while
+ * `state.events.pendingEvent` is set ("Pending event! Resolve it first"), so
+ * a `tick 1` issued after a spontaneous event stops advancing the clock
+ * entirely — every further call is a no-op, and a wait long enough to
+ * plausibly hit one (charging is real work now, easily hundreds of ticks
+ * across a multi-hole plan with only one or two blasters) stalls forever
+ * without ever reaching `maxTicks`'s own failure message. Command mode has
+ * no player to read the event's content and choose deliberately — every
+ * existing scenario's own hand-written long-tick loops already resolve a
+ * pending event this same way (`event choose 0`) — so this is the
+ * uninterrupted-wait behavior `waitUntil` promises, not a new one.
+ * Interaction mode does not need the same fix: its own wait
+ * (`interaction-executor.ts`) drives the real, `isPaused`-gated clock, so an
+ * event genuinely pauses it exactly as it would for a real player — a
+ * scenario wanting to prove that dwells on it with `resolveEventIfPending`.
  */
 function runWaitUntil(
   engine: RunnerWithContext,
@@ -33,6 +50,9 @@ function runWaitUntil(
   let lastState: Record<string, unknown> | null = null;
   for (let i = 0; i < action.maxTicks; i++) {
     runCommand(engine, 'tick 1');
+    if (ctx.state?.events.pendingEvent) {
+      runCommand(engine, 'event choose 0');
+    }
     lastState = serializeGameState(ctx) as Record<string, unknown> | null;
     lastValue = lastState ? lastState[action.field] : undefined;
     if (lastValue === action.equals) {

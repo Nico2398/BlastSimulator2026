@@ -495,7 +495,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -531,7 +533,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 4
         }
@@ -555,7 +559,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 2
         }
@@ -618,48 +624,89 @@
     {
       "command": "tick 50",
       "description": "#553 follow-up: drain the ordered plan in bounded chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. With a second (tier-2) driller/drill_rig working in parallel, sandbox-measured (pure command-mode engine probe) landing all 9 holes around tick ~300-315 from a drill_plan at tick 102, with 59+ ticks of margin before both the worker-revolt countdown (tick ~333+) and the bankruptcy grace period run out -- the last (5th) chunk below is deliberately smaller than the others to land in that window rather than overshoot.",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 25",
       "description": "Fifth and final chunk, deliberately smaller than the rest -- all 9 holes should have landed by now, with margin before the worker-revolt countdown and bankruptcy grace period. Bumped from 20 to 25 (#596/#597): the event pool/cooldown fixes changed which tick a pending event halts a chunk on, so the last hole now lands 5 ticks later than before -- re-measured directly (command-mode engine probe): orderedHoleCount hits 0 at tick 300, still well inside the worker-revolt/bankruptcy margin.",
-      "interaction": [{"type": "command", "command": "tick 25"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
       "role": "setup",
       "expect": {
         "equals": {
@@ -670,7 +717,11 @@
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
@@ -683,8 +734,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 9,
+          "orderedChargeCount": 0
         }
       }
     },

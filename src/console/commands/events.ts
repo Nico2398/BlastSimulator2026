@@ -30,6 +30,7 @@ import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation
 import { detectUnqualifiedTask, detectTrafficJam } from '../../core/events/EventEngine.js';
 import { estimateSurveyResult, applySeismicSurveyDamage, type SurveyMethod } from '../../core/mining/SurveyCalc.js';
 import { landDrilledHole } from '../../core/mining/DrillPlan.js';
+import { landLoadedCharge } from '../../core/mining/ChargePlan.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 import { checkDeadlines, generateContracts } from '../../core/economy/Contract.js';
 import { updateBankruptcy } from '../../core/campaign/Bankruptcy.js';
@@ -321,6 +322,22 @@ export function tickCommand(
               });
             }
             lines.push(`[tick ${state.tickCount}] Hole ${drilled.id} drilled at (${drilled.x}, ${drilled.z}).`);
+          }
+        }
+
+        // A completed 'charge_hole' task lands here — the charge moves from
+        // plannedChargesByHole into chargesByHole only once the blaster has
+        // actually finished loading it, not the instant the order was placed
+        // (#554, mirrors the 'drill_hole' branch above). No NavGrid patch —
+        // charging doesn't change the navmesh.
+        if (progress.actionType === 'charge_hole' && progress.actionPayload) {
+          const holeId = progress.actionPayload['holeId'] as string;
+          const planned = state.plannedChargesByHole[holeId];
+          if (planned) {
+            delete state.plannedChargesByHole[holeId];
+            const loaded = landLoadedCharge(planned);
+            state.chargesByHole[holeId] = loaded;
+            lines.push(`[tick ${state.tickCount}] Charge loaded at ${holeId}: ${loaded.explosiveId} ${loaded.amountKg}kg.`);
           }
         }
       }
