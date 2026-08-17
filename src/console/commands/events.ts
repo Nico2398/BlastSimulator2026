@@ -67,7 +67,7 @@ function deductExpense(
 }
 
 /** Build the EventContext from the current GameState. */
-function buildEventContext(ctx: GameContext): EventContext {
+export function buildEventContext(ctx: GameContext): EventContext {
   const s = ctx.state!;
   return {
     scores: s.scores,

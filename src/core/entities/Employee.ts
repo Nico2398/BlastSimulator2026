@@ -320,6 +320,19 @@ export function calculateSalary(employee: Employee): number {
 }
 
 /**
+ * The living roster — every employee still `alive`. Shared filter for any
+ * aggregate/threshold computed over the roster (headcount-style stats,
+ * event-eligibility gates, living-quarters capacity) so a death doesn't
+ * silently skew it — see computeAverageMorale's own doc comment above for
+ * the shape of the bug this closes. `killEmployee` never splices
+ * `employees` (only `fireEmployee` does), so a corpse's frozen fields stay
+ * in the array forever unless the reader excludes them explicitly.
+ */
+export function getLivingEmployees(employees: readonly Employee[]): Employee[] {
+  return employees.filter(e => e.alive);
+}
+
+/**
  * Average morale across the LIVING roster, for feeding ScoreManager's
  * wellBeing input. A dead employee is never spliced from `employees` (only
  * fireEmployee does that — killEmployee just sets alive:false, same as
