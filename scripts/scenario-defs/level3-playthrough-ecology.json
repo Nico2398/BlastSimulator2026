@@ -1595,7 +1595,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. Confirmed by direct probe: charging's own added real time (draining 20 holes) is enough on its own to push cash under BANKRUPTCY_THRESHOLD -- this file's final conclusion is bankruptcy either way (see the final campaign status step), but under #554 it now fires here, mid-drain, rather than only after the blast below. Nothing halts a tick or a blast once levelEnded flips (this file's own established narrative, matching level3-playthrough-win.json's identical finding), so the blast below still fires for real regardless.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1608,15 +1608,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 360,
+          "tickCount": 436,
           "holeCount": 20,
           "orderedHoleCount": 0,
           "chargedCount": 20,
           "sequencedCount": 0,
           "deathCount": 0,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null,
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy",
           "orderedChargeCount": 0
         }
       }
@@ -1625,44 +1625,25 @@
       "command": "sequence auto delay_step:10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"3\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"delay-step\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+          "type": "command",
+          "command": "sequence auto delay_step:10"
         }
       ],
-      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts). 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
-      "role": "player",
+      "description": "#554: was role: player, driving the delay-step stepper and auto-sequence button directly (Sequence's delay-step stepper carries data-field=\"delay-step\", Sequence.ts). Converted to guard, same reason as level3-playthrough-win.json's identical steps: `state.bankrupt` is already true (see the wait_until step above) by the time this runs, and `LevelEndScreen.update()` shows its full-screen `#bs-level-end-screen` overlay the instant `levelEndReason` goes non-null -- `#bs-blast-panel [data-step=\"3\"]` is covered, unreachable by any click. The command still runs (nothing in the engine gates a command on `levelEndReason`) and sequencedCount still reaches 20 -- only the UI path is gone.",
+      "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
+          "tickCount": 436,
           "holeCount": 20,
           "orderedHoleCount": 0,
           "chargedCount": 20,
           "sequencedCount": 20,
           "deathCount": 0,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
+        "blocked": "#bs-blast-panel [data-step=\"3\"]",
         "changedBy": {
           "cash": 0
         }
@@ -1672,45 +1653,26 @@
       "command": "blast",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"5\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"execute\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "[data-action=\"report-close\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "[data-action=\"report-close\"]"
+          "type": "command",
+          "command": "blast"
         }
       ],
-      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). #593 (autoInsertNeedTasks no longer preempts an employee's own interrupted work the instant rest completes; releaseVehicleReservation now syncs a dismounting driver's position to the vehicle's real location instead of freezing it at the old boarding point) changes who is standing where at fire time: Finding: all 5 of the original staffed employees die (deathCount 0 -> 5) -- employees #1 (Gus Rubble, the driller who just spent 260-345 ticks physically working every hole in this pattern), #2 (Walt Rockwell, the staffed blaster), #3 (Earl Boulder), #4 (Pete Quartzman) and #5 (Walt Quartzman, the staffed drivers) are all standing close enough to the pattern for Damage.ts's DEATH_THRESHOLD (2000 kJ) to be met -- #4 no longer stays frozen at a safe boarding-point position under the old bug and now dies alongside the rest; all 7 hand-hired employees (#6-#12, hired at tick 260 and never dispatched anywhere near the pattern) survive. The drill_rig (vehicle #1) survives too, thanks to the relocate step above. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty).",
-      "role": "player",
+      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). #593 (autoInsertNeedTasks no longer preempts an employee's own interrupted work the instant rest completes; releaseVehicleReservation now syncs a dismounting driver's position to the vehicle's real location instead of freezing it at the old boarding point) changes who is standing where at fire time. #554: was role: player, driving the execute/confirm/report-close click sequence -- converted to guard, same reason as level3-playthrough-win.json's identical step: `state.bankrupt` is already true (the wait_until step above) by the time this runs, and `LevelEndScreen.update()`'s full-screen `#bs-level-end-screen` overlay covers `#bs-blast-panel [data-step=\"5\"]` (and everything downstream of it) the instant `levelEndReason` goes non-null. The blast still detonates for real -- deathCount is 11 here, not the pre-#554 file's 5 (confirmed by direct probe): with charging now taking real time, more of the roster ends up standing near the pattern by fire time than under instant charging. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty), unaffected by the death-toll change.",
+      "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
+          "tickCount": 436,
           "holeCount": 0,
           "orderedHoleCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
           "vehicleCount": 1,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
+        "blocked": "#bs-blast-panel [data-step=\"5\"]",
         "changedBy": {
           "cash": 0
         }
@@ -1727,11 +1689,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "tickCount": 436,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
           "cash": 0
@@ -1749,15 +1711,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "tickCount": 436,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 36.982000000000184,
+          "wellBeing": 7.537000000000062,
           "safety": 50,
           "ecology": 29.53,
           "nuisance": 0,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
           "cash": 0
@@ -1768,46 +1730,25 @@
       "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 diameter:0.089 start:25,10",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-step=\"1\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 25,
-          "z1": 10,
-          "x2": 37,
-          "z2": 19
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
+          "type": "command",
+          "command": "drill_plan grid rows:4 cols:5 spacing:3 depth:6 diameter:0.089 start:25,10"
         }
       ],
-      "description": "Finding #62 (this pass): ordering a plan is free and unrestricted -- drill_plan itself never checks cash or crew, so this still succeeds and queues 20 ghost holes exactly as declared. What changes is everything downstream. Cash is -$62,402 and there is no licensed, equipped driller left: the only driving.drill_rig licence on the roster died with employee #1 in the blast above, none of the 7 hand-hired employees hold it, and licensing one (`employee assign_skill <id> skill:driving.drill_rig level:1`) would not help even if it were free -- there is nothing left to spend on a second vehicle, and the one surviving rig has no living driver to claim it. orderedHoleCount sits at 20 forever; holeCount never leaves the 0 this pattern starts at. This is why this file only ever reaches 2 of its originally-described 6 patterns -- see the file description for the full finding.",
-      "role": "player",
+      "description": "Finding #62 (this pass): ordering a plan is free and unrestricted -- drill_plan itself never checks cash or crew, so this still succeeds and queues 20 ghost holes exactly as declared. What changes is everything downstream: there is no licensed, equipped driller left -- the only driving.drill_rig licence on the roster died with employee #1 in the blast above, none of the 7 hand-hired employees hold it, and licensing one (`employee assign_skill <id> skill:driving.drill_rig level:1`) would not help even if it were free -- there is nothing left to spend on a second vehicle, and the one surviving rig has no living driver to claim it. orderedHoleCount sits at 20 forever; holeCount never leaves the 0 this pattern starts at. This is why this file only ever reaches 2 of its originally-described 6 patterns -- see the file description for the full finding. #554: was role: player, driving the grid-tool drag-select directly -- converted to guard, same reason as the Charge/Sequence/blast steps above: bankruptcy already fired during the wait_until several steps up (not only after the blast, as pre-#554), so `#bs-level-end-screen`'s full-screen overlay already covers `#bs-blast-panel [data-step=\"1\"]` by the time this step runs. The command still runs and orderedHoleCount still reaches 20.",
+      "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
+          "tickCount": 436,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
+        "blocked": "#bs-blast-panel [data-step=\"1\"]",
         "changedBy": {
           "cash": 0
         }
@@ -1825,15 +1766,15 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
+          "tickCount": 436,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
           "cash": 0
@@ -1853,15 +1794,15 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
+          "tickCount": 436,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
           "cash": 0
@@ -1881,15 +1822,15 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "tickCount": 360,
+          "tickCount": 436,
           "holeCount": 0,
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
           "cash": 0
@@ -1908,11 +1849,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "tickCount": 436,
+          "deathCount": 11,
           "employeeCount": 12,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
           "cash": 0
@@ -1930,15 +1871,15 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 360,
-          "deathCount": 5,
+          "tickCount": 436,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 36.982000000000184,
+          "wellBeing": 7.537000000000062,
           "safety": 50,
           "ecology": 29.53,
           "nuisance": 0,
-          "levelEnded": false,
-          "levelEndReason": null
+          "levelEnded": true,
+          "levelEndReason": "bankruptcy"
         },
         "changedBy": {
           "cash": 0
@@ -1957,10 +1898,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 380,
+          "tickCount": 437,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1978,10 +1919,10 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 380,
+          "tickCount": 437,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 5,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -1999,8 +1940,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 380,
-          "deathCount": 5,
+          "tickCount": 437,
+          "deathCount": 11,
           "employeeCount": 12,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -2018,12 +1959,12 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 380,
-          "deathCount": 5,
+          "tickCount": 437,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 56.98200000000017,
+          "wellBeing": 12.257000000000062,
           "safety": 0,
-          "ecology": 30.530000000000015,
+          "ecology": 29.580000000000002,
           "nuisance": 0,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
@@ -2041,12 +1982,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 380,
-          "deathCount": 5,
+          "tickCount": 437,
+          "deathCount": 11,
           "employeeCount": 12,
-          "wellBeing": 56.98200000000017,
+          "wellBeing": 12.257000000000062,
           "safety": 0,
-          "ecology": 30.530000000000015,
+          "ecology": 29.580000000000002,
           "nuisance": 0,
           "levelEnded": true,
           "levelEndReason": "bankruptcy",

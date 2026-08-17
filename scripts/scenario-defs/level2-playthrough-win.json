@@ -1313,7 +1313,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1339,7 +1339,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1360,7 +1360,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1381,7 +1381,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1407,7 +1407,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1428,7 +1428,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1451,7 +1451,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1471,7 +1471,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1492,7 +1492,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1503,17 +1503,17 @@
       }
     },
     {
-      "command": "contract accept 21",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 21"
+          "command": "contract accept type:rubble_disposal"
         }
       ],
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -1526,11 +1526,11 @@
       "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #20 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as the charge step at tick 440 above -- accept is genuinely unreachable by tick 446, `expect.blocked` proves it, and the command runs directly so activeContractCount still moves the way a console-only operator's would. #553-followup (issue #586 CI): the guard target was `#bs-contract-panel [data-contract-id=\"20\"] .bs-contract-accept` -- wrong selector, not just a stale one: that row only exists in the AVAILABLE section, and the `command` action in this very step's own interaction array accepts contract 20 before `expect.blocked` is ever checked, moving it into ACTIVE and making that specific accept button vanish from the DOM for the correct, unrelated reason that it was just accepted, not because the overlay blocks it. `#bs-toolbar [data-panel=\"contracts\"]` (matching level3-playthrough-win.json's own identical fix) is the toolbar button, always present regardless of contract state, so `expect.blocked` proves the real overlay block instead of a false 'not in the DOM'."
     },
     {
-      "command": "contract deliver 21 amount:100",
+      "command": "contract deliver type:rubble_disposal amount:100",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 21 amount:100"
+          "command": "contract deliver type:rubble_disposal amount:100"
         }
       ],
       "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- that control is covered by the same full-screen bankruptcy overlay as everything else past tick 132, not usable either.",
@@ -1540,17 +1540,17 @@
       "role": "guard"
     },
     {
-      "command": "contract accept 22",
+      "command": "contract accept type:ore_sale",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 22"
+          "command": "contract accept type:ore_sale"
         }
       ],
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1563,11 +1563,11 @@
       "description": "#553: contract id renumbered -- by tick 447 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #21 is what `contract list` actually offers at this point in the run. Same bankruptcy-overlay finding as contract 20 above. #553-followup (issue #586 CI): same wrong-selector fix as contract 20's own accept step above -- the row-specific accept selector vanishes once this step's own `command` action accepts it, so the guard target moved to the toolbar button (matching level3-playthrough-win.json's own fix)."
     },
     {
-      "command": "contract deliver 22 amount:40",
+      "command": "contract deliver type:ore_sale amount:40",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 22 amount:40"
+          "command": "contract deliver type:ore_sale amount:40"
         }
       ],
       "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
@@ -1587,7 +1587,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1608,7 +1608,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3,
@@ -1635,7 +1635,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1657,7 +1657,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 2,
           "surveyCount": 3
@@ -1680,7 +1680,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1700,7 +1700,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1721,7 +1721,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1741,7 +1741,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1762,12 +1762,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 0,
-          "holeCount": 25
+          "orderedHoleCount": 6,
+          "holeCount": 19
         },
         "increased": [
           "tickCount"
@@ -1784,12 +1784,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 0,
-          "holeCount": 25
+          "orderedHoleCount": 6,
+          "holeCount": 19
         },
         "changedBy": {
           "tickCount": 0
@@ -1807,7 +1807,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1828,7 +1828,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1849,7 +1849,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1870,11 +1870,11 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 25,
+          "holeCount": 19,
           "sequencedCount": 0
         },
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
@@ -1902,12 +1902,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 25,
-          "chargedCount": 25,
+          "chargedCount": 19,
           "sequencedCount": 0,
           "orderedChargeCount": 0
         }
@@ -1924,12 +1924,12 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 2,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 25,
-          "chargedCount": 25,
+          "chargedCount": 19,
           "sequencedCount": 25
         },
         "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]",
@@ -1949,13 +1949,13 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
-          "chargedCount": 0,
-          "sequencedCount": 0
+          "holeCount": 25,
+          "chargedCount": 19,
+          "sequencedCount": 25
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]",
         "changedBy": {
@@ -1975,7 +1975,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1996,7 +1996,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2017,7 +2017,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2038,14 +2038,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 39.8,
-          "nuisance": 24.5
+          "ecology": 50,
+          "nuisance": 50
         },
         "changedBy": {
           "tickCount": 0
@@ -2063,13 +2063,13 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
         },
         "changedBy": {
-          "tickCount": 0
+          "tickCount": 1
         }
       }
     },
@@ -2084,7 +2084,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2107,7 +2107,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2127,7 +2127,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2148,7 +2148,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2159,17 +2159,17 @@
       }
     },
     {
-      "command": "contract accept 50",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 50"
+          "command": "contract accept type:rubble_disposal"
         }
       ],
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2182,11 +2182,11 @@
       "description": "#553: contract id renumbered -- by tick 1048 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #50 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly. #553-followup (issue #586 CI): same wrong-selector fix as contract 20's own accept step -- the row-specific accept selector vanishes once this step's own `command` action accepts it, so the guard target moved to the toolbar button (matching level3-playthrough-win.json's own fix)."
     },
     {
-      "command": "contract deliver 50 amount:100",
+      "command": "contract deliver type:rubble_disposal amount:100",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 50 amount:100"
+          "command": "contract deliver type:rubble_disposal amount:100"
         }
       ],
       "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
@@ -2206,7 +2206,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2227,7 +2227,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2248,7 +2248,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2283,7 +2283,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2305,7 +2305,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2326,7 +2326,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2348,7 +2348,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2369,7 +2369,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2389,7 +2389,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2410,12 +2410,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 30,
-          "holeCount": 0
+          "orderedHoleCount": 8,
+          "holeCount": 22
         },
         "increased": [
           "tickCount"
@@ -2432,12 +2432,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 30,
-          "holeCount": 0
+          "orderedHoleCount": 8,
+          "holeCount": 22
         },
         "changedBy": {
           "tickCount": 0
@@ -2455,7 +2455,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2476,7 +2476,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2497,7 +2497,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2518,11 +2518,11 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 22,
           "chargedCount": 0,
           "sequencedCount": 0
         },
@@ -2544,13 +2544,13 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 22,
           "chargedCount": 0,
-          "sequencedCount": 0
+          "sequencedCount": 22
         },
         "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]",
         "changedBy": {
@@ -2569,13 +2569,13 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 22,
           "chargedCount": 0,
-          "sequencedCount": 0
+          "sequencedCount": 22
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]",
         "changedBy": {
@@ -2595,7 +2595,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2616,7 +2616,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2637,7 +2637,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2660,7 +2660,7 @@
       "expect": {
         "blocked": "#bs-event-dialog",
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2681,7 +2681,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2701,7 +2701,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2722,7 +2722,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2733,17 +2733,17 @@
       }
     },
     {
-      "command": "contract accept 80",
+      "command": "contract accept type:ore_sale",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 80"
+          "command": "contract accept type:ore_sale"
         }
       ],
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2756,11 +2756,11 @@
       "description": "#553: contract id renumbered -- by tick 1656 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past this file's originally-declared ids, none of which exist in the live pool any more. #80 is what `contract list` actually offers at this point in the run. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly. #553-followup (issue #586 CI): same wrong-selector fix as contract 20's own accept step -- the row-specific accept selector vanishes once this step's own `command` action accepts it, so the guard target moved to the toolbar button (matching level3-playthrough-win.json's own fix)."
     },
     {
-      "command": "contract deliver 80 amount:300",
+      "command": "contract deliver type:ore_sale amount:300",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 80 amount:300"
+          "command": "contract deliver type:ore_sale amount:300"
         }
       ],
       "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
@@ -2780,7 +2780,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2801,14 +2801,14 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "wellBeing": 0,
-          "safety": 10.300000000000004,
+          "wellBeing": 2.299999999999999,
+          "safety": 0,
           "ecology": 50,
-          "nuisance": 42.89999999999966
+          "nuisance": 50
         },
         "changedBy": {
           "tickCount": 0
@@ -2826,7 +2826,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2848,7 +2848,7 @@
       "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost — see gameplay-employee-needs for the corrected mapping.",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2870,7 +2870,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2891,7 +2891,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -2912,7 +2912,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2939,7 +2939,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2961,7 +2961,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -2984,7 +2984,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3004,7 +3004,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3025,7 +3025,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3045,7 +3045,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3066,7 +3066,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3086,7 +3086,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3107,7 +3107,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3127,7 +3127,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3148,12 +3148,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 48,
-          "holeCount": 0
+          "orderedHoleCount": 9,
+          "holeCount": 39
         },
         "increased": [
           "tickCount"
@@ -3170,12 +3170,12 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 48,
-          "holeCount": 0
+          "orderedHoleCount": 9,
+          "holeCount": 39
         },
         "changedBy": {
           "tickCount": 0
@@ -3193,7 +3193,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3214,7 +3214,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3235,7 +3235,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3256,11 +3256,11 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 39,
           "chargedCount": 0,
           "sequencedCount": 0
         },
@@ -3282,13 +3282,13 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 39,
           "chargedCount": 0,
-          "sequencedCount": 0
+          "sequencedCount": 39
         },
         "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]",
         "changedBy": {
@@ -3307,13 +3307,13 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "holeCount": 0,
+          "holeCount": 39,
           "chargedCount": 0,
-          "sequencedCount": 0
+          "sequencedCount": 39
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]",
         "changedBy": {
@@ -3333,7 +3333,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3354,7 +3354,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3375,7 +3375,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3395,7 +3395,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3416,7 +3416,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3436,7 +3436,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3457,7 +3457,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -3478,7 +3478,7 @@
       "role": "guard",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -3515,11 +3515,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "cash": -1271073
+          "cash": -1108749
         },
         "changedBy": {
           "tickCount": 0
@@ -3538,12 +3538,12 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0,
-          "safety": 50,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
@@ -3563,12 +3563,12 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0,
-          "safety": 50,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
@@ -3588,13 +3588,13 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2320,
-          "deathCount": 5,
+          "tickCount": 2874,
+          "deathCount": 7,
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
           "wellBeing": 0,
-          "safety": 50,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,

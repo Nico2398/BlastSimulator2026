@@ -342,7 +342,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 50,
+          "tickCount": 81,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
@@ -380,7 +380,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 50,
+          "tickCount": 81,
           "deathCount": 0,
           "employeeCount": 1,
           "activeContractCount": 0,
@@ -424,7 +424,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 50,
+          "tickCount": 81,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
@@ -449,7 +449,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 50,
+          "tickCount": 81,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -470,11 +470,11 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 50,
+          "tickCount": 81,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "wellBeing": 65.08000000000018,
+          "wellBeing": 58.55000000000027,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
@@ -496,7 +496,7 @@
           "safety"
         ],
         "equals": {
-          "tickCount": 70,
+          "tickCount": 101,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -515,7 +515,7 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
         "equals": {
-          "tickCount": 70,
+          "tickCount": 101,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -534,7 +534,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 90,
+          "tickCount": 121,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -553,7 +553,7 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
         "equals": {
-          "tickCount": 90,
+          "tickCount": 121,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -572,7 +572,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 90,
+          "tickCount": 121,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -580,7 +580,7 @@
       }
     },
     {
-      "command": "contract accept 3",
+      "command": "contract accept material:sparkium type:ore_sale",
       "interaction": [
         {
           "type": "clickSelector",
@@ -588,42 +588,42 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 90,
+          "tickCount": 121,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
       },
-      "description": "#553: contract id renumbered 1 -> 3 -- the extra travel/landing ticks this file now spends (the driller/rig now take real time to reach and sink each pattern) push this checkpoint's tickCount from the original file's 40 to 90, and the pool refreshes on its own clock (CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3) independent of anything this file does, so ids 1 and 2 are long gone from it by now. #3 (sparkium, 420kg @ $237.60/kg, 42-tick deadline, $29,937 penalty) is genuinely first in the live pool at this tick -- probed via `contract list`. Coincidentally the same commodity/penalty the original file's Finding #53 called out as its 'accept whatever renders first' risk, just landing at this file's first contract stage instead of its second. #513/#581: the accept click is scoped to `[data-contract-id=\"3\"]`, the contract this step's `command` names -- unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so scoping keeps both channels testing the same acceptance."
+      "description": "#554: switched from `contract accept 3` to `material:sparkium type:ore_sale` (#597's stable `ContractSelector`) -- charging's own added real time (the wait_until above) pushes this checkpoint's tickCount from 90 (the #553-era figure the old numeric id was measured against) to 121, and the pool refreshes on its own independent clock (CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3), so id 3 no longer names anything by the time this step runs. Re-verified against a real run: the pool still genuinely offers a sparkium ore_sale contract at this tick (id 6 now, not 3) -- same commodity/penalty class Finding #53 originally called out, just re-selected by what it actually is instead of a generation-order id."
     },
     {
-      "command": "contract deliver 3 amount:300",
+      "command": "contract deliver material:sparkium type:ore_sale amount:300",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 3 amount:300"
+          "command": "contract deliver material:sparkium type:ore_sale amount:300"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of sparkium in storage against this contract -- the single driller this file hires never touches hauling, and no debris_hauler is ever bought. The console command is no better: it returns success:false (\"Not enough sparkium in storage: 0.0 kg available, 300.0 kg requested\") and command mode only fails a step on a thrown exception, so this is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of sparkium in storage against this contract -- the single driller this file hires never touches hauling, and no debris_hauler is ever bought. The console command is no better: it returns success:false (\"Not enough sparkium in storage: 0.0 kg available, 300.0 kg requested\") and command mode only fails a step on a thrown exception, so this is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. #554: switched to the same `material:sparkium type:ore_sale` selector as the accept step above.",
       "expect": {
         "equals": {
-          "tickCount": 90,
+          "tickCount": 121,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"3\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-deliver",
         "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery."
       },
       "role": "guard"
@@ -668,7 +668,7 @@
         "equals": {
           "orderedHoleCount": 8,
           "holeCount": 0,
-          "tickCount": 90,
+          "tickCount": 121,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -689,7 +689,7 @@
         "equals": {
           "orderedHoleCount": 8,
           "holeCount": 0,
-          "tickCount": 95,
+          "tickCount": 126,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -731,7 +731,7 @@
       "description": "#553: Charge All is still a real, clickable control with zero drilled holes to charge (Charge.ts never disables it on hole count) -- it charges 0 of the 8 still-ordered ghosts, matching command mode's own \"Charged 0 holes with pop_rock 3kg\" output exactly.",
       "expect": {
         "equals": {
-          "tickCount": 95,
+          "tickCount": 126,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
@@ -766,7 +766,7 @@
       "description": "1 decrement click added (Finding #75 follow-up): the earlier delay_step:30 occurrence in this file now really moves dstepMs to 30, so this step starts from 30 and must click back down to 25. Auto-sequence is likewise never disabled on hole count -- it sequences 0 of the 8 ghosts, matching command mode's \"Auto V-pattern sequence, 25ms step, 0 holes\".",
       "expect": {
         "equals": {
-          "tickCount": 95,
+          "tickCount": 126,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
@@ -796,7 +796,7 @@
       "description": "#553: unlike the charge/sequence controls, the Fire button IS gated on real drilled holes -- BlastFooter.ts computes `fireOk = hasHoles && errors.length === 0` off `state.drillHoles` (not the ordered ghosts) and disables the button whenever hasHoles is false. With 0 real holes, no player can click DETONATE here at all; this is the rejection-path counterpart to the first pattern's full click-through blast above, not a weaker version of it. Command mode still runs the bare `blast` command, which returns a real, non-throwing BAD/$0 report (0 cleared voxels) -- the same zero-hole outcome, proven the way each mode actually reaches it. #586 CI: this bare-command `blast` still sets `state.lastBlastReport`, which BlastReportModal.update() reacts to unconditionally (UIManager.ts) by opening a real report modal regardless of which mode fired the command -- and UIManager.update() deliberately defers `eventModal` while that modal is visible (\"Deferred while BlastReportModal is up\"). Nothing in this step's own interaction array used to close it, so it stayed open for the rest of the run and permanently blocked every later `resolveEventIfPending` from ever seeing `#bs-event-dialog` mount -- not a rendering-speed problem, root-caused via a direct screenshot at the first failing event step showing this exact Blast Report modal still on screen. The report-close click above is the real fix; the timeoutMs/step-timeout bumps elsewhere in this file are a harmless margin, not what was actually wrong.",
       "expect": {
         "equals": {
-          "tickCount": 95,
+          "tickCount": 126,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
@@ -819,7 +819,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 95,
+          "tickCount": 126,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -837,7 +837,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 115,
+          "tickCount": 146,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -856,7 +856,7 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
         "equals": {
-          "tickCount": 115,
+          "tickCount": 146,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -878,7 +878,7 @@
           "cash"
         ],
         "equals": {
-          "tickCount": 135,
+          "tickCount": 166,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -898,7 +898,7 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s and step-level `timeout` bumped 60s -> 120s (issue #586 CI) as margin, but a sandboxed repro of the real CI failure (screenshot at this exact step) found the actual cause was NOT rendering speed: the second pattern's guard `blast` step above (a bare console `blast` call with 0 real holes, tickCount 95) still sets `state.lastBlastReport`, which BlastReportModal.update() opens unconditionally regardless of which mode fired the command (UIManager.ts) -- and that step's own interaction array never closed it. UIManager.update() deliberately defers `eventModal` while BlastReportModal.visible is true (\"Deferred while BlastReportModal is up\", UIManager.ts), so once that report modal opened at the second pattern's blast it stayed open and permanently blocked `#bs-event-dialog .bs-event-choice` from ever mounting -- no amount of extra timeoutMs would have helped, since the dialog was never going to appear. Fixed at the root: the guard blast steps (second/third/fourth patterns) now click `[data-action=\"report-close\"]` right after the bare command, so this step's own `resolveEventIfPending` reaches a real, unblocked event dialog. The larger timeouts are kept as a harmless margin for genuine per-frame slowness under this file's entity-heavy scene (91 muck-pile fragments sandbox-measured at this tick), not because they were the actual fix.",
       "expect": {
         "equals": {
-          "tickCount": 135,
+          "tickCount": 166,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -918,7 +918,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 135,
+          "tickCount": 166,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0
@@ -926,7 +926,7 @@
       }
     },
     {
-      "command": "contract accept 5",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "clickSelector",
@@ -934,42 +934,42 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-accept"
         }
       ],
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 135,
+          "tickCount": 166,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         }
       },
-      "description": "#553: contract id renumbered 3 -> 5 for this file's second accept, matching whatever the live pool holds first at tick 125 (probed via `contract list`) -- #5, Dispose of rubble, 260kg @ $1.74/kg, 75-tick deadline, $136 penalty. #513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names, for the same DOM-order-coupling reason documented on the first accept step above."
+      "description": "#554: switched from `contract accept 5` to `type:rubble_disposal` (#597's stable `ContractSelector`) -- same pool-rotation reason as the first accept step above; id 5 no longer exists in the pool by tick 166. Re-verified against a real run: resolves to contract #11 (Dispose of rubble, 230kg)."
     },
     {
-      "command": "contract deliver 5 amount:400",
+      "command": "contract deliver type:rubble_disposal amount:400",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 5 amount:400"
+          "command": "contract deliver type:rubble_disposal amount:400"
         }
       ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (sparkium #3, rubble #5) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 260.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (sparkium and rubble) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #554: switched to the same `type:rubble_disposal` selector as the accept step above, id 11.",
       "expect": {
         "equals": {
-          "tickCount": 135,
+          "tickCount": 166,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"11\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -1013,7 +1013,7 @@
         "equals": {
           "orderedHoleCount": 16,
           "holeCount": 0,
-          "tickCount": 135,
+          "tickCount": 166,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1034,7 +1034,7 @@
         "equals": {
           "orderedHoleCount": 16,
           "holeCount": 0,
-          "tickCount": 140,
+          "tickCount": 171,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1084,7 +1084,7 @@
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #553: still 0 holes to charge -- Charge All is never disabled on hole count, so it charges 0 of the 16 ordered ghosts (\"Charged 0 holes with boomite 5kg\"). #586 CI: amount stepper direction fixed -- entering state here is pop_rock/3kg (Charge.ts's `amountKg` is one instance field with no reset between charge steps, left at 3 by the second pattern's `charge ... pop_rock amount:3` above; selecting boomite clamps into its 1-8kg range, which 3 already satisfies, so it stays 3 unchanged). Reaching the declared 5kg needs two +1 increments (`:last-child`, DELTA=+1, Charge.ts's `adjustAmount`), not one -1 decrement (`:first-child`) -- the prior single decrement click silently undercounted to 2kg and only surfaced once a sandboxed run of this file finally got past the step-32 event-dialog blocker below to reach this step at all (issue #586 CI investigation).",
       "expect": {
         "equals": {
-          "tickCount": 140,
+          "tickCount": 171,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
@@ -1121,7 +1121,7 @@
       "description": "Asserted rather than assumed (Finding #75 follow-up): the preceding delay_step:25 occurrence's decrement click should have already left dstepMs at 25 here. #553: sequences 0 of the 16 ghosts (\"Auto V-pattern sequence, 25ms step, 0 holes\") -- auto-sequence is never disabled on hole count either.",
       "expect": {
         "equals": {
-          "tickCount": 140,
+          "tickCount": 171,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
@@ -1151,7 +1151,7 @@
       "description": "#553: same guard as the second pattern's blast above -- 0 real holes means BlastFooter.ts's fireOk is false and DETONATE is disabled. No player can fire this third \"blast\" at all. #586 CI: report-close click added -- the bare command still opens a real Blast Report modal (BlastReportModal.update() reacts to state.lastBlastReport regardless of mode) which UIManager.ts then uses to defer eventModal indefinitely; see the second pattern's blast step above for the full root-cause writeup.",
       "expect": {
         "equals": {
-          "tickCount": 140,
+          "tickCount": 171,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
@@ -1174,7 +1174,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 140,
+          "tickCount": 171,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1195,11 +1195,11 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 140,
+          "tickCount": 171,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 60.58000000000044,
+          "wellBeing": 54.05000000000052,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
@@ -1218,7 +1218,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 160,
+          "tickCount": 175,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1237,7 +1237,7 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
         "equals": {
-          "tickCount": 160,
+          "tickCount": 175,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1256,7 +1256,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 175,
+          "tickCount": 195,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1272,18 +1272,14 @@
           "timeoutMs": 90000
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted. #554: dropped the `changedBy: {cash: -4000}` food_fest claim -- charging's own added real time (this file's first wait_until, plus the #554 contract-selector migration's own knock-on effect on which contracts get accepted/expire when) shifts which random event this exact command/tick sequence lands on; a direct trace confirms no event is pending at this specific step anymore (the miner_month bonus at the step above already consumed the event this block's own budget had room for). A harmless no-op here, same class as the other tick/event pairs elsewhere in this file that land with nothing pending.",
       "expect": {
-        "changedBy": {
-          "cash": -4000
-        },
         "equals": {
-          "tickCount": 175,
+          "tickCount": 195,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
-        },
-        "note": "#593: superseding the pre-#593 union_merch/-$2,500 note this once carried -- with the driller dead (first pattern's blast, far above) the pool of pending events this exact command/tick sequence lands on has shifted, and it's now UnionEvents2's food_fest whose option 0 fires: sandbox-measured as a fixed, RNG-free -$4,000 (also +10 wellBeing, +5 nuisance, not separately asserted here)."
+        }
       },
       "role": "player"
     },
@@ -1298,7 +1294,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 175,
+          "tickCount": 195,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1324,7 +1320,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "tickCount": 175,
+          "tickCount": 195,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
@@ -1343,7 +1339,7 @@
       "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough blingite in storage: 0.0 kg available, 250.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard.",
       "expect": {
         "equals": {
-          "tickCount": 175,
+          "tickCount": 195,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
@@ -1393,7 +1389,7 @@
         "equals": {
           "orderedHoleCount": 16,
           "holeCount": 0,
-          "tickCount": 175,
+          "tickCount": 195,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
@@ -1414,7 +1410,7 @@
         "equals": {
           "orderedHoleCount": 16,
           "holeCount": 0,
-          "tickCount": 180,
+          "tickCount": 200,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
@@ -1460,7 +1456,7 @@
       "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls. #586 CI: click count fixed from 3 to 1 -- entering state here is boomite/5kg (not pop_rock/3kg as the superseded note below once assumed): the third pattern's charge step above now correctly lands on its own declared 5kg (see its own #586 note), so Charge.ts's single persistent `amountKg` instance field carries 5kg in here, and selecting boomite again (already selected) re-clamps into its own 1-8kg range without changing it. One +1 increment (`:last-child`) reaches the declared 6kg; the old 3-click version overshot to 8kg and only surfaced once a full sandboxed run finally got past this file's earlier blockers to reach this step (issue #586 CI investigation). Superseded note, kept for history: \"Entering state is pop_rock/3kg/2.0m, not the declared prior step's boomite/5kg/2.0m — the preceding charge step... only clicks data-step then Charge All without touching the explosive/amount/stemming controls\" — inaccurate against the third pattern's actual (now-fixed) interaction array, which always did touch those controls; the real entering value was governed by whichever bug that step had at the time, not by it skipping the controls entirely. #553: still 0 real holes -- charges 0 of the 16 ghosts.",
       "expect": {
         "equals": {
-          "tickCount": 180,
+          "tickCount": 200,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
@@ -1495,7 +1491,7 @@
       "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts) for unambiguous click targeting. 1 decrement click: dstepMs is 25 here (the preceding delay_step:25 occurrence left it unchanged), so one click reaches 20 (DELAY_STEP_INCREMENT=5ms, Sequence.ts). #553: sequences 0 of the 16 ghosts.",
       "expect": {
         "equals": {
-          "tickCount": 180,
+          "tickCount": 200,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
@@ -1525,7 +1521,7 @@
       "description": "#553: same guard as the second and third patterns' blasts above -- 0 real holes, DETONATE disabled, no player can fire this fourth \"blast\" either. This file's title still counts 4 blasts (the drill/charge/sequence/blast cycle runs 4 times, matching its own description) even though only the first one is ever real. #586 CI: report-close click added -- same root cause as the second pattern's blast step above (a bare-command blast still opens a real Blast Report modal that UIManager.ts uses to defer eventModal indefinitely until closed).",
       "expect": {
         "equals": {
-          "tickCount": 180,
+          "tickCount": 200,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
@@ -1548,7 +1544,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 180,
+          "tickCount": 200,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2
@@ -1566,10 +1562,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 200,
+          "tickCount": 220,
           "deathCount": 1,
           "employeeCount": 1,
-          "activeContractCount": 2
+          "activeContractCount": 1
         },
         "note": "#593: cash is no longer asserted as decreased -- the driller died in the first pattern's blast, far above, so cash sits flat at -$23,317 through this block."
       }
@@ -1585,10 +1581,10 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
         "equals": {
-          "tickCount": 200,
+          "tickCount": 220,
           "deathCount": 1,
           "employeeCount": 1,
-          "activeContractCount": 2
+          "activeContractCount": 1
         }
       },
       "role": "player"
@@ -1603,16 +1599,13 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
-        ],
         "equals": {
-          "tickCount": 220,
+          "tickCount": 240,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
         },
-        "note": "#597 (event cooldown caching): re-verified against current code -- only one of the two remaining contracts expires inside this block: #5 (rubble, $136 penalty) at tick 211. #7 (blingite, 97-tick deadline from its tick-175 accept, $2,919 penalty) is still active at tick 220 -- its own deadline lands well past this file's final checkpoint. #593: cash: -$23,317 -> -$23,453 (the rubble fine is the only thing left to move it -- the driller died in the first pattern's blast, far above, so there is no ongoing payroll/fuel drain). activeContractCount drops from 2 to 1. Cumulative ticksBelowThreshold (BANKRUPTCY_THRESHOLD=$5,000 in balance.ts) is nowhere near the 100-tick BANKRUPTCY_GRACE_TICKS -- deeply negative, but not an actual bankruptcy game-over; confirmed via a direct trace (`bankrupt`/`levelEnded` both still false at the final checkpoint below)."
+        "note": "#554: dropped the `decreased: [cash]` claim -- with the driller dead since the first pattern's blast, far above, there is no ongoing payroll/fuel drain, and this block's own contract-expiry fine already landed in an earlier tick block under the #554 contract-selector migration's own timing (two steps up), not this one -- confirmed by direct trace, cash is flat through this exact 20-tick chunk. activeContractCount already dropped from 2 to 1 at the tick/event pair above."
       }
     },
     {
@@ -1626,7 +1619,7 @@
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. timeoutMs bumped from the default 30s to 90s (issue #586 CI): this file never buys a debris_hauler, so blast fragments/wreckage accumulate in the scene for its whole run -- deep into the file the resulting entity-heavy scene pushes real per-frame render cost past the default 30s ceiling under load, timing out `resolveEventIfPending` itself even though it correctly detects a genuinely-pending event (interaction-executor.ts's own internal 30s wait on `#bs-event-dialog .bs-event-choice`) -- a rendering-speed accommodation, not a change to what's asserted.",
       "expect": {
         "equals": {
-          "tickCount": 220,
+          "tickCount": 240,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1645,7 +1638,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 220,
+          "tickCount": 240,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1
@@ -1666,14 +1659,14 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 220,
+          "tickCount": 240,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 66.58000000000067,
+          "wellBeing": 56.60000000000072,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 52.75000000000013
+          "nuisance": 50
         },
         "note": "#593, superseding the pre-#593 note this once carried, and updated again for the Employee.ts computeAverageMorale fix (dead employees now excluded from the average outright, not diluted-but-never-cleared): with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down, and with zero living employees avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback) rather than the driller's own frozen-at-death morale. wellBeing decays back up from its post-death low toward the equilibrium that constant produces, reaching 66.58 by this checkpoint (still climbing from the earlier scores checkpoint's 60.58) rather than climbing all the way toward 100 the way a higher, morale-derived average once did. safety is re-verified as pinned at its floor of 0, not recovering -- sandbox-measured, it never moves off 0 anywhere in this file's run once it bottoms out there (tickCount 70, see that scores step's note). nuisance is no longer untouched either: the food_fest event partway through the run (see its own changedBy step) added +5 and it has been decaying back down since (52.75 here). ecology alone stays at the fresh-game 50 -- confirmed across the whole file: the one real blast (the first pattern) never registered a vibration hit, and the other three never fired at all."
       }
@@ -1692,11 +1685,11 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 220,
+          "tickCount": 240,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 66.58000000000067,
+          "wellBeing": 56.60000000000072,
           "safety": 0
         }
       }
@@ -1712,12 +1705,12 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -23453,
-          "tickCount": 220,
+          "cash": -22099,
+          "tickCount": 240,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 66.58000000000067,
+          "wellBeing": 56.60000000000072,
           "safety": 0,
           "bankrupt": false,
           "levelEnded": false,

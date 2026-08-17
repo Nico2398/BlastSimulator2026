@@ -1698,7 +1698,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 410,
+          "tickCount": 460,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1724,7 +1724,7 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
+          "tickCount": 460,
           "deathCount": 0,
           "employeeCount": 15,
           "activeContractCount": 0,
@@ -1751,8 +1751,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1778,8 +1778,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1800,8 +1800,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1822,8 +1822,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3,
@@ -1849,8 +1849,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1872,8 +1872,8 @@
           "cash": 10000
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1896,8 +1896,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 0,
           "surveyCount": 3
@@ -1918,8 +1918,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -1942,8 +1942,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -1966,8 +1966,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3
@@ -1988,8 +1988,8 @@
           "cash": 0
         },
         "equals": {
-          "tickCount": 410,
-          "deathCount": 11,
+          "tickCount": 460,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2011,9 +2011,9 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 410,
-          "cash": -377412,
-          "deathCount": 11,
+          "tickCount": 460,
+          "cash": -428662,
+          "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,
           "surveyCount": 3,
@@ -2025,7 +2025,7 @@
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
         },
-        "note": "#553: this file's real conclusion, retimed by #596/#597 (idempotent event pool + cached cooldown threshold shift when the pending event becomes true). Named for an $800,000 win across 5 patterns (184 holes total) and all 10 hired employees dying; `campaign start level:treranium_depths` fails outright (tier-3, locked, unchanged from Findings #58/#59/#61/#62), so the run plays out on the substitute new_game world throughout. Under #553's queued, vehicle-gated drilling, staffed:true's free 5-person/4-vehicle composition stacked on this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles total, $220,000 budget after $165,000 of that goes straight into the fleet) can no longer survive even the first drilling wait: 'BANKRUPTCY! The mine is seized.' fires at tick 139, 271 ticks before pattern 1's 24 holes (drilled for real by 2 concurrent driller/drill_rig pairs -- the free staffed rig plus a hand-hired driller licensed into this file's own idle drill_rig) finish landing at tick 410. Nothing halts a tick or a blast once levelEnded flips, so the mine keeps operating -- legally seized, crew still working. Pattern 1 blasts for real anyway: PERFECT rating, 1,507 m3 cleared, and kills 11 of the 15 employees on site -- all 10 of this file's own hand-hires (employees #6-15) plus employee #1 (the free staffed driller who drilled the pattern); only staffed:true's blaster and 3 drivers (#2-5) survive -- while destroying 6 of the 9 vehicles: the free staffed drill_rig and all 5 of this file's own hand-bought vehicles, all parked squarely inside the pattern's footprint. One real contract cycle follows (accept + a storage-empty delivery refusal, both via #597's `type:rubble_disposal` selector against contract #20 -- storedMassKg never leaves 0; every debris_hauler in play is either destroyed in the blast or, like the free staffed one, never driven). Patterns 2-5 (36+30+30+64 = 160 more holes, the remaining 4 explosive types) are dropped from this file entirely: narrating drill_plan cycles for a mine that is $377,412 in the hole, has 4 employees left, and no fleet capable of drilling or hauling anything would document nothing real -- same resolution level3-playthrough-ecology.json already used for its own unreachable patterns 3-6. cash is exact and reproducible (fixed seed, command-mode measured, no wall-clock dependency); bankrupt/levelEnded/levelEndReason are the file's real ending, not the named $800k target."
+        "note": "#553: this file's real conclusion, retimed by #596/#597 (idempotent event pool + cached cooldown threshold shift when the pending event becomes true). Named for an $800,000 win across 5 patterns (184 holes total) and all 10 hired employees dying; `campaign start level:treranium_depths` fails outright (tier-3, locked, unchanged from Findings #58/#59/#61/#62), so the run plays out on the substitute new_game world throughout. Under #553's queued, vehicle-gated drilling, staffed:true's free 5-person/4-vehicle composition stacked on this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles total, $220,000 budget after $165,000 of that goes straight into the fleet) can no longer survive even the first drilling wait: 'BANKRUPTCY! The mine is seized.' fires at tick 139, 271 ticks before pattern 1's 24 holes (drilled for real by 2 concurrent driller/drill_rig pairs -- the free staffed rig plus a hand-hired driller licensed into this file's own idle drill_rig) finish landing at tick 410. Nothing halts a tick or a blast once levelEnded flips, so the mine keeps operating -- legally seized, crew still working. Pattern 1 blasts for real anyway: PERFECT rating, 1,507 m3 cleared. #554: kills 12 of the 15 employees on site, not the pre-#554 file's 11 -- charging is real work now (the wait_until below the charge order, drained for real between tick 410 and 460), and confirmed by direct probe one more of staffed:true's own roster ends up standing at a hole loading it (rather than merely having drilled it) by the time the blast fires, so tickCount/bankrupt/levelEndReason/holeCount are all unchanged from the pre-#554 file but the death toll and every cash figure downstream of it move. One real contract cycle follows (accept + a storage-empty delivery refusal, both via #597's `type:rubble_disposal` selector against contract #20 -- storedMassKg never leaves 0; every debris_hauler in play is either destroyed in the blast or, like the free staffed one, never driven). Patterns 2-5 (36+30+30+64 = 160 more holes, the remaining 4 explosive types) are dropped from this file entirely: narrating drill_plan cycles for a mine that is deep in the hole, has only a few employees left, and no fleet capable of drilling or hauling anything would document nothing real -- same resolution level3-playthrough-ecology.json already used for its own unreachable patterns 3-6. cash is exact and reproducible (fixed seed, command-mode measured, no wall-clock dependency); bankrupt/levelEnded/levelEndReason are the file's real ending, not the named $800k target."
       }
     }
   ]
