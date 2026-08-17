@@ -1,6 +1,6 @@
 {
   "name": "hauling-gate",
-  "description": "Self-dispatching debris hauling (issue #552, superseding the manual 'vehicle haul <id> fragment:<id>' flow from #437): once a debris_hauler and a truck-licensed driver exist, an on-ground blast fragment spawns its own haul_debris PendingAction with no player command at all \u2014 the driver claims it, boards the free hauler, drives to the fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. There is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happened at claim time instead), so this file only advances ticks and asserts on the automatic outcome: logistics.storedMassKg must rise, and by the final tick block the hauled fragment must read state:stored.",
+  "description": "Self-dispatching debris hauling (issue #552, superseding the manual 'vehicle haul <id> fragment:<id>' flow from #437): once a debris_hauler and a truck-licensed driver exist, an on-ground blast fragment spawns its own haul_debris PendingAction with no player command at all — the driver claims it, boards the free hauler, drives to the fragment, loads it only on arrival, drives to the nearest freight_warehouse, and delivers it only on arrival. There is no player-chosen fragment id any more (findReachableGroundFragment's nearest-reachable pick happened at claim time instead), so this file only advances ticks and asserts on the automatic outcome: logistics.storedMassKg must rise, and by the final tick block the hauled fragment must read state:stored.",
   "steps": [
     {
       "command": "new_game seed:42 cash:150000 staffed:true",
@@ -127,8 +127,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -348,6 +368,32 @@
         {
           "type": "command",
           "command": "tick 20"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554: idempotent (resolveEventIfPending — no-op when nothing is pending). tickCommand itself stops early and auto-pauses the instant any event fires mid-window (\"Pending event! Resolve it first\"), and the earlier charge-order wait above shifts tickCount enough that a spontaneous event now sometimes lands inside the tick 20 window right above, cutting it short before the hauler's fragment-to-depot round trip has a chance to even start. Clearing it here, before the tick 60 step below actually asserts hauling progress, keeps that assertion honest regardless of exactly when the event happened to fire.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 60",
+      "description": "#554: the real wait for automatic hauling to make progress, now that the tick 20 + event choose 0 pair above guarantees a clear run (no pending event can still be blocking tickCommand from the very first tick).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 60"
         }
       ],
       "role": "setup",

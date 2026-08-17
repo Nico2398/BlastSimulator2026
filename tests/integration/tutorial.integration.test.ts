@@ -167,6 +167,16 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
       run('tick 1');
     }
     expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    // #554: charging is real work too — drain the ordered charges the same
+    // way the drill plan above was drained before blasting.
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      run('tick 1');
+    }
     expect(run('sequence auto delay_step:25').success).toBe(true);
     const blastResult = run('blast');
     expect(blastResult.success).toBe(true);

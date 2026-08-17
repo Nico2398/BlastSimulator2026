@@ -582,11 +582,31 @@
       "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 209 (84 ticks before this step, per the tick-168 wait step's own expect above) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel control here sits at z-panel (100, tokens.ts), so the overlay covers charge-all just like it does in level2-playthrough-win.json and level3-playthrough-win.json's identical finding -- same overlay class, this file's own bankruptcy trigger instead of theirs. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 16 holes really do charge and the rest of this file's own trajectory (5 deaths at blast 1, destroyed rig, eventual revolt) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong.",
       "role": "guard",
       "expect": {
-        "equals": {
-          "chargedCount": 16
-        },
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "traced in command mode; cash is deliberately not asserted here -- ground rule #12, this step follows a tick block"
+        "note": "traced in command mode; cash is deliberately not asserted here -- ground rule #12, this step follows a tick block",
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 16,
+          "orderedChargeCount": 0
+        }
       }
     },
     {

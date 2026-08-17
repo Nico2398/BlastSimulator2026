@@ -56,6 +56,22 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
   }
 }
 
+/**
+ * Ticks until every charge ordered by the last `charge hole:*`/`charge
+ * hole:<id>` has landed in state.chargesByHole (#554), mirroring
+ * driveDrillPlanToCompletion above.
+ */
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
+  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 beforeEach(() => resetHoleIds());
 
 /**
@@ -332,6 +348,7 @@ describe('NavGrid patching — blast', () => {
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const result = blastCommand(ctx, [], {});
@@ -384,6 +401,7 @@ describe('NavGrid patching — blast', () => {
     drillPlanCommand(ctx, ['add'], { x: '8', z: '8', depth: '18' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'dynatomics', amount: '20kg', stemming: '1m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
 
     const before = solidCount(8, 8);

@@ -118,13 +118,33 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "role: player (issue #515): the old \"no UI feature\" reasoning is stale \u2014 Charge.ts's own header comment records that per-hole charging (gap G3) got a real control, ChargeHoleList's `[data-hole=\"H1\"] [data-action=\"charge-hole\"]`, which commits the panel's current product/amount/stemming to one hole instead of all of them.",
+      "description": "role: player (issue #515): the old \"no UI feature\" reasoning is stale — Charge.ts's own header comment records that per-hole charging (gap G3) got a real control, ChargeHoleList's `[data-hole=\"H1\"] [data-action=\"charge-hole\"]`, which commits the panel's current product/amount/stemming to one hole instead of all of them.",
       "expect": {
-        "equals": {
-          "chargedCount": 1
-        }
+        "increased": [
+          "orderedChargeCount"
+        ]
       },
       "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto",
@@ -279,7 +299,9 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "note": "vehicle list confirms real NavGrid-aware movement toward (15,15) — position advances from spawn each tick"
       }
     },

@@ -560,6 +560,10 @@ window.__gameState = () => {
     // with "undefined" rather than a real mismatch (#553's original
     // implementation added the field to command mode only).
     orderedHoleCount: s.plannedDrillHoles.length,
+    // Charges ordered but not yet loaded (state.plannedChargesByHole) --
+    // mirrors serializeGameState's own field (console-api.ts), same
+    // rationale as orderedHoleCount above (#554).
+    orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
     surveyCount: s.surveyResults.length,

@@ -188,6 +188,16 @@ export class BlastPlanOverlay {
     );
     bottom.rotation.x = -Math.PI / 2;
 
+    // Charge order still loading (#554) — a distinct low-opacity fill so an
+    // ordered-but-unloaded hole reads differently from both an uncharged hole
+    // (nothing at all) and a landed charge's amount-scaled fill below.
+    if (!charge && hd.chargeOrdered) {
+      this.addXrayMesh(
+        new THREE.CylinderGeometry(HOLE_RADIUS * 0.4, HOLE_RADIUS * 0.4, depth * 0.3, HOLE_SEGMENTS),
+        { color: CHARGE_ORDERED_COLOR, transparent: true, opacity: CHARGE_ORDERED_OPACITY }, 13, x, base - depth + depth * 0.15, z, pickId,
+      );
+    }
+
     // Charge fill inside shaft + surface indicator
     if (charge && charge.amountKg > 0) {
       // Scale charge level against a realistic max (10kg) instead of 200kg

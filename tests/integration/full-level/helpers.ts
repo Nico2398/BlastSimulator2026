@@ -111,6 +111,30 @@ export function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): vo
 }
 
 /**
+ * Ticks until every charge ordered by the most recent `charge hole:*`/`charge
+ * hole:<id>` has landed in state.chargesByHole (#554) — a 'blasting'-
+ * qualified employee must already exist for any charge to ever land.
+ * Resolves pending events and tops up employee need gauges each tick, same
+ * reasoning as driveDrillPlanToCompletion above.
+ */
+export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+    if (ctx.state!.events.pendingEvent) {
+      eventCommand(ctx, ['choose', '0'], {});
+    }
+    if (ctx.state!.isPaused) {
+      ctx.state!.isPaused = false;
+    }
+  }
+}
+
+/**
  * Perform a standard blast cycle: drill grid, charge all, auto-sequence, blast.
  * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
  * @param ctx The game context (cast to MiningContext internally for command compatibility).

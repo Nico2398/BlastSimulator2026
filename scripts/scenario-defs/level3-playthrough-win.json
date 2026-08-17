@@ -1674,12 +1674,41 @@
           "activeContractCount": 0,
           "surveyCount": 3,
           "holeCount": 24,
-          "chargedCount": 24,
           "sequencedCount": 0
         },
-        "blocked": "#bs-blast-panel [data-step=\"2\"]"
+        "blocked": "#bs-blast-panel [data-step=\"2\"]",
+        "increased": [
+          "orderedChargeCount"
+        ]
       },
       "description": "CI finding, this PR (#586): was role: player (issue #515) driving real clicks through the Charge step. It can't be -- `state.bankrupt` flipped true (and levelEndReason to 'bankruptcy') two tick-blocks back, and `LevelEndScreen.update()` (src/main.ts:526, called after every command whenever `!tutorial.isActive`) shows its full-screen `#bs-level-end-screen` overlay -- `position:fixed;inset:0` at `--bsx-z-menu` -- the instant `levelEndReason` goes non-null, for EVERY defeat reason, not just worker_revolt. It stays up: `update()` only clears `rendered` (and re-hides) when `levelEndReason` goes back to null, which a defeated level never does. So `#bs-blast-panel [data-step=\"2\"]` is exactly the covered-by-div failure this PR's other broken scenario files hit for a different reason (crew walkout) -- same overlay class, different trigger. The command still runs (nothing in the engine gates a command on `levelEndReason`, matching this file's own established 'nothing halts a tick or a blast once levelEnded flips' narrative below) and chargedCount still reaches 24 -- only the UI path to get there is gone. `role: guard` + `expect.blocked` proves that honestly instead of asserting a click no real player could make."
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "tickCount": 410,
+          "deathCount": 0,
+          "employeeCount": 15,
+          "activeContractCount": 0,
+          "surveyCount": 3,
+          "holeCount": 24,
+          "chargedCount": 24,
+          "sequencedCount": 0,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",

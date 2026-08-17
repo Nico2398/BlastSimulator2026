@@ -74,12 +74,50 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
   }
 }
 
+/**
+ * Ticks until every charge ordered by the last `charge hole:*` has landed in
+ * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
+ *
+ * Charging is on-foot work (no vehicle gate, unlike drilling) — either the
+ * driller (id 1, relocated clear by driveDrillPlanToCompletion above once
+ * drilling finished) or the staffed blaster (id 2, also 'blasting'-qualified,
+ * STARTING_SITE_STAFFED_COMPOSITION) can walk back into the pattern to claim
+ * a charge_hole action, undoing that relocation. Same reasoning as the drill
+ * helper's own relocation: these tests are about flyrock reaching the crew
+ * crewBesideTheBlast (or a test's own explicitly hired/positioned employee)
+ * places deliberately, not about whichever staffed employee happened to do
+ * the charging — so only ids 1/2 (the staffed opening's driller/blaster,
+ * hired before any test-specific crew) are parked clear of the pattern once
+ * every charge has landed. Relocating by qualification instead of by these
+ * fixed ids would also sweep up a test's own deliberately-placed 'driller'-
+ * role bystanders (crewBesideTheBlast, onTheBlast), which are 'blasting'-
+ * qualified too (ROLE_STARTING_QUALIFICATION) but must stay exactly where
+ * each test put them.
+ */
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+  for (const emp of ctx.state!.employees.employees) {
+    if (emp.id === 1 || emp.id === 2) {
+      emp.x = 44;
+      emp.z = 44;
+    }
+  }
+}
+
 /** Fire a 3×3 pattern at (15,15) with the given stemming. */
 function blastAt(ctx: MiningContext, stemming: string): void {
   resetHoleIds();
   drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
   driveDrillPlanToCompletion(ctx);
   chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming });
+  driveChargePlanToCompletion(ctx);
   sequenceCommand(ctx, ['auto'], { delay_step: '25' });
   const result = blastCommand(ctx, [], {});
   expect(result.success, result.output).toBe(true);
@@ -91,12 +129,21 @@ function blastAt(ctx: MiningContext, stemming: string): void {
  * fires, including the well-stemmed '2' case, which clears *more* ground than
  * a poorly-stemmed shot since more of its energy goes down instead of up) but
  * well inside a minimally-stemmed (0.5m, the createCharge floor) shot's throw.
+ *
+ * Hired as 'driver', not 'driller' (#554): a 'driller' is 'blasting'-
+ * qualified (ROLE_STARTING_QUALIFICATION), and charge_hole — unlike
+ * drill_hole — has no vehicle gate, so any 'blasting'-qualified bystander
+ * standing this close to the pattern would get dispatched to walk in and
+ * charge a hole itself (nearest-first, ActionSelection.ts), planting exactly
+ * the passive bystander these tests need beside the blast squarely on top of
+ * it instead. 'driver' carries no qualification charge_hole/drill_hole ever
+ * checks, so this crew can only ever be a bystander, never a blaster.
  */
 function crewBesideTheBlast(ctx: MiningContext, count = 12): number[] {
   const rng = new Random(7);
   const ids: number[] = [];
   for (let i = 0; i < count; i++) {
-    const hire = hireEmployee(ctx.state!.employees, 'driller', rng, 24 + (i % 4), 14 + Math.floor(i / 4));
+    const hire = hireEmployee(ctx.state!.employees, 'driver', rng, 24 + (i % 4), 14 + Math.floor(i / 4));
     if (hire.employee) ids.push(hire.employee.id);
   }
   return ids;
@@ -178,7 +225,11 @@ describe('Blast flyrock — danger reaches the crew', () => {
   it('leaves people well clear of the blast alone', () => {
     const ctx = makeCtx();
     const rng = new Random(11);
-    const farAway = hireEmployee(ctx.state!.employees, 'driller', rng, 44, 44).employee;
+    // 'driver', not 'driller' (#554) — same reasoning as crewBesideTheBlast:
+    // a 'blasting'-qualified bystander this far out could still get
+    // dispatched to walk in and charge a hole (charge_hole has no vehicle
+    // gate), which is exactly the "well clear" this test means to prove.
+    const farAway = hireEmployee(ctx.state!.employees, 'driver', rng, 44, 44).employee;
 
     blastAt(ctx, '0.5');
 
@@ -197,6 +248,7 @@ describe('Blast flyrock — danger reaches the crew', () => {
     drillPlanCommand(reckless, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8', start: '30,30' });
     driveDrillPlanToCompletion(reckless);
     chargeCommand(reckless, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
+    driveChargePlanToCompletion(reckless);
     sequenceCommand(reckless, ['auto'], {});
     const output = blastCommand(reckless, [], {}).output;
 

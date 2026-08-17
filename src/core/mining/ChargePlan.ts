@@ -2,7 +2,7 @@
 // Assigns explosives and stemming to each hole in the drill plan.
 
 import { getExplosive } from '../world/ExplosiveCatalog.js';
-import { MIN_STEMMING_M } from '../config/balance.js';
+import { MIN_STEMMING_M, CHARGE_HOLE_BASE_DURATION_TICKS, CHARGE_HOLE_REFERENCE_AMOUNT_KG } from '../config/balance.js';
 
 export interface HoleCharge {
   explosiveId: string;
@@ -68,17 +68,23 @@ export type PlannedCharge = HoleCharge;
 
 /**
  * Land a planned (ordered-but-not-loaded) charge into a completed `HoleCharge`
- * once its `charge_hole` action finishes (#554). TODO: implement.
+ * once its `charge_hole` action finishes (#554).
  */
-export function landLoadedCharge(_planned: PlannedCharge): HoleCharge {
-  throw new Error('not implemented');
+export function landLoadedCharge(planned: PlannedCharge): HoleCharge {
+  return {
+    explosiveId: planned.explosiveId,
+    amountKg: planned.amountKg,
+    stemmingM: planned.stemmingM,
+  };
 }
 
 /**
  * Ticks to load a charge of the given amount, mirroring
  * computeDrillHoleDurationTicks's scaling against a reference amount (#554).
- * TODO: implement.
  */
-export function computeChargeHoleDurationTicks(_amountKg: number): number {
-  throw new Error('not implemented');
+export function computeChargeHoleDurationTicks(amountKg: number): number {
+  return Math.max(
+    1,
+    Math.round(CHARGE_HOLE_BASE_DURATION_TICKS * (amountKg / CHARGE_HOLE_REFERENCE_AMOUNT_KG)),
+  );
 }

@@ -88,7 +88,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "FINDING: stemming:0 (this file's original declared value, fully unstemmed) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...), so a player can never leave a hole truly unstemmed, only reach 0.5m. The console command has no such floor, so command mode's version of this file (and every earlier interaction-mode run, which never touched these steppers and silently charged at the 5kg/2m panel defaults instead) tested a different, stronger-than-achievable unstemmed case that no player could reproduce. Corrected to the real UI-reachable extreme: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) \u2014 the strongest overcharge a real player can actually create.",
+      "description": "FINDING: stemming:0 (this file's original declared value, fully unstemmed) is not reachable by any click — Charge.ts's adjustStemming() floors at Math.max(0.5, ...), so a player can never leave a hole truly unstemmed, only reach 0.5m. The console command has no such floor, so command mode's version of this file (and every earlier interaction-mode run, which never touched these steppers and silently charged at the 5kg/2m panel defaults instead) tested a different, stronger-than-achievable unstemmed case that no player could reproduce. Corrected to the real UI-reachable extreme: 3 amount-stepper clicks (5->8kg, data-field=\"amount\") and 8 stemming-stepper clicks (2.0->0.5m, data-field=\"stemming\", clamped at the floor) — the strongest overcharge a real player can actually create.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -141,8 +141,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },

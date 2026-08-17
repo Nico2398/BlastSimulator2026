@@ -348,13 +348,33 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed.",
       "expect": {
-        "equals": {
-          "chargedCount": 4
-        }
+        "increased": [
+          "orderedChargeCount"
+        ]
       },
       "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto",
@@ -873,7 +893,7 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 6",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "clickSelector",
@@ -881,11 +901,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"6\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -894,10 +914,10 @@
           "activeContractCount": 1
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id]`, the contract this step's `command` names (ContractsPanel sets `data-contract-id` on offered cards via `makeOfferedCard`), so command mode and interaction mode are guaranteed to accept the same contract instead of command mode taking the named id literally while an unscoped click took whatever led the DOM. #553-followup (issue #586 CI): a genuine duplicate JSON `description` key on this step silently discarded a first, correct description ('contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks') and kept only this second, boilerplate one -- which still pointed the interaction selectors at the stale id 1 even though the command itself had already been updated to 6. Fixed both scoped selectors to match."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id]`, the contract this step's `command` names (ContractsPanel sets `data-contract-id` on offered cards via `makeOfferedCard`), so command mode and interaction mode are guaranteed to accept the same contract instead of command mode taking the named id literally while an unscoped click took whatever led the DOM. #553-followup (issue #586 CI): a genuine duplicate JSON `description` key on this step silently discarded a first, correct description ('contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks') and kept only this second, boilerplate one -- which still pointed the interaction selectors at the stale id 1 even though the command itself had already been updated to 6. Fixed both scoped selectors to match. #554: `contract accept 6` -> `contract accept type:rubble_disposal` -- charging is real work too now, and the extra ticks the charge-order waits above spend shift the tick-based contract pool refresh far enough that a fixed id is no longer a reliable bet at all; `type:`/`material:` selectors (ContractSelector, #597) name a contract by what it actually is rather than where it landed in generation order. This file only ever accepts one contract, so `type:rubble_disposal` is unambiguous both in `available` at accept time and in `active` at deliver time below -- no `[data-contract-id]` scoping is needed to disambiguate multiple same-type offers the way core-loop-visual.json's guard steps do."
     },
     {
-      "command": "contract deliver 6 amount:200",
+      "command": "contract deliver type:rubble_disposal amount:200",
       "interaction": [
         {
           "type": "awaitUsable",

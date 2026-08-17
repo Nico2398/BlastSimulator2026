@@ -1,6 +1,6 @@
 {
   "name": "landscape-continuity-visual",
-  "description": "Visual regression for the landscape/playable mesh junction (#491): frames a ridge, a slope, the close and far pit edges, and a material/biome transition on relief terrain, then drills, charges, sequences and blasts right at the pit edge and re-frames it post-blast \u2014 the landscape and the crater must read as one continuous, gap-free, non-overlapping surface throughout, with no hard-edged material snap across the boundary. Confirmed directly (not just via state assertions) by inspecting step-07's pre-blast and step-10's post-blast screenshots: the fresh crater blends into the surrounding terrain with no visible gaps, floating chunks, or hard material seam. See Finding #64.",
+  "description": "Visual regression for the landscape/playable mesh junction (#491): frames a ridge, a slope, the close and far pit edges, and a material/biome transition on relief terrain, then drills, charges, sequences and blasts right at the pit edge and re-frames it post-blast — the landscape and the crater must read as one continuous, gap-free, non-overlapping surface throughout, with no hard-edged material snap across the boundary. Confirmed directly (not just via state assertions) by inspecting step-07's pre-blast and step-10's post-blast screenshots: the fresh crater blends into the surrounding terrain with no visible gaps, floating chunks, or hard material seam. See Finding #64.",
   "shots": [
     {
       "name": "overview",
@@ -16,70 +16,100 @@
       "name": "desert-edge-west-closeup",
       "yaw": 90,
       "pitch": 14,
-      "target": [2, 32],
+      "target": [
+        2,
+        32
+      ],
       "distance": 45
     },
     {
       "name": "desert-topdown-boundary",
       "yaw": 0,
       "pitch": 82,
-      "target": [32, 32],
+      "target": [
+        32,
+        32
+      ],
       "distance": 150
     },
     {
       "name": "alpine-edge-closeup",
       "yaw": 0,
       "pitch": 12,
-      "target": [32, 3],
+      "target": [
+        32,
+        3
+      ],
       "distance": 45
     },
     {
       "name": "foothills-edge-closeup",
       "yaw": 0,
       "pitch": 12,
-      "target": [3, 32],
+      "target": [
+        3,
+        32
+      ],
       "distance": 42
     },
     {
       "name": "karst-corner-grazing",
       "yaw": 225,
       "pitch": 10,
-      "target": [4, 4],
+      "target": [
+        4,
+        4
+      ],
       "distance": 60
     },
     {
       "name": "karst-high-boundary",
       "yaw": 45,
       "pitch": 55,
-      "target": [32, 32],
+      "target": [
+        32,
+        32
+      ],
       "distance": 120
     },
     {
       "name": "desert-north-edge-closeup",
       "yaw": 180,
       "pitch": 14,
-      "target": [32, 2],
+      "target": [
+        32,
+        2
+      ],
       "distance": 45
     },
     {
       "name": "alpine-topdown-boundary",
       "yaw": 0,
       "pitch": 78,
-      "target": [32, 32],
+      "target": [
+        32,
+        32
+      ],
       "distance": 140
     },
     {
       "name": "foothills-topdown-boundary",
       "yaw": 90,
       "pitch": 80,
-      "target": [32, 32],
+      "target": [
+        32,
+        32
+      ],
       "distance": 140
     },
     {
       "name": "karst-edge-closeup",
       "yaw": 135,
       "pitch": 14,
-      "target": [4, 32],
+      "target": [
+        4,
+        32
+      ],
       "distance": 45
     }
   ],
@@ -327,8 +357,36 @@
           "worldMinX": 0,
           "worldMinZ": 0,
           "holeCount": 4,
-          "chargedCount": 4,
           "sequencedCount": 0
+        },
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "worldSizeX": 48,
+          "worldSizeZ": 48,
+          "worldMinX": 0,
+          "worldMinZ": 0,
+          "holeCount": 4,
+          "chargedCount": 4,
+          "sequencedCount": 0,
+          "orderedChargeCount": 0
         }
       }
     },

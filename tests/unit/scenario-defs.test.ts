@@ -1048,7 +1048,10 @@ describe('expect.changedBy shape (issue #596)', () => {
 // ──────────────────────────────────────────────
 describe('The 3 known un-converted player steps are converted to real UI interactions (#514)', () => {
   const TARGETS: Array<{ file: string; stepIndex: number; expectedCommandPrefix: string }> = [
-    { file: 'multi-deck-blast', stepIndex: 8, expectedCommandPrefix: 'blast' },
+    // stepIndex 8 -> 12 (#554): charging is real work now, so a wait_until
+    // step lands after each of the 4 per-hole charge commands above,
+    // shifting the 'blast' step later.
+    { file: 'multi-deck-blast', stepIndex: 12, expectedCommandPrefix: 'blast' },
     { file: 'blast-preview-step-visual', stepIndex: 3, expectedCommandPrefix: 'charge hole:*' },
     { file: 'blast-sequence-step-visual', stepIndex: 3, expectedCommandPrefix: 'charge hole:*' },
   ];

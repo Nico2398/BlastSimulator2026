@@ -466,7 +466,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2
         }
@@ -490,7 +492,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -526,7 +530,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 3
         }
@@ -550,7 +556,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 2
         }
@@ -613,59 +621,109 @@
     {
       "command": "tick 50",
       "description": "#553 follow-up: drain the ordered plan in bounded chunks rather than one large tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. With two drillers working in parallel, sandbox-measured (pure command-mode engine probe) landing all 9 holes around tick ~297-310 from a drill_plan at tick 102, comfortably inside the worker-revolt countdown's tick ~333 deadline -- the last (5th) chunk below is deliberately smaller than the others to land in that window with margin rather than overshoot into revolt.",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 20",
       "description": "Fifth chunk, deliberately smaller than the rest -- all 9 holes should have landed with margin before the worker-revolt countdown completes.",
-      "interaction": [{"type": "command", "command": "tick 20"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 5",
       "description": "#596/#597 follow-up: with the event cooldown's random threshold now cached once per window instead of redrawn on every 5-tick retry, an event goes pending a few ticks earlier than before, and a `tick N` batch halts the instant that happens -- so the fifth chunk above now lands a few ticks short of its requested count. This small buffer chunk (sandbox-measured, seed:42) makes up the shortfall and lands all 9 holes at tick ~300, still comfortably inside the tick ~333 worker-revolt deadline.",
-      "interaction": [{"type": "command", "command": "tick 5"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
       "role": "setup",
       "expect": {
         "equals": {
@@ -676,7 +734,11 @@
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
@@ -689,8 +751,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 9,
+          "orderedChargeCount": 0
         }
       }
     },

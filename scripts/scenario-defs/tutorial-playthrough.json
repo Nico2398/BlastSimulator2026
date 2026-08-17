@@ -307,11 +307,31 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "chargedCount": 9
-        },
         "changedBy": {
           "cash": 0
+        },
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -516,7 +536,7 @@
     },
     {
       "command": "contract accept 5",
-      "description": "#553: contract ids renumbered 1/2/3 -> 5/10/11. The drill wait above spends 130 ticks, and the available pool refreshes on its own clock (REFRESH_INTERVAL, Contract.ts) -- contracts 1-3 were shifted out of it long before this step is reached. 5, 10 and 11 are what the pool actually holds here, and they are the three whose deadlines (91/87/69 ticks) outlast the second drill wait plus the closing tick, so `campaign status` still counts three active contracts at the end. The `tick 10` closing step is `tick 5` for the same reason: at 10 the 69-tick contract expires one tick before the assertion reads it.",
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #5 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -536,8 +556,7 @@
         "equals": {
           "activeContractCount": 1
         }
-      },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #5 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      }
     },
     {
       "command": "contract deliver 5 amount:5000",
@@ -1063,13 +1082,33 @@
           "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): dropped `cash: 28108` -- a real CI run read 28156, $48 over. Not replaced with increased/decreased: the charge cost itself is flat and mode-invariant, but the cash *entering* this step already carries whatever real-time payroll drift accrued from every click/wait earlier in the file, and that drift's sign isn't consistent run to run -- no single relative claim holds. chargedCount still proves the charge itself landed.",
       "expect": {
-        "equals": {
-          "chargedCount": 4
-        }
+        "increased": [
+          "orderedChargeCount"
+        ]
       },
       "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:20",

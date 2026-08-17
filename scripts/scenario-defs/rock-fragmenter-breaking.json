@@ -170,8 +170,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -226,7 +246,7 @@
     },
     {
       "command": "fragments",
-      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments \u2014 this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens \u2014 otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
+      "description": "Undercharged 2kg boomite at wide 5m spacing (mirrors blast-undercharge.json) reliably leaves a couple of oversized fragments (volume > OVERSIZED_FRAGMENT_THRESHOLD) among the ground fragments — this step's output exposes their ids. Interaction mode's blast step above also dismisses the Blast Report modal (data-action=\"report-close\") that the blast command opens — otherwise its .bs-confirm-overlay backdrop blocks every later click (#484's original scenario had the same gap; command mode never surfaced it since there's no DOM to click against).",
       "interaction": [
         {
           "type": "command",
@@ -247,7 +267,7 @@
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #2 (#553: #1 is now the driller hired at the top of this file) \u2014 will be crewed onto the debris_hauler.",
+      "description": "Employee #2 (#553: #1 is now the driller hired at the top of this file) — will be crewed onto the debris_hauler.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -304,7 +324,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "description": "Vehicle #2 (#553: #1 was the drill_rig bought at the top of this file, destroyed sitting inside its own hole's blast radius \u2014 see the blast step above) \u2014 a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
+      "description": "Vehicle #2 (#553: #1 was the drill_rig bought at the top of this file, destroyed sitting inside its own hole's blast radius — see the blast step above) — a real click on the tier-1 debris_hauler buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -328,7 +348,7 @@
     },
     {
       "command": "vehicle driver 2 2",
-      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #2 (#553's driller renumbering) \u2014 the assign button click alone boards them.",
+      "description": "Only one licensed (driving.truck) crew member is eligible, so the driver <select> already defaults to employee #2 (#553's driller renumbering) — the assign button click alone boards them.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -381,7 +401,7 @@
     },
     {
       "command": "employee hire role:driver",
-      "description": "Employee #3 (#553: #1 is now the driller, #2 the debris_hauler driver) \u2014 will be crewed onto the rock_fragmenter.",
+      "description": "Employee #3 (#553: #1 is now the driller, #2 the debris_hauler driver) — will be crewed onto the rock_fragmenter.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -404,7 +424,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "HIRING_COSTS.driver = 800 plus salary/maintenance drained by the tick 10 above. Not an exact-cash check: unlike a hire with no ticks in between, new_game runs with isPaused:false by default, so interaction mode's real wall-clock during the tick 10 step's click round-trip advances the sim beyond exactly 10 ticks \u2014 command mode has no such drift (no timers, only explicit tick N). decreased is the only cross-mode-robust check here."
+        "note": "HIRING_COSTS.driver = 800 plus salary/maintenance drained by the tick 10 above. Not an exact-cash check: unlike a hire with no ticks in between, new_game runs with isPaused:false by default, so interaction mode's real wall-clock during the tick 10 step's click round-trip advances the sim beyond exactly 10 ticks — command mode has no such drift (no timers, only explicit tick N). decreased is the only cross-mode-robust check here."
       }
     },
     {
@@ -420,7 +440,7 @@
     },
     {
       "command": "vehicle buy rock_fragmenter",
-      "description": "Vehicle #3 (#553: #1 was the drill_rig, destroyed by the blast; #2 is the debris_hauler) \u2014 a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) \u2014 combining both double-buys (#484).",
+      "description": "Vehicle #3 (#553: #1 was the drill_rig, destroyed by the blast; #2 is the debris_hauler) — a real click on the tier-1 rock_fragmenter buy button. Click is the sole purchase action in interaction mode (the top-level `command` covers command mode) — combining both double-buys (#484).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -443,7 +463,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "rock_fragmenter tier-1 purchaseCost = 32000 (balance.ts) \u2014 decreased, not an exact value, since this step's baseline (hire2's real cash) already carries the previous step's real-time drift (see hire2's note)"
+        "note": "rock_fragmenter tier-1 purchaseCost = 32000 (balance.ts) — decreased, not an exact value, since this step's baseline (hire2's real cash) already carries the previous step's real-time drift (see hire2's note)"
       }
     },
     {
@@ -496,12 +516,12 @@
         "decreased": [
           "cash"
         ],
-        "note": "50 ticks of salary/maintenance drain since the last checkpoint \u2014 decreased, not an exact value; interaction mode's real wall-clock ticking (isPaused:false by default, no explicit pause in this file) advances the sim beyond exactly N ticks during every click round-trip, a drift command mode's headless tick N can't reproduce"
+        "note": "50 ticks of salary/maintenance drain since the last checkpoint — decreased, not an exact value; interaction mode's real wall-clock ticking (isPaused:false by default, no explicit pause in this file) advances the sim beyond exactly N ticks during every click round-trip, a drift command mode's headless tick N can't reproduce"
       }
     },
     {
       "command": "event choose 0",
-      "description": "#553: idempotent \u2014 a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block (sandbox-measured: a Book Club event fires around here on seed 42). A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
+      "description": "#553: idempotent — a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block (sandbox-measured: a Book Club event fires around here on seed 42). A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -556,7 +576,39 @@
         "decreased": [
           "cash"
         ],
-        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) \u2014 decreased, not an exact value, since this step's baseline already carries the tick 30 step's real-time drift (see that step's note)"
+        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) — decreased, not an exact value, since this step's baseline already carries the tick 30 step's real-time drift (see that step's note)"
+      }
+    },
+    {
+      "command": "build freight_warehouse at:8,13",
+      "description": "#554: a second T1 freight_warehouse (2000kg capacity each, 4000kg combined) -- charging is real work now, and the extra real ticks the charge-order wait spends before this point let the single debris_hauler above make enough round trips that one 2000kg warehouse alone reaches ~1800/2000kg stored by the final tick-40 step below, with every remaining on-ground fragment too large (262.5kg+) to fit the last ~200kg of headroom -- storedMassKg then genuinely cannot grow further no matter how many more ticks pass, which is exactly the kind of stall this step's own 'increased' assertion exists to catch. The extra capacity removes that ceiling instead of chasing an exact mass figure that depends on which specific fragments the hauler happens to reach first.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 8,
+          "z": 13
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "buildingCount": 2
+        },
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -614,12 +666,12 @@
         "decreased": [
           "cash"
         ],
-        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check \u2014 storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs \u2014 increased is the cross-mode-robust proof."
+        "note": "the file's own long-standing TODO ('Final assertion point: logistics.storedMassKg must have grown') finally has a real check — storedMassKg was 0 through the whole file until this delivery (verified: the earlier haul-refused step already proved that), so 'increased' here is the genuine proof the sub-fragment was hauled and stored, not just that the button clicked. Not an exact storedMassKg value: interaction mode's real wall-clock ticking (isPaused:false by default) can extend this step's effective duration enough for the hauler to complete more than one round trip, so the exact delivered mass isn't guaranteed identical across modes/runs — increased is the cross-mode-robust proof."
       }
     },
     {
       "command": "state full",
-      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass \u2014 checked on the 'tick 40' step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
+      "description": "Final assertion point: logistics.storedMassKg must have grown by exactly the hauled piece's mass — checked on the 'tick 40' step above (the state the delivery actually lands in), since command mode's `before`/`after` capture is per-step and this step's own command is a pure read with nothing left to change.",
       "interaction": [
         {
           "type": "command",

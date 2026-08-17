@@ -328,7 +328,7 @@
     },
     {
       "command": "tick 50",
-      "description": "Eighth and final chunk \u2014 all 16 holes should have landed by now.",
+      "description": "Eighth and final chunk — all 16 holes should have landed by now.",
       "interaction": [
         {
           "type": "command",
@@ -354,7 +354,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:1.8",
-      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls \u2014 this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): stemming raised 1.0 m -> 1.8 m, the fix for the freight_warehouse dying in interaction mode while command mode kept it alive. Root cause is flyrock, not the crater: a building is destroyed either by a cleared voxel landing inside its footprint (BlastExecution.ts step 5b) or by a thrown fragment coming to rest within HIT_RADIUS=2.0 m of its centre with >=500 J (processProjections, Damage.ts, called from the blast command). At 1.0 m stemming on 6 m holes the charge vents to the surface and throws 444 projections up to ~52 m across a 64x64 m site, so *every* tile on the map is inside flyrock range and warehouse survival is a lottery on where those 444 land. What decides that is the auto-sequence delay layout, which keys off state.drillHoles' array ORDER, and interaction mode fills that array in real-time drill-completion order rather than command mode's fixed plan order. Sandbox-measured over 64 shuffled completion orders on this exact setup: at amount:8 stemming:1 the warehouse survives 42/64 (closest projection landed 0.2 m from its centre, peak damage 9345 vs 150 HP); at amount:8 stemming:1.8 it survives 64/64, closest landing 3.8 m -- nearly 2x the 2.0 m hit radius, with no hit recorded at all. Rejected alternatives, both sandbox-measured: (a) moving the warehouse further out does nothing, because flyrock at 1.0 m stemming is sprayed over the whole site -- (38,25) 11/24, (40,25) 11/24, (42,25) 11/24, (45,25) 12/24, i.e. still a coin flip 16 tiles away, and at 1.8 m stemming (45,25) is actually *worse* (29/32) than (35,25) (64/64); (b) cutting the charge to 6 kg also holds, but throws away the overcharge this file exists to visualise (77 projections vs 147). Stemming is the physically right knob anyway -- flyrock is what an under-stemmed hole produces, and 1.0 m of stemming on a 6 m hole is barely a sixth of the column. The blast stays CATASTROPHIC and gets *bigger*, not tamer: confining it puts more energy into the rock (1247 cleared voxels vs 1114), it still throws 147 projections ~51 m for the projection preview to draw, and ecology/nuisance still drop. Panel clicks follow the value: DEFAULT_STEMMING_M=2 with 0.2 m per click (Charge.ts), so one decrement now instead of five.",
+      "description": "role: player (issue #515): the Charge step's amount/stemming steppers and product-card explosive selector are real controls — this reaches the declared explosive/amount/stemming via clicks instead of Charge All using whatever the panel's fields already showed. #553-followup (issue #586 CI): stemming raised 1.0 m -> 1.8 m, the fix for the freight_warehouse dying in interaction mode while command mode kept it alive. Root cause is flyrock, not the crater: a building is destroyed either by a cleared voxel landing inside its footprint (BlastExecution.ts step 5b) or by a thrown fragment coming to rest within HIT_RADIUS=2.0 m of its centre with >=500 J (processProjections, Damage.ts, called from the blast command). At 1.0 m stemming on 6 m holes the charge vents to the surface and throws 444 projections up to ~52 m across a 64x64 m site, so *every* tile on the map is inside flyrock range and warehouse survival is a lottery on where those 444 land. What decides that is the auto-sequence delay layout, which keys off state.drillHoles' array ORDER, and interaction mode fills that array in real-time drill-completion order rather than command mode's fixed plan order. Sandbox-measured over 64 shuffled completion orders on this exact setup: at amount:8 stemming:1 the warehouse survives 42/64 (closest projection landed 0.2 m from its centre, peak damage 9345 vs 150 HP); at amount:8 stemming:1.8 it survives 64/64, closest landing 3.8 m -- nearly 2x the 2.0 m hit radius, with no hit recorded at all. Rejected alternatives, both sandbox-measured: (a) moving the warehouse further out does nothing, because flyrock at 1.0 m stemming is sprayed over the whole site -- (38,25) 11/24, (40,25) 11/24, (42,25) 11/24, (45,25) 12/24, i.e. still a coin flip 16 tiles away, and at 1.8 m stemming (45,25) is actually *worse* (29/32) than (35,25) (64/64); (b) cutting the charge to 6 kg also holds, but throws away the overcharge this file exists to visualise (77 projections vs 147). Stemming is the physically right knob anyway -- flyrock is what an under-stemmed hole produces, and 1.0 m of stemming on a 6 m hole is barely a sixth of the column. The blast stays CATASTROPHIC and gets *bigger*, not tamer: confining it puts more energy into the rock (1247 cleared voxels vs 1114), it still throws 147 projections ~51 m for the projection preview to draw, and ecology/nuisance still drop. Panel clicks follow the value: DEFAULT_STEMMING_M=2 with 0.2 m per click (Charge.ts), so one decrement now instead of five.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -402,11 +402,31 @@
         }
       ],
       "expect": {
-        "equals": {
-          "chargedCount": 16
-        }
+        "increased": [
+          "orderedChargeCount"
+        ]
       },
       "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 16,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:10",
@@ -446,7 +466,7 @@
     },
     {
       "command": "buy_software tier:1",
-      "description": "preview projections requires software tier 3+ (default tier is 0) \u2014 unlock sequentially so the projection preview actually computes instead of printing a lock message",
+      "description": "preview projections requires software tier 3+ (default tier is 0) — unlock sequentially so the projection preview actually computes instead of printing a lock message",
       "interaction": [
         {
           "type": "clickSelector",

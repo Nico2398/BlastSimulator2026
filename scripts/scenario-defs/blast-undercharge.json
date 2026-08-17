@@ -88,7 +88,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
-      "description": "stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), so only amount needs adjusting: 3 decrement clicks on the amount stepper (data-field=\"amount\") reach boomite's minimum viable charge, 5->2kg, before Charge All (issue #479 follow-up, same class as Finding #4/the overcharge fix \u2014 verified against the real chargesByHole dump, not assumed).",
+      "description": "stemming:2 already matches the Charge panel's default (DEFAULT_STEMMING_M, Charge.ts), so only amount needs adjusting: 3 decrement clicks on the amount stepper (data-field=\"amount\") reach boomite's minimum viable charge, 5->2kg, before Charge All (issue #479 follow-up, same class as Finding #4/the overcharge fix — verified against the real chargesByHole dump, not assumed).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -109,8 +109,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },

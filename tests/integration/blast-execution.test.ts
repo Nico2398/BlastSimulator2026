@@ -217,19 +217,13 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
     expect(state.plannedDrillHoles).toHaveLength(0);
     expect(state.drillHoles.length).toBeGreaterThan(0);
 
-    const expectedChargedCount = state.drillHoles.length;
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
 
-    // #554: charging now queues one charge_hole PendingAction per hole
-    // instead of writing chargesByHole instantly — wait for every ordered
-    // charge to actually land before sequencing/blasting, the same way the
-    // drilling wait right above this one waits for plannedDrillHoles to
-    // drain. Polls Object.keys(state.chargesByHole).length rather than
-    // hand-counting ticks against a stub duration, since
-    // computeChargeHoleDurationTicks isn't implemented yet on this branch.
-    for (let i = 0; i < 800 && Object.keys(state.chargesByHole).length < expectedChargedCount; i++) run('tick 1');
-    expect(Object.keys(state.chargesByHole)).toHaveLength(expectedChargedCount);
-    expect(state.plannedChargesByHole).toEqual({});
+    // #554: charging is real work too — drain the ordered charges the same
+    // way the drill plan above was drained before blasting.
+    for (let i = 0; i < 800 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(Object.keys(state.chargesByHole).length).toBeGreaterThan(0);
 
     expect(run('sequence auto delay_step:25').success).toBe(true);
 

@@ -6,7 +6,10 @@
       "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true",
       "description": "No new_game first — a sandbox site is created from nothing, which is the point of the mode. #553: staffed:true (sandbox start supports the same flag as new_game, Sandbox.ts) hires a driller with blasting + drill_rig licence and buys an unmanned drill_rig for free — automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
-        { "type": "command", "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true" }
+        {
+          "type": "command",
+          "command": "sandbox start biome:alpine_granite difficulty:hard seed:777 staffed:true"
+        }
       ],
       "role": "setup"
     },
@@ -33,12 +36,33 @@
       "command": "drill_plan grid rows:2 cols:2 spacing:4 depth:6 start:10,10",
       "description": "#553: shrunk from the original rows:3 cols:3 (9 holes, start:20,20) to 2x2 (4 holes, start:10,10, closer to the staffed roster's near-origin spawn) so the single driller/drill_rig lands the whole plan quickly -- this file's point is a full drill/charge/sequence/blast cycle actually working, not a specific hole count.",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"blast\"]" },
-        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"grid-tool\"]" },
-        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
-        { "type": "clickSelector", "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child" },
-        { "type": "dragTiles", "x1": 10, "z1": 10, "x2": 14, "z2": 14 },
-        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 10,
+          "z1": 10,
+          "x2": 14,
+          "z2": 14
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
       ],
       "role": "player",
       "expect": {
@@ -55,7 +79,10 @@
       "command": "tick 60",
       "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 45).",
       "interaction": [
-        { "type": "command", "command": "tick 60" }
+        {
+          "type": "command",
+          "command": "tick 60"
+        }
       ],
       "role": "setup",
       "expect": {
@@ -69,19 +96,45 @@
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"charge-all\"]" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },
     {
       "command": "sequence auto delay_step:25",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
       ],
       "role": "player",
       "expect": {
@@ -94,11 +147,26 @@
       "command": "blast",
       "role": "player",
       "interaction": [
-        { "type": "clickSelector", "selector": "#bs-blast-panel [data-action=\"execute\"]" },
-        { "type": "waitForSelector", "selector": ".bs-confirm-overlay .bs-btn-danger" },
-        { "type": "clickSelector", "selector": ".bs-confirm-overlay .bs-btn-danger" },
-        { "type": "waitForSelector", "selector": "[data-action=\"report-close\"]" },
-        { "type": "clickSelector", "selector": "[data-action=\"report-close\"]" }
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
       ],
       "timeout": 30,
       "expect": {
@@ -113,7 +181,10 @@
       "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337",
       "description": "A second site with a different biome, difficulty and seed, to confirm the mode can be re-entered.",
       "interaction": [
-        { "type": "command", "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337" }
+        {
+          "type": "command",
+          "command": "sandbox start biome:tropical_karst difficulty:easy seed:31337"
+        }
       ],
       "expect": {
         "equals": {
