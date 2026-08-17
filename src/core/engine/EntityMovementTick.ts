@@ -7,9 +7,13 @@
 import type { GameState } from '../state/GameState.js';
 import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import { findPath } from '../nav/Pathfinding.js';
+import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath } from '../nav/AgentAdvance.js';
-import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY } from '../config/balance.js';
+import {
+  AGENT_WALK_SPEED,
+  STUCK_MORALE_PENALTY,
+  VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+} from '../config/balance.js';
 
 // ── Vehicle movement ──
 
@@ -132,6 +136,19 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
     vehicle.z = vehicle.targetZ;
     setVehicleIdle(vehicle);
   }
+}
+
+/**
+ * Re-runs findPath with every OTHER live vehicle's current cell
+ * temporarily marked vehicleOccupied, so avoidVehicles:true actually
+ * routes around them. Marks are reverted before returning.
+ * STUB — logic added by implementer.
+ */
+export function findPathAvoidingOtherVehicles(state: GameState, vehicle: Vehicle): PathResult {
+  void state;
+  void vehicle;
+  void VEHICLE_OCCUPANCY_REROUTE_THRESHOLD;
+  throw new Error('not implemented');
 }
 
 /** The immediate next grid cell along a found path — the one occupancy is checked against. */

@@ -519,6 +519,20 @@ export function pathfindingNodeBudget(gridWidth: number, gridHeight: number): nu
 /** Number of consecutive failed re-route attempts before the agent transitions to stuck state. */
 export const STUCK_THRESHOLD = 3;
 
+/**
+ * Consecutive ticks a vehicle may sit `state: 'waiting'` behind another
+ * vehicle occupying its next path cell before the engine attempts a
+ * vehicle-avoiding reroute (avoidVehicles: true) — and, if none exists,
+ * flips isMoveStuck the same way a genuine pathfinding failure already
+ * does. Deliberately larger than STUCK_THRESHOLD (3, tuned for the rarer
+ * "no path at all" failure): ordinary transient contention between two
+ * moving vehicles must not false-positive into a reroute/stuck flip.
+ * Matches TRAFFIC_JAM_MIN_TICKS's order of magnitude for "no longer a
+ * transient wait" as its own named constant (different concept: this is a
+ * single vehicle blocked mid-route, not several converging on one cell).
+ */
+export const VEHICLE_OCCUPANCY_REROUTE_THRESHOLD = 10;
+
 /** Employee agent walking speed in grid cells per tick (1 tick = 1 game-hour). */
 export const AGENT_WALK_SPEED = 2;
 
