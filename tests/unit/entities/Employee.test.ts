@@ -13,6 +13,7 @@ import {
   gainXp,
   calculateSalary,
   computeAverageMorale,
+  getLivingEmployees,
   BASE_SALARIES,
   PAY_CYCLE_TICKS,
   HIRING_COSTS,
@@ -568,6 +569,40 @@ describe('computeAverageMorale()', () => {
     // average if computeAverageMorale did not filter on alive.
     expect(state.employees).toHaveLength(2);
     expect(computeAverageMorale(state.employees)).toBe(100);
+  });
+});
+
+describe('getLivingEmployees()', () => {
+  // ── Test 1 (happy path) ────────────────────────────────────────────────────
+  it('returns only the alive employees, in original roster order', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee: a } = hireEmployee(state, 'driller', rng);
+    const { employee: b } = hireEmployee(state, 'blaster', rng);
+    const { employee: c } = hireEmployee(state, 'surveyor', rng);
+    killEmployee(state, b.id);
+
+    // killEmployee only flips alive:false — b is still physically present in
+    // state.employees, at its original index between a and c.
+    expect(state.employees).toHaveLength(3);
+    expect(getLivingEmployees(state.employees)).toEqual([a, c]);
+  });
+
+  // ── Test 2 (boundary) ──────────────────────────────────────────────────────
+  it('returns an empty array for an empty roster', () => {
+    expect(getLivingEmployees([])).toEqual([]);
+  });
+
+  // ── Test 3 (boundary) ──────────────────────────────────────────────────────
+  it('returns an empty array when every employee on the roster is dead', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee: a } = hireEmployee(state, 'driller', rng);
+    const { employee: b } = hireEmployee(state, 'blaster', rng);
+    killEmployee(state, a.id);
+    killEmployee(state, b.id);
+
+    expect(getLivingEmployees(state.employees)).toEqual([]);
   });
 });
 
