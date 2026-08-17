@@ -112,10 +112,19 @@ async function blockedByFor(api, issue) {
   return { numbers: [...union], unknown: Boolean(declared.unknown) };
 }
 
-/** @returns {{assignable: false, reason: string}} */
-const no = (reason) => ({ assignable: false, reason });
-/** @returns {{assignable: true, reason: string}} */
-const yes = () => ({ assignable: true, reason: 'no blocking condition found' });
+/**
+ * A refusal. `unreadable` separates the two kinds of them, which look identical
+ * in a job log and are opposite facts: "this issue is not eligible" is the
+ * queue working, and "this issue could not be assessed" is the queue broken.
+ * Callers report the second one loudly — on 17 Aug 2026 every candidate was
+ * skipped on a 503 and three dispatches in a row ended green with "Nothing
+ * assigned", so #554 waited on a success that had never happened.
+ *
+ * @returns {{assignable: false, reason: string, unreadable: boolean}}
+ */
+const no = (reason, unreadable = false) => ({ assignable: false, reason, unreadable });
+/** @returns {{assignable: true, reason: string, unreadable: false}} */
+const yes = () => ({ assignable: true, reason: 'no blocking condition found', unreadable: false });
 
 /**
  * Conditions readable off the candidate itself, before any dependency is fetched.
@@ -192,7 +201,8 @@ function dependencyVerdict(dep, deliverable) {
   // built on it (#568's predicate, applied to the shared rules).
   if (!deliverable || deliverable.unknown) {
     return no(
-      `dependency #${dep.number}'s pull requests could not be read, so an unmerged one cannot be ruled out`
+      `dependency #${dep.number}'s pull requests could not be read, so an unmerged one cannot be ruled out`,
+      true
     );
   }
   if (deliverable.pipeline && !deliverable.pipeline.merged) {
@@ -226,7 +236,10 @@ async function graphVerdict(api, root) {
   const seen = new Set([root.number]);
   const rootDeps = await blockedByFor(api, root);
   if (rootDeps.unknown) {
-    return no('its `Blocked by` relationships could not be read, so no dependency can be ruled out');
+    return no(
+      'its `Blocked by` relationships could not be read, so no dependency can be ruled out',
+      true
+    );
   }
 
   const queue = [...rootDeps.numbers];
@@ -249,7 +262,8 @@ async function graphVerdict(api, root) {
       // Previously a `core.warning` and then ignored, which let a typo in a
       // `Blocked by` line read as "no dependency" and start the run anyway.
       return no(
-        `dependency #${number} could not be read; a dependency that cannot be verified counts as unmet`
+        `dependency #${number} could not be read; a dependency that cannot be verified counts as unmet`,
+        true
       );
     }
 
@@ -262,7 +276,8 @@ async function graphVerdict(api, root) {
       const deps = await blockedByFor(api, dep);
       if (deps.unknown) {
         return no(
-          `dependency #${number}'s own \`Blocked by\` relationships could not be read, so its graph cannot be cleared`
+          `dependency #${number}'s own \`Blocked by\` relationships could not be read, so its graph cannot be cleared`,
+          true
         );
       }
       queue.push(...deps.numbers);
@@ -292,7 +307,7 @@ async function assessCandidate(api, issue) {
   // cites half the backlog).
   const deliverable = await api.deliverableFor(issue.number);
   if (deliverable.unknown) {
-    return no('its pull requests could not be read, so an open one cannot be ruled out');
+    return no('its pull requests could not be read, so an open one cannot be ruled out', true);
   }
   if (deliverable.pipeline && !deliverable.pipeline.merged) {
     return no(`pull request #${deliverable.pipeline.number} is already open against it`);
@@ -311,8 +326,15 @@ async function assessCandidate(api, issue) {
  * Selection order is the issue number, ascending: the oldest eligible task goes
  * first, and the order does not depend on when labels happened to be applied.
  *
+ * `unreadable` lists the candidates that were skipped because a fact about them
+ * could not be read, rather than because they are ineligible. Empty is the
+ * normal case; non-empty with no issue picked means the queue was not read, and
+ * the caller has to say so out loud instead of reporting an idle queue.
+ *
  * @param {IssueApi} api
  * @param {{log?: (message: string) => void, completedIssue?: number|null}} options
+ * @returns {Promise<{issue: object|null, reason: string,
+ *                    unreadable: {number: number, reason: string}[]}>}
  */
 async function selectNextAssignable(api, options = {}) {
   const log = options.log || (() => {});
@@ -329,22 +351,24 @@ async function selectNextAssignable(api, options = {}) {
     log(
       `#${busy.number} is in progress — deferring. Finishing that run re-enters this step.`
     );
-    return { issue: null, reason: `#${busy.number} is still in progress` };
+    return { issue: null, reason: `#${busy.number} is still in progress`, unreadable: [] };
   }
 
   const ready = await api.listIssuesByLabel(READY);
   ready.sort((a, b) => a.number - b.number);
 
+  const unreadable = [];
   for (const issue of ready) {
     const verdict = await assessCandidate(api, issue);
     if (!verdict.assignable) {
       log(`#${issue.number}: skipped — ${verdict.reason}.`);
+      if (verdict.unreadable) unreadable.push({ number: issue.number, reason: verdict.reason });
       continue;
     }
-    return { issue, reason: verdict.reason };
+    return { issue, reason: verdict.reason, unreadable };
   }
 
-  return { issue: null, reason: 'no assignable ready issue' };
+  return { issue: null, reason: 'no assignable ready issue', unreadable };
 }
 
 /**

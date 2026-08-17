@@ -541,6 +541,58 @@ describe('picking the next issue', () => {
     expect(result.issue).toBeNull();
     expect(result.reason).toContain('no assignable');
   });
+
+  // An idle queue and an unread one produce the same "nothing assigned", and
+  // they are opposite facts. Three dispatches of the trigger on 17 Aug 2026
+  // reported the first while every candidate had been skipped on a 503.
+  describe('an unread queue is not an idle queue', () => {
+    it('names the candidates it could not assess', async () => {
+      const result = await select(
+        fakeApi([
+          { number: 554, labels: ['ready'], deliverableUnknown: true },
+          { number: 555, labels: ['ready'], deliverableUnknown: true },
+        ])
+      );
+      expect(result.issue).toBeNull();
+      expect(result.unreadable.map((skip: { number: number }) => skip.number)).toEqual([554, 555]);
+      expect(result.unreadable[0].reason).toContain('could not be read');
+    });
+
+    // An unmet dependency is the queue working, not the queue broken. Reporting
+    // it as unreadable would turn every legitimately blocked batch into a red
+    // dispatch, and the signal would stop meaning anything.
+    it('leaves an ineligible candidate off that list', async () => {
+      const result = await select(
+        fakeApi([
+          { number: 547, labels: ['blocked'], closers: [{ number: 566, merged: false }] },
+          { number: 548, labels: ['ready'], body: '## Blocked by\n\n- #547\n' },
+          { number: 549, labels: ['ready', 'blocked'] },
+        ])
+      );
+      expect(result.issue).toBeNull();
+      expect(result.unreadable).toEqual([]);
+    });
+
+    it('reports an unreadable dependency too', async () => {
+      const result = await select(
+        fakeApi([{ number: 554, labels: ['ready'], body: '## Blocked by\n\n- #553\n' }])
+      );
+      expect(result.issue).toBeNull();
+      expect(result.unreadable[0]).toMatchObject({ number: 554 });
+      expect(result.unreadable[0].reason).toContain('#553');
+    });
+
+    it('reports nothing unreadable when an issue is assigned', async () => {
+      const result = await select(
+        fakeApi([
+          { number: 554, labels: ['ready'], deliverableUnknown: true },
+          { number: 555, labels: ['ready'] },
+        ])
+      );
+      expect(result.issue?.number).toBe(555);
+      expect(result.unreadable.map((skip: { number: number }) => skip.number)).toEqual([554]);
+    });
+  });
 });
 
 describe('the cascade brake', () => {
@@ -637,6 +689,9 @@ describe('resolving the configured agent', () => {
 });
 
 describe('the GitHub half', () => {
+  /** Retry backoff, without the wall-clock time it would otherwise cost a test. */
+  const instant = async () => {};
+
   const octokit = (overrides: Record<string, unknown> = {}) => ({
     rest: {
       issues: {
@@ -763,8 +818,9 @@ describe('the GitHub half', () => {
       expect(await client.deliverableFor(547)).toEqual({ pipeline: null, closers: [], unknown: false });
     });
 
-    // Fail closed on any read error: a 500 is not an empty list.
-    it('reports unknown when either read fails', async () => {
+    // Fail closed on a read error that no retry and no fallback clears: a 500
+    // is not an empty list.
+    it('reports unknown when the pipeline-branch read fails', async () => {
       const restFails = createIssueApi(
         {
           rest: {
@@ -773,18 +829,158 @@ describe('the GitHub half', () => {
           },
           graphql: async () => ({ repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } } }),
         },
-        { owner: 'o', repo: 'r' }
+        { owner: 'o', repo: 'r', sleep: instant }
       );
       expect((await restFails.deliverableFor(1)).unknown).toBe(true);
+    });
 
-      const graphqlFails = createIssueApi(
-        {
-          rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
-          graphql: async () => { throw new Error('GraphQL down'); },
-        },
-        { owner: 'o', repo: 'r' }
-      );
-      expect((await graphqlFails.deliverableFor(1)).unknown).toBe(true);
+    // The incident of 17 Aug 2026: `agentic-trigger.yml` was dispatched three
+    // times, and each run skipped every `ready` issue with "deliverable PRs
+    // could not be read (503)" — the GraphQL field below answering 503 for one
+    // candidate after another. Issue #554 never got its session, and the runs
+    // reported success. Two properties keep that from parking the queue again:
+    // a transient failure is asked again, and one that persists falls back to
+    // the REST timeline rather than taking the whole queue down with it.
+    describe('when the closing-PR read is degraded', () => {
+      /** A read that fails `failures` times with `status`, then succeeds. */
+      const flaky = (failures: number, status: number, value: unknown) => {
+        let seen = 0;
+        return async () => {
+          if (seen++ < failures) throw Object.assign(new Error('unavailable'), { status });
+          return value;
+        };
+      };
+
+      const nodes = (list: { number: number; merged: boolean }[]) => ({
+        repository: { issue: { closedByPullRequestsReferences: { nodes: list } } },
+      });
+
+      it('asks again after a 503 rather than skipping the issue', async () => {
+        const log: string[] = [];
+        const client = createIssueApi(
+          {
+            rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
+            graphql: flaky(2, 503, nodes([{ number: 570, merged: true }])),
+          },
+          { owner: 'o', repo: 'r', sleep: instant, log: (m: string) => log.push(m) }
+        );
+        expect(await client.deliverableFor(554)).toEqual({
+          pipeline: null,
+          closers: [{ number: 570, merged: true }],
+          unknown: false,
+        });
+        expect(log.join('\n')).toContain('asking again');
+      });
+
+      // A 404 is an answer, not an outage — retrying it only burns the queue's time.
+      it('does not ask again on a status that is an answer', async () => {
+        let calls = 0;
+        const client = createIssueApi(
+          {
+            rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
+            graphql: async () => {
+              calls += 1;
+              throw Object.assign(new Error('Not Found'), { status: 404 });
+            },
+          },
+          { owner: 'o', repo: 'r', sleep: instant }
+        );
+        await client.deliverableFor(554);
+        expect(calls).toBe(1);
+      });
+
+      /**
+       * The timeline the fallback reads: a PR whose body closes this issue, a PR
+       * that only mentions it, and a closed-unmerged PR that closes it.
+       */
+      const timelineWith = (list: {
+        number: number;
+        state: string;
+        merged_at: string | null;
+        body: string;
+      }[]) => ({
+        listEventsForTimeline: async () => ({
+          data: list.map((pr) => ({
+            event: 'cross-referenced',
+            source: {
+              issue: {
+                number: pr.number,
+                state: pr.state,
+                body: pr.body,
+                pull_request: { merged_at: pr.merged_at },
+              },
+            },
+          })),
+        }),
+      });
+
+      it('reads the closing pull requests off the timeline when GraphQL stays down', async () => {
+        const client = createIssueApi(
+          {
+            rest: {
+              issues: {
+                ...octokit().rest.issues,
+                ...timelineWith([
+                  { number: 610, state: 'open', merged_at: null, body: 'Closes #554\n\nwork' },
+                  { number: 611, state: 'open', merged_at: null, body: 'see #554 for context' },
+                  { number: 603, state: 'closed', merged_at: null, body: 'Closes #554' },
+                ]),
+              },
+              pulls: { list: async () => ({ data: [] }) },
+            },
+            graphql: async () => {
+              throw Object.assign(new Error('unavailable'), { status: 503 });
+            },
+          },
+          { owner: 'o', repo: 'r', sleep: instant }
+        );
+        // #610 closes it and is open; #611 only mentions it (#568's predicate);
+        // #603 closes it but was closed unmerged — `includeClosedPrs: false`.
+        expect(await client.deliverableFor(554)).toEqual({
+          pipeline: null,
+          closers: [{ number: 610, merged: false }],
+          unknown: false,
+        });
+      });
+
+      it('reports an empty timeline as no closer, so the queue keeps moving', async () => {
+        const client = createIssueApi(
+          {
+            rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
+            graphql: async () => {
+              throw Object.assign(new Error('unavailable'), { status: 503 });
+            },
+          },
+          { owner: 'o', repo: 'r', sleep: instant }
+        );
+        expect(await client.deliverableFor(554)).toEqual({
+          pipeline: null,
+          closers: [],
+          unknown: false,
+        });
+      });
+
+      // Both paths down is the one case that still blocks: nothing was read.
+      it('reports unknown when the fallback cannot be read either', async () => {
+        const client = createIssueApi(
+          {
+            rest: {
+              issues: {
+                ...octokit().rest.issues,
+                listEventsForTimeline: async () => {
+                  throw Object.assign(new Error('unavailable'), { status: 503 });
+                },
+              },
+              pulls: { list: async () => ({ data: [] }) },
+            },
+            graphql: async () => {
+              throw Object.assign(new Error('unavailable'), { status: 503 });
+            },
+          },
+          { owner: 'o', repo: 'r', sleep: instant }
+        );
+        expect((await client.deliverableFor(554)).unknown).toBe(true);
+      });
     });
   });
 
@@ -885,6 +1081,8 @@ describe('running the assign action end to end', () => {
     mergedPipelinePrs?: { merged_at: string | null; head: { ref: string } }[];
     /** Comments already on an issue when the step starts. */
     existingComments?: { issue: number; body: string }[];
+    /** Issues whose deliverable-PR reads all fail — GraphQL and the fallback. */
+    unreadable?: number[];
     env?: Record<string, string>;
   }
 
@@ -952,9 +1150,14 @@ describe('running the assign action end to end', () => {
               .filter((i) => i.state === 'open' && i.labels.includes(labels))
               .map((i) => ({ ...i, state_reason: i.stateReason })),
           }),
-          listEventsForTimeline: async ({ issue_number }: { issue_number: number }) => ({
-            data: timelineOf(issue_number),
-          }),
+          listEventsForTimeline: async ({ issue_number }: { issue_number: number }) => {
+            // 403 rather than 503: an answer, so the retry loop does not spend
+            // its backoff on a test that is about the verdict, not the retry.
+            if (scenario.unreadable?.includes(issue_number)) {
+              throw Object.assign(new Error('unavailable'), { status: 403 });
+            }
+            return { data: timelineOf(issue_number) };
+          },
           listComments: async ({ issue_number }: { issue_number: number }) => ({
             data: result.comments
               .filter((comment) => comment.issue === issue_number)
@@ -994,6 +1197,9 @@ describe('running the assign action end to end', () => {
         },
       },
       graphql: async (_query: string, params: { number: number }) => {
+        if (scenario.unreadable?.includes(params.number)) {
+          throw Object.assign(new Error('unavailable'), { status: 403 });
+        }
         const found = state.get(params.number);
         return {
           repository: {
@@ -1068,6 +1274,45 @@ describe('running the assign action end to end', () => {
     expect(result.unlabelled).toEqual([{ issue: 20, label: 'ready' }]);
     expect(result.comments[0].body).toContain('@claude');
     expect(result.comments[0].body).toContain('issue #20');
+  });
+
+  // 17 Aug 2026: every candidate skipped on a 503, three dispatches in a row,
+  // each ending green on "Nothing assigned — see the step above for the reason".
+  // The Actions list showed three successes and issue #554 never got a session.
+  it('fails the step when the queue could not be read', async () => {
+    const result = await run({
+      issues: [
+        { number: 554, labels: ['ready'] },
+        { number: 555, labels: ['ready'] },
+      ],
+      unreadable: [554, 555],
+    });
+    expect(result.outputs.issue).toBe('');
+    expect(result.failed).toContain('#554');
+    expect(result.failed).toContain('could not be assessed');
+  });
+
+  // The other half of the same rule: a queue that was read and holds nothing
+  // eligible is the normal resting state, and must stay a green no-op.
+  it('stays green on a queue that is genuinely idle', async () => {
+    const result = await run({ issues: [{ number: 554, labels: ['ready', 'blocked'] }] });
+    expect(result.outputs.issue).toBe('');
+    expect(result.failed).toBeNull();
+    expect(result.log.join('\n')).toContain('Nothing assigned');
+  });
+
+  // One unreadable candidate is not a reason to park a queue that still has an
+  // assignable issue in it — the run assigns, and says nothing failed.
+  it('assigns past a candidate it could not read', async () => {
+    const result = await run({
+      issues: [
+        { number: 554, labels: ['ready'] },
+        { number: 555, labels: ['ready'] },
+      ],
+      unreadable: [554],
+    });
+    expect(result.outputs.issue).toBe('555');
+    expect(result.failed).toBeNull();
   });
 
   it('fails loudly on an unrecognised agent rather than picking one', async () => {

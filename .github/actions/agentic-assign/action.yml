@@ -195,12 +195,24 @@ runs:
           }
 
           // --- Pick the next assignable issue ---
-          const { issue, reason: why } = await rules.selectNextAssignable(api, {
+          const { issue, reason: why, unreadable } = await rules.selectNextAssignable(api, {
             log,
             completedIssue: completed,
           });
 
           if (!issue) {
+            // An unread queue is not an empty queue. On 17 Aug 2026 the GraphQL
+            // read behind `deliverableFor` answered 503 for every candidate;
+            // all three dispatches that day ended green on "Nothing assigned",
+            // and #554 was never assigned to anyone who could see why.
+            if (unreadable && unreadable.length > 0) {
+              core.setFailed(
+                `Nothing assigned, and ${unreadable.length} ready issue(s) could not be assessed: ` +
+                unreadable.map((skip) => `#${skip.number} — ${skip.reason}`).join('; ') +
+                '. This is a failed read, not an empty queue: nothing here says the queue is idle.'
+              );
+              return;
+            }
             core.info(`Nothing assigned — ${why}.`);
             return;
           }
