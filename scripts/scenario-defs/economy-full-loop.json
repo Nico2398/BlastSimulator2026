@@ -465,7 +465,7 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "description": "#553: qualificationCount/proficiencyTotal bumped by 1 each over the pre-#553 baseline -- the driller (employee #2) now also carries the driving.drill_rig licence added above.",
+      "description": "#553: qualificationCount/proficiencyTotal bumped by 1 each over the pre-#553 baseline -- the driller (employee #2) now also carries the driving.drill_rig licence added above. #592: qualificationCount/proficiencyTotal dropped from 4/12 to 2/6 -- the blast a few steps above kills the driller (employee #2, holding blasting:5 + driving.drill_rig:1 -- confirmed via direct trace: `alive:false` on employee #2 immediately after the `blast` step), and qualificationCount/proficiencyTotal are now computed over living employees only (issue #592 -- a dead employee's frozen qualifications used to permanently pollute this aggregate). Only the surveyor (geology:5) is alive going into this hire, so 5 + this new driver's own driving.truck:1 = 6.",
       "role": "player",
       "expect": {
         "decreased": [
@@ -473,8 +473,8 @@
         ],
         "equals": {
           "employeeCount": 3,
-          "qualificationCount": 4,
-          "proficiencyTotal": 12
+          "qualificationCount": 2,
+          "proficiencyTotal": 6
         }
       }
     },
@@ -486,13 +486,13 @@
           "command": "employee assign_skill 3 skill:driving.truck level:5"
         }
       ],
-      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`.",
+      "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. #592: proficiencyTotal dropped from 16 to 10 -- same living-employees-only computation as the hire step just above (6 + this level bump from 1 to 5, i.e. +4, = 10); the dead driller's frozen qualifications no longer count.",
       "expect": {
         "changedBy": {
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 16
+          "proficiencyTotal": 10
         }
       },
       "role": "bootstrap"
@@ -551,7 +551,7 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "description": "#553: this file's charge (amount:3kg boomite at spacing:4) always left some oversized boulders alongside the haulable rubble -- pre-#553, blast landed at tick 0 so the single debris_hauler driver's cost-ranked action window (ACTION_SELECTION_MAX_PATH_ATTEMPTS=5, ActionSelection.ts) never filled with fragment_debris the driver could never claim (no rock_fragmenter existed). Post-#553 the drilling wait shifts nothing about the blast's own geometry, but empirically the closest 5 pending actions to a debris_hauler driver's hire position are fragment_debris, and with no rock_fragmenter ever able to claim them they never clear -- permanently starving the driver's own haul_debris candidates out of its bounded top-5 window. A second driver crewing a rock_fragmenter (bought below, before the debris_hauler) clears that oversized boulder backlog so the debris_hauler's window actually reaches a haul_debris action. Employee #4.",
+      "description": "#553: this file's charge (amount:3kg boomite at spacing:4) always left some oversized boulders alongside the haulable rubble -- pre-#553, blast landed at tick 0 so the single debris_hauler driver's cost-ranked action window (ACTION_SELECTION_MAX_PATH_ATTEMPTS=5, ActionSelection.ts) never filled with fragment_debris the driver could never claim (no rock_fragmenter existed). Post-#553 the drilling wait shifts nothing about the blast's own geometry, but empirically the closest 5 pending actions to a debris_hauler driver's hire position are fragment_debris, and with no rock_fragmenter ever able to claim them they never clear -- permanently starving the driver's own haul_debris candidates out of its bounded top-5 window. A second driver crewing a rock_fragmenter (bought below, before the debris_hauler) clears that oversized boulder backlog so the debris_hauler's window actually reaches a haul_debris action. Employee #4. #592: qualificationCount/proficiencyTotal dropped from 5/17 to 3/11 -- same living-employees-only computation as the two steps above (the dead driller's blasting:5 + driving.drill_rig:1 still excluded): 2 living quals (surveyor geology:5, driver#3 driving.truck:5 -- profTotal 10) + this new driver's own driving.truck:1 = 3 quals / 11 proficiency.",
       "role": "player",
       "expect": {
         "decreased": [
@@ -559,8 +559,8 @@
         ],
         "equals": {
           "employeeCount": 4,
-          "qualificationCount": 5,
-          "proficiencyTotal": 17
+          "qualificationCount": 3,
+          "proficiencyTotal": 11
         }
       }
     },
@@ -572,14 +572,14 @@
           "command": "employee assign_skill 4 skill:driving.excavator level:5"
         }
       ],
-      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #4 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator (the rock_fragmenter's licence) belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow, and rock-fragmenter-breaking.json's identical bootstrap). Left as a test-only bootstrap since this file's focus is the hauling/contract loop, not re-proving excavator licensing.",
+      "description": "Unlike the driving.truck bootstrap above, this one grants a licence from nothing: employee #4 was hired as a driver (ROLE_STARTING_QUALIFICATION driving.truck only), and driving.excavator (the rock_fragmenter's licence) belongs to no hiring role at all -- the real path is training at a driving_center (see employee-training.json's own conversion of that exact flow, and rock-fragmenter-breaking.json's identical bootstrap). Left as a test-only bootstrap since this file's focus is the hauling/contract loop, not re-proving excavator licensing. #592: proficiencyTotal dropped from 22 to 16 -- same living-employees-only computation as the steps above; this adds a brand-new qualification (11 + 5 = 16) rather than raising an existing one.",
       "role": "bootstrap",
       "expect": {
         "changedBy": {
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 22
+          "proficiencyTotal": 16
         }
       }
     },

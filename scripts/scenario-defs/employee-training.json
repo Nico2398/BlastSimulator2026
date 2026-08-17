@@ -543,6 +543,7 @@
     },
     {
       "command": "state full",
+      "description": "#592: qualificationCount/proficiencyTotal dropped from 4/6 to 0/0 -- this file's only employee (Chuck Miner, the driller hired at step 1) dies in the `blast` step above (confirmed via direct trace: `alive:false` immediately after), and both fields are now computed over living employees only (issue #592 -- a dead employee's frozen qualifications used to permanently pollute this aggregate). With nobody left alive, both are genuinely 0 -- not a bug, the earlier `tick 32` step (qualificationCount:4) already proved the training landed before the blast.",
       "interaction": [
         {
           "type": "command",
@@ -552,8 +553,8 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "qualificationCount": 4,
-          "proficiencyTotal": 6
+          "qualificationCount": 0,
+          "proficiencyTotal": 0
         }
       }
     }
