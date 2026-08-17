@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 2 real blasts and 2 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory. Interaction-mode finding, this file's own: once levelEndReason turns non-null at tick 132, LevelEndScreen's full-viewport overlay (z-index 9999, every panel/toolbar control sits at z 100-200) covers the whole screen for the rest of the run and never clears -- no player click reaches ANY panel again after that tick, including blast 1's own charge/sequence/execute and every contract-accept/drill-plan-grid step that follows. Every step past tick 132 that mutates state now runs its command directly (role:'guard' + expect.blocked, same convention this file already used for its phantom blasts) instead of pretending a click still lands. #593 (GameLoop.ts's autoInsertNeedTasks no longer preempting an employee's own interrupted work the instant their rest completes, and VehicleReservation.ts's releaseVehicleReservation now syncing a dismounting driver's real position) changes the trajectory this file records: pattern 1 lands only 23 of its 24 holes before blast 1 fires (2 deaths, not 4, since one driller/rig pair is still short of its hole), which leaves one drill_rig alive to fully drill pattern 2 (25/25) for a second real blast (3 more deaths, 5 total) before patterns 3 and 4 revert to genuinely phantom (both rigs destroyed by blast 2, never replaced). Final balance: -$1,271,073.",
+  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 2 real blasts and 2 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory. Interaction-mode finding, this file's own: once levelEndReason turns non-null at tick 132, LevelEndScreen's full-viewport overlay (z-index 9999, every panel/toolbar control sits at z 100-200) covers the whole screen for the rest of the run and never clears -- no player click reaches ANY panel again after that tick, including blast 1's own charge/sequence/execute and every contract-accept/drill-plan-grid step that follows. Every step past tick 132 that mutates state now runs its command directly (role:'guard' + expect.blocked, same convention this file already used for its phantom blasts) instead of pretending a click still lands. #593 (GameLoop.ts's autoInsertNeedTasks no longer preempting an employee's own interrupted work the instant their rest completes, and VehicleReservation.ts's releaseVehicleReservation now syncing a dismounting driver's real position) changes the trajectory this file records: pattern 1 lands only 23 of its 24 holes before blast 1 fires (2 deaths, not 4, since one driller/rig pair is still short of its hole), which leaves one drill_rig alive to fully drill pattern 2 (25/25) for a second real blast (3 more deaths, 5 total) before patterns 3 and 4 revert to genuinely phantom (both rigs destroyed by blast 2, never replaced). Final balance: -$1,282,536 (#591: updated from -$1,271,073 -- staffed-fleet spawn spacing and vehicle occupancy reroute shift exact pathing/payroll timing without changing the trajectory in kind).",
   "steps": [
     {
       "command": "new_game seed:2277 cash:150000 staffed:true",
@@ -1988,8 +1988,8 @@
           "surveyCount": 3,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 39.8,
-          "nuisance": 24.5
+          "ecology": 39.78,
+          "nuisance": 24.45
         },
         "changedBy": {
           "tickCount": 0
@@ -2752,7 +2752,7 @@
           "wellBeing": 0,
           "safety": 10.300000000000004,
           "ecology": 50,
-          "nuisance": 42.89999999999966
+          "nuisance": 42.84999999999966
         },
         "changedBy": {
           "tickCount": 0
@@ -3463,13 +3463,13 @@
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "cash": -1271073
+          "cash": -1282536
         },
         "changedBy": {
           "tickCount": 0
         }
       },
-      "description": "#553/#593: this file's real conclusion. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). The pre-#553 substitute trajectory reached a modest $32,530 profit -- still short of $250k, but a going concern. Under queued, vehicle-gated drilling, the same $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait: the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, and by the time this file's own 4 blast attempts and 5 contract cycles have played out -- blast 1 lands only 23/24 holes and kills 2 (#593's dispatch/reservation fix leaves one driller/rig pair alive), that survivor fully drills and detonates pattern 2 for 3 more deaths (5 total) before both rigs are gone and patterns 3-4 drill nothing -- cash sits at -$1,271,073. Sandbox-measured, command mode; the number is exact and does not change run to run (fixed seed, no dependency on wall-clock timing)."
+      "description": "#553/#593/#591: this file's real conclusion. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). The pre-#553 substitute trajectory reached a modest $32,530 profit -- still short of $250k, but a going concern. Under queued, vehicle-gated drilling, the same $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait: the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, and by the time this file's own 4 blast attempts and 5 contract cycles have played out -- blast 1 lands only 23/24 holes and kills 2 (#593's dispatch/reservation fix leaves one driller/rig pair alive), that survivor fully drills and detonates pattern 2 for 3 more deaths (5 total) before both rigs are gone and patterns 3-4 drill nothing -- cash sits at -$1,282,536. Sandbox-measured, command mode; the number is exact and does not change run to run (fixed seed, no dependency on wall-clock timing). #591: cash updated -1271073->-1282536 (ecology 39.8->39.78, nuisance 42.9->42.85 at the earlier scores checkpoints) -- the staffed fleet's spawn spacing widened (SPAWN_TILE_SPACING, GameState.ts) and EntityMovementTick.ts now wires in VehicleOccupancyReroute.ts's stuck-detection/reroute, both shifting exact vehicle-pathing/payroll timing through this file's hundreds of ticks without changing the trajectory's outcome in kind (still bankrupt at tick 132, still 2 real blasts, still 5 deaths)."
     },
     {
       "command": "scores",
