@@ -3,6 +3,8 @@
 // find-path/advance pipeline (AgentAdvance.advanceAlongPath) and were added
 // together to wire vehicles and employees onto the NavGrid, so they live in
 // one cohesive module rather than the general tick orchestration in GameLoop.ts.
+// VehicleOccupancyReroute.ts holds the occupancy-block reroute/escalation
+// logic, split out once it pushed this file past the 300-line limit (#591).
 
 import type { GameState } from '../state/GameState.js';
 import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
@@ -10,6 +12,9 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { advanceAlongPath } from '../nav/AgentAdvance.js';
 import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY } from '../config/balance.js';
+import { applyAdvanceOutcome, handleVehicleOccupancyBlock } from './VehicleOccupancyReroute.js';
+
+export { findPathAvoidingOtherVehicles } from './VehicleOccupancyReroute.js';
 
 // ── Vehicle movement ──
 
@@ -29,16 +34,13 @@ import { AGENT_WALK_SPEED, STUCK_MORALE_PENALTY } from '../config/balance.js';
  * this fix, and still exercised by callers/tests that construct a GameState
  * without a NavGrid.
  *
- * Vehicle-vs-vehicle collision avoidance is a separate, simpler mechanism
- * from NavCell.vehicleOccupied — no caller in src/ ever sets that flag true,
- * so Pathfinding/AgentMovement's own avoidVehicles checks against it are
- * always a no-op today. tickVehicle instead checks other vehicles' live x/z
- * directly via isCellOccupiedByOtherVehicle before committing to the next
- * grid cell, which is what actually stops two vehicles from occupying the
- * same cell. On the NavGrid path this is only checked for the immediate next
- * cell, not every cell a multi-cell-per-tick (speed > 1) vehicle would cross
- * in the same tick — a vehicle already mid-tick will not stop for one that
- * enters a farther cell of its path within that same tick.
+ * Vehicle-vs-vehicle collision avoidance primarily checks other vehicles'
+ * live x/z via isCellOccupiedByOtherVehicle before committing to the next
+ * grid cell (only the immediate one, not every cell a multi-cell-per-tick
+ * vehicle crosses in one tick). NavCell.vehicleOccupied stays unused by that
+ * check; VehicleOccupancyReroute.ts's handleVehicleOccupancyBlock is the one
+ * caller that sets it, temporarily, once waitingTicks crosses
+ * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD on a blocked next cell (#591).
  */
 export function tickVehicle(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
   if (!canTickVehicle(vehicle)) return;
@@ -85,6 +87,14 @@ function tickVehicleDirectLine(state: GameState, vehicle: Vehicle): void {
 
 /** NavGrid-aware stepper: routes via A*, respects move costs, tracks stuck state. */
 function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: EventEmitter): void {
+  // Captured before the top-level findPath/advanceAlongPath call below, which
+  // always succeeds here (findPath ignores vehicle occupancy) and so always
+  // resets vehicle.isMoveStuck to false via outcome.isStuck — clobbering any
+  // stuck state set by a PRIOR tick's occupancy-escalation branch before this
+  // tick's own occupancy check gets a chance to read it. Without this capture,
+  // the rising-edge guard below always reads false and re-emits every tick.
+  const wasStuckBeforeTick = vehicle.isMoveStuck;
+
   const path = findPath(state.navGrid!, {
     agentId: vehicle.id,
     fromX: vehicle.x,
@@ -118,20 +128,11 @@ function tickVehicleOnNavGrid(state: GameState, vehicle: Vehicle, emitter?: Even
 
   const nextStep = nextGridStep(vehicle, path.waypoints);
   if (nextStep && isCellOccupiedByOtherVehicle(state, vehicle, nextStep.x, nextStep.z)) {
-    markVehicleWaiting(vehicle);
+    handleVehicleOccupancyBlock(state, vehicle, emitter, wasStuckBeforeTick);
     return;
   }
 
-  vehicle.x = outcome.x;
-  vehicle.z = outcome.z;
-  vehicle.state = 'moving';
-  vehicle.waitingTicks = 0;
-
-  if (outcome.isPathComplete) {
-    vehicle.x = vehicle.targetX;
-    vehicle.z = vehicle.targetZ;
-    setVehicleIdle(vehicle);
-  }
+  applyAdvanceOutcome(vehicle, outcome, outcome.isStuck);
 }
 
 /** The immediate next grid cell along a found path — the one occupancy is checked against. */
@@ -146,7 +147,7 @@ function nextGridStep(
   return first;
 }
 
-function markVehicleWaiting(vehicle: Vehicle): void {
+export function markVehicleWaiting(vehicle: Vehicle): void {
   if (vehicle.state !== 'waiting') {
     vehicle.state = 'waiting';
     vehicle.waitingTicks = 1;

@@ -443,3 +443,35 @@ describe('buildGameNavGrid (task 6.10)', () => {
     expect(state.navGrid!.cells[0]![0]!.type).toBe('walkable');
   });
 });
+
+// ── applyStaffedComposition — staffed vehicle spawn placement (issue #591) ──
+// Before the fix, the 4 staffed vehicles spawned at (i*2, 2) — only 2 cells
+// apart on a single row — close enough that one vehicle's very first move
+// could land it on the immediate next path cell of another, permanently
+// blocking it (the occupancy-reroute bug this issue also fixes). The correct
+// formula spaces them SPAWN_TILE_SPACING(=3) cells apart along a single row
+// (spawnX = i * SPAWN_TILE_SPACING, spawnZ = 2), matching the `vehicle buy`
+// spawn-placement convention.
+
+describe('createGame — applyStaffedComposition vehicle spawn placement (issue #591)', () => {
+  it('spaces the 4 staffed vehicles 3 cells apart on one row instead of stacking every 2 cells', () => {
+    const state = createGame({ seed: 42, staffed: true });
+
+    const positions = state.vehicles.vehicles.map(v => [v.x, v.z]);
+    // Order matches STARTING_SITE_STAFFED_COMPOSITION.vehicles: drill_rig,
+    // debris_hauler, rock_digger, rock_fragmenter.
+    expect(positions).toEqual([
+      [0, 2],
+      [3, 2],
+      [6, 2],
+      [9, 2],
+    ]);
+  });
+
+  it('never places two staffed vehicles on the same cell', () => {
+    const state = createGame({ seed: 42, staffed: true });
+
+    const keys = state.vehicles.vehicles.map(v => `${v.x},${v.z}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});

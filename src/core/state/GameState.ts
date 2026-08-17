@@ -1,7 +1,11 @@
 // BlastSimulator2026 — Central game state
 // Pure data. No side effects. All game data lives here.
 
-import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../config/balance.js';
+import {
+  STARTING_CASH,
+  STARTING_SITE_STAFFED_COMPOSITION,
+  SPAWN_TILE_SPACING,
+} from '../config/balance.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
@@ -380,7 +384,18 @@ function applyStaffedComposition(state: GameState): void {
 
   STARTING_SITE_STAFFED_COMPOSITION.vehicles.forEach((slot, i) => {
     // Purchase cost is intentionally not deducted from cash, same as hiring above.
-    purchaseVehicle(state.vehicles, slot.role, i * 2, 2, slot.tier);
+    // Single row, spaced SPAWN_TILE_SPACING apart (#591): the old i*2 spacing
+    // put drill_rig at (0,2) exactly octile-tied with a route forced through
+    // debris_hauler's spawn at (2,2), so A* could resolve onto the blocked
+    // cell on turn one. SPAWN_TILE_SPACING=3 breaks that tie (a detour through
+    // (3,2) costs strictly more than the direct route) without moving any
+    // vehicle off row z=2 — an earlier 2D ring/grid fix wrapped the 4th
+    // vehicle onto row z=5, landing it near paths this row's own scenario
+    // fixtures already drive vehicles along and stalling them on occupancy
+    // waits (see landscape-continuity-visual).
+    const spawnX = i * SPAWN_TILE_SPACING;
+    const spawnZ = 2;
+    purchaseVehicle(state.vehicles, slot.role, spawnX, spawnZ, slot.tier);
   });
 }
 

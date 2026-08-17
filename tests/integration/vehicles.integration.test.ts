@@ -24,7 +24,12 @@ import {
 } from '../../src/core/entities/Employee.js';
 import { tickVehicle } from '../../src/core/engine/GameLoop.js';
 import { Random } from '../../src/core/math/Random.js';
-import { TRAFFIC_JAM_MIN_VEHICLES, TRAFFIC_JAM_MIN_TICKS } from '../../src/core/config/balance.js';
+import {
+  TRAFFIC_JAM_MIN_VEHICLES,
+  TRAFFIC_JAM_MIN_TICKS,
+  VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+} from '../../src/core/config/balance.js';
+import { createRunner, runCommand } from '../../src/console/createRunner.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -758,5 +763,47 @@ describe('Vehicle fleet', () => {
 
       expect(sawQueued).toBe(true);
     });
+  });
+});
+
+// ── Occupancy-block reroute/stuck escalation — end-to-end repro (issue #591) ──
+// The issue's console repro: a staffed site's drill_rig, auto-dispatched
+// toward a 5×5 drill pattern, could park forever behind another staffed
+// vehicle spawned only 2 cells away — no reroute, no escalation to
+// isMoveStuck, invisible to detectTrafficJam (which needs 3+ vehicles). Drives
+// the real command layer (not the lower-level tickVehicle/EntityMovementTick
+// APIs the unit tests above use) so this also proves the fix reaches players
+// through the console, not just the engine function directly.
+//
+// Ticks one at a time (rather than a single `tick 100`) and samples every
+// tick: the needs system periodically interrupts the drive to force a rest,
+// which cycles the rig back through idle — so the bug (permanently 'waiting'
+// past the reroute threshold with isMoveStuck still false) can be present at
+// tick 47 and gone by the single-shot snapshot at tick 100 purely because the
+// rig happens to be mid-rest right then. Sampling every tick catches the
+// defect at the moment it actually occurs, not just at one snapshot.
+
+describe('vehicle occupancy reroute / stuck escalation — end-to-end repro (issue #591)', () => {
+  it('rig #1 is never left permanently "waiting" past the reroute threshold without either escalating to isMoveStuck or getting moving again, over the first 100 ticks', () => {
+    const engine = createRunner();
+
+    expect(runCommand(engine, 'campaign start level:dusty_hollow staffed:true').success).toBe(true);
+    expect(runCommand(engine, 'drill_plan grid rows:5 cols:5 spacing:3 depth:6 start:5,5').success).toBe(true);
+
+    // The exact bug this issue fixes: still 'waiting' behind a permanently
+    // occupied next cell, having waited past the reroute-escalation
+    // threshold, with isMoveStuck never having flipped true either. A fixed
+    // engine either gets the vehicle moving again (reroute succeeded) or
+    // gives up cleanly and reports isMoveStuck — never silently parks forever.
+    let sawUnescalatedOverThreshold = false;
+    for (let i = 0; i < 100; i++) {
+      expect(runCommand(engine, 'tick 1').success).toBe(true);
+      const rig = engine.ctx.state!.vehicles.vehicles.find(v => v.id === 1)!;
+      if (rig.state === 'waiting' && rig.waitingTicks >= VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 1 && !rig.isMoveStuck) {
+        sawUnescalatedOverThreshold = true;
+      }
+    }
+
+    expect(sawUnescalatedOverThreshold).toBe(false);
   });
 });

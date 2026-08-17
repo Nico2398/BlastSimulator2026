@@ -20,14 +20,19 @@ export interface NavCell {
   moveCost: number;
   benchLevel: number;
   /**
-   * Reserved for a future per-cell vehicle-occupancy pass (checked by
-   * Pathfinding.findPath/AgentMovement.isPathBlocked when a caller requests
-   * avoidVehicles). No caller in src/ ever sets this true — EntityMovementTick's
-   * tickVehicle/tickEmployeeMovement both request avoidVehicles:false and
-   * instead do vehicle-vs-vehicle collision avoidance by comparing live x/z
-   * directly (see isCellOccupiedByOtherVehicle in EntityMovementTick.ts) — so
-   * this field is always false today and the avoidVehicles checks against it
-   * are a no-op.
+   * Per-cell vehicle-occupancy flag, checked by Pathfinding.findPath/
+   * AgentMovement.isPathBlocked when a caller requests avoidVehicles.
+   * tickVehicle/tickEmployeeMovement's own per-tick pathfinds both request
+   * avoidVehicles:false and instead do vehicle-vs-vehicle collision avoidance
+   * by comparing live x/z directly (see isCellOccupiedByOtherVehicle in
+   * EntityMovementTick.ts) — this field plays no part in that. The one caller
+   * that does set it is the vehicle-occupancy-reroute escalation path
+   * (handleVehicleOccupancyBlock/findPathAvoidingOtherVehicles in
+   * VehicleOccupancyReroute.ts, #591): once a vehicle has waited
+   * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD ticks on a blocked next cell, it
+   * temporarily marks every other live vehicle's current cell true, requests
+   * avoidVehicles:true for a one-shot reroute, then reverts the marks in a
+   * finally block before returning — no lasting mutation to the grid.
    */
   vehicleOccupied: boolean;
 }

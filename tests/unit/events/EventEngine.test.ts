@@ -211,6 +211,29 @@ describe('EventEngine — detectTrafficJam (Task 2.8)', () => {
     expect(result).toBeNull();
     expect(eventState.pendingEvent).toBeNull();
   });
+
+  // ── issue #591: a single occupancy-stuck vehicle is not a traffic jam ─────
+  // The occupancy-block reroute/stuck escalation (EntityMovementTick.ts) sets
+  // isMoveStuck on a single vehicle stranded behind an obstacle; detectTrafficJam
+  // must stay keyed on state==='waiting' + waitingTicks alone, unaffected by
+  // isMoveStuck — TRAFFIC_JAM_MIN_VEHICLES still requires 3+ vehicles sharing a
+  // target, regardless of any one of them being individually stuck.
+
+  it('does not fire for a single stuck (isMoveStuck) vehicle, however long it has waited', () => {
+    const stuckVehicle: Vehicle = { ...makeWaitingVehicle(5, 5, 500), isMoveStuck: true } as Vehicle;
+    const result = detectTrafficJam([stuckVehicle], eventState, 100);
+    expect(result).toBeNull();
+    expect(eventState.pendingEvent).toBeNull();
+  });
+
+  it('still requires 3+ vehicles even when 2 of them are individually stuck', () => {
+    const vehicles: Vehicle[] = [
+      { ...makeWaitingVehicle(5, 5, 50), isMoveStuck: true } as Vehicle,
+      { ...makeWaitingVehicle(5, 5, 50), isMoveStuck: true } as Vehicle,
+    ];
+    const result = detectTrafficJam(vehicles, eventState, 100);
+    expect(result).toBeNull();
+  });
 });
 
 // ── traffic_jam EventDef registration ────────────────────────────────────────

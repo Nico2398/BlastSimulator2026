@@ -12,7 +12,12 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { AGENT_WALK_SPEED, STUCK_THRESHOLD, STUCK_MORALE_PENALTY } from '../../../src/core/config/balance.js';
+import {
+  AGENT_WALK_SPEED,
+  STUCK_THRESHOLD,
+  STUCK_MORALE_PENALTY,
+  VEHICLE_OCCUPANCY_REROUTE_THRESHOLD,
+} from '../../../src/core/config/balance.js';
 
 const VEHICLE_TICK_SEED = 42;
 
@@ -147,6 +152,206 @@ describe('tickVehicle — NavGrid stuck detection (issue #407 review round 2)', 
     expect(stuckEvents).toEqual([vehicle.id]);
     expect(vehicle.isMoveStuck).toBe(true);
     expect(vehicle.waitingTicks).toBe(STUCK_THRESHOLD + 1);
+  });
+});
+
+// ── tickVehicle — occupancy-block reroute/stuck escalation (issue #591) ─────
+// tickVehicleOnNavGrid finds a path just fine here (findPath ignores vehicles
+// unless avoidVehicles:true) — the block is a stationary vehicle sitting on
+// the immediate next path cell, caught by isCellOccupiedByOtherVehicle, not a
+// pathfinding failure. Before the fix, that branch just called
+// markVehicleWaiting and returned, forever, with no escalation at all: no
+// reroute attempt, no isMoveStuck flip, no vehicle:stuck emission, regardless
+// of how long the wait ran. These tests build small hand-crafted NavGrids
+// (same solidVoxel() helper as the STUCK_THRESHOLD suite above) and drive a
+// blocked vehicle with tickVehicle to exercise the escalation.
+
+describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)', () => {
+  /** Solid rock voxel — same fixture as the describe block above. */
+  function solidVoxel() {
+    return { composition: { rocks: [{ rockId: 'cruite', coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+  }
+
+  /**
+   * Open 5×3 NavGrid (x:0..4, z:0..2), fully walkable — wide enough that a
+   * vehicle blocked mid-route has a real diagonal detour available.
+   */
+  function buildOpenState() {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const vg = new VoxelGrid(5, 2, 3);
+    for (let z = 0; z < 3; z++) {
+      for (let x = 0; x < 5; x++) {
+        vg.setVoxel(x, 0, z, solidVoxel());
+      }
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return state;
+  }
+
+  /**
+   * 1-cell-wide horizontal corridor (x:0..4, z:0..2) — only row z=1 is solid,
+   * so rows z=0 and z=2 are 'void' (impassable). No detour around any
+   * obstacle placed in the corridor can exist.
+   */
+  function buildCorridorState() {
+    const state = createGame({ seed: VEHICLE_TICK_SEED });
+    const vg = new VoxelGrid(5, 2, 3);
+    for (let x = 0; x < 5; x++) {
+      vg.setVoxel(x, 0, 1, solidVoxel());
+    }
+    state.navGrid = NavGrid.buildNavGrid(vg, [], []);
+    return state;
+  }
+
+  it('reroutes around a stationary blocking vehicle once the wait crosses VEHICLE_OCCUPANCY_REROUTE_THRESHOLD, and reaches its target without ever going stuck', () => {
+    const state = buildOpenState();
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 4;
+    vehicle.targetZ = 1;
+
+    // Stationary, driverless vehicle sitting directly on the shortest route.
+    // Never ticked (task stays 'idle'), so it never moves out of the way on
+    // its own — only a reroute lets vehicle get past it.
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
+    blocker.task = 'idle';
+    blocker.state = 'idle';
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
+
+    const MAX_TICKS = VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 20;
+    let maxWaitingTicksSeen = 0;
+    let ticks = 0;
+    while (!(vehicle.x === 4 && vehicle.z === 1 && vehicle.task === 'idle') && ticks < MAX_TICKS) {
+      tickVehicle(state, vehicle, emitter);
+      expect(vehicle.isMoveStuck).toBe(false);
+      maxWaitingTicksSeen = Math.max(maxWaitingTicksSeen, vehicle.waitingTicks);
+      ticks++;
+    }
+
+    // Proves the vehicle actually got blocked long enough to require the
+    // reroute escalation, rather than happening to find a clear route.
+    expect(maxWaitingTicksSeen).toBeGreaterThanOrEqual(VEHICLE_OCCUPANCY_REROUTE_THRESHOLD - 1);
+
+    expect(vehicle.x).toBe(4);
+    expect(vehicle.z).toBe(1);
+    expect(vehicle.task).toBe('idle');
+    expect(stuckEvents).toEqual([]);
+  });
+
+  it('sets isMoveStuck and emits vehicle:stuck exactly once when no route avoiding the obstacle exists (1-wide corridor)', () => {
+    const state = buildCorridorState();
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 4;
+    vehicle.targetZ = 1;
+
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
+    blocker.task = 'idle';
+    blocker.state = 'idle';
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
+
+    // 1 tick to reach the cell right before the blocker, then enough blocked
+    // ticks to cross VEHICLE_OCCUPANCY_REROUTE_THRESHOLD and a couple more.
+    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(vehicle.isMoveStuck).toBe(true);
+    expect(stuckEvents).toEqual([vehicle.id]); // fired exactly once
+    expect(vehicle.x).toBe(1); // never advanced past the cell before the blocker
+    expect(vehicle.z).toBe(1);
+
+    // Further blocked ticks must not re-fire the event.
+    tickVehicle(state, vehicle, emitter);
+    tickVehicle(state, vehicle, emitter);
+    expect(stuckEvents).toEqual([vehicle.id]);
+    expect(vehicle.isMoveStuck).toBe(true);
+  });
+
+  it('does not escalate before VEHICLE_OCCUPANCY_REROUTE_THRESHOLD is reached — stays waiting, never stuck, never rerouted early', () => {
+    const state = buildCorridorState();
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 4;
+    vehicle.targetZ = 1;
+
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
+    blocker.task = 'idle';
+    blocker.state = 'idle';
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
+
+    // First tick: unblocked move onto the cell just before the blocker.
+    tickVehicle(state, vehicle, emitter);
+    expect(vehicle.x).toBe(1);
+    expect(vehicle.z).toBe(1);
+
+    // Blocked ticks 1..(threshold - 1): must never escalate.
+    for (let i = 0; i < VEHICLE_OCCUPANCY_REROUTE_THRESHOLD - 1; i++) {
+      tickVehicle(state, vehicle, emitter);
+      expect(vehicle.isMoveStuck).toBe(false);
+      expect(vehicle.state).toBe('waiting');
+      expect(vehicle.x).toBe(1);
+      expect(vehicle.z).toBe(1);
+    }
+    expect(vehicle.waitingTicks).toBe(VEHICLE_OCCUPANCY_REROUTE_THRESHOLD - 1);
+    expect(stuckEvents).toEqual([]);
+
+    // Crossing tick — waitingTicks reaches the threshold, escalation fires
+    // now, not before.
+    tickVehicle(state, vehicle, emitter);
+    expect(vehicle.isMoveStuck).toBe(true);
+    expect(stuckEvents).toEqual([vehicle.id]);
+  });
+
+  it('resumes normal movement and clears isMoveStuck once the blocking vehicle moves away, even after the wait escalated into stuck', () => {
+    const state = buildCorridorState();
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 4;
+    vehicle.targetZ = 1;
+
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
+    blocker.task = 'idle';
+    blocker.state = 'idle';
+
+    const emitter = new EventEmitter();
+
+    // Drive the wait past the threshold so isMoveStuck is genuinely set by
+    // the new occupancy-escalation trigger (not the old moveConsecutiveFailures
+    // one — findPath never fails here, the corridor is topologically fine).
+    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+    expect(vehicle.isMoveStuck).toBe(true); // sanity: fixture actually reached stuck
+
+    // Blocker drives off — cell (2,1) is free now.
+    blocker.x = 99;
+    blocker.z = 99;
+
+    tickVehicle(state, vehicle, emitter);
+
+    expect(vehicle.isMoveStuck).toBe(false);
+    expect(vehicle.state).not.toBe('waiting');
+    expect(vehicle.waitingTicks).toBe(0);
+    expect(vehicle.x).toBe(2);
+    expect(vehicle.z).toBe(1);
   });
 });
 

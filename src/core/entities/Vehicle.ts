@@ -135,7 +135,13 @@ export interface Vehicle {
   waitingTicks: number;
   /** Consecutive ticks tickVehicle failed to find a NavGrid path to targetX/Z. */
   moveConsecutiveFailures: number;
-  /** True once moveConsecutiveFailures reaches STUCK_THRESHOLD — idle until the path clears. */
+  /**
+   * True once moveConsecutiveFailures reaches STUCK_THRESHOLD, OR once an
+   * occupancy-block reroute attempt fails after
+   * VEHICLE_OCCUPANCY_REROUTE_THRESHOLD ticks of waiting on another vehicle
+   * (both in src/core/config/balance.ts; see handleVehicleOccupancyBlock in
+   * VehicleOccupancyReroute.ts, #591) — idle until the path clears either way.
+   */
   isMoveStuck: boolean;
   /** Fragment ID this debris_hauler is currently hauling, or null when not hauling. */
   haulingFragmentId: number | null;
