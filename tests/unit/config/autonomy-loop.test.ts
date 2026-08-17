@@ -989,3 +989,84 @@ describe('a pipeline PR that is neither marked nor draft', () => {
     );
   });
 });
+
+// An unattended session gets one turn. When it ends the process exits, so any
+// result the run arranged to collect "later" — a backgrounded sub-agent, a
+// backgrounded shell command, a task notification — is never collected, and
+// everything not yet pushed dies with the runner VM.
+//
+// `require-foreground-agents.sh` closed this for delegation after #404 and #406.
+// It came back through the shell and cost three runs in four days, all rescued
+// as draft PRs nobody asked for:
+//
+//   #604  "Scenario verification is running in the background — pausing here
+//         until it reports back."  3h11m and $30.55 of finished TDD work gone,
+//         and the retry repeated it inside 2m51s.
+//   #594  "Waiting for the background vitest run — will be notified
+//         automatically."  Both attempts.
+//   #603  Polled `ps -p` in 280s slices 40+ times instead, spending the whole
+//         360-minute job budget without finishing, then died on the job clock.
+//
+// Three layers hold it now and each fails differently: a hook on what may be
+// started, a hook on whether the turn may end, and the runner prompt that tells
+// the session the rule before it has to be enforced. These pin all three.
+describe('a run cannot end waiting on work that reports after the turn', () => {
+  const settings = JSON.parse(
+    readFileSync(join(ROOT, '.claude/settings.json'), 'utf8')
+  ) as {
+    hooks?: Record<string, { matcher?: string; hooks?: { command?: string }[] }[]>;
+  };
+
+  const registered = (event: string, script: string) =>
+    (settings.hooks?.[event] ?? []).filter((entry) =>
+      (entry.hooks ?? []).some((hook) => (hook.command ?? '').endsWith(script))
+    );
+
+  // In settings.json, never in agent frontmatter: a frontmatter hook registers
+  // only for an agent started through the `Agent` tool, and `/agentic-run`
+  // forks into the orchestrator without one. That is how the delegation guard
+  // sat inert while #406 died 58 seconds in.
+  it('blocks a backgrounded Bash call, from settings.json', () => {
+    const entries = registered('PreToolUse', 'require-foreground-bash.sh');
+    expect(
+      entries.length,
+      'require-foreground-bash.sh is not a PreToolUse hook — a backgrounded command ' +
+      'reports on a turn that never comes'
+    ).toBeGreaterThan(0);
+    expect(entries.some((entry) => /(^|\|)Bash(\||$)/.test(entry.matcher ?? ''))).toBe(true);
+  });
+
+  // Stop is the only guard that acts at the moment the work is actually lost,
+  // and SubagentStop matters just as much: a specialist is what runs
+  // `npm run scenarios`, so its own turn can end on an unfinished handle.
+  it.each(['Stop', 'SubagentStop'])('refuses to end a %s with a long run unfinished', (event) => {
+    expect(
+      registered(event, 'require-settled-turn.sh').length,
+      `require-settled-turn.sh is not registered on ${event}`
+    ).toBeGreaterThan(0);
+  });
+
+  it('keeps the delegation guard that closed #404 and #406', () => {
+    expect(registered('PreToolUse', 'require-foreground-agents.sh').length).toBeGreaterThan(0);
+  });
+
+  // The warning used to be the retry's alone. The first attempt is the one
+  // holding the whole 360-minute budget — by the time #604's retry read it,
+  // there were three minutes left, and it made the same move again.
+  it('warns the first attempt, not only the retry', () => {
+    const runner = workflow('claude-runner.yml');
+    const first = runner.slice(
+      runner.indexOf('- name: Run Claude Code'),
+      runner.indexOf('- name: Did the run settle its issue?')
+    );
+    expect(first).toContain('THIS SESSION GETS ONE TURN');
+    expect(first).toContain('npm run long -- wait');
+  });
+
+  it('tells the retry the same rule', () => {
+    const runner = workflow('claude-runner.yml');
+    const retry = runner.slice(runner.indexOf('- name: Retry the run when the first attempt'));
+    expect(retry).toContain('there is no later turn');
+    expect(retry).toContain('npm run long -- wait');
+  });
+});

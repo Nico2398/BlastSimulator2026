@@ -146,8 +146,24 @@ jobs:
           # OpenCode's `default_agent`. The entity reference leads the argument
           # so the fork still knows what it is working on even if the multi-line
           # context that follows does not survive argument substitution.
+          #
+          # The one-turn warning is on the FIRST attempt, not only on the retry
+          # below. It used to be the retry's alone, and the first attempt is the
+          # one that holds the whole job budget: PRs #594, #603 and #604 each
+          # lost theirs to a turn that ended waiting on a background command,
+          # and by the time the retry read the warning there were minutes left,
+          # not hours.
           prompt: |
             /agentic-run ${{ steps.context.outputs.entity }}
+            ▶ THIS SESSION GETS ONE TURN. Nobody will reply to you, and when this turn ends the
+            process exits. Any result you arrange to collect "later" is never collected: a
+            backgrounded sub-agent, a backgrounded shell command, a task notification. Every
+            delegation is synchronous — parallel means several delegations in ONE message, all
+            awaited in that same turn. For a command too long for one Bash call (`npm run
+            scenarios`, `npm run ci:await`), start it with `npm run long -- start <label> -- <cmd>`
+            and then call `npm run long -- wait <label>` repeatedly in this same turn; exit code 75
+            means still going, not failed. Never end your turn while one is outstanding.
+
             ${{ steps.context.outputs.prompt }}
           # No permission prompts. The runner is a throwaway VM with no access
           # beyond this checkout and the job's own scoped tokens, and there is
@@ -221,10 +237,13 @@ jobs:
             before deciding: continue the furthest one that is sound, or rebuild from `main`.
             Either way this attempt owes the same terminal outcome as any other run.
 
-            The most likely reason the last attempt ended early is a delegation that did not
-            return inside the turn that issued it. Every delegation is synchronous. Parallel
-            means several delegations in ONE message, all awaited in that same turn — never
-            work launched now and collected later, because there is no later turn.
+            The most likely reason the last attempt ended early is work that did not return
+            inside the turn that issued it — a delegation, or a backgrounded shell command whose
+            result it meant to collect later. Every delegation is synchronous. Parallel means
+            several delegations in ONE message, all awaited in that same turn — never work
+            launched now and collected later, because there is no later turn. For a command too
+            long for one Bash call, `npm run long -- start <label> -- <cmd>` then
+            `npm run long -- wait <label>` until it stops exiting 75, all inside this turn.
 
             ${{ steps.context.outputs.prompt }}
           claude_args: '--permission-mode bypassPermissions --model claude-sonnet-5'
