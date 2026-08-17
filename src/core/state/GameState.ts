@@ -1,7 +1,12 @@
 // BlastSimulator2026 — Central game state
 // Pure data. No side effects. All game data lives here.
 
-import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../config/balance.js';
+import {
+  STARTING_CASH,
+  STARTING_SITE_STAFFED_COMPOSITION,
+  SPAWN_RING_SIZE,
+  SPAWN_TILE_SPACING,
+} from '../config/balance.js';
 import type { DrillHole, PlannedHole } from '../mining/DrillPlan.js';
 import type { HoleCharge } from '../mining/ChargePlan.js';
 import type { SurveyResult } from '../mining/SurveyCalc.js';
@@ -380,7 +385,12 @@ function applyStaffedComposition(state: GameState): void {
 
   STARTING_SITE_STAFFED_COMPOSITION.vehicles.forEach((slot, i) => {
     // Purchase cost is intentionally not deducted from cash, same as hiring above.
-    purchaseVehicle(state.vehicles, slot.role, i * 2, 2, slot.tier);
+    // Ring layout (reusing the same spread used for `vehicle buy` spawns) rather
+    // than a single row — a single row let one staffed vehicle block another's
+    // very first move on the NavGrid (#591).
+    const spawnX = (i % SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+    const spawnZ = 2 + Math.floor(i / SPAWN_RING_SIZE) * SPAWN_TILE_SPACING;
+    purchaseVehicle(state.vehicles, slot.role, spawnX, spawnZ, slot.tier);
   });
 }
 
