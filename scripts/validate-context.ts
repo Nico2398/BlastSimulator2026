@@ -418,6 +418,37 @@ const SETTINGS_HOOKS = [
       'guard never ran, and issue #406 lost its run to a backgrounded sub-agent',
   },
   {
+    script: '.claude/hooks/require-foreground-bash.sh',
+    event: 'PreToolUse',
+    /** Every shell command has to pass it, so the matcher must cover `Bash`. */
+    tools: ['Bash'],
+    why:
+      'the same one-turn rule as the delegation guard above, arriving through the shell: a ' +
+      'backgrounded command reports on a turn that never comes. PRs #594, #603 and #604 were ' +
+      'all rescued branches, and every one of them ended on a sentence promising to wait for ' +
+      'a background task — #604 threw away 3h11m of finished work that way',
+  },
+  {
+    script: '.claude/hooks/require-settled-turn.sh',
+    event: 'Stop',
+    /** Stop carries no tool name; registration itself is the whole check. */
+    tools: [],
+    why:
+      'it is the only guard that acts at the moment the work is actually lost — the turn ' +
+      'ending while a `npm run long` handle is still unfinished. Prose did not hold here: ' +
+      'CLAUDE.md, the orchestrator definition and the retry prompt all already said results ' +
+      'must arrive inside the turn that asked for them',
+  },
+  {
+    script: '.claude/hooks/require-settled-turn.sh',
+    event: 'SubagentStop',
+    tools: [],
+    why:
+      'a specialist is what actually runs `npm run scenarios`, so a sub-agent ending its own ' +
+      'turn on an unfinished long run loses the result exactly the same way the main session ' +
+      'does — `Stop` alone never sees it',
+  },
+  {
     script: '.claude/hooks/no-ask-user-question.sh',
     event: 'PreToolUse',
     tools: ['AskUserQuestion'],

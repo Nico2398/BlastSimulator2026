@@ -77,7 +77,30 @@ Four independent channels prove a change works. Each catches what the others mis
 
 ## ▶ Claude Code only — some channels belong to CI, not to your session
 
-**Deliberately not mirrored into `.github/copilot-instructions.md` or `.opencode/AGENTS.md`.** Entry points are the one layer whose bodies are allowed to diverge — each runtime holds its own, and `validate:context` checks only that all three name the same gates and channels, not that they read alike. This section describes how *this* runtime executes: long-running processes it starts in the background and watches across turns. The other two runtimes drive their harnesses differently, so their authors decide their own wording. Its absence there is intentional; do not sync it.
+**Deliberately not mirrored into `.github/copilot-instructions.md` or `.opencode/AGENTS.md`.** Entry points are the one layer whose bodies are allowed to diverge — each runtime holds its own, and `validate:context` checks only that all three name the same gates and channels, not that they read alike. This section describes how *this* runtime executes: which channels it runs itself, which it hands to CI, and how it runs a command that outlives one Bash call. The other two runtimes drive their harnesses differently, so their authors decide their own wording. Its absence there is intentional; do not sync it.
+
+### ▶ There is no later turn — how to run a command that outlives one Bash call
+
+**A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and three of the commands this project requires sit at or past that ceiling — `npm run scenarios` is ~9 m 20 s in a sandbox and slower on a 2-core runner, `npm run ci:await` waits as long as CI takes. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
+
+An unattended session — a GitHub Actions runner, Claude Code on the web — gets **one turn**. When that turn ends the process exits. A background-task notification is delivered on a later turn, and there is no later turn, so it is never delivered at all. Everything not yet pushed dies with the VM. This is the same rule that already governs delegation (`require-foreground-agents.sh`, issues #404 and #406), arriving through the shell instead of through a sub-agent. It cost three runs in four days:
+
+| PR | How the turn ended | Cost |
+|----|--------------------|------|
+| #604 | "Scenario verification is running in the background — pausing here until it reports back." | 3 h 11 m and $30.55 of finished TDD work, discarded. Its retry repeated it in 2 m 51 s. |
+| #594 | "Waiting for the background vitest run — will be notified automatically." | Both attempts, same sentence. |
+| #603 | Never ended the turn — hand-rolled `timeout 280 bash -c 'until ! ps -p <pid>…'` 40+ times instead. | The whole 360-minute job budget spent polling, then the job timeout, with no budget left to retry. |
+
+**The rule.** Run it in the foreground when it fits — pass an explicit `timeout` up to 600000. When it does not fit, use the one wrapper that can be waited on inside this turn:
+
+```bash
+npm run long -- start scenarios -- npm run scenarios
+npm run long -- wait scenarios      # blocks one bounded slice
+```
+
+`wait` exits `75` while the command is still going. **That is not a failure and not a verdict** — call `wait` again, in this same turn, as many times as it takes, until it prints `FINISHED` and the command's own exit code. Then act on that code.
+
+Two hooks enforce this, because prose did not hold: `require-foreground-bash.sh` refuses a `run_in_background` Bash call or raw `nohup`/`setsid`/`disown`/trailing-`&` detach, and `require-settled-turn.sh` refuses to let a turn (or a sub-agent's turn) end while a `npm run long` handle is unfinished. A human at an interactive CLI, where a later turn genuinely exists, can set `AGENTIC_ALLOW_BACKGROUND_BASH=1`; no pipeline workflow sets it.
 
 Without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475). Loading a level is cheap — a `new_game` is ~4 s and a campaign start ~16 s. What is expensive is *waiting on frames*: the browser harnesses poll the page over CDP, and every such call waits a full frame, so a single player action costs tens of seconds and an interaction-mode scenario beat costs minutes. That is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
 
@@ -100,7 +123,7 @@ A channel that belongs to CI is **covered**, never pending: an autonomous run ma
 
 **Covered means the report gets read, not that you may leave before it arrives.** A red CI is announced to nobody: `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked PR. So an autonomous run's last step is `npm run ci:await -- --pr <number>`, which blocks until every workflow run on the PR head reports — green ends the run, red is work on the same branch. PR #581 is what skipping it costs: green on every channel its session ran, marked, two interaction shards red, and issue #552 held the queue until a human looked. `agentic-pipeline-finalization` holds the step and its bounded fix loop; `agentic-pipeline-ci-fix` is the pipeline for a red CI handed back to a later session.
 
-**While any browser-driven run is in flight: change no file** (Vite reloads the page and kills the run with `Execution context was destroyed`, which looks like a game bug and is not), **start no second browser harness**, and **wait for the run's own terminal line**. Slow is not stuck. A run you interrupted produced no result — report the channel as pending CI, never as passed.
+**While any browser-driven run is in flight: change no file** (Vite reloads the page and kills the run with `Execution context was destroyed`, which looks like a game bug and is not), **start no second browser harness**, and **wait for the run's own terminal line** — in this turn, through `npm run long -- wait`, never by ending the turn on it. Slow is not stuck. A run you interrupted produced no result — report the channel as pending CI, never as passed.
 
 ## ▶ Capability Gate
 
