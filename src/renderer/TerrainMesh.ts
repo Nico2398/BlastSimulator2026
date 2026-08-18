@@ -552,14 +552,12 @@ export class TerrainMesh {
     // symmetrically below for completeness, though the chunk below's own
     // topmost-cube march (its own "above" check, targeting this slab) is
     // what actually owns that seam.
-    const aboveRange = this.grid.chunkDensityRange(cx, cz, cy + 1);
-    const aboveSafe = aboveRange === null || aboveRange.min >= SURFACE_THRESHOLD;
-    if (!aboveSafe) return false;
-    if (cy > 0) {
-      const belowRange = this.grid.chunkDensityRange(cx, cz, cy - 1);
-      const belowSafe = belowRange === null || belowRange.min >= SURFACE_THRESHOLD;
-      if (!belowSafe) return false;
-    }
+    const slabSafe = (neighbourCy: number): boolean => {
+      const r = this.grid.chunkDensityRange(cx, cz, neighbourCy);
+      return r === null || r.min >= SURFACE_THRESHOLD;
+    };
+    if (!slabSafe(cy + 1)) return false;
+    if (cy > 0 && !slabSafe(cy - 1)) return false;
 
     // A fully interior chunk never emits geometry.
     if (hasWest && hasEast && hasNorth && hasSouth) return true;
