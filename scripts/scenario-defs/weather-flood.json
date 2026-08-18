@@ -162,8 +162,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:15,15 diameter:0.089",
-      "description": "Corrected from rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = round(5/3)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json and repeated in several other files this batch (hauling-gate.json, safety-projection-visual.json, core-loop-visual.json). Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: confirming the grid queues 9 drill_hole PendingActions and pushes 9 PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/save-load-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission kept the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent, a $60 divergence at every downstream cash checkpoint. Confirmed exact: adding the real default reproduces interaction mode's own $51,260 figure precisely.",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:15,15 diameter:0.089",
+      "description": "Corrected from rows:2 cols:2 spacing:5 (which command mode ran literally, producing 4 holes): the click drags the (15,15)-(20,20) rectangle at the Drill panel's own default spacing (DEFAULT_SPACING_M=3), computing cols/rows as round(size/spacing)+1 = round(5/3)+1 = 3x3 = 9 holes for that same rectangle -- the command and the click were silently testing two different grids, the same class of bug already fixed in nav-cell-types-visual.json and repeated in several other files this batch (hauling-gate.json, safety-projection-visual.json, core-loop-visual.json). Caught by adding expect.equals.holeCount; fixed by describing what the click actually produces. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: confirming the grid queues drill_hole PendingActions and pushes PlannedHoles into plannedDrillHoles — none are drilled yet, so holeCount stays 0 right after confirm. diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/save-load-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission kept the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent, a $60 divergence at every downstream cash checkpoint. Confirmed exact: adding the real default reproduces interaction mode's own $51,260 figure precisely. #554-followup: grid trimmed 3x3 (9 holes) -> 2x2 (4 holes), dragTiles rectangle shrunk (15,15)-(20,20) -> (15,15)-(18,18) so round(3/3)+1=2 -- same root cause and same fix as survey-then-blast.json: this file's single driller (vs. that file's two) drilling+charging 9 holes leaves wellBeing pinned at its intentional sticky-zero floor (ScoreManager.ts's applyDecay -- confirmed load-bearing design, see tests/integration/full-level/level1-lose-revolt.integration.test.ts) for long enough to cross REVOLT_TICKS=120 in BOTH modes; command mode's own trace revolts too, it just has no DOM to be blocked by the resulting level-end overlay the way interaction mode's real click is. Fewer holes means less real work, comfortable margin before the revolt deadline in either mode.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -181,8 +181,8 @@
           "type": "dragTiles",
           "x1": 15,
           "z1": 15,
-          "x2": 20,
-          "z2": 20
+          "x2": 18,
+          "z2": 18
         },
         {
           "type": "screenshot"
@@ -195,7 +195,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 9,
+          "orderedHoleCount": 4,
           "holeCount": 0
         },
         "changedBy": {
@@ -204,20 +204,20 @@
       }
     },
     {
-      "command": "tick 185",
-      "description": "#553: drain the ordered plan — the single manually-hired driller/drill_rig (no staffed near-origin spawn here) lands all 9 holes well inside this pad (sandbox-measured landing at tick 26 for H1, all 9 by tick ~180).",
+      "command": "tick 60",
+      "description": "#553/#554-followup: drain the ordered plan — the single manually-hired driller/drill_rig (no staffed near-origin spawn here) lands all 4 holes of the trimmed grid. Sandbox-measured: all 4 holes land by tick 47 (H4 at 28, H1 at 35, H2 at 40, H3 at 47) -- trimmed from the old 9-hole budget (185 ticks) to avoid burning ~170 dead ticks the driller would otherwise spend idle between finishing drilling and the charge order below, which was needlessly draining wellBeing toward its intentional sticky-zero floor (ScoreManager.ts's applyDecay) for no in-scenario reason.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 185"
+          "command": "tick 60"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 9,
-          "tickCount": 190
+          "holeCount": 4,
+          "tickCount": 65
         },
         "decreased": [
           "cash"
@@ -242,63 +242,7 @@
     },
     {
       "command": "tick 15",
-      "description": "#554-followup (issue #586 CI): a real-time waitUntil here let real interaction-mode CI reach a genuine worker_revolt before the sequence step below (the level-end screen covered the whole panel) even though command mode's own deterministic trace never revolts -- same real-time-vs-deterministic-convergence mismatch already found and fixed this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json, scores-display-visual.json, survey-overlay-lifecycle.json). Sandbox-measured: charging converges 98 ticks after this wait starts (tick 190 -> 288). Switched to the same deterministic tick-N/event-choose-0 chunked pattern -- 7 rounds of tick 15 (105 ticks) replay the identical trajectory in both modes instead of gambling on real-time throughput.",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
+      "description": "#554-followup (issue #586 CI, revised for the #554-followup grid trim): a real-time waitUntil here let real interaction-mode CI reach a genuine worker_revolt before the sequence step below (the level-end screen covered the whole panel) even though command mode's own deterministic trace never revolts -- same real-time-vs-deterministic-convergence mismatch already found and fixed this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json, scores-display-visual.json, survey-overlay-lifecycle.json). Deterministic tick-N/event-choose-0 chunked pattern, re-measured after the drill-plan grid trim (9 holes -> 4): with the drilling budget above also trimmed from a padded 220 ticks down to the 65 actually needed, the single driller now charges all 4 holes by ~tick 96-110 (measured from a fresh tick65 baseline) instead of the old plan's ~288 -- 3 rounds of tick 15 (45 ticks) give comfortable margin without re-introducing the dead-tick padding that was driving wellBeing toward its sticky-zero floor for no reason.",
       "interaction": [
         { "type": "command", "command": "tick 15" }
       ],
@@ -333,7 +277,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 9,
+          "chargedCount": 4,
           "orderedChargeCount": 0
         }
       }
@@ -360,13 +304,13 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 9
+          "sequencedCount": 4
         }
       }
     },
     {
       "command": "blast",
-      "description": "boomite is waterSensitive:true (ExplosiveCatalog.ts); every hole here is flooded (raining, no tubing installed -- WetHoles.ts's wetHoles()) so this blast now genuinely detonates weak (Finding #39: BlastExecution.ts never wired the water/flood mechanic into the real energy calculation at all -- waterEffect/wetHoles existed but had zero effect on any blast until this fix). No state field exposes the blast report's clearedVoxels/rating directly, so the weakening itself is proven by dedicated tests rather than a scenario assertion: a direct trace of this exact command sequence shows 27 cleared voxels / $83,500 ore value flooded vs. 395 cleared voxels / $1,337,550 dry (~14x weaker, same seed/grid/charge) -- confirmed end-to-end through the real console command pipeline by tests/integration/weather-blast.integration.test.ts, and at the physics level by new tests in BlastCalc.test.ts/BlastExecution.test.ts.",
+      "description": "boomite is waterSensitive:true (ExplosiveCatalog.ts); every hole here is flooded (raining, no tubing installed -- WetHoles.ts's wetHoles()) so this blast now genuinely detonates weak (Finding #39: BlastExecution.ts never wired the water/flood mechanic into the real energy calculation at all -- waterEffect/wetHoles existed but had zero effect on any blast until this fix). No state field exposes the blast report's clearedVoxels/rating directly, so the weakening itself is proven by dedicated tests rather than a scenario assertion: a direct trace of this exact command sequence shows 27 cleared voxels / $83,500 ore value flooded vs. 395 cleared voxels / $1,337,550 dry (~14x weaker, same seed/grid/charge) -- confirmed end-to-end through the real console command pipeline by tests/integration/weather-blast.integration.test.ts, and at the physics level by new tests in BlastCalc.test.ts/BlastExecution.test.ts. (Figures predate the #554-followup 9-hole -> 4-hole grid trim; the weak-vs-dry ratio this proves is unaffected by grid size, so left as the original measurement rather than re-run for an unasserted description.)",
       "interaction": [
         {
           "type": "clickSelector",
@@ -420,11 +364,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 295,
+          "tickCount": 110,
           "holeCount": 0,
           "weather": "heavy_rain"
         },
-        "note": "tickCount up from 190 (#554): charging is real work now -- the 9-hole charge order above, drained by the chunked tick-N wait above (7 rounds of tick 15 = 105 ticks, a few past the 98 actually needed for margin), adds real ticks between drilling landing and this final checkpoint."
+        "note": "#554-followup: tickCount down from 295 after the grid trim (9 holes -> 4) and the drilling budget trim (220 ticks of mostly-idle padding -> the 60 actually needed) -- charging is still real work (the 4-hole charge order above, drained by 3 rounds of tick 15 = 45 ticks), but the driller no longer sits idle for ~170 dead ticks between landing the last hole and the charge order being issued, which is what was pinning wellBeing at its intentional sticky-zero floor (ScoreManager.ts's applyDecay) long enough to cross REVOLT_TICKS=120 in both modes. Sandbox-verified revolted:false throughout with this grid/budget."
       }
     }
   ]
