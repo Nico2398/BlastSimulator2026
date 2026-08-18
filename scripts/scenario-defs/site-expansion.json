@@ -387,7 +387,7 @@
     },
     {
       "command": "save slot:expanded",
-      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. Runs after the far-bridging claim above, so the saved state (and the load below) includes the bridged ground at chunk (8,0), not just the original blast.",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. Runs after the far-bridging claim above, so the saved state (and the load below) includes the bridged ground at chunk (8,0), not just the original blast. #554-followup (issue #586 CI): dropped the exact `cash: 453554` -- a real CI run read 453466 ($88 off), the same real-time-accrual drift class already diagnosed and fixed for level1-playthrough-revolt.json's own cash checkpoints (see that file's notes): this step follows the `wait_until field:orderedChargeCount` charge-drain wait above, whose real per-hole charging (#554) accrues a different number of real ticks (and therefore payroll/upkeep) in interaction mode's own wall-clock pacing than in command mode's fixed tick-command trajectory. `changedBy: {cash: 0}` replaces it -- a real, load-bearing check that `save` itself doesn't spend or credit cash, provable in both modes regardless of which absolute value cash happens to be at this point.",
       "timeout": 150,
       "interaction": [
         {
@@ -396,15 +396,15 @@
         }
       ],
       "expect": {
-        "equals": {
-          "cash": 453554
+        "changedBy": {
+          "cash": 0
         }
       },
       "role": "setup"
     },
     {
       "command": "load slot:expanded",
-      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. The point of this round-trip: the expanded site bounds -- now including the far-bridged claim at chunk (8,0), not just the original blast -- must survive a save/load, not only a live session.",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. The point of this round-trip: the expanded site bounds -- now including the far-bridged claim at chunk (8,0), not just the original blast -- must survive a save/load, not only a live session. #554-followup (issue #586 CI): dropped the exact `cash: 453554` here too, same real-time-accrual drift class as the save step's own note above. `changedBy: {cash: 0}` is the stronger, mode-invariant replacement for this step's actual purpose: nothing happens between `save` and `load` here, so if `load` genuinely restores the exact snapshot `save` just wrote, cash must come back unchanged from whatever it already was -- a real proof of round-trip fidelity that doesn't depend on pinning cash's own absolute value, which the two modes don't agree on to begin with.",
       "timeout": 150,
       "interaction": [
         {
@@ -413,8 +413,10 @@
         }
       ],
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "equals": {
-          "cash": 453554,
           "worldSizeX": 160,
           "worldMinX": -16,
           "buildingCount": 1

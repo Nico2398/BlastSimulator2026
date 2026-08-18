@@ -1081,11 +1081,11 @@
           "command": "tick 10"
         }
       ],
-      "description": "#557: cash dips deep negative in this window but bankruptcy no longer fires -- with this file's crew down to 6 employees (see the earlier hire step's own finding), the one dip below the $5,000 threshold stays well short of `BANKRUPTCY_GRACE_TICKS=100` (Bankruptcy.ts) before the file's own scripted end, sandbox-confirmed end-to-end. tickCount stays `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning.",
+      "description": "#557: cash dips deep negative in this window but bankruptcy no longer fires -- with this file's crew down to 6 employees (see the earlier hire step's own finding), the one dip below the $5,000 threshold stays well short of `BANKRUPTCY_GRACE_TICKS=100` (Bankruptcy.ts) before the file's own scripted end, sandbox-confirmed end-to-end. tickCount stays `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning. #554-followup (this session, issue #586 CI): `changedBy: 6` further loosened to `increased` -- `tickCommand` itself stops early and auto-pauses the instant a random event fires mid-window (\"Pending event! Resolve it first\", same mechanism `blast-execution-visual.json`'s own `wait_until`-conversion note documents), and this step's own upstream timing shifts run-to-run (bankruptcy-adjacent cash swings, event draws) enough that sometimes only 6 of the 10 requested ticks land before hitting a pending event, sometimes fewer still (CI: 2, tickCount 138->140) -- CI's own report is a second, smaller interruption inside what the #596 fix had already treated as one. This step isn't waiting on queued work landing (no `waitUntil` target applies -- it's a plain real-time pad before the next event), so per this project's own convention it takes the weaker directional check rather than a `waitUntil`, matching the sibling `tick 10` step immediately above this one in this same file, which already documents the identical class of interruption (\"only 1 of the 10 requested ticks advances here\") with the same `increased` treatment.",
       "expect": {
-        "changedBy": {
-          "tickCount": 6
-        },
+        "increased": [
+          "tickCount"
+        ],
         "decreased": [
           "cash"
         ]

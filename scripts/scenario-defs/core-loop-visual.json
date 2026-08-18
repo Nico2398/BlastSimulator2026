@@ -298,45 +298,7 @@
     },
     {
       "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "description": "Fifth and final chunk — all 4 holes should have landed by now.",
+      "description": "Third and final chunk — all 4 holes should have landed by now. Two further chunks (150->250 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 4 holes already landed by tick 155 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding, on a 2-employee crew with no living quarters ever built in this file, was enough for wellBeing (already pinned at 0 by ~tick135) to accumulate REVOLT_TICKS=120 consecutive ticks at zero and end the level via worker_revolt (WorkerRevolt.ts) before charging ever got a chance to run as real, clickable UI -- the interaction-mode wait_until step below needs the speed-8x control to still be usable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/sequence/blast to run as genuine player interaction instead of falling back to the guard-step pattern.",
       "interaction": [
         {
           "type": "command",
@@ -364,14 +326,13 @@
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
-          "type": "command",
-          "command": "charge hole:* explosive:boomite amount:5 stemming:2"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
         }
       ],
-      "description": "#553 interaction-mode finding: direct trace of the equivalent point in this file's own command sequence shows state.wellBeing pinned at 0 from tick 155 on (only 2 employees, no living quarters anywhere in this file) and state.revolted flipping true during the final tick-50 chunk (tickCount 205->255, REVOLT_TICKS=120, WorkerRevolt.ts) -- levelEndReason reads 'worker_revolt' by the time this step runs. LevelEndScreen shows its fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null, for every defeat reason including worker_revolt, and never hides it again (same mechanism level1-playthrough-revolt.json and level2/level3-playthrough-win.json hit for bankruptcy). Command mode's own headless engine has no such overlay, so its literal command list keeps passing straight through -- this divergence is purely a UI-reachability one. `expect.blocked` proves the real block; the command still runs directly so chargedCount reaches 4 exactly as before.",
-      "role": "guard",
+      "description": "#554-followup (issue #586 CI): restored to a real click. Trimming the dead tick-50 padding above (see that step's own description) keeps the level alive past this point -- worker_revolt no longer fires before charging, so the full-viewport LevelEndScreen overlay this step used to guard against never appears here, and charge-all is genuinely reachable the same way blast-basic.json's own charge-all click is.",
+      "role": "player",
       "expect": {
-        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
         "increased": [
           "orderedChargeCount"
         ]
@@ -379,8 +340,8 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "timeout": 910,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #554-followup (issue #586 CI, sandbox-confirmed): widened from the usual 120000ms to 900000ms specifically for this file -- SceneManager.ts clamps every render frame's own dt to 100ms (`Math.min((now-lastTime)/1000, 0.1)`) regardless of how long the frame itself actually took, and main.ts's accumulator only fires one `tick <timeScale>` per 1000ms of *accumulated, clamped* time -- so real interaction-mode tick throughput is capped at (0.1s/frame / 1s) * timeScale = 0.8 ticks per frame at 8x speed, independent of the ~6s/frame software-rasterization cost (#475) and independent of the wall-clock budget given here. Most files' wait_until steps clear this easily because a well-rested, properly-staffed crew loads a charge in single-digit ticks; this file's own 2-employee crew (no living quarters anywhere in the file, wellBeing pinned at 0 since ~tick135, confirmed via direct trace) already collapsed from fatigue twice during drilling (employee_collapsed at ticks 97/101, sandbox-reproduced) before charging even starts, so the same driller needs one or more full rest cycles mid-charge too -- sandbox-reproduced hitting the old 120000ms budget with orderedChargeCount stalled at 4 (zero progress in the entire window), consistent with well under the ~10 ticks needed for even the first hole to land. 900000ms budgets for roughly 10x the throughput of the old window, comfortably covering a multi-hole charge queue plus at least one full rest cycle for a fatigue-strained two-person crew.",
       "interaction": [
         {
           "type": "awaitUsable",
@@ -395,7 +356,7 @@
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 3000,
-          "timeoutMs": 120000
+          "timeoutMs": 900000
         }
       ],
       "role": "setup",
@@ -407,20 +368,30 @@
       }
     },
     {
-      "command": "sequence auto delay_step:25",
+      "command": "time speed 1",
+      "description": "Restore normal speed before the remaining player-driven steps, matching blast-basic.json's own convention.",
       "interaction": [
         {
           "type": "command",
-          "command": "sequence auto delay_step:25"
+          "command": "time speed 1"
         }
       ],
-      "description": "#553: same class as the charge step above -- the full-viewport worker_revolt overlay has covered auto-sequence since tick ~230 too.",
-      "role": "guard",
+      "role": "setup"
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "description": "#554-followup (issue #586 CI): restored to a real click, same reason as the charge-all step above -- the level is alive again by this point.",
+      "role": "player",
       "expect": {
         "equals": {
           "sequencedCount": 4
-        },
-        "blocked": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
       }
     },
     {
@@ -435,16 +406,16 @@
     },
     {
       "command": "blast_preview",
-      "description": "This file never buys any software tier, so the preview prints '[Requires software tier N]' for every section (see safety-projection-visual.json for the unlocked version) -- still a real, clickable control either way. #553 interaction-mode finding: moot regardless -- same worker_revolt full-screen overlay as the charge/sequence steps above covers run-analysis too, so this is a guard step like them. cash is no longer pinned to an exact figure here: command mode's headless engine and interaction mode's real click sequence diverge by a fixed $54 by this point (command mode traces 122416, interaction mode sandbox-measured 122470 across repeated runs -- both stable/deterministic within their own mode, not flaky) -- the same class of action-count-driven event/payroll-cycle timing divergence documented on level1-playthrough-revolt.json's weather_minor_tremor step and level1-win-efficient's own $12 gap (issue #553 investigation). Neither mode is wrong; a single `equals` just can't hold both.",
+      "description": "This file never buys any software tier, so the preview prints '[Requires software tier N]' for every section (see safety-projection-visual.json for the unlocked version) -- still a real, clickable control either way. #554-followup (issue #586 CI): restored to a real click -- the level is alive again by this point (see the charge-all step's description above), so run-analysis is genuinely reachable, not covered by a level-end overlay.",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast_preview"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
         }
       ],
-      "role": "guard",
+      "role": "player",
       "expect": {
-        "blocked": "#bs-blast-panel [data-action=\"run-analysis\"]"
+        "usable": "#bs-blast-panel [data-action=\"run-analysis\"]"
       }
     },
     {
@@ -452,21 +423,36 @@
       "timeout": 30,
       "frames": 6,
       "interval": 50,
-      "description": "#553 interaction-mode finding: same worker_revolt full-screen overlay as the earlier steps -- execute is covered too, no player can click it by this point. The command still runs directly so the real hole/charge/sequence counts below keep holding.",
+      "description": "#554-followup (issue #586 CI): restored to a real click sequence (execute -> confirm -> report close), same reason as the steps above -- matches blast-basic.json's own execute flow.",
       "interaction": [
         {
-          "type": "command",
-          "command": "blast"
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "guard",
+      "role": "player",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0
-        },
-        "blocked": "#bs-blast-panel [data-action=\"execute\"]"
+        }
       }
     },
     {
@@ -493,18 +479,25 @@
       "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
-          "type": "command",
-          "command": "contract accept type:rubble_disposal"
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         }
       ],
-      "role": "guard",
+      "role": "player",
       "expect": {
         "equals": {
           "activeContractCount": 1
-        },
-        "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
+        }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #553 interaction-mode finding: moot regardless -- by this point in the run the same worker_revolt full-screen overlay covering charge/sequence/blast above also covers the contracts panel entirely (nothing at z-panel/z-rail is reachable once levelEndReason turns non-null), so this is a guard step now too, same class as the other post-revolt steps. #553-followup (issue #586 CI): `blocked` repointed from `[data-contract-id=\"11\"] .bs-contract-accept` to the static toolbar contracts button -- the offered contract pool refreshes on its own tick-based clock, and by CI's real pacing id 11 was never offered at all, so the harness correctly refused to trust a `blocked` result against a control that was never in the DOM for unrelated reasons. The static toolbar button is present regardless of which contracts are offered and still proves the whole panel is unreachable under the overlay, matching the fix already applied to level2-playthrough-win.json's own post-bankruptcy contract-accept guards. #554: `contract accept 11` -> `contract accept type:rubble_disposal` -- charging is real work now, and the extra ticks the charge-order wait above spends shift the tick-based contract pool refresh far enough that a fixed id is no longer a reliable bet at all; `type:`/`material:` selectors (ContractSelector, #597) name a contract by what it actually is rather than where it landed in generation order. rubble_disposal specifically needs no ore in storage to exist as an offer (only delivery, asserted failed below regardless, needs stock)."
+      "description": "#513/#581: the accept click is scoped by contract type, not a fixed id -- `data-contract-type` (ContractsPanel's `makeOfferedCard`) names a contract by what it actually is (#554/#597's `type:`/`material:` ContractSelector convention), immune to the tick-based offer pool's own id drift. #554-followup (issue #586 CI): restored to a real click -- trimming the dead tick-50 padding earlier in this file (see that step's own description) keeps the level alive past the charge/sequence/blast steps, so the contracts panel is genuinely reachable here too, not covered by a level-end overlay."
     },
     {
       "command": "contract deliver type:rubble_disposal amount:500",
@@ -514,13 +507,13 @@
           "command": "contract deliver type:rubble_disposal amount:500"
         }
       ],
-      "description": "BLOCKED for two independent reasons by this point: the ACTIVE card's DELIVER button is genuinely disabled (ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg in storage -- nothing in this scenario ever hauls material into storage), AND the worker_revolt full-screen overlay (active since ~tick 230, see the charge step above) now covers the whole contracts panel regardless. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so this is a silent no-op in both modes today. `expect.blocked` pins down the real (now doubly-blocked) control; `usable` on the panel's own storage link is dropped -- that control is covered by the same overlay as everything else past this point, not usable either (same adjustment level2-playthrough-win.json made for its own bankruptcy overlay). Forcing a click here would be asserting something the game correctly forbids. #554: `contract deliver 11` -> `contract deliver type:rubble_disposal`, same fixed-id-drift reason as the accept step above.",
+      "description": "BLOCKED for a real, load-bearing reason: the ACTIVE card's DELIVER button is genuinely disabled (ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg in storage -- this file never buys a hauling vehicle or hires a driver, so nothing ever reaches storage). The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so this is a silent no-op in both modes today. `expect.blocked` pins the real control down by contract type, same convention as the accept step above, rather than the toolbar-level overlay guard this step used before the level-end padding fix -- the contracts panel itself is reachable now, only this specific card's DELIVER button is genuinely disabled. Forcing a click here would be asserting something the game correctly forbids.",
       "expect": {
         "equals": {
           "activeContractCount": 1
         },
-        "blocked": "#bs-toolbar [data-panel=\"contracts\"]",
-        "note": "the contract stays active/undelivered -- this file's own \"contract delivery\" step in its description is a queued attempt, not a completed one; economy-full-loop.json is the file that actually hauls stock and completes a delivery. #553-followup (issue #586 CI): dropped the exact `cash: 122416` (same real-time-accrual drift class documented throughout this PR) and repointed `blocked` at the static toolbar contracts button, same reason and same fix as the contract-accept guard above."
+        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
+        "note": "the contract stays active/undelivered -- this file's own \"contract delivery\" step in its description is a queued attempt, not a completed one; economy-full-loop.json is the file that actually hauls stock and completes a delivery."
       },
       "role": "guard"
     },
