@@ -140,6 +140,23 @@ interface VoxelChunk {
   readonly fracture: Float64Array;
   /** Sparse, keyed by chunk-local flat index. Only voxels with ore pay for a Record. */
   readonly ores: Map<number, Record<string, number>>;
+  /** True min/max density ever written to a voxel in this y-slab (#560). Seeded at
+   *  +Infinity/-Infinity ("nothing written yet") and only ever widens, exactly like the
+   *  rest of this summary — a voxel later overwritten to a narrower value does not
+   *  shrink it back down. Index = slabIndex (this chunk's own CHUNK_SIZE-tall vertical
+   *  banding), length = ceil(sizeY / CHUNK_SIZE). Not directly what `chunkDensityRange`
+   *  returns — see `slabTouchedCount` for why. */
+  readonly slabMinDensity: Float64Array;
+  readonly slabMaxDensity: Float64Array;
+  /** Count of distinct voxel positions ever written within this slab (#560), deduped via
+   *  `touched`. Every position not yet written is honestly still air (density 0) — so
+   *  while this is below the slab's true volume, `chunkDensityRange` must still fold in
+   *  that implicit 0. Once it reaches the slab's volume, every voxel has an explicit
+   *  written value and `slabMinDensity`/`slabMaxDensity` are exact on their own. */
+  readonly slabTouchedCount: Uint32Array;
+  /** One byte per voxel in the chunk (all slabs) — 1 once that voxel has been written at
+   *  least once via a mutator, so `slabTouchedCount` counts each position only once. */
+  readonly touched: Uint8Array;
 }
 
 /** Packs a chunk coordinate pair into one collision-free numeric key. Range ±32768 chunks (±524 km). */
@@ -394,6 +411,7 @@ export class VoxelGrid {
 
   private allocateChunk(cx: number, cz: number): VoxelChunk {
     const n = CHUNK_SIZE * this.sizeY * CHUNK_SIZE;
+    const nSlabs = Math.ceil(this.sizeY / CHUNK_SIZE);
     const chunk: VoxelChunk = {
       cx, cz,
       x0: cx * CHUNK_SIZE, z0: cz * CHUNK_SIZE,
@@ -402,6 +420,13 @@ export class VoxelGrid {
       compId: new Uint16Array(n),
       fracture: new Float64Array(n).fill(1.0),
       ores: new Map(),
+      // +Infinity/-Infinity sentinels ("nothing written yet") rather than 0/0 —
+      // chunkDensityRange folds in the honest "still air" 0 baseline itself for
+      // any slab that isn't yet fully touched (#560).
+      slabMinDensity: new Float64Array(nSlabs).fill(Infinity),
+      slabMaxDensity: new Float64Array(nSlabs).fill(-Infinity),
+      slabTouchedCount: new Uint32Array(nSlabs),
+      touched: new Uint8Array(n),
     };
     this.chunks.set(chunkKey(cx, cz), chunk);
     this.cacheKey = -1;
@@ -422,6 +447,55 @@ export class VoxelGrid {
       if (chunk.z1 > maxZ) maxZ = chunk.z1;
     }
     this.bMinX = minX; this.bMinZ = minZ; this.bMaxX = maxX; this.bMaxZ = maxZ;
+  }
+
+  // ── Per-chunk density summary (#560) ──
+
+  /**
+   * Conservative [min, max] density observed in chunk (cx, cz)'s y-slab
+   * `slabIndex` (VoxelGrid's own CHUNK_SIZE-tall vertical banding). Widens
+   * monotonically on every voxel write in that slab, never narrowed back down
+   * except on a full reload (#560). Returns null for an unowned chunk or a
+   * slab index past the grid's height.
+   */
+  chunkDensityRange(cx: number, cz: number, slabIndex: number): { min: number; max: number } | null {
+    const chunk = this.chunks.get(chunkKey(cx, cz));
+    if (!chunk) return null;
+    if (slabIndex < 0 || slabIndex >= chunk.slabMinDensity.length) return null;
+    const touched = chunk.slabTouchedCount[slabIndex]!;
+    if (touched === 0) return { min: 0, max: 0 }; // nothing written — honestly all air
+    const trueMin = chunk.slabMinDensity[slabIndex]!;
+    const trueMax = chunk.slabMaxDensity[slabIndex]!;
+    if (touched >= this.slabVolume(chunk, slabIndex)) {
+      // Every voxel in this slab has an explicit written value — no implicit
+      // air left unaccounted for, so the true written min/max is exact.
+      return { min: trueMin, max: trueMax };
+    }
+    // Still some untouched positions in this slab — they're honestly air (0),
+    // so fold that baseline in (density is always >= 0, so it never affects max).
+    return { min: Math.min(0, trueMin), max: Math.max(0, trueMax) };
+  }
+
+  /** Voxel count of the owned span of chunk's slab `slabIndex` — the number of
+   *  distinct positions `slabTouchedCount` would need to reach for full coverage (#560). */
+  private slabVolume(chunk: VoxelChunk, slabIndex: number): number {
+    const bandHeight = Math.min(CHUNK_SIZE, this.sizeY - slabIndex * CHUNK_SIZE);
+    if (bandHeight <= 0) return 0;
+    return (chunk.x1 - chunk.x0) * (chunk.z1 - chunk.z0) * bandHeight;
+  }
+
+  /** Widens chunk's per-slab true written min/max density to include a write of
+   *  `density` at local index `i`, world y (#560). Dedupes via `touched` so the
+   *  same position written twice doesn't double-count toward full slab coverage. */
+  private touchDensity(chunk: VoxelChunk, i: number, y: number, density: number): void {
+    const slab = Math.floor(y / CHUNK_SIZE);
+    if (slab < 0 || slab >= chunk.slabMinDensity.length) return;
+    if (density < chunk.slabMinDensity[slab]!) chunk.slabMinDensity[slab] = density;
+    if (density > chunk.slabMaxDensity[slab]!) chunk.slabMaxDensity[slab] = density;
+    if (!chunk.touched[i]) {
+      chunk.touched[i] = 1;
+      chunk.slabTouchedCount[slab]!++;
+    }
   }
 
   // ── Dirty tracking — what a save has to store voxel-by-voxel (#473 D4) ──
@@ -519,6 +593,7 @@ export class VoxelGrid {
     if (ores && Object.keys(ores).length > 0) chunk.ores.set(i, { ...ores });
     else chunk.ores.delete(i);
     this.touch(chunk);
+    this.touchDensity(chunk, i, y, density);
   }
 
   setFractureAt(x: number, y: number, z: number, value: number): void {
@@ -569,6 +644,7 @@ export class VoxelGrid {
     if (Object.keys(voxel.oreDensities).length > 0) chunk.ores.set(i, { ...voxel.oreDensities });
     else chunk.ores.delete(i);
     this.touch(chunk);
+    this.touchDensity(chunk, i, y, voxel.density);
   }
 
   clearVoxel(x: number, y: number, z: number): void {
@@ -580,6 +656,7 @@ export class VoxelGrid {
     chunk.fracture[i] = 1.0;
     chunk.ores.delete(i);
     this.touch(chunk);
+    this.touchDensity(chunk, i, y, 0);
   }
 
   // ── Raw chunk storage access — for VoxelGridCodec (save serialization) only ──
@@ -620,6 +697,41 @@ export class VoxelGrid {
     chunk.ores.clear();
     for (const [i, rec] of ores) chunk.ores.set(i, rec);
     this.recomputeBounds();
+
+    // Exact rescan (#560): this bulk path bypasses the per-voxel mutators
+    // that maintain the conservative widening summary, and a save/load
+    // shouldn't carry forward stale bounds from before the save — an O(n)
+    // rescan is cheap here since restoring the chunk's arrays already was.
+    //
+    // Every owned (x, z) column is scanned across the full y range, so each
+    // touched position is marked and counted exactly once — chunkDensityRange
+    // reports the exact restored min/max for a fully-scanned slab, and
+    // honestly falls back to {min:0, max:0} for one no owned column reaches.
+    //
+    // `rect` (and therefore chunk.x0/x1/z0/z1, just assigned above) comes
+    // straight from deserialized save JSON and is never validated against
+    // the grid's real dimensions — a corrupted/hand-edited save with an
+    // absurd rect (e.g. maxX/maxZ ~1e12) must not turn this loop into an
+    // unbounded scan. Clamp to the chunk's actual storage span, the same
+    // defensive clamping forEachInRegion already does against real grid
+    // bounds elsewhere in this file.
+    const zLo = Math.max(chunk.z0, chunk.cz * CHUNK_SIZE);
+    const zHi = Math.min(chunk.z1, chunk.cz * CHUNK_SIZE + CHUNK_SIZE);
+    const xLo = Math.max(chunk.x0, chunk.cx * CHUNK_SIZE);
+    const xHi = Math.min(chunk.x1, chunk.cx * CHUNK_SIZE + CHUNK_SIZE);
+
+    chunk.slabMinDensity.fill(Infinity);
+    chunk.slabMaxDensity.fill(-Infinity);
+    chunk.slabTouchedCount.fill(0);
+    chunk.touched.fill(0);
+    for (let z = zLo; z < zHi; z++) {
+      for (let y = 0; y < this.sizeY; y++) {
+        for (let x = xLo; x < xHi; x++) {
+          const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+          this.touchDensity(chunk, i, y, chunk.density[i]!);
+        }
+      }
+    }
   }
 
   /** Get all voxels within a bounding box (inclusive on both ends). Unowned columns are skipped. */

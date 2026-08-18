@@ -31,6 +31,11 @@ const CHUNK_SIZE = VOXEL_CHUNK_SIZE;
 // Density ≥ this is considered solid material (0.5 = half-filled)
 const SURFACE_THRESHOLD = 0.5;
 
+/** Metres of buffer below the neighbouring landscape's sampled ground height
+ *  at which a boundary/skirt wall may stop (#560). Exported so tests can
+ *  assert against the same constant the implementation uses. */
+export const SKIRT_VISIBILITY_MARGIN_M = 2;
+
 export interface DirtyRegion {
   minX: number; minY: number; minZ: number;
   maxX: number; maxY: number; maxZ: number;
@@ -377,6 +382,16 @@ export class TerrainMesh {
     return ((cx + 1024) * 2048 + (cz + 1024)) * 1024 + cy;
   }
 
+  /** Which horizontal neighbours of chunk (cx, cz) are owned — computed once per rebuild and shared by rebuildChunk/canSkipChunkMarch/boundarySkirtFloorY instead of each recomputing it (#560). */
+  private neighbourFlags(cx: number, cz: number): { hasWest: boolean; hasEast: boolean; hasNorth: boolean; hasSouth: boolean } {
+    return {
+      hasWest: this.grid.hasChunk(cx - 1, cz),
+      hasEast: this.grid.hasChunk(cx + 1, cz),
+      hasNorth: this.grid.hasChunk(cx, cz - 1),
+      hasSouth: this.grid.hasChunk(cx, cz + 1),
+    };
+  }
+
   private disposeAllChunks(): void {
     for (const mesh of this.chunks.values()) {
       if (!mesh) continue;
@@ -415,13 +430,18 @@ export class TerrainMesh {
       this.chunks.set(key, null);
       return 0;
     }
-    const oy = cy * CHUNK_SIZE;
     // Extend one cube outward only where no owned chunk lies beyond that
     // side: an owned neighbour marches those cubes itself, and marching them
     // twice would emit the interior wall between two claimed chunks.
-    const xStart = this.grid.hasChunk(cx - 1, cz) ? rect.minX : rect.minX - 1;
-    const zStart = this.grid.hasChunk(cx, cz - 1) ? rect.minZ : rect.minZ - 1;
-    const yStart = cy === 0 ? -1 : oy;
+    const { hasWest, hasEast, hasNorth, hasSouth } = this.neighbourFlags(cx, cz);
+    if (this.canSkipChunkMarch(cx, cy, cz, rect)) {
+      this.chunks.set(key, null);
+      return 0;
+    }
+    const oy = cy * CHUNK_SIZE;
+    const xStart = hasWest ? rect.minX : rect.minX - 1;
+    const zStart = hasNorth ? rect.minZ : rect.minZ - 1;
+    const yStart = oy;
     const xEnd = rect.maxX;
     const zEnd = rect.maxZ;
     const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
@@ -429,6 +449,8 @@ export class TerrainMesh {
     for (let z = zStart; z < zEnd; z++) {
       for (let y = yStart; y < yEnd; y++) {
         for (let x = xStart; x < xEnd; x++) {
+          const floorY = this.boundarySkirtFloorY(x, z, rect, hasWest, hasEast, hasNorth, hasSouth);
+          if (floorY !== null && y + 1 < floorY) continue;
           this.marchCube(x, y, z, positions, rockA, rockB, rockWeight, ore);
         }
       }
@@ -461,6 +483,135 @@ export class TerrainMesh {
     this.scene.add(mesh);
     this.chunks.set(key, mesh);
     return positions.length / 3;
+  }
+
+  /**
+   * Lowest world Y at which a wall/skirt cube may still be emitted for column
+   * (x, z), or null when this column borders no unclaimed neighbour (ordinary
+   * interior geometry) or no EdgeHeightSampler is installed (full-depth
+   * fallback). A column bordering unclaimed land on more than one side (site
+   * corner) returns the minimum of the applicable sides' floors (#560).
+   */
+  private boundarySkirtFloorY(
+    x: number, z: number,
+    rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+    hasWest: boolean, hasEast: boolean, hasNorth: boolean, hasSouth: boolean,
+  ): number | null {
+    // A column borders unclaimed land on a side exactly when it's the halo
+    // column the march reaches into on that side (same coordinates
+    // rebuildChunk's xStart/zStart/xEnd/zEnd already use).
+    const bordersWest = !hasWest && x === rect.minX - 1;
+    const bordersEast = !hasEast && x === rect.maxX - 1;
+    const bordersNorth = !hasNorth && z === rect.minZ - 1;
+    const bordersSouth = !hasSouth && z === rect.maxZ - 1;
+    if (!bordersWest && !bordersEast && !bordersNorth && !bordersSouth) return null;
+    if (!this.edgeHeightSampler) return null;
+
+    let floor: number | null = null;
+    const consider = (sampleX: number, sampleZ: number): void => {
+      const h = this.edgeHeightSampler!(sampleX, sampleZ);
+      if (!Number.isFinite(h)) return;
+      const f = Math.floor(h) - SKIRT_VISIBILITY_MARGIN_M;
+      if (floor === null || f < floor) floor = f;
+    };
+    // West/north halo columns are already at the sampling coordinate; east/
+    // south need the neighbour column one past this chunk's owned rect,
+    // since the march's own loop bound stops at the last owned column.
+    if (bordersWest) consider(x, z);
+    if (bordersEast) consider(rect.maxX, z);
+    if (bordersNorth) consider(x, z);
+    if (bordersSouth) consider(x, rect.maxZ);
+
+    return floor;
+  }
+
+  /**
+   * True when chunk mesh (cx, cy, cz) is provably empty/solid-interior without
+   * marching a single cube (#560), using VoxelGrid's per-chunk density summary.
+   * False always falls through to the normal march — never a false positive.
+   */
+  private canSkipChunkMarch(
+    cx: number, cy: number, cz: number,
+    rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+  ): boolean {
+    const { hasWest, hasEast, hasNorth, hasSouth } = this.neighbourFlags(cx, cz);
+    const range = this.grid.chunkDensityRange(cx, cz, cy);
+    if (!range) return false;
+    if (range.max < SURFACE_THRESHOLD) return true; // uniformly air
+    if (range.min < SURFACE_THRESHOLD) return false; // genuinely mixed — a surface crosses this slab
+
+    // Uniformly solid. Unlike x/z, rebuildChunk's y-loop has no "-1" halo
+    // start (yStart is always oy, never oy-1) — the only vertical read past
+    // this chunk's own slab is its topmost cube's far corner, which lands
+    // one row into slab cy+1 (see yEnd's dy=1 corner in rebuildChunk). If
+    // that neighbouring slab isn't ALSO uniformly solid, the real surface
+    // may sit exactly on this chunk's own top boundary, and nothing else
+    // ever marches that cube — so it is never safe to skip on the strength
+    // of this slab's own density range alone (#560, reviewer repro: a flat
+    // surface landing exactly on a CHUNK_SIZE multiple). Checked
+    // symmetrically below for completeness, though the chunk below's own
+    // topmost-cube march (its own "above" check, targeting this slab) is
+    // what actually owns that seam.
+    const slabSafe = (neighbourCy: number): boolean => {
+      const r = this.grid.chunkDensityRange(cx, cz, neighbourCy);
+      return r === null || r.min >= SURFACE_THRESHOLD;
+    };
+    if (!slabSafe(cy + 1)) return false;
+    if (cy > 0 && !slabSafe(cy - 1)) return false;
+
+    // A fully interior chunk never emits geometry.
+    if (hasWest && hasEast && hasNorth && hasSouth) return true;
+
+    // Boundary chunk: only skippable if every bordering edge column proves a
+    // skirt cutoff above this slab, and this slab sits entirely below it.
+    if (!this.edgeHeightSampler) return false;
+
+    let deepestFloor = Infinity;
+    const consider = (x: number, z: number): boolean => {
+      const floorY = this.boundarySkirtFloorY(x, z, rect, hasWest, hasEast, hasNorth, hasSouth);
+      if (floorY === null) return false;
+      if (floorY < deepestFloor) deepestFloor = floorY;
+      return true;
+    };
+
+    // Loop ranges below reach one cell past [rect.minZ, rect.maxZ) / [rect.minX,
+    // rect.maxX) on the LOW end only, to include the diagonal corner cube
+    // (e.g. (rect.minX-1, rect.minZ-1)) that rebuildChunk's own march loop
+    // does visit when both an x-side and a z-side are unclaimed (xStart/
+    // zStart both shift to rect.minX-1/rect.minZ-1 in that case), but which
+    // neither a west-only nor a north-only scan of [rect.minZ, rect.maxZ) /
+    // [rect.minX, rect.maxX) alone would ever pass to boundarySkirtFloorY.
+    // The high end never needs a matching +1: rebuildChunk's xEnd/zEnd stay
+    // at rect.maxX/rect.maxZ regardless of hasEast/hasSouth (the east/south
+    // halo is reached through the last owned cube's high corner, not a
+    // shifted loop start), so rect.maxX-1/rect.maxZ-1 are already the last
+    // values these ranges cover. boundarySkirtFloorY itself combines
+    // multiple borders via min when called at a shared corner index, so the
+    // handful of extra calls this adds where a corner was already covered by
+    // the other side's scan are redundant, not incorrect.
+    if (!hasWest) {
+      for (let z = rect.minZ - 1; z < rect.maxZ; z++) {
+        if (!consider(rect.minX - 1, z)) return false;
+      }
+    }
+    if (!hasEast) {
+      for (let z = rect.minZ - 1; z < rect.maxZ; z++) {
+        if (!consider(rect.maxX - 1, z)) return false;
+      }
+    }
+    if (!hasNorth) {
+      for (let x = rect.minX - 1; x < rect.maxX; x++) {
+        if (!consider(x, rect.minZ - 1)) return false;
+      }
+    }
+    if (!hasSouth) {
+      for (let x = rect.minX - 1; x < rect.maxX; x++) {
+        if (!consider(x, rect.maxZ - 1)) return false;
+      }
+    }
+
+    const slabTop = Math.min((cy + 1) * CHUNK_SIZE, this.grid.sizeY);
+    return slabTop < deepestFloor;
   }
 
   private marchCube(

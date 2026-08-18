@@ -1,17 +1,36 @@
 // TerrainMesh — unit tests
 // Tests geometry generation from VoxelGrid without needing a browser.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
+import { VoxelGrid, CHUNK_SIZE } from '../../../src/core/world/VoxelGrid.js';
 import {
   TerrainMesh,
   SurveyConfidenceOverlay,
   virtualEdgeDensity,
+  SKIRT_VISIBILITY_MARGIN_M,
   type SurveyConfidencePoint,
   type SurveyConfidenceOverlayOptions,
 } from '../../../src/renderer/TerrainMesh.js';
 import { TerrainMaterial } from '../../../src/renderer/terrain/TerrainMaterial.js';
+
+/** Access to TerrainMesh's private #560 stubs — TS-private, not runtime-private,
+ *  so a narrow structural cast is enough to exercise the documented contract
+ *  directly rather than only through indirect geometry assertions. */
+type TerrainMeshSkirtInternals = {
+  boundarySkirtFloorY(
+    x: number, z: number,
+    rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+    hasWest: boolean, hasEast: boolean, hasNorth: boolean, hasSouth: boolean,
+  ): number | null;
+  canSkipChunkMarch(
+    cx: number, cy: number, cz: number,
+    rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+  ): boolean;
+};
+function skirtInternals(tm: TerrainMesh): TerrainMeshSkirtInternals {
+  return tm as unknown as TerrainMeshSkirtInternals;
+}
 
 // Minimal mock THREE.Scene — just captures adds/removes
 function makeScene(): THREE.Scene {
@@ -20,6 +39,22 @@ function makeScene(): THREE.Scene {
 
 function makeSolidVoxel(rockId = 'sandite'): import('../../../src/core/world/VoxelGrid.js').VoxelData {
   return { composition: { rocks: [{ rockId, coefficient: 1.0 }] }, density: 1.0, oreDensities: {}, fractureModifier: 1.0 };
+}
+
+// #560: 3x3 chunks horizontally, 2 chunks tall, fully solid throughout — chunk
+// (1, 0, 1) sits fully enclosed on every side: 4 solid owned horizontal
+// neighbours, and solid material continuing above it into chunk cy=1, so no
+// surface of any kind (wall or ground) passes through its own slab. The
+// canonical "provably skippable, no marching needed" fixture.
+const MULTI_CHUNK_SIZE_XZ = CHUNK_SIZE * 3;
+const MULTI_CHUNK_SIZE_Y = CHUNK_SIZE * 2;
+function fullySolidMultiChunkGrid(): VoxelGrid {
+  const grid = new VoxelGrid(MULTI_CHUNK_SIZE_XZ, MULTI_CHUNK_SIZE_Y, MULTI_CHUNK_SIZE_XZ);
+  for (let x = 0; x < MULTI_CHUNK_SIZE_XZ; x++)
+    for (let y = 0; y < MULTI_CHUNK_SIZE_Y; y++)
+      for (let z = 0; z < MULTI_CHUNK_SIZE_XZ; z++)
+        grid.setVoxel(x, y, z, makeSolidVoxel());
+  return grid;
 }
 
 function makeConfidencePoint(
@@ -57,11 +92,12 @@ describe('TerrainMesh', () => {
     tm.dispose();
   });
 
-  it('buildAll on a fully-solid grid seals it into a closed box', () => {
-    // The grid is a finite volume, not an infinite solid: its outer faces are
-    // real surfaces. Emitting nothing here used to leave the mesh an open
-    // shell you could see straight into wherever terrain was cut back at the
-    // site edge.
+  it('buildAll on a fully-solid grid seals the sides, but does not cap the floor (#560)', () => {
+    // The grid is a finite volume, not an infinite solid: its side faces are
+    // real surfaces, and stay sealed. But #560 removes the floor cap that
+    // used to close the bottom too — an invisible, wasted surface under the
+    // whole site. Only the visible ground and the boundary/skirt walls are
+    // emitted; nothing closes the bottom of the world.
     const scene = makeScene();
     const grid = new VoxelGrid(4, 4, 4);
     for (let x = 0; x < 4; x++)
@@ -73,20 +109,23 @@ describe('TerrainMesh', () => {
 
     expect(scene.children.length).toBeGreaterThan(0);
 
-    // Every one of the six bounding faces must carry geometry.
+    // The four side faces must still carry geometry reaching the site edge.
     const pos = (scene.children[0] as THREE.Mesh).geometry.getAttribute('position').array as Float32Array;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxZ = -Infinity, minZ = Infinity;
     for (let i = 0; i < pos.length; i += 3) {
       minX = Math.min(minX, pos[i]!);     maxX = Math.max(maxX, pos[i]!);
-      minY = Math.min(minY, pos[i + 1]!); maxY = Math.max(maxY, pos[i + 1]!);
+      minY = Math.min(minY, pos[i + 1]!);
       minZ = Math.min(minZ, pos[i + 2]!); maxZ = Math.max(maxZ, pos[i + 2]!);
     }
     expect(minX).toBeLessThanOrEqual(-0.5);
     expect(maxX).toBeGreaterThanOrEqual(3.5);
-    expect(minY).toBeLessThanOrEqual(-0.5);
-    expect(maxY).toBeGreaterThanOrEqual(3.5);
     expect(minZ).toBeLessThanOrEqual(-0.5);
     expect(maxZ).toBeGreaterThanOrEqual(3.5);
+    // No floor cap: the old sealed box put its lowest vertex at y = -0.5 (one
+    // cell below the grid). #560's fallback (no sampler installed) still
+    // marches the skirt walls to the very bottom of the grid (y = 0), but
+    // never below it.
+    expect(minY).toBeGreaterThanOrEqual(-1e-6);
     tm.dispose();
   });
 
@@ -529,6 +568,12 @@ describe('TerrainMesh', () => {
       const edgeCounts = new Map<string, number>();
       const key = (arr: Float32Array, i: number): string =>
         `${arr[i]!.toFixed(3)},${arr[i + 1]!.toFixed(3)},${arr[i + 2]!.toFixed(3)}`;
+      let minY = Infinity;
+      for (const child of scene.children) {
+        if (!(child instanceof THREE.Mesh)) continue;
+        const pos = child.geometry.getAttribute('position').array as Float32Array;
+        for (let i = 1; i < pos.length; i += 3) minY = Math.min(minY, pos[i]!);
+      }
       for (const child of scene.children) {
         if (!(child instanceof THREE.Mesh)) continue;
         const pos = child.geometry.getAttribute('position').array as Float32Array;
@@ -541,8 +586,17 @@ describe('TerrainMesh', () => {
           }
         }
       }
-      for (const count of edgeCounts.values()) {
-        if (count !== 2) return false;
+      for (const [edgeKey, count] of edgeCounts) {
+        if (count === 2) continue;
+        // #560: the floor is no longer capped, so the open bottom rim — an
+        // edge whose two endpoints both sit at the mesh's own lowest Y — is
+        // deliberately unstitched, not a hole in the visible surface. Any
+        // other unmatched edge is a real gap.
+        const [aStr, bStr] = edgeKey.split('|');
+        const aY = parseFloat(aStr!.split(',')[1]!);
+        const bY = parseFloat(bStr!.split(',')[1]!);
+        if (Math.abs(aY - minY) < 1e-3 && Math.abs(bY - minY) < 1e-3) continue;
+        return false;
       }
       return edgeCounts.size > 0;
     }
@@ -654,6 +708,343 @@ describe('TerrainMesh', () => {
     expect(tm.sharedMaterial).toBeInstanceOf(TerrainMaterial);
     expect(tm.sharedMaterial.customUniforms['uPlayRect']).toBeUndefined();
     tm.dispose();
+  });
+
+  // ─── #560: depth-limited perimeter skirt + chunk-skip ──────────────────
+
+  describe('boundarySkirtFloorY (direct method contract, #560)', () => {
+    const RECT = { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+
+    it('returns null for an interior column (owned neighbours on all four sides), regardless of sampler', () => {
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      tm.setEdgeHeightSampler(() => 10);
+      expect(skirtInternals(tm).boundarySkirtFloorY(8, 8, RECT, true, true, true, true)).toBeNull();
+      tm.dispose();
+    });
+
+    it('returns null (full-depth fallback) when no sampler is installed, even at a true boundary column', () => {
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      // The halo column rebuildChunk actually marches on the west side when
+      // !hasWest is rect.minX - 1, not rect.minX itself — see the method's
+      // own doc comment ("same coordinates rebuildChunk's xStart/... use").
+      expect(skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true)).toBeNull();
+      tm.dispose();
+    });
+
+    it("returns the sampled neighbour height minus SKIRT_VISIBILITY_MARGIN_M for a column bordering unclaimed land on exactly one side", () => {
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      tm.setEdgeHeightSampler(() => 20);
+      // x = rect.minX - 1 is the actual west halo column the march visits (see above).
+      const floor = skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true);
+      expect(floor).toBeCloseTo(20 - SKIRT_VISIBILITY_MARGIN_M, 6);
+      tm.dispose();
+    });
+
+    it("at a site corner (unclaimed on two sides), returns the minimum (deepest) of the two applicable sides' floors", () => {
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      // West neighbour reads much deeper (lower cutoff) than north.
+      tm.setEdgeHeightSampler((x) => (x < 0 ? 5 : 25));
+      // (rect.minX - 1, rect.minZ - 1) is the actual corner halo cell both
+      // the west and north loop extensions visit together.
+      const floor = skirtInternals(tm).boundarySkirtFloorY(-1, -1, RECT, false, true, false, true);
+      expect(floor).toBeCloseTo(5 - SKIRT_VISIBILITY_MARGIN_M, 6);
+      tm.dispose();
+    });
+
+    it('falls back to null (no cutoff) rather than returning NaN when the sampler reports an unusable value', () => {
+      const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+      tm.setEdgeHeightSampler(() => NaN);
+      const floor = skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true);
+      expect(floor).toBeNull();
+      tm.dispose();
+    });
+  });
+
+  describe('canSkipChunkMarch (direct method contract, #560)', () => {
+    it('returns true for a chunk with no marchable geometry anywhere (uniformly solid, fully enclosed on every side)', () => {
+      const grid = fullySolidMultiChunkGrid();
+      const tm = new TerrainMesh(makeScene(), grid);
+      const rect = grid.chunkRect(1, 1)!;
+      expect(skirtInternals(tm).canSkipChunkMarch(1, 0, 1, rect)).toBe(true);
+      tm.dispose();
+    });
+
+    it('returns false for a chunk that genuinely contains a surface (never a false positive)', () => {
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE);
+      for (let x = 0; x < CHUNK_SIZE; x++)
+        for (let y = 0; y < CHUNK_SIZE / 2; y++)
+          for (let z = 0; z < CHUNK_SIZE; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(makeScene(), grid);
+      const rect = grid.chunkRect(0, 0)!;
+      expect(skirtInternals(tm).canSkipChunkMarch(0, 0, 0, rect)).toBe(false);
+      tm.dispose();
+    });
+
+    it('returns false for a fully-solid boundary chunk when no sampler is installed (full-depth fallback still needs the wall)', () => {
+      // Single chunk footprint (boundary on all four sides), 2 y-chunks tall
+      // and solid throughout, so chunk cy=0 has no top surface of its own —
+      // isolating the "boundary wall still needed" reason from "has a real surface".
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      for (let x = 0; x < CHUNK_SIZE; x++)
+        for (let y = 0; y < CHUNK_SIZE * 2; y++)
+          for (let z = 0; z < CHUNK_SIZE; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(makeScene(), grid);
+      const rect = grid.chunkRect(0, 0)!;
+      expect(skirtInternals(tm).canSkipChunkMarch(0, 0, 0, rect)).toBe(false);
+      tm.dispose();
+    });
+  });
+
+  describe('boundary/skirt walls without a sampler still march full depth (#560 fallback)', () => {
+    function flatSiteLocal(size: number, surfaceY: number): VoxelGrid {
+      const grid = new VoxelGrid(size, size, size);
+      for (let x = 0; x < size; x++)
+        for (let y = 0; y < surfaceY; y++)
+          for (let z = 0; z < size; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    it('reaches the bottom of the grid (y=0) when no EdgeHeightSampler is installed', () => {
+      const scene = makeScene();
+      const size = 8;
+      const tm = new TerrainMesh(scene, flatSiteLocal(size, 4));
+      tm.buildAll();
+      let minY = Infinity;
+      for (const mesh of tm.meshes) {
+        const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < pos.length; i += 3) minY = Math.min(minY, pos[i + 1]!);
+      }
+      expect(minY).toBeLessThanOrEqual(0 + 1e-6);
+      tm.dispose();
+    });
+  });
+
+  describe('EdgeHeightSampler depth-limits the skirt (#560)', () => {
+    const SIZE = 8;
+    const SURFACE_Y = 30;
+    const DEEP_SIZE_Y = 40;
+
+    function deepFlatSite(): VoxelGrid {
+      const grid = new VoxelGrid(SIZE, DEEP_SIZE_Y, SIZE);
+      for (let x = 0; x < SIZE; x++)
+        for (let y = 0; y < SURFACE_Y; y++)
+          for (let z = 0; z < SIZE; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    it('with a sampler reporting the neighbour ground near the site surface, total vertex count is strictly less than with no sampler installed', () => {
+      const sceneA = makeScene();
+      const tmA = new TerrainMesh(sceneA, deepFlatSite());
+      tmA.buildAll(); // no sampler — full-depth fallback
+      const withoutSampler = tmA.getBounds()?.vertexCount ?? 0;
+      tmA.dispose();
+
+      const sceneB = makeScene();
+      const tmB = new TerrainMesh(sceneB, deepFlatSite());
+      tmB.setEdgeHeightSampler(() => SURFACE_Y - 0.5); // neighbour ground right at the site's own surface
+      tmB.buildAll();
+      const withSampler = tmB.getBounds()?.vertexCount ?? 0;
+      tmB.dispose();
+
+      expect(withSampler).toBeGreaterThan(0);
+      expect(withSampler).toBeLessThan(withoutSampler);
+    });
+
+    it('a blast crater at the site edge stays closed (no see-through gap) with a sampler installed and the skirt depth-limited', () => {
+      function flatSiteLocal(size: number, surfaceY: number): VoxelGrid {
+        const grid = new VoxelGrid(size, size, size);
+        for (let x = 0; x < size; x++)
+          for (let y = 0; y < surfaceY; y++)
+            for (let z = 0; z < size; z++)
+              grid.setVoxel(x, y, z, makeSolidVoxel());
+        return grid;
+      }
+      function maxVertexXLocal(scene: THREE.Scene): number {
+        let m = -Infinity;
+        for (const child of scene.children) {
+          const geo = (child as THREE.Mesh).geometry;
+          if (!geo) continue;
+          const pos = geo.getAttribute('position').array as Float32Array;
+          for (let i = 0; i < pos.length; i += 3) m = Math.max(m, pos[i]!);
+        }
+        return m;
+      }
+
+      const scene = makeScene();
+      const size = 8;
+      const grid = flatSiteLocal(size, 4);
+      const tm = new TerrainMesh(scene, grid);
+      tm.setEdgeHeightSampler(() => 3.5); // neighbour ground reported at the same height as the site surface
+      tm.buildAll();
+
+      for (let y = 0; y < 4; y++) {
+        for (let z = 2; z < 5; z++) {
+          grid.clearVoxel(size - 1, y, z);
+          grid.clearVoxel(size - 2, y, z);
+        }
+      }
+      tm.remeshRegion({ minX: size - 2, minY: 0, minZ: 2, maxX: size - 1, maxY: 3, maxZ: 4 });
+
+      expect(maxVertexXLocal(scene)).toBeGreaterThanOrEqual(size - 0.5 - 1e-4);
+      tm.dispose();
+    });
+  });
+
+  describe('canSkipChunkMarch — chunk-skip via VoxelGrid density summary (#560)', () => {
+    it('a fully-solid interior chunk (all 4 neighbours owned, no surface anywhere in its slab) is skipped without marching a single cube', () => {
+      const scene = makeScene();
+      const grid = fullySolidMultiChunkGrid();
+      const marchSpy = vi.spyOn(TerrainMesh.prototype as unknown as { marchCube: (...args: unknown[]) => void }, 'marchCube');
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+
+      expect(tm.getChunkMesh(1, 0, 1)).toBeNull();
+
+      // Chunk (1, 0, 1) owns exactly x:16..31, y:0..15, z:16..31 (CHUNK_SIZE=16)
+      // and has an owned neighbour on every horizontal side, so no other
+      // chunk's own halo march ever needs to touch this region either.
+      const rect = grid.chunkRect(1, 1)!;
+      const touchedSkippedChunk = marchSpy.mock.calls.some((args) => {
+        const [x, y, z] = args as [number, number, number];
+        return x >= rect.minX && x < rect.maxX && y >= 0 && y < CHUNK_SIZE && z >= rect.minZ && z < rect.maxZ;
+      });
+      expect(touchedSkippedChunk).toBe(false);
+
+      marchSpy.mockRestore();
+      tm.dispose();
+    });
+
+    it('a fully-solid boundary chunk entirely below the sampled skirt floor is also skipped', () => {
+      // Single chunk footprint (boundary on every side), 2 y-chunks tall,
+      // solid throughout. Neighbour ground reported at y=22 -> skirt floor
+      // ~= 22 - SKIRT_VISIBILITY_MARGIN_M = 20, comfortably above chunk
+      // cy=0's own span (0..15).
+      const scene = makeScene();
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      for (let x = 0; x < CHUNK_SIZE; x++)
+        for (let y = 0; y < CHUNK_SIZE * 2; y++)
+          for (let z = 0; z < CHUNK_SIZE; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(scene, grid);
+      tm.setEdgeHeightSampler(() => 22);
+      tm.buildAll();
+      expect(tm.getChunkMesh(0, 0, 0)).toBeNull();
+      tm.dispose();
+    });
+
+    it('a boundary chunk straddling the skirt cutoff is NOT skipped', () => {
+      const scene = makeScene();
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      for (let x = 0; x < CHUNK_SIZE; x++)
+        for (let y = 0; y < CHUNK_SIZE * 2; y++)
+          for (let z = 0; z < CHUNK_SIZE; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(scene, grid);
+      tm.setEdgeHeightSampler(() => 22); // cutoff ~20, inside chunk cy=1's own span (16..31)
+      tm.buildAll();
+      expect(tm.getChunkMesh(0, 1, 0)).not.toBeNull();
+      tm.dispose();
+    });
+
+    it('a chunk that becomes mixed after a blast (density crosses SURFACE_THRESHOLD in its own slab) is re-marched on the next rebuild, not left stale from a prior skip', () => {
+      const scene = makeScene();
+      const grid = fullySolidMultiChunkGrid();
+      const tm = new TerrainMesh(scene, grid);
+      tm.buildAll();
+      expect(tm.getChunkMesh(1, 0, 1)).toBeNull(); // provably solid interior, skipped
+
+      // Carve a small air pocket well inside chunk (1, 0, 1)'s own span
+      // (x:16..31, y:0..15, z:16..31).
+      for (let y = 4; y < 8; y++) grid.clearVoxel(20, y, 20);
+      tm.remeshRegion({ minX: 19, minY: 3, minZ: 19, maxX: 21, maxY: 8, maxZ: 21 });
+
+      expect(tm.getChunkMesh(1, 0, 1)).not.toBeNull();
+      tm.dispose();
+    });
+  });
+
+  describe('boundarySkirtFloorY corner columns use the minimum (deepest) applicable floor (#560)', () => {
+    // Single chunk footprint -> (0,0) is the grid's own NW corner, bordering
+    // unclaimed land on both west and north. 2 y-chunks tall, solid
+    // throughout, so there's no top-surface confound near the corner's own
+    // deep cutoff.
+    function tallCornerColumn(): VoxelGrid {
+      const grid = new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE * 2, CHUNK_SIZE);
+      for (let x = 0; x < CHUNK_SIZE; x++)
+        for (let y = 0; y < CHUNK_SIZE * 2; y++)
+          for (let z = 0; z < CHUNK_SIZE; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      return grid;
+    }
+
+    /** Lowest Y reached by any wall vertex within a small window around the grid's NW corner. */
+    function minCornerWallY(scene: THREE.Scene): number {
+      let m = Infinity;
+      for (const child of scene.children) {
+        const geo = (child as THREE.Mesh).geometry;
+        if (!geo) continue;
+        const pos = geo.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < pos.length; i += 3) {
+          const x = pos[i]!, y = pos[i + 1]!, z = pos[i + 2]!;
+          if (x <= 1 && z <= 1) m = Math.min(m, y);
+        }
+      }
+      return m;
+    }
+
+    it("a corner column bordering unclaimed land on two sides reaches down to the deeper of the two sides' floors", () => {
+      // Shallow uniform sampler: both directions read the same high (shallow) neighbour height.
+      const sceneShallow = makeScene();
+      const tmShallow = new TerrainMesh(sceneShallow, tallCornerColumn());
+      tmShallow.setEdgeHeightSampler(() => 25);
+      tmShallow.buildAll();
+      const shallowMinY = minCornerWallY(sceneShallow);
+      tmShallow.dispose();
+
+      // West much deeper than north: the corner must follow the deeper
+      // (west) side, not the shallow one.
+      const sceneCorner = makeScene();
+      const tmCorner = new TerrainMesh(sceneCorner, tallCornerColumn());
+      tmCorner.setEdgeHeightSampler((x) => (x < 0 ? 5 : 25));
+      tmCorner.buildAll();
+      const cornerMinY = minCornerWallY(sceneCorner);
+      tmCorner.dispose();
+
+      expect(cornerMinY).toBeLessThan(shallowMinY);
+    });
+  });
+
+  describe('EdgeHeightSampler robustness (#560)', () => {
+    it('a NaN sampler value falls back to full depth instead of propagating NaN into the emitted geometry', () => {
+      const scene = makeScene();
+      const size = 8;
+      const grid = new VoxelGrid(size, size, size);
+      for (let x = 0; x < size; x++)
+        for (let y = 0; y < 4; y++)
+          for (let z = 0; z < size; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(scene, grid);
+      tm.setEdgeHeightSampler(() => NaN);
+      expect(() => tm.buildAll()).not.toThrow();
+
+      let minY = Infinity;
+      for (const mesh of tm.meshes) {
+        const pos = mesh.geometry.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < pos.length; i += 3) {
+          expect(Number.isNaN(pos[i]!)).toBe(false);
+          expect(Number.isNaN(pos[i + 1]!)).toBe(false);
+          expect(Number.isNaN(pos[i + 2]!)).toBe(false);
+          minY = Math.min(minY, pos[i + 1]!);
+        }
+      }
+      // No cutoff applied — full-depth fallback, same as no sampler installed at all.
+      expect(minY).toBeLessThanOrEqual(0 + 1e-6);
+      tm.dispose();
+    });
   });
 });
 

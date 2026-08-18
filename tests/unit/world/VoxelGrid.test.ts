@@ -373,6 +373,79 @@ describe('VoxelGrid — dirty-chunk tracking (#473 D4)', () => {
   });
 });
 
+describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#560)', () => {
+  it('returns {min:0, max:0} for a freshly claimed, ungenerated chunk', () => {
+    const grid = new VoxelGrid(32, 8, 32); // 2x2 chunks, sizeY=8 -> nSlabs=1
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 0 });
+    expect(grid.chunkDensityRange(1, 1, 0)).toEqual({ min: 0, max: 0 });
+  });
+
+  it('widens min/max to include fillVoxel, setVoxel, and clearVoxel writes into a given y-slab', () => {
+    const grid = new VoxelGrid(16, 8, 16); // 1 chunk, nSlabs=1
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 0 });
+
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(1, 1, 1, compId); // density defaults to 1.0
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 1 });
+
+    grid.setVoxel(2, 2, 2, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] },
+      density: 0.4,
+      oreDensities: {},
+      fractureModifier: 1,
+    });
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 1 }); // 0.4 is within the already-observed [0,1] range
+
+    grid.clearVoxel(1, 1, 1); // density -> 0, but the summary never narrows back down
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 1 });
+  });
+
+  it('once a slab is observed mixed (min=0, max=1), a later write that would locally narrow it leaves the summary widened', () => {
+    const grid = new VoxelGrid(16, 8, 16);
+    const compId = grid.palette.intern({ rocks: [{ rockId: 'cruite', coefficient: 1 }] });
+    grid.fillVoxel(5, 5, 5, compId); // density 1.0 -> widens the slab to {min:0, max:1}
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 1 });
+
+    // A write of a mid-range density, taken in isolation, would suggest a
+    // narrower [0.3, 0.3] range for this one voxel -- but the slab's own
+    // summary must stay at its already-widened [0, 1], not shrink to match
+    // the most recent write.
+    grid.setVoxel(6, 5, 5, {
+      composition: { rocks: [{ rockId: 'cruite', coefficient: 1 }] },
+      density: 0.3,
+      oreDensities: {},
+      fractureModifier: 1,
+    });
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0, max: 1 });
+  });
+
+  it('restoreChunkRaw fully rescans the density summary rather than leaving it stale', () => {
+    const grid = new VoxelGrid(16, 8, 16); // 1 chunk, nSlabs=1
+    const n = CHUNK_SIZE * grid.sizeY * CHUNK_SIZE;
+    // Every restored voxel counts toward the rescan (even the ones left at
+    // their default), so the array must be filled throughout: a mostly-zero
+    // array's true minimum really is 0, not whatever floor value a couple of
+    // cells happen to poke — that would be asserting a bound the input data
+    // doesn't actually have.
+    const density = new Float64Array(n).fill(0.15);
+    const compId = new Uint16Array(n);
+    const fracture = new Float64Array(n).fill(1.0);
+    // Local index formula mirrors VoxelGrid's own: lx + y*CHUNK_SIZE + lz*CHUNK_SIZE*sizeY.
+    const idx = (lx: number, y: number, lz: number): number => lx + y * CHUNK_SIZE + lz * CHUNK_SIZE * grid.sizeY;
+    density[idx(1, 1, 1)] = 0.85;
+
+    grid.restoreChunkRaw(0, 0, { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE }, density, compId, fracture, new Map());
+
+    expect(grid.chunkDensityRange(0, 0, 0)).toEqual({ min: 0.15, max: 0.85 });
+  });
+
+  it("returns null for an unowned chunk, and for a slab index past the grid's height", () => {
+    const grid = new VoxelGrid(16, 8, 16); // nSlabs = ceil(8/16) = 1 -> only slab 0 exists
+    expect(grid.chunkDensityRange(5, 5, 0)).toBeNull(); // chunk (5,5) was never claimed
+    expect(grid.chunkDensityRange(0, 0, 1)).toBeNull(); // slab 1 doesn't exist for an 8-tall grid
+  });
+});
+
 describe('computeVoxelColumnSurfaceY', () => {
   it('finds the highest solid voxel in a column', () => {
     const grid = new VoxelGrid(16, 8, 16);
