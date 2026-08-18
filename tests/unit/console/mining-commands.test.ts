@@ -8,6 +8,7 @@ import {
   blastPreviewCommand,
   buildRampCommand,
   buySoftwareCommand,
+  cancelRampCommand,
   chargeCommand,
   drillPlanCommand,
   sequenceCommand,
@@ -19,10 +20,12 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { Random } from '../../../src/core/math/Random.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
-import { RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
+import { RAMP_COST_PER_METER, carveRampSegment } from '../../../src/core/mining/Ramp.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
 import { MIN_STEMMING_M } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
+import { employeeCommand } from '../../../src/console/commands/employees.js';
+import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
 
 function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
@@ -1118,5 +1121,142 @@ describe('buildRampCommand', () => {
     const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '5' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
+  });
+});
+
+// ── build_ramp cancel (#555 code review — no coverage before this) ─────────
+// Mirrors #553/#554's drill_hole/charge_hole cancel coverage
+// (charge-plan-queueing.test.ts's "employee cancel <id>" describe block):
+// cancelling a ramp order must keep already-carved terrain carved, refund
+// only the unspent remainder, clear the PlannedRamp/ghosts, and the generic
+// `employee cancel <id>` path (Operations panel single-segment cancel) must
+// touch only the one segment cancelled, not the whole ramp.
+//
+// Segment 0 is completed the same way the real tick-completion handler
+// (console/commands/events.ts's 'dig_ramp_segment' branch) does — carving its
+// cells via carveRampSegment and marking its RampSegmentTracker.done — rather
+// than driving a full navmesh walk through `tick`, which is exercised
+// end-to-end by GameLoop.test.ts's dig_ramp_segment describe block already.
+describe('build_ramp cancel / employee cancel — ramp segment cancellation (#555)', () => {
+  /**
+   * Marks ramp segment `index` as carved-and-done, exactly like the real
+   * tick-completion handler (console/commands/events.ts's 'tick' handler):
+   * carve the cells, remove the now-finished PendingAction/ghost via
+   * completePendingAction (already done by the time that handler's own
+   * 'dig_ramp_segment' branch runs), then mark the tracker done.
+   */
+  function completeSegment(ctx: MiningContext, rampId: number, index: number): void {
+    const ramp = ctx.state!.plannedRamps.find(r => r.id === rampId)!;
+    const tracker = ramp.segments.find(s => s.index === index)!;
+    carveRampSegment(ctx.grid!, { index, cells: tracker.cells, region: tracker.region });
+    completePendingAction(ctx.state!, tracker.actionId);
+    tracker.done = true;
+  }
+
+  it('cancelling a partially-dug ramp keeps already-carved cells carved and refunds only the undone segments', () => {
+    const ctx = makeMiningContext();
+
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    expect(buildResult.success).toBe(true);
+    const ramp = ctx.state!.plannedRamps[0]!;
+    const rampId = ramp.id;
+    const totalSegments = ramp.segments.length;
+    expect(totalSegments).toBeGreaterThan(1);
+
+    // Complete segment 0 for real — carve its cells and mark it done — before
+    // the ramp is ever cancelled.
+    const doneSegment = ramp.segments[0]!;
+    completeSegment(ctx, rampId, doneSegment.index);
+    for (const cell of doneSegment.cells) {
+      expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+    }
+
+    const cashBeforeCancel = ctx.state!.cash;
+    const undoneCount = totalSegments - 1;
+
+    const result = cancelRampCommand(ctx, rampId);
+
+    expect(result.success).toBe(true);
+    // Only the undone segments' cost comes back — the done segment's share
+    // was already spent on real, carved terrain.
+    expect(ctx.state!.cash).toBe(cashBeforeCancel + undoneCount * RAMP_COST_PER_METER);
+    expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
+
+    // Already-carved terrain is untouched by the cancel.
+    for (const cell of doneSegment.cells) {
+      expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+    }
+
+    // The PlannedRamp is gone entirely.
+    expect(ctx.state!.plannedRamps.find(r => r.id === rampId)).toBeUndefined();
+
+    // No dig_ramp_segment action or ghost survives for this ramp.
+    const remainingActions = ctx.state!.pendingActions.filter(
+      a => a.type === 'dig_ramp_segment' && a.payload['rampId'] === rampId,
+    );
+    expect(remainingActions).toHaveLength(0);
+    const remainingGhosts = ctx.state!.ghostPreviews.filter(g =>
+      remainingActions.some(a => a.id === g.id),
+    );
+    expect(remainingGhosts).toHaveLength(0);
+  });
+
+  it('cancelling a non-existent ramp id fails cleanly with no state change', () => {
+    const ctx = makeMiningContext();
+    buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+    const actionsBefore = ctx.state!.pendingActions.length;
+
+    const result = cancelRampCommand(ctx, 999999);
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Ramp #999999 not found');
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps).toHaveLength(rampsBefore);
+    expect(ctx.state!.pendingActions).toHaveLength(actionsBefore);
+  });
+
+  it('the generic "employee cancel <id>" path cancels only one segment of a multi-segment ramp, leaving the rest untouched', () => {
+    const ctx = makeMiningContext();
+
+    const buildResult = buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '5', depth: '8' });
+    expect(buildResult.success).toBe(true);
+    const ramp = ctx.state!.plannedRamps[0]!;
+    const rampId = ramp.id;
+    const totalSegments = ramp.segments.length;
+    expect(totalSegments).toBeGreaterThan(1);
+
+    // Cancel segment index 1 (still queued — segment 0 is the only one
+    // claimable first, per isRampSegmentClaimable) via the generic
+    // Operations-panel cancel path, not build_ramp's own cancel command.
+    const targetTracker = ramp.segments.find(s => s.index === 1)!;
+    const otherTrackers = ramp.segments.filter(s => s.index !== 1);
+    const cashBefore = ctx.state!.cash;
+
+    const result = employeeCommand(ctx, ['cancel', String(targetTracker.actionId)], {});
+
+    expect(result.success).toBe(true);
+    // Only that one segment's cost is refunded.
+    expect(ctx.state!.cash).toBe(cashBefore + RAMP_COST_PER_METER);
+    expect(ctx.state!.finances.cash).toBe(ctx.state!.cash);
+
+    // The PlannedRamp survives — other segments remain outstanding.
+    const survivingRamp = ctx.state!.plannedRamps.find(r => r.id === rampId);
+    expect(survivingRamp).toBeDefined();
+    expect(survivingRamp!.segments.find(s => s.index === 1)).toBeUndefined();
+    expect(survivingRamp!.segments).toHaveLength(totalSegments - 1);
+
+    // Every other segment's own tracking is unaffected.
+    for (const other of otherTrackers) {
+      const stillThere = survivingRamp!.segments.find(s => s.index === other.index);
+      expect(stillThere).toEqual(other);
+      const stillQueued = ctx.state!.pendingActions.find(a => a.id === other.actionId);
+      expect(stillQueued).toBeDefined();
+    }
+
+    // The cancelled segment's own action/ghost are gone.
+    expect(ctx.state!.pendingActions.find(a => a.id === targetTracker.actionId)).toBeUndefined();
+    expect(ctx.state!.ghostPreviews.find(g => g.id === targetTracker.actionId)).toBeUndefined();
   });
 });

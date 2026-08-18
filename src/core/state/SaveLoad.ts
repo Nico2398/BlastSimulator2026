@@ -3,6 +3,7 @@
 
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
+import { SCORE_DECAY_RATE } from '../config/balance.js';
 
 /**
  * Serialize a GameState to a JSON string.
@@ -101,8 +102,16 @@ function migrateV11ToV12(obj: Record<string, unknown>): Record<string, unknown> 
  * order queues one `dig_ramp_segment` action per segment instead of carving
  * voxels into the grid instantly). A pre-v13 save has no ramps in flight —
  * `plannedRamps` defaults to an empty array and `nextPlannedRampId` to 1,
- * matching `createGame`'s own defaults. Mutates `obj` in place, matching
- * every other migration block in `deserialize` below.
+ * matching `createGame`'s own defaults.
+ *
+ * The same #555 branch also added `ScoreState.decayRate` and
+ * `RevoltState.immune`, both persisted verbatim (no dedicated migration
+ * version bump). A pre-v13 save's `scores`/`revolt` objects predate both
+ * fields — leaving `decayRate` undefined turns every future `applyDecay`
+ * call into `value +/- undefined` (NaN), which never recovers (ScoreManager.ts).
+ * Default them here to `createGame`'s own defaults: `SCORE_DECAY_RATE` for
+ * `decayRate`, `false` for `immune`. Mutates `obj` in place, matching every
+ * other migration block in `deserialize` below.
  */
 function migrateV12ToV13(obj: Record<string, unknown>): Record<string, unknown> {
   if (!Array.isArray(obj['plannedRamps'])) {
@@ -110,6 +119,14 @@ function migrateV12ToV13(obj: Record<string, unknown>): Record<string, unknown> 
   }
   if (typeof obj['nextPlannedRampId'] !== 'number') {
     obj['nextPlannedRampId'] = 1;
+  }
+  const scoresRaw = obj['scores'] as Record<string, unknown> | undefined;
+  if (scoresRaw && typeof scoresRaw['decayRate'] !== 'number') {
+    scoresRaw['decayRate'] = SCORE_DECAY_RATE;
+  }
+  const revoltRaw = obj['revolt'] as Record<string, unknown> | undefined;
+  if (revoltRaw && typeof revoltRaw['immune'] !== 'boolean') {
+    revoltRaw['immune'] = false;
   }
   return obj;
 }

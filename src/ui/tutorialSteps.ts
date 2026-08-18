@@ -168,11 +168,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     highlightTarget: TOOLBAR_TARGET.employees,
     tickBudget: 25,
     waitsOnWork: true,
-    isComplete: (state: GameState) => getEmployees(state).some((e) => {
-      const raw = e as unknown as Record<string, unknown>;
-      const quals = raw.qualifications as Array<{ category: string }> | undefined;
-      return (quals ?? []).some((q) => q.category === 'driving.excavator');
-    }),
+    isComplete: (state: GameState) => (state.employees?.employees ?? []).some((e) =>
+      e.qualifications.some((q) => q.category === 'driving.excavator'),
+    ),
   },
 
   // ── Step 3f: buy-rock-digger-assign ──
