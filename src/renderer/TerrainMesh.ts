@@ -420,30 +420,30 @@ export class TerrainMesh {
       this.chunks.set(key, null);
       return 0;
     }
+    if (this.canSkipChunkMarch(cx, cy, cz, rect)) {
+      this.chunks.set(key, null);
+      return 0;
+    }
     const oy = cy * CHUNK_SIZE;
     // Extend one cube outward only where no owned chunk lies beyond that
     // side: an owned neighbour marches those cubes itself, and marching them
     // twice would emit the interior wall between two claimed chunks.
-    const xStart = this.grid.hasChunk(cx - 1, cz) ? rect.minX : rect.minX - 1;
-    const zStart = this.grid.hasChunk(cx, cz - 1) ? rect.minZ : rect.minZ - 1;
+    const hasWest = this.grid.hasChunk(cx - 1, cz);
+    const hasEast = this.grid.hasChunk(cx + 1, cz);
+    const hasNorth = this.grid.hasChunk(cx, cz - 1);
+    const hasSouth = this.grid.hasChunk(cx, cz + 1);
+    const xStart = hasWest ? rect.minX : rect.minX - 1;
+    const zStart = hasNorth ? rect.minZ : rect.minZ - 1;
     const yStart = oy;
     const xEnd = rect.maxX;
     const zEnd = rect.maxZ;
     const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
 
-    // TODO(#560): call this.canSkipChunkMarch(cx, cy, cz, rect) here — return
-    // early (chunks.set(key, null); return 0;) when it's true.
-    // TODO(#560): call this.boundarySkirtFloorY(x, z, rect, hasWest, hasEast,
-    // hasNorth, hasSouth) per boundary column and clamp the y loop's lower
-    // bound to it, instead of marching the skirt wall all the way to y=0.
-    // Referenced (not called) here only so the skeleton stubs below aren't
-    // flagged as unused before implementer wires them in.
-    void this.canSkipChunkMarch;
-    void this.boundarySkirtFloorY;
-
     for (let z = zStart; z < zEnd; z++) {
       for (let y = yStart; y < yEnd; y++) {
         for (let x = xStart; x < xEnd; x++) {
+          const floorY = this.boundarySkirtFloorY(x, z, rect, hasWest, hasEast, hasNorth, hasSouth);
+          if (floorY !== null && y + 1 < floorY) continue;
           this.marchCube(x, y, z, positions, rockA, rockB, rockWeight, ore);
         }
       }
@@ -486,11 +486,36 @@ export class TerrainMesh {
    * corner) returns the minimum of the applicable sides' floors (#560).
    */
   private boundarySkirtFloorY(
-    _x: number, _z: number,
-    _rect: { minX: number; minZ: number; maxX: number; maxZ: number },
-    _hasWest: boolean, _hasEast: boolean, _hasNorth: boolean, _hasSouth: boolean,
+    x: number, z: number,
+    rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+    hasWest: boolean, hasEast: boolean, hasNorth: boolean, hasSouth: boolean,
   ): number | null {
-    throw new Error('not implemented');
+    // A column borders unclaimed land on a side exactly when it's the halo
+    // column the march reaches into on that side (same coordinates
+    // rebuildChunk's xStart/zStart/xEnd/zEnd already use).
+    const bordersWest = !hasWest && x === rect.minX - 1;
+    const bordersEast = !hasEast && x === rect.maxX - 1;
+    const bordersNorth = !hasNorth && z === rect.minZ - 1;
+    const bordersSouth = !hasSouth && z === rect.maxZ - 1;
+    if (!bordersWest && !bordersEast && !bordersNorth && !bordersSouth) return null;
+    if (!this.edgeHeightSampler) return null;
+
+    let floor: number | null = null;
+    const consider = (sampleX: number, sampleZ: number): void => {
+      const h = this.edgeHeightSampler!(sampleX, sampleZ);
+      if (!Number.isFinite(h)) return;
+      const f = Math.floor(h) - SKIRT_VISIBILITY_MARGIN_M;
+      if (floor === null || f < floor) floor = f;
+    };
+    // West/north halo columns are already at the sampling coordinate; east/
+    // south need the neighbour column one past this chunk's owned rect,
+    // since the march's own loop bound stops at the last owned column.
+    if (bordersWest) consider(x, z);
+    if (bordersEast) consider(rect.maxX, z);
+    if (bordersNorth) consider(x, z);
+    if (bordersSouth) consider(x, rect.maxZ);
+
+    return floor;
   }
 
   /**
@@ -499,10 +524,56 @@ export class TerrainMesh {
    * False always falls through to the normal march — never a false positive.
    */
   private canSkipChunkMarch(
-    _cx: number, _cy: number, _cz: number,
-    _rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+    cx: number, cy: number, cz: number,
+    rect: { minX: number; minZ: number; maxX: number; maxZ: number },
   ): boolean {
-    throw new Error('not implemented');
+    const range = this.grid.chunkDensityRange(cx, cz, cy);
+    if (!range) return false;
+    if (range.max < SURFACE_THRESHOLD) return true; // uniformly air
+    if (range.min < SURFACE_THRESHOLD) return false; // genuinely mixed — a surface crosses this slab
+
+    // Uniformly solid. A fully interior chunk never emits geometry.
+    const hasWest = this.grid.hasChunk(cx - 1, cz);
+    const hasEast = this.grid.hasChunk(cx + 1, cz);
+    const hasNorth = this.grid.hasChunk(cx, cz - 1);
+    const hasSouth = this.grid.hasChunk(cx, cz + 1);
+    if (hasWest && hasEast && hasNorth && hasSouth) return true;
+
+    // Boundary chunk: only skippable if every bordering edge column proves a
+    // skirt cutoff above this slab, and this slab sits entirely below it.
+    if (!this.edgeHeightSampler) return false;
+
+    let deepestFloor = Infinity;
+    const consider = (x: number, z: number): boolean => {
+      const floorY = this.boundarySkirtFloorY(x, z, rect, hasWest, hasEast, hasNorth, hasSouth);
+      if (floorY === null) return false;
+      if (floorY < deepestFloor) deepestFloor = floorY;
+      return true;
+    };
+
+    if (!hasWest) {
+      for (let z = rect.minZ; z < rect.maxZ; z++) {
+        if (!consider(rect.minX - 1, z)) return false;
+      }
+    }
+    if (!hasEast) {
+      for (let z = rect.minZ; z < rect.maxZ; z++) {
+        if (!consider(rect.maxX - 1, z)) return false;
+      }
+    }
+    if (!hasNorth) {
+      for (let x = rect.minX; x < rect.maxX; x++) {
+        if (!consider(x, rect.minZ - 1)) return false;
+      }
+    }
+    if (!hasSouth) {
+      for (let x = rect.minX; x < rect.maxX; x++) {
+        if (!consider(x, rect.maxZ - 1)) return false;
+      }
+    }
+
+    const slabTop = Math.min((cy + 1) * CHUNK_SIZE, this.grid.sizeY);
+    return slabTop < deepestFloor;
   }
 
   private marchCube(

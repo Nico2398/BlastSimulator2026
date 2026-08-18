@@ -407,9 +407,9 @@ export class VoxelGrid {
       compId: new Uint16Array(n),
       fracture: new Float64Array(n).fill(1.0),
       ores: new Map(),
-      // TODO(#560): implementer decides the correct initial min/max fill
-      // (e.g. min=1/max=0 sentinel vs. 0/0) once touchDensity's widening
-      // convention is implemented.
+      // Zero-filled (min=0, max=0): honest, not a placeholder — every voxel
+      // in a freshly allocated chunk really is air (density 0) until
+      // generation writes it, and touchDensity only widens from here (#560).
       slabMinDensity: new Float64Array(nSlabs),
       slabMaxDensity: new Float64Array(nSlabs),
     };
@@ -443,13 +443,19 @@ export class VoxelGrid {
    * except on a full reload (#560). Returns null for an unowned chunk or a
    * slab index past the grid's height.
    */
-  chunkDensityRange(_cx: number, _cz: number, _slabIndex: number): { min: number; max: number } | null {
-    throw new Error('not implemented');
+  chunkDensityRange(cx: number, cz: number, slabIndex: number): { min: number; max: number } | null {
+    const chunk = this.chunks.get(chunkKey(cx, cz));
+    if (!chunk) return null;
+    if (slabIndex < 0 || slabIndex >= chunk.slabMinDensity.length) return null;
+    return { min: chunk.slabMinDensity[slabIndex]!, max: chunk.slabMaxDensity[slabIndex]! };
   }
 
   /** Widens chunk's per-slab min/max density summary to include a write of `density` at world y (#560). */
-  private touchDensity(_chunk: VoxelChunk, _y: number, _density: number): void {
-    throw new Error('not implemented');
+  private touchDensity(chunk: VoxelChunk, y: number, density: number): void {
+    const slab = Math.floor(y / CHUNK_SIZE);
+    if (slab < 0 || slab >= chunk.slabMinDensity.length) return;
+    if (density < chunk.slabMinDensity[slab]!) chunk.slabMinDensity[slab] = density;
+    if (density > chunk.slabMaxDensity[slab]!) chunk.slabMaxDensity[slab] = density;
   }
 
   // ── Dirty tracking — what a save has to store voxel-by-voxel (#473 D4) ──
@@ -547,10 +553,7 @@ export class VoxelGrid {
     if (ores && Object.keys(ores).length > 0) chunk.ores.set(i, { ...ores });
     else chunk.ores.delete(i);
     this.touch(chunk);
-    // TODO(#560): call touchDensity(chunk, y, density) here. Referenced (not
-    // called) below only so the skeleton stub isn't flagged as unused before
-    // implementer wires it in.
-    void this.touchDensity;
+    this.touchDensity(chunk, y, density);
   }
 
   setFractureAt(x: number, y: number, z: number, value: number): void {
@@ -601,7 +604,7 @@ export class VoxelGrid {
     if (Object.keys(voxel.oreDensities).length > 0) chunk.ores.set(i, { ...voxel.oreDensities });
     else chunk.ores.delete(i);
     this.touch(chunk);
-    // TODO(#560): call touchDensity(chunk, y, voxel.density) here
+    this.touchDensity(chunk, y, voxel.density);
   }
 
   clearVoxel(x: number, y: number, z: number): void {
@@ -613,7 +616,7 @@ export class VoxelGrid {
     chunk.fracture[i] = 1.0;
     chunk.ores.delete(i);
     this.touch(chunk);
-    // TODO(#560): call touchDensity(chunk, y, 0) here
+    this.touchDensity(chunk, y, 0);
   }
 
   // ── Raw chunk storage access — for VoxelGridCodec (save serialization) only ──
@@ -654,6 +657,33 @@ export class VoxelGrid {
     chunk.ores.clear();
     for (const [i, rec] of ores) chunk.ores.set(i, rec);
     this.recomputeBounds();
+
+    // Exact rescan (#560): this bulk path bypasses the per-voxel mutators
+    // that maintain the conservative widening summary, and a save/load
+    // shouldn't carry forward stale bounds from before the save — an O(n)
+    // rescan is cheap here since restoring the chunk's arrays already was.
+    chunk.slabMinDensity.fill(Infinity);
+    chunk.slabMaxDensity.fill(-Infinity);
+    for (let z = chunk.z0; z < chunk.z1; z++) {
+      for (let y = 0; y < this.sizeY; y++) {
+        const slab = Math.floor(y / CHUNK_SIZE);
+        for (let x = chunk.x0; x < chunk.x1; x++) {
+          const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
+          const d = chunk.density[i]!;
+          if (d < chunk.slabMinDensity[slab]!) chunk.slabMinDensity[slab] = d;
+          if (d > chunk.slabMaxDensity[slab]!) chunk.slabMaxDensity[slab] = d;
+        }
+      }
+    }
+    // A slab with no owned voxels in this chunk (e.g. a partial edge chunk
+    // whose owned rect doesn't reach that slab) never gets touched above —
+    // report it as all-air (0/0) rather than leaving the sentinel.
+    for (let s = 0; s < chunk.slabMinDensity.length; s++) {
+      if (chunk.slabMinDensity[s] === Infinity) {
+        chunk.slabMinDensity[s] = 0;
+        chunk.slabMaxDensity[s] = 0;
+      }
+    }
   }
 
   /** Get all voxels within a bounding box (inclusive on both ends). Unowned columns are skipped. */
