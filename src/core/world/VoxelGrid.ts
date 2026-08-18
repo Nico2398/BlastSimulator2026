@@ -726,14 +726,9 @@ export class VoxelGrid {
     chunk.touched.fill(0);
     for (let z = zLo; z < zHi; z++) {
       for (let y = 0; y < this.sizeY; y++) {
-        const slab = Math.floor(y / CHUNK_SIZE);
         for (let x = xLo; x < xHi; x++) {
           const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
-          const d = chunk.density[i]!;
-          if (d < chunk.slabMinDensity[slab]!) chunk.slabMinDensity[slab] = d;
-          if (d > chunk.slabMaxDensity[slab]!) chunk.slabMaxDensity[slab] = d;
-          chunk.touched[i] = 1;
-          chunk.slabTouchedCount[slab]!++;
+          this.touchDensity(chunk, i, y, chunk.density[i]!);
         }
       }
     }

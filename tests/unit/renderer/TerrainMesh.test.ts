@@ -755,7 +755,7 @@ describe('TerrainMesh', () => {
       const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
       tm.setEdgeHeightSampler(() => NaN);
       const floor = skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true);
-      expect(floor === null || Number.isFinite(floor)).toBe(true);
+      expect(floor).toBeNull();
       tm.dispose();
     });
   });

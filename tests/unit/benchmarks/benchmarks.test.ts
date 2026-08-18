@@ -487,14 +487,13 @@ describe('Performance Benchmarks', () => {
   });
 
   describe('TerrainMesh rebuild timing with the #560 depth-limited skirt + chunk-skip', () => {
-    // #560: canSkipChunkMarch/boundarySkirtFloorY don't exist yet (skeleton
-    // stubs throw 'not implemented', not wired into rebuildChunk's march loop
-    // either) -- these three benchmarks assert the same budgets an
-    // unconditional full march already has to hit today (matching the
-    // existing "re-meshing a 16^3 chunk completes in under 200ms" convention
-    // in TerrainMesh.test.ts). The real, wired-in implementation should only
-    // ever do LESS work than today's unconditional march, so it must clear
-    // these same budgets comfortably too.
+    // #560: canSkipChunkMarch/boundarySkirtFloorY are implemented and wired
+    // into rebuildChunk's march loop -- these three benchmarks assert the
+    // same budgets an unconditional full march already had to hit before
+    // #560 (matching the existing "re-meshing a 16^3 chunk completes in
+    // under 200ms" convention in TerrainMesh.test.ts). The depth-limited
+    // skirt and chunk-skip only ever do LESS work than the old unconditional
+    // march, so it clears these same budgets comfortably too.
 
     function representativeSite(): VoxelGrid {
       // 4x4 chunks (64m x 64m footprint), 2 y-chunks deep, solid to y=20 --
