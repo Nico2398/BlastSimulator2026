@@ -148,5 +148,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     mixedRockHardness: SANDBOX_FIXED_MIXED_ROCK_HARDNESS,
     // Tier 0 keeps it off the campaign world map, which lists tier > 0 only.
     difficultyTier: 0,
+    // Sandbox is not the tutorial — a permanent worker revolt still ends it.
+    revoltImmune: false,
   };
 }

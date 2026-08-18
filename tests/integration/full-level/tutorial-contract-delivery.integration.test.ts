@@ -48,8 +48,9 @@ describe('Tutorial Level — Contract Delivery', () => {
     // setupHaulingFleet below crews a freight_warehouse + debris_hauler on
     // top of that — together more than tutorial_pit's starting cash covers
     // ($80,000 at the time this comment was written; #555 later raised it to
-    // $190,000 for an unrelated reason, box-cut's own rock_digger gate, which
-    // this file's flow never exercises). Every assertion here is relative
+    // $290,000 for an unrelated reason, box-cut's own rock_digger gate plus
+    // the tutorial worker-revolt fix's own cash correction, neither of which
+    // this file's flow exercises). Every assertion here is relative
     // (before/after), never against an absolute cash figure, so this doesn't
     // change what's being tested.
     ctx.state!.cash += 50_000;

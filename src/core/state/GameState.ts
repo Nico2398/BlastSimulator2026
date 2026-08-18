@@ -84,6 +84,22 @@ export interface GameConfig {
   mineType?: string;
   startingCash?: number;
   eventFreqMultiplier?: number;
+  /**
+   * Per-tick pull toward the neutral (50) midpoint for all four scores
+   * (ScoreManager's `updateScores`). Defaults to the global `SCORE_DECAY_RATE`
+   * when omitted. Every `LevelDef` already declares its own `scoreDecayRate`
+   * (tutorial_pit's 0.01 is documented "player-proof") but nothing read it
+   * before this field existed — every level shared one hardcoded constant
+   * regardless (#555 tutorial worker-revolt fix).
+   */
+  scoreDecayRate?: number;
+  /**
+   * When true, a permanent worker revolt (WorkerRevolt.ts) can never end this
+   * level, however long well-being sits at 0. Sourced from the level's own
+   * `LevelDef.revoltImmune` — true only for tutorial_pit (#555 tutorial
+   * worker-revolt fix).
+   */
+  revoltImmune?: boolean;
   /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
   staffed?: boolean;
 }
@@ -361,7 +377,7 @@ export function createGame(config: GameConfig): GameState {
     buildings: createBuildingState(),
     vehicles: createVehicleState(),
     employees: createEmployeeState(),
-    scores: createScoreState(),
+    scores: createScoreState(config.scoreDecayRate),
     damage: createDamageState(),
     zone: createZoneState(),
     events: createEventSystemState(config.eventFreqMultiplier ?? 1),
@@ -371,7 +387,7 @@ export function createGame(config: GameConfig): GameState {
     bankruptcy: createBankruptcyState(),
     arrest: createArrestState(),
     ecological: createEcologicalState(),
-    revolt: createRevoltState(),
+    revolt: createRevoltState(config.revoltImmune ?? false),
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
     levelEnded: false,

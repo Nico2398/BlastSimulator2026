@@ -22,10 +22,16 @@ export interface RevoltState {
   warningFired: boolean;
   /** Whether the permanent revolt has been triggered. */
   revolted: boolean;
+  /**
+   * When true, `updateRevolt` never triggers a revolt on this level — sourced
+   * from `LevelDef.revoltImmune` (true only for tutorial_pit). See that
+   * field's own doc comment for why (#555 tutorial worker-revolt fix).
+   */
+  immune: boolean;
 }
 
-export function createRevoltState(): RevoltState {
-  return { ticksAtZero: 0, warningFired: false, revolted: false };
+export function createRevoltState(immune: boolean = false): RevoltState {
+  return { ticksAtZero: 0, warningFired: false, revolted: false, immune };
 }
 
 // ── Tick update ──
@@ -39,7 +45,7 @@ export function updateRevolt(
   revolt: RevoltState,
   emitter: EventEmitter,
 ): boolean {
-  if (revolt.revolted) return false;
+  if (revolt.revolted || revolt.immune) return false;
 
   if (state.scores.wellBeing <= 0) {
     revolt.ticksAtZero++;
