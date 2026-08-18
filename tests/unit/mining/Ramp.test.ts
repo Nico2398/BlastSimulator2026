@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import { buildRamp, RAMP_COST_PER_METER } from '../../../src/core/mining/Ramp.js';
+import {
+  buildRamp, RAMP_COST_PER_METER,
+  validateRampOrder, defineRampSegments, carveRampSegment, computeRampSegmentDurationTicks,
+  type RampDef, type RampDirection,
+} from '../../../src/core/mining/Ramp.js';
+import { RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 
 function fillGrid(grid: VoxelGrid) {
   for (let z = 0; z < grid.sizeZ; z++)
@@ -153,5 +159,187 @@ describe('Ramp building', () => {
     expect(result.success).toBe(true);
     const farSurfaceAfter = localSurfaceY(grid, 2, 2);
     expect(farSurfaceAfter).toBe(farSurfaceBefore);
+  });
+});
+
+// ── #555: ordered ramp excavation — validateRampOrder / defineRampSegments /
+// carveRampSegment / computeRampSegmentDurationTicks ─────────────────────────
+//
+// Ramp excavation becomes work (mirrors #553/#554's drill_hole/charge_hole
+// pattern): order-time only validates + prices the ramp (validateRampOrder),
+// the corridor is split into one excavation segment per existing per-step
+// loop iteration (defineRampSegments), and each segment is carved
+// independently (carveRampSegment) as its dig_ramp_segment PendingAction
+// completes. These tests are Red today only because the four functions are
+// stubs (Ramp.ts) — buildRamp itself is unchanged and used here purely as
+// the reference behavior the segmented path must reproduce.
+
+const ALL_DIRECTIONS: RampDirection[] = ['north', 'south', 'east', 'west'];
+
+describe('defineRampSegments + carveRampSegment vs buildRamp (#555)', () => {
+  const RAMP: Omit<RampDef, 'direction'> = { originX: 20, originZ: 20, length: 8, targetDepth: 6 };
+
+  for (const direction of ALL_DIRECTIONS) {
+    it(`sequentially carving every segment reaches an identical final grid to buildRamp — direction ${direction}`, () => {
+      const gridDirect = makeElevatedGrid(40, 30, 40, 15);
+      const gridSegmented = makeElevatedGrid(40, 30, 40, 15);
+      const ramp: RampDef = { ...RAMP, direction };
+
+      const directResult = buildRamp(gridDirect, ramp, 100000);
+      expect(directResult.success).toBe(true);
+
+      const segments = defineRampSegments(gridSegmented, ramp);
+      for (const segment of segments) {
+        carveRampSegment(gridSegmented, segment);
+      }
+
+      const mismatches: string[] = [];
+      for (let x = 0; x < 40; x++) {
+        for (let y = 0; y < 30; y++) {
+          for (let z = 0; z < 40; z++) {
+            const a = gridDirect.densityAt(x, y, z);
+            const b = gridSegmented.densityAt(x, y, z);
+            if (a !== b) mismatches.push(`(${x},${y},${z}): direct=${a} segmented=${b}`);
+          }
+        }
+      }
+      expect(mismatches).toEqual([]);
+    });
+  }
+
+  it('a partial carve clears exactly the carved segments\' own declared cells, and leaves not-yet-applied segments solid', () => {
+    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const segments = defineRampSegments(grid, ramp);
+    expect(segments.length).toBeGreaterThan(0);
+
+    const half = Math.ceil(segments.length / 2);
+    const carved = segments.slice(0, half);
+    const uncarved = segments.slice(half);
+
+    for (const segment of carved) carveRampSegment(grid, segment);
+
+    // Every carved segment's own declared cells are now cleared.
+    for (const segment of carved) {
+      for (const cell of segment.cells) {
+        expect(grid.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+      }
+    }
+
+    // Every not-yet-applied segment's cells remain solid.
+    for (const segment of uncarved) {
+      for (const cell of segment.cells) {
+        expect(grid.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+      }
+    }
+
+    // No voxel outside the carved segments' own declared cells was touched —
+    // every originally-solid cell (y <= 15, the makeElevatedGrid surface) not
+    // in a carved segment's own cell list must still be solid.
+    const carvedCellKeys = new Set(
+      carved.flatMap(segment => segment.cells.map(c => `${c.x},${c.y},${c.z}`)),
+    );
+    for (let x = 0; x < 40; x++) {
+      for (let z = 0; z < 40; z++) {
+        for (let y = 0; y <= 15; y++) {
+          const key = `${x},${y},${z}`;
+          if (carvedCellKeys.has(key)) continue;
+          expect(grid.densityAt(x, y, z)).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('carving a segment whose cells were already cleared externally reports voxelsCleared: 0 and does not throw', () => {
+    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const segments = defineRampSegments(grid, ramp);
+    expect(segments.length).toBeGreaterThan(0);
+
+    const segment = segments[0]!;
+    const firstCarve = carveRampSegment(grid, segment);
+    expect(firstCarve.voxelsCleared).toBeGreaterThan(0);
+
+    expect(() => carveRampSegment(grid, segment)).not.toThrow();
+    const secondCarve = carveRampSegment(grid, segment);
+    expect(secondCarve.voxelsCleared).toBe(0);
+  });
+
+  it('a segment already cleared by an external caller before the segment is ever carved also reports voxelsCleared: 0', () => {
+    const grid = makeElevatedGrid(40, 30, 40, 15);
+    const ramp: RampDef = { ...RAMP, direction: 'south' };
+
+    const segments = defineRampSegments(grid, ramp);
+    expect(segments.length).toBeGreaterThan(0);
+
+    const segment = segments[0]!;
+    for (const cell of segment.cells) grid.clearVoxel(cell.x, cell.y, cell.z);
+
+    const result = carveRampSegment(grid, segment);
+    expect(result.voxelsCleared).toBe(0);
+  });
+});
+
+describe('computeRampSegmentDurationTicks (#555)', () => {
+  it('is ceil(voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tier workRate multiplier))', () => {
+    const voxelCount = 64;
+    const tier1Ticks = computeRampSegmentDurationTicks(voxelCount, 1);
+    const tier3Ticks = computeRampSegmentDurationTicks(voxelCount, 3);
+
+    const expectedTier1 = Math.max(
+      1, Math.ceil(voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * VEHICLE_TIER_MULTIPLIERS[1].workRate)),
+    );
+    const expectedTier3 = Math.max(
+      1, Math.ceil(voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * VEHICLE_TIER_MULTIPLIERS[3].workRate)),
+    );
+
+    expect(tier1Ticks).toBe(expectedTier1);
+    expect(tier3Ticks).toBe(expectedTier3);
+    // A higher tier's faster workRate multiplier means fewer ticks for the
+    // same voxel count.
+    expect(tier3Ticks).toBeLessThan(tier1Ticks);
+  });
+
+  it('returns at least 1 tick even for zero voxels', () => {
+    expect(computeRampSegmentDurationTicks(0, 1)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns at least 1 tick for a tiny voxel count that would otherwise round to 0', () => {
+    expect(computeRampSegmentDurationTicks(1, 3)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('validateRampOrder (#555)', () => {
+  const BASE_RAMP: RampDef = { originX: 10, originZ: 10, direction: 'south', length: 10, targetDepth: 8 };
+
+  it('accepts a valid order without mutating any grid, cost = RAMP_COST_PER_METER * length', () => {
+    const result = validateRampOrder(BASE_RAMP, 50000);
+    expect(result.success).toBe(true);
+    expect(result.cost).toBe(BASE_RAMP.length * RAMP_COST_PER_METER);
+  });
+
+  it('rejects insufficient funds with the same message convention buildRamp uses today', () => {
+    const totalCost = BASE_RAMP.length * RAMP_COST_PER_METER;
+    const cash = 50;
+    const result = validateRampOrder(BASE_RAMP, cash);
+    expect(result.success).toBe(false);
+    expect(result.message).toBe(`Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`);
+    expect(result.cost).toBe(0);
+  });
+
+  it('rejects a non-positive length with buildRamp\'s own message', () => {
+    const result = validateRampOrder({ ...BASE_RAMP, length: 0 }, 50000);
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('Ramp length must be positive');
+    expect(result.cost).toBe(0);
+  });
+
+  it('rejects a non-positive target depth with buildRamp\'s own message', () => {
+    const result = validateRampOrder({ ...BASE_RAMP, targetDepth: 0 }, 50000);
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('Target depth must be positive');
+    expect(result.cost).toBe(0);
   });
 });

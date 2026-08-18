@@ -41,12 +41,13 @@ import {
 import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
 import { completePendingAction, dispatchPendingAction } from '../../../src/core/engine/TaskDispatch.js';
 import { releaseVehicleOnCompletion } from '../../../src/core/engine/VehicleReservation.js';
+import { isRampSegmentClaimable } from '../../../src/core/engine/ActionSelection.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import {
   hireEmployee, assignSkill, checkCollapse, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
 import type { NeedKey } from '../../../src/core/entities/Employee.js';
-import type { PendingAction } from '../../../src/core/state/GameState.js';
+import type { PendingAction, PlannedRamp, RampSegmentTracker } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { landDrilledHole, type PlannedHole } from '../../../src/core/mining/DrillPlan.js';
@@ -1303,6 +1304,215 @@ describe('charge_hole actions — dispatch and landing (#554)', () => {
 
     expect(sawSimultaneousInProgress).toBe(false);
     expect(landedOrder).toEqual(['H3', 'H1', 'H2']);
+  });
+});
+
+// ── Issue #555: ramp excavation becomes work — dig_ramp_segment ────────────
+//
+// A dig_ramp_segment PendingAction (requiredSkill: 'driving.excavator',
+// requiredVehicleRole: 'rock_digger') is vehicle-gated like drill_hole
+// (#553/#550) — the same skill category gates both claim eligibility and the
+// vehicle licence check (findVehicleForClaim/ROLE_LICENCE_REQUIRED.rock_digger),
+// unlike drill_hole's split 'blasting' (claim skill) / drill_rig licence
+// (separate skill) shape. The engine (#547-#552) is already fully generic;
+// nothing here re-specifies claim/arrival/completion machinery already
+// covered by the drill_hole/charge_hole describe blocks above.
+
+describe('dig_ramp_segment actions — vehicle-gated dispatch and driving.excavator gate (#555)', () => {
+  const SEED = 42;
+
+  function makeFlatNavGrid(width: number, height: number): NavGrid {
+    const cells: NavCell[][] = [];
+    for (let z = 0; z < height; z++) {
+      const row: NavCell[] = [];
+      for (let x = 0; x < width; x++) {
+        row.push({ type: 'walkable', moveCost: 1.0, benchLevel: 0, vehicleOccupied: false });
+      }
+      cells.push(row);
+    }
+    return new NavGrid(width, height, cells);
+  }
+
+  function makeExcavatorDriver(state: GameState, rng: Random, x: number, z: number) {
+    const { employee } = hireEmployee(state.employees, 'driver', rng, x, z);
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.rock_digger, 1);
+    return employee;
+  }
+
+  function queueDigRampSegmentAction(state: GameState, targetX: number, targetZ: number, durationTicks = 3): number {
+    const id = state.nextPendingActionId++;
+    dispatchPendingAction(state, {
+      id,
+      type: 'dig_ramp_segment',
+      requiredSkill: 'driving.excavator',
+      requiredVehicleRole: 'rock_digger',
+      targetX, targetZ, targetY: 0,
+      payload: { durationTicks },
+      targetEmployeeId: null,
+    }, { skipQualificationCheck: true });
+    return id;
+  }
+
+  it('taskTicksRemaining only counts down once a driving.excavator-qualified employee is aboard a reserved rock_digger at the segment target', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 5);
+    const rng = new Random(SEED);
+
+    const employee = makeExcavatorDriver(state, rng, 0, 0);
+    purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+
+    queueDigRampSegmentAction(state, 10, 0);
+
+    // Claim: pendingTaskDuration/taskTicksRemaining stay null — the work
+    // timer only seeds once the vehicle has actually arrived at the target,
+    // mirroring the drill_hole/charge_hole vehicle-gated claim tests above.
+    tickEmployees(state);
+    expect(employee.activeActionId).not.toBeNull();
+    expect(employee.taskTicksRemaining).toBeNull();
+
+    // Drive the employee -> vehicle -> target arrival loop until the work
+    // timer is finally seeded.
+    let seededAt = -1;
+    for (let i = 0; i < 100 && employee.taskTicksRemaining === null; i++) {
+      tickEmployeeMovement(state);
+      tickArrivalGate(state);
+      if (employee.taskTicksRemaining !== null) seededAt = i;
+    }
+    expect(seededAt).toBeGreaterThanOrEqual(0);
+
+    const before = employee.taskTicksRemaining!;
+    tickTaskProgress(state, employee);
+    expect(employee.taskTicksRemaining).toBe(before - 1);
+  });
+
+  it('an employee without driving.excavator never claims a dig_ramp_segment action, even with a free rock_digger available', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(40, 5);
+    const rng = new Random(SEED);
+
+    // Hired with an unrelated driving licence — no driving.excavator.
+    const { employee } = hireEmployee(state.employees, 'driver', rng, 0, 0);
+    assignSkill(state.employees, employee.id, 'driving.truck', 1);
+    purchaseVehicle(state.vehicles, 'rock_digger', 0, 0);
+
+    const actionId = queueDigRampSegmentAction(state, 10, 0);
+
+    const result = tickEmployees(state);
+
+    expect(employee.activeActionId).toBeNull();
+    expect(state.pendingActions.find(a => a.id === actionId)!.status).toBe('queued');
+    expect(result.claimed).not.toContain(actionId);
+  });
+});
+
+// ── Issue #555: isRampSegmentClaimable (ActionSelection.ts) ────────────────
+//
+// Claim-time gate for a dig_ramp_segment PendingAction — mirrors the shape of
+// GameLoop.ts's vehicle-availability isClaimable predicate: segment index 0
+// is always claimable (the ramp's own entrance has no prior segment to wait
+// on), and segment index N > 0 is claimable only once segment N - 1's
+// tracked RampSegmentTracker.done is true. Tested directly against the
+// exported function with a constructed PlannedRamp — not behavior requiring
+// selectBestActionForEmployee to actually be wired with it yet (per the
+// stub's own doc comment, it is not).
+
+describe('isRampSegmentClaimable (#555)', () => {
+  function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
+    return {
+      type: 'dig_ramp_segment',
+      requiredSkill: 'driving.excavator',
+      requiredVehicleRole: 'rock_digger',
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { rampId: 1, segmentIndex: 0 },
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+      ...overrides,
+    };
+  }
+
+  function makeTracker(index: number, actionId: number, done: boolean): RampSegmentTracker {
+    return { index, actionId, cells: [], region: null, done };
+  }
+
+  it('segment index 0 is claimable when no PlannedRamp tracking exists yet (fail-open)', () => {
+    const state = createGame({ seed: 1 });
+    // No plannedRamps at all — nothing to gate on.
+    const action = makeAction({ id: 1, payload: { rampId: 99, segmentIndex: 0 } });
+
+    expect(isRampSegmentClaimable(state, action)).toBe(true);
+  });
+
+  it('segment index 0 is claimable — genuinely the ramp\'s own entrance, no prior segment', () => {
+    const state = createGame({ seed: 1 });
+    const plannedRamp: PlannedRamp = {
+      id: 1,
+      def: { originX: 0, originZ: 0, direction: 'south', length: 3, targetDepth: 6 },
+      footprint: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 },
+      segments: [
+        makeTracker(0, 10, false),
+        makeTracker(1, 11, false),
+        makeTracker(2, 12, false),
+      ],
+    };
+    state.plannedRamps.push(plannedRamp);
+    const action = makeAction({ id: 10, payload: { rampId: 1, segmentIndex: 0 } });
+
+    expect(isRampSegmentClaimable(state, action)).toBe(true);
+  });
+
+  it('segment index N > 0 is NOT claimable while segment N - 1 is not yet done', () => {
+    const state = createGame({ seed: 1 });
+    const plannedRamp: PlannedRamp = {
+      id: 1,
+      def: { originX: 0, originZ: 0, direction: 'south', length: 3, targetDepth: 6 },
+      footprint: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 },
+      segments: [
+        makeTracker(0, 10, false), // segment 0 not yet done
+        makeTracker(1, 11, false),
+        makeTracker(2, 12, false),
+      ],
+    };
+    state.plannedRamps.push(plannedRamp);
+    const action = makeAction({ id: 11, payload: { rampId: 1, segmentIndex: 1 } });
+
+    expect(isRampSegmentClaimable(state, action)).toBe(false);
+  });
+
+  it('segment index N > 0 IS claimable once segment N - 1 is done', () => {
+    const state = createGame({ seed: 1 });
+    const plannedRamp: PlannedRamp = {
+      id: 1,
+      def: { originX: 0, originZ: 0, direction: 'south', length: 3, targetDepth: 6 },
+      footprint: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 },
+      segments: [
+        makeTracker(0, 10, true), // segment 0 done
+        makeTracker(1, 11, false),
+        makeTracker(2, 12, false),
+      ],
+    };
+    state.plannedRamps.push(plannedRamp);
+    const action = makeAction({ id: 11, payload: { rampId: 1, segmentIndex: 1 } });
+
+    expect(isRampSegmentClaimable(state, action)).toBe(true);
+  });
+
+  it('a later segment (index 2) stays unclaimable while its immediate predecessor (index 1) is undone, even if segment 0 is done', () => {
+    const state = createGame({ seed: 1 });
+    const plannedRamp: PlannedRamp = {
+      id: 1,
+      def: { originX: 0, originZ: 0, direction: 'south', length: 3, targetDepth: 6 },
+      footprint: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 },
+      segments: [
+        makeTracker(0, 10, true),
+        makeTracker(1, 11, false), // immediate predecessor of segment 2, not done
+        makeTracker(2, 12, false),
+      ],
+    };
+    state.plannedRamps.push(plannedRamp);
+    const action = makeAction({ id: 12, payload: { rampId: 1, segmentIndex: 2 } });
+
+    expect(isRampSegmentClaimable(state, action)).toBe(false);
   });
 });
 

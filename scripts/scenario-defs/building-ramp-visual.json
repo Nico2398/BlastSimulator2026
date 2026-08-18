@@ -1,25 +1,47 @@
 {
   "name": "building-ramp-visual",
-  "description": "Visual check of ramp construction with different directions and depths for multi-level access",
+  "description": "#555: ordering a ramp queues progressive dig_ramp_segment excavation work instead of carving the whole corridor instantly. A staffed, excavator-crewed rock_digger digs a 6-segment ramp one segment at a time — this scenario screenshots the corridor half-dug (orderedRampSegmentCount:3) and again once every segment has landed (orderedRampSegmentCount:0), proving the dig happens incrementally rather than in one synchronous burst.",
   "steps": [
     {
-      "command": "new_game seed:42",
-      "timeout": 30,
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000
+          "cash": 50000,
+          "vehicleCount": 4,
+          "employeeCount": 5
         }
       }
     },
     {
-      "command": "build_ramp origin:5,15 direction:south length:10 depth:8",
+      "command": "vehicle driver 3 4",
+      "description": "Staffed vehicles come unmanned (#551) — crew rock_digger #3 with driver #4, the first of the two driving.excavator-qualified drivers STARTING_SITE_STAFFED_COMPOSITION grants (balance.ts), before ordering any excavation work.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "build_ramp origin:20,20 direction:south length:6 depth:6",
+      "description": "Order the ramp — order-time validates and charges the whole corridor, then queues one dig_ramp_segment PendingAction per segment (#555) instead of carving anything yet.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -34,72 +56,11 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
-          "type": "mousedown",
-          "x": 640,
-          "y": 360,
-          "button": "right"
-        },
-        {
-          "type": "mousemove",
-          "x": 700,
-          "y": 320
-        },
-        {
-          "type": "mouseup",
-          "x": 700,
-          "y": 320,
-          "button": "right"
-        },
-        {
-          "type": "dragTiles",
-          "x1": 5,
-          "z1": 15,
-          "x2": 5,
-          "z2": 25
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -1000
-        }
-      }
-    },
-    {
-      "command": "build_ramp origin:20,15 direction:east length:8 depth:6",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-ramp-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-param-strip .bsx-stepper-btn:first-child"
-        },
-        {
           "type": "dragTiles",
           "x1": 20,
-          "z1": 15,
-          "x2": 28,
-          "z2": 15
-        },
-        {
-          "type": "screenshot"
+          "z1": 20,
+          "x2": 20,
+          "z2": 26
         },
         {
           "type": "clickSelector",
@@ -107,32 +68,53 @@
         }
       ],
       "role": "player",
-      "description": "Ramp depth defaults to 8m and only moves via the strip's -/+ stepper (#bs-param-strip .bsx-stepper-btn, the only field this tool shows) -- two decrements land on the scenario's depth:6.",
       "expect": {
-        "changedBy": {
-          "cash": -800
-        }
+        "decreased": ["cash"],
+        "equals": {
+          "orderedRampSegmentCount": 6
+        },
+        "note": "6 segments ordered (one per length-step, entrance-first), none carved yet."
       }
     },
     {
-      "command": "inspect 5,20,0",
+      "command": "wait_until field:orderedRampSegmentCount equals:3 max_ticks:400",
+      "description": "Drain half the ordered segments — the crewed rock_digger digs one dig_ramp_segment action at a time, nearest/entrance-first (mirrors #553's drill_hole landing order). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor is carved partway down, not the whole length.",
       "interaction": [
         {
-          "type": "command",
-          "command": "inspect 5,20,0"
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 3,
+          "maxTicks": 400,
+          "timeoutMs": 90000
         }
       ],
-      "role": "observe"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 3
+        },
+        "note": "Mid-dig: half of the ramp's 6 segments have landed, half remain queued."
+      }
     },
     {
-      "command": "inspect 20,15,0",
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
+      "description": "Drain the remaining segments. This step's own auto-captured screenshot is the full-completion checkpoint: every segment carved, the ramp corridor complete end to end.",
       "interaction": [
         {
-          "type": "command",
-          "command": "inspect 20,15,0"
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 800,
+          "timeoutMs": 120000
         }
       ],
-      "role": "observe"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "Ramp fully dug: every dig_ramp_segment action landed."
+      }
     },
     {
       "command": "state full",
@@ -152,34 +134,9 @@
       "pitch": 45
     },
     {
-      "name": "ramp-closeup",
+      "name": "closeup",
       "yaw": 90,
-      "pitch": 60,
-      "target": [
-        5,
-        20
-      ],
-      "distance": 18
-    },
-    {
-      "name": "birdseye",
-      "yaw": 0,
-      "pitch": 80,
-      "target": [
-        24,
-        15
-      ],
-      "distance": 17
-    },
-    {
-      "name": "angled",
-      "yaw": 135,
-      "pitch": 30,
-      "target": [
-        16,
-        20
-      ],
-      "distance": 22
+      "pitch": 15
     }
   ]
 }
