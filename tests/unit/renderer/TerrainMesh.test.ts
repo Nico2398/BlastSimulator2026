@@ -724,14 +724,18 @@ describe('TerrainMesh', () => {
 
     it('returns null (full-depth fallback) when no sampler is installed, even at a true boundary column', () => {
       const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
-      expect(skirtInternals(tm).boundarySkirtFloorY(0, 8, RECT, false, true, true, true)).toBeNull();
+      // The halo column rebuildChunk actually marches on the west side when
+      // !hasWest is rect.minX - 1, not rect.minX itself — see the method's
+      // own doc comment ("same coordinates rebuildChunk's xStart/... use").
+      expect(skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true)).toBeNull();
       tm.dispose();
     });
 
     it("returns the sampled neighbour height minus SKIRT_VISIBILITY_MARGIN_M for a column bordering unclaimed land on exactly one side", () => {
       const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
       tm.setEdgeHeightSampler(() => 20);
-      const floor = skirtInternals(tm).boundarySkirtFloorY(0, 8, RECT, false, true, true, true);
+      // x = rect.minX - 1 is the actual west halo column the march visits (see above).
+      const floor = skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true);
       expect(floor).toBeCloseTo(20 - SKIRT_VISIBILITY_MARGIN_M, 6);
       tm.dispose();
     });
@@ -740,7 +744,9 @@ describe('TerrainMesh', () => {
       const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
       // West neighbour reads much deeper (lower cutoff) than north.
       tm.setEdgeHeightSampler((x) => (x < 0 ? 5 : 25));
-      const floor = skirtInternals(tm).boundarySkirtFloorY(0, 0, RECT, false, true, false, true);
+      // (rect.minX - 1, rect.minZ - 1) is the actual corner halo cell both
+      // the west and north loop extensions visit together.
+      const floor = skirtInternals(tm).boundarySkirtFloorY(-1, -1, RECT, false, true, false, true);
       expect(floor).toBeCloseTo(5 - SKIRT_VISIBILITY_MARGIN_M, 6);
       tm.dispose();
     });
@@ -748,7 +754,7 @@ describe('TerrainMesh', () => {
     it('falls back to null (no cutoff) rather than returning NaN when the sampler reports an unusable value', () => {
       const tm = new TerrainMesh(makeScene(), new VoxelGrid(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
       tm.setEdgeHeightSampler(() => NaN);
-      const floor = skirtInternals(tm).boundarySkirtFloorY(0, 8, RECT, false, true, true, true);
+      const floor = skirtInternals(tm).boundarySkirtFloorY(-1, 8, RECT, false, true, true, true);
       expect(floor === null || Number.isFinite(floor)).toBe(true);
       tm.dispose();
     });

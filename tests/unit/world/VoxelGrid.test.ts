@@ -422,12 +422,16 @@ describe('VoxelGrid.chunkDensityRange — per-chunk per-slab density summary (#5
   it('restoreChunkRaw fully rescans the density summary rather than leaving it stale', () => {
     const grid = new VoxelGrid(16, 8, 16); // 1 chunk, nSlabs=1
     const n = CHUNK_SIZE * grid.sizeY * CHUNK_SIZE;
-    const density = new Float64Array(n);
+    // Every restored voxel counts toward the rescan (even the ones left at
+    // their default), so the array must be filled throughout: a mostly-zero
+    // array's true minimum really is 0, not whatever floor value a couple of
+    // cells happen to poke — that would be asserting a bound the input data
+    // doesn't actually have.
+    const density = new Float64Array(n).fill(0.15);
     const compId = new Uint16Array(n);
     const fracture = new Float64Array(n).fill(1.0);
     // Local index formula mirrors VoxelGrid's own: lx + y*CHUNK_SIZE + lz*CHUNK_SIZE*sizeY.
     const idx = (lx: number, y: number, lz: number): number => lx + y * CHUNK_SIZE + lz * CHUNK_SIZE * grid.sizeY;
-    density[idx(0, 0, 0)] = 0.15;
     density[idx(1, 1, 1)] = 0.85;
 
     grid.restoreChunkRaw(0, 0, { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE }, density, compId, fracture, new Map());
