@@ -816,6 +816,10 @@
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }

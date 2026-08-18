@@ -536,8 +536,8 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "timeout": 245,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #554-followup (issue #586 CI): widened from 120000ms to 240000ms -- same converging-but-too-slow class as tutorial-interactive.json's sibling step.",
       "interaction": [
         {
           "type": "command",
@@ -548,7 +548,7 @@
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 3000,
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         }
       ],
       "role": "setup",

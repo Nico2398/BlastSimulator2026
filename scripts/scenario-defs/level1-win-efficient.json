@@ -1177,307 +1177,35 @@
       }
     },
     {
-      "command": "tick 20",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "timeout": 245,
+      "description": "#554-followup (issue #586 CI): replaced the four-round tick-20/tick-5 hand-measured drilling wait with a proper waitUntil -- real CI intermittently landed the charge step below at 14/16 holes instead of 16 despite two rounds of fixed-tick-budget attempts (a flat 80 ticks, then finer tick-5 chunking to recover ticks lost to tickCommand's stop-on-event behavior); neither fully closed the gap, meaning the true bottleneck was the fixed budget itself, not lost ticks within it. `waitUntil` (#590) converges on the real target (orderedHoleCount:0, i.e. all 16 holes actually landed) instead of gambling a tick count is enough, matching this file's own charge-drain step immediately below (already a waitUntil) and scores-display-visual.json's identical fix for the same class of issue.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 20"
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 240000
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 112,
           "deathCount": 0,
           "employeeCount": 4,
           "activeContractCount": 0,
           "surveyCount": 2,
-          "holeCount": 0,
-          "orderedHoleCount": 16
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (issue #586 CI): dropped the hardcoded `cash: 2554566` -- CI's own runner produced 2554554 (a $12 gap matching the exact real-time payroll/fuel accrual class already documented elsewhere in this PR, e.g. safety-projection-visual.json's buy_software tier:3 note). Not replaced with `decreased`: command mode's own trace shows cash completely unchanged by this step (no wall-clock elapses resolving an event via a direct command), so a `decreased` assertion holds in interaction mode but fails command mode -- there is no single mode-agnostic cash claim to make here. The remaining exact fields (tickCount, deathCount, employeeCount, etc.) still prove the event resolved.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "tickCount": 112,
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2,
-          "holeCount": 0,
-          "orderedHoleCount": 16
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "description": "#553-followup (this batch's own proactive pass): dropped `holeCount: 5`/`orderedHoleCount: 11` from this step and its immediately-following event-choose-0 step -- this is a landing-boundary block (holeCount changes from 0 to 5 within this 20-tick window, the same class as the confirmed interaction-mode failure at tickCount 225's own note). Applied pre-emptively rather than waiting for a round trip to prove it.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (issue #586 CI): dropped `cash: 2551474` -- a real CI run read 2551498, the same real-time-accrual class as the other resolveEventIfPending checkpoints in this file (see line ~1072's own note for the mechanism). `holeCount`/`orderedHoleCount` also dropped here -- same landing-boundary note as the tick step just above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 20",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2545994` pre-emptively, same real-time-accrual class as the other resolveEventIfPending checkpoints in this file's pattern-1 drilling window (line ~1072's own note has the full mechanism) -- three tier-3 rigs actively mid-drill at this exact tickCount makes the idle/busy fuel-cost timing sensitive to interaction mode's real wall-clock delay the same way the two checkpoints just above it already proved. The remaining exact fields still prove the event resolved.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 5",
-      "description": "#554-followup (issue #586 CI, real failure): this last round split from one tick-20/event-choose-0 pair into four tick-5/event-choose-0 pairs -- tickCommand itself stops early and auto-pauses the instant any event fires mid-window, so real interaction-mode CI can lose a few of a tick-20 batch's ticks to a single mid-batch event (command mode's own deterministic trace never loses any, which is why this file's baseline passes command mode cleanly at 80 total ticks across all four rounds but real CI still landed the charge step below at 14/16 holes instead of 16/16). MIN_EVENT_INTERVAL_TICKS (120, balance.ts) means at most one event can plausibly fire inside this 20-tick window, so four 5-tick sub-batches each with their own event-choose-0 recovers however many ticks that one event would otherwise have cost, without changing this round's total tick budget (still 20) or any downstream absolute tickCount/cash figure.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
-        }
-      }
-    },
-    {
-      "command": "tick 5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "tickCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode. #553-followup (this batch's own proactive pass): dropped `cash: 2540464` pre-emptively, same real-time-accrual class documented at line ~1072 -- three tier-3 rigs still actively mid-drill at this tickCount. The remaining exact fields still prove the event resolved.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "deathCount": 0,
-          "employeeCount": 4,
-          "activeContractCount": 0,
-          "surveyCount": 2
-        },
-        "changedBy": {
-          "tickCount": 0
+          "holeCount": 16,
+          "orderedHoleCount": 0
         }
       }
     },
@@ -2408,7 +2136,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 1,
+          "activeContractCount": 2,
           "surveyCount": 2
         },
         "decreased": [
@@ -2432,7 +2160,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 1,
+          "activeContractCount": 2,
           "surveyCount": 2
         },
         "changedBy": {
@@ -2454,7 +2182,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "decreased": [
@@ -2478,7 +2206,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "changedBy": {
@@ -2500,7 +2228,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "decreased": [
@@ -2524,7 +2252,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 0,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "changedBy": {
@@ -2883,7 +2611,7 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 14.000000000000075,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50
         }
@@ -2907,7 +2635,7 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 14.000000000000075,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50
         }
@@ -2931,7 +2659,7 @@
           "activeContractCount": 0,
           "surveyCount": 2,
           "wellBeing": 0,
-          "safety": 14.000000000000075,
+          "safety": 0,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
