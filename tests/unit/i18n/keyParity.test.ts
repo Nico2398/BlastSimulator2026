@@ -122,10 +122,17 @@ describe('en.json / fr.json — key-set parity', () => {
     // for a queued ramp) and ui.crew.action_dig_ramp_segment (the crew
     // panel's action label while an employee excavates a ramp segment),
     // both locales translated.
+    // Baseline is now 3275 (up from 3268): #555's tutorial fix adds two new
+    // tutorial steps (train-digger, buy-rock-digger-assign) closing the
+    // box-cut deadlock the same way #553 closed drill-plan's -- their card
+    // title/body keys (tutorial.step_traindigger[.title],
+    // tutorial.step_buyrockdigger[.title]) plus three tutorial rail hint keys
+    // (tutorial.stage.expand_digger, tutorial.stage.train_excavator,
+    // tutorial.stage.vehicle_buy_rock_digger), both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3268);
+    expect(Object.keys(en).length).toBe(3275);
   });
 });
 

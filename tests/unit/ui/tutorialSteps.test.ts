@@ -5,8 +5,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 27 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(27);
+  it('has exactly 29 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(29);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -95,6 +95,8 @@ describe('tutorialSteps', () => {
       'build-driving-center',
       'train-driller',
       'buy-drill-rig-assign',
+      'train-digger',
+      'buy-rock-digger-assign',
       'box-cut',
       'drill-plan',
       'charge',
@@ -295,6 +297,7 @@ describe('tutorialSteps', () => {
     const stepsWithTarget = new Set([
       'time-speed', 'hire-surveyor', 'survey', 'hire-driller',
       'build-driving-center', 'train-driller', 'buy-drill-rig-assign',
+      'train-digger', 'buy-rock-digger-assign',
       'drill-plan', 'charge', 'sequence', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager', 'contract-accept',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'contract-deliver',
@@ -442,7 +445,7 @@ describe('tutorialSteps', () => {
     // the player: the card never completes and there is nothing left to click.
     // vehicle-buy-assign did exactly that — assigning a driver sends them
     // walking to the vehicle, and ArrivalGate only seats them on arrival.
-    const SIMULATION_OWNED = ['survey', 'train-driller', 'buy-drill-rig-assign', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver'];
+    const SIMULATION_OWNED = ['survey', 'train-driller', 'buy-drill-rig-assign', 'train-digger', 'buy-rock-digger-assign', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver'];
 
     for (const id of SIMULATION_OWNED) {
       it(`"${id}" waits on work and is given a tick allowance`, () => {

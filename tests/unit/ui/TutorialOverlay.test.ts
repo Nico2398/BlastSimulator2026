@@ -192,9 +192,10 @@ describe('TutorialOverlay (12.4)', () => {
   });
 
   describe('progress display', () => {
-    it('shows step counter "1 / 27" at step 0 and has progress bar fill', () => {
-      // 27, not 24: #553 inserts build-driving-center/train-driller/
-      // buy-drill-rig-assign right after hire-driller.
+    it('shows step counter "1 / 29" at step 0 and has progress bar fill', () => {
+      // 29, not 24: #553 inserts build-driving-center/train-driller/
+      // buy-drill-rig-assign right after hire-driller, and #555 inserts
+      // train-digger/buy-rock-digger-assign right after that trio.
       const tut = new TutorialOverlay(container);
       overlay = tut;
       tut.start(createMockState());
@@ -202,7 +203,7 @@ describe('TutorialOverlay (12.4)', () => {
       const els = Array.from(container.querySelectorAll('*'));
       const ctr = els.find(el => /\d\s*\/\s*\d/.test(el.textContent ?? ''));
       expect(ctr).toBeDefined();
-      expect(ctr?.textContent).toMatch(/1\s*\/\s*27/);
+      expect(ctr?.textContent).toMatch(/1\s*\/\s*29/);
       expect(container.querySelector('.bs-tutorial-progress-fill')).not.toBeNull();
     });
   });
@@ -468,11 +469,12 @@ describe('TutorialOverlay (12.4)', () => {
     });
 
     it('highlightTarget with undefined selector does not throw', () => {
-      // congratulations (last step, index 26 after #553's tutorial fix
-      // added three drill-rig-licensing steps) has no highlightTarget
+      // congratulations (last step, index 28 after #553's tutorial fix added
+      // three drill-rig-licensing steps and #555 added two more
+      // rock-digger-licensing steps) has no highlightTarget
       const tut = new TutorialOverlay(container) as any;
       overlay = tut;
-      tut.stepIndex = 26;
+      tut.stepIndex = 28;
       expect(() => tut.render()).not.toThrow();
     });
 
@@ -518,12 +520,13 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // Set to the scores step so advanceToNextStep goes to event-fire-resolve
-      // (index 12/13 after #553's tutorial fix added three drill-rig-licensing
-      // steps earlier in the sequence).
-      tut.stepIndex = 12;
+      // (index 14/15 after #553's tutorial fix added three drill-rig-licensing
+      // steps and #555 added two more rock-digger-licensing steps earlier in
+      // the sequence).
+      tut.stepIndex = 14;
       tut.advanceToNextStep();
 
-      expect(tut.stepIndex).toBe(13);
+      expect(tut.stepIndex).toBe(15);
       expect(gameConsole).toHaveBeenCalledWith('tick 3');
     });
 
@@ -536,7 +539,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
 
       // createMockState does not include events → pendingEvent is undefined (== null)
-      tut.stepIndex = 12;
+      tut.stepIndex = 14;
       tut.advanceToNextStep();
 
       expect(gameConsole).toHaveBeenCalledWith('event fire tutorial_synergy_consultant');
@@ -549,9 +552,9 @@ describe('TutorialOverlay (12.4)', () => {
       tut.start(state);
       // Do NOT call setGameConsole — gameConsole stays null
 
-      tut.stepIndex = 11;
+      tut.stepIndex = 13;
       expect(() => tut.advanceToNextStep()).not.toThrow();
-      expect(tut.stepIndex).toBe(12);
+      expect(tut.stepIndex).toBe(14);
     });
   });
 
@@ -581,9 +584,10 @@ describe('TutorialOverlay (12.4)', () => {
       overlay = tut;
       tut.start(createMockState());
 
-      // Directly set to congratulations step (last step, index 26 after
-      // #553's tutorial fix added three drill-rig-licensing steps) and render
-      tut.stepIndex = 26;
+      // Directly set to congratulations step (last step, index 28 after
+      // #553's tutorial fix added three drill-rig-licensing steps and #555
+      // added two more rock-digger-licensing steps) and render
+      tut.stepIndex = 28;
       tut.render();
 
       const titleEl = container.querySelector('.bs-panel-title') as HTMLElement;

@@ -46,9 +46,12 @@ describe('Tutorial Level — Contract Delivery', () => {
     // Topped up (#553): this sequence now also crews a drill_rig ($35,000)
     // so drill_plan grid's queued drill_hole actions can actually land, and
     // setupHaulingFleet below crews a freight_warehouse + debris_hauler on
-    // top of that — together more than tutorial_pit's $80,000 starting cash
-    // covers. Every assertion here is relative (before/after), never against
-    // an absolute cash figure, so this doesn't change what's being tested.
+    // top of that — together more than tutorial_pit's starting cash covers
+    // ($80,000 at the time this comment was written; #555 later raised it to
+    // $190,000 for an unrelated reason, box-cut's own rock_digger gate, which
+    // this file's flow never exercises). Every assertion here is relative
+    // (before/after), never against an absolute cash figure, so this doesn't
+    // change what's being tested.
     ctx.state!.cash += 50_000;
 
     // 1. Hire surveyor (ID=1) with geology skill

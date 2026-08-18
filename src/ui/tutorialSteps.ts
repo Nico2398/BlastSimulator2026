@@ -152,6 +152,57 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     },
   },
 
+  // ── Step 3e: train-digger ──
+  // #555: dig_ramp_segment work (the box-cut step below) now requires a
+  // driving.excavator licence + a rock_digger vehicle, the same gate #553 put
+  // on drilling. Nothing above ever grants that licence -- the surveyor
+  // (employee #1) finished their one-off job at the survey step and is idle
+  // from then on, so they're who trains here. Existence-check like
+  // train-driller: nobody starts with driving.excavator, so "value increased"
+  // has nothing to increase from.
+  {
+    id: 'train-digger',
+    titleKey: 'tutorial.step_traindigger.title',
+    textKey: 'tutorial.step_traindigger',
+    commands: ['employee train 1 skill:driving.excavator'],
+    highlightTarget: TOOLBAR_TARGET.employees,
+    tickBudget: 25,
+    waitsOnWork: true,
+    isComplete: (state: GameState) => getEmployees(state).some((e) => {
+      const raw = e as unknown as Record<string, unknown>;
+      const quals = raw.qualifications as Array<{ category: string }> | undefined;
+      return (quals ?? []).some((q) => q.category === 'driving.excavator');
+    }),
+  },
+
+  // ── Step 3f: buy-rock-digger-assign ──
+  // Same guarded count-increased + newly-driven-vehicle shape as
+  // buy-drill-rig-assign above, and for the same reason: the drill_rig
+  // bought there already has a driver, so a naive "some vehicle has a
+  // driver" check would false-complete instantly.
+  {
+    id: 'buy-rock-digger-assign',
+    titleKey: 'tutorial.step_buyrockdigger.title',
+    textKey: 'tutorial.step_buyrockdigger',
+    highlightTarget: TOOLBAR_TARGET.vehicles,
+    // The digger trained one step earlier is employee #1.
+    commands: ['vehicle buy rock_digger', 'vehicle driver 2 1'],
+    tickBudget: 20,
+    waitsOnWork: true,
+    captureSnapshot: (state: GameState) => ({
+      prevVehicleCount: getVehicles(state).length,
+      prevDrivenVehicleIds: getVehicles(state).filter((v) => v.driverId !== null).map((v) => v.id),
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prevCount = snapshot.prevVehicleCount as number;
+      const prevDriven = snapshot.prevDrivenVehicleIds as number[];
+      return (
+        getVehicles(state).length > prevCount &&
+        getVehicles(state).some((v) => v.driverId !== null && !prevDriven.includes(v.id))
+      );
+    },
+  },
+
   // ── Step 4: box-cut ──
   // Real pits start the way this step does: an access ramp and a starter cut
   // are dug *before* the first shot, because blasted rock swells and has to

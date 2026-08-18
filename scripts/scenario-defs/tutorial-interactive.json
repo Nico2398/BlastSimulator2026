@@ -15,19 +15,19 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:250000",
+      "command": "campaign start level:tutorial_pit cash:320000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list.",
+      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:250000"
+          "command": "campaign start level:tutorial_pit cash:320000"
         }
       ],
       "expect": {
         "equals": {
-          "cash": 250000
+          "cash": 320000
         }
       }
     },
@@ -316,6 +316,96 @@
       "command": "vehicle driver 1 2",
       "timeout": 90,
       "description": "#553: buy-drill-rig-assign complete: Assign clicked, then the tutorial's own clock runs while the newly-licensed driller (employee #2) walks to the drill_rig and boards -- the drill-plan step right after this one can only ever land a hole once this actually completes.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "train-digger",
+          "timeout": 60000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "train-digger"
+      }
+    },
+    {
+      "command": "employee train 1 skill:driving.excavator",
+      "timeout": 30,
+      "description": "#555: train-digger, click half: driving.excavator course booked at the driving_center built above -- dig_ramp_segment work (the box-cut step below) now requires this licence + a rock_digger vehicle, the same gate #553 put on drilling. The surveyor (employee #1) is idle since the survey step completed, so they're who trains here. Training itself takes real ticks (TRAINING_BASE_TICKS, balance.ts) -- command mode has no implicit clock between steps, so the wait is its own step right below, mirroring train-driller's own click/wait split above.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "trainingCount"
+        ]
+      }
+    },
+    {
+      "command": "tick 25",
+      "timeout": 30,
+      "description": "#555: train-digger complete: the training course finishes and the surveyor (employee #1) is granted driving.excavator. waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick since it has no implicit clock between steps.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "buy-rock-digger-assign",
+          "timeout": 30000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "buy-rock-digger-assign"
+      }
+    },
+    {
+      "command": "vehicle buy rock_digger",
+      "timeout": 30,
+      "description": "buy-rock-digger-assign, first half: Vehicles panel open, tier-1 rock_digger bought and placed on the terrain surface",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"rock_digger\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+        }
+      ],
+      "expect": {
+        "increased": [
+          "vehicleCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle driver 2 1",
+      "timeout": 90,
+      "description": "#555: buy-rock-digger-assign complete: Assign clicked, then the tutorial's own clock runs while the newly-licensed digger (employee #1) walks to the rock_digger and boards -- box-cut's own dig_ramp_segment work can only ever land a segment once this actually completes.",
       "role": "player",
       "interaction": [
         {

@@ -185,6 +185,29 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
   ],
 
+  'train-digger': [
+    { target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.open_crew' },
+    // CrewPanel is single-expansion (expandedId) -- .bs-train-btn only
+    // renders once the digger's own row is expanded. The surveyor hired by
+    // 'hire-surveyor' -- idle since the survey step completed -- is always
+    // employee #1 at this point in the campaign's own tutorial script, the
+    // same fixed-id assumption train-driller makes for the driller (#2).
+    {
+      target: '#bs-employee-panel [data-employee-id="1"] .bs-detail-toggle',
+      hintKey: 'tutorial.stage.expand_digger',
+    },
+    {
+      target: '#bs-employee-panel .bs-train-btn[data-skill="driving.excavator"]',
+      hintKey: 'tutorial.stage.train_excavator',
+    },
+  ],
+
+  'buy-rock-digger-assign': [
+    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
+    { target: '#bs-vehicle-panel [data-vtype="rock_digger"]', hintKey: 'tutorial.stage.vehicle_buy_rock_digger' },
+    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
+  ],
+
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="grid-tool"]', hintKey: 'tutorial.stage.grid_tool' },

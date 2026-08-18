@@ -72,9 +72,23 @@ const LEVELS: readonly LevelDef[] = [
     // survey (up to $3,000), the scripted consultant ($3,000), a debris_hauler
     // ($25,000) and a freight_warehouse ($15,000) — about $52,000 before the
     // delivery step that first earns anything. At $20,000 the tutorial was
-    // unfinishable: the hauler alone cost more than the whole purse. This leaves
-    // headroom for salaries, fuel and maintenance across the run.
-    startingCash: 80000,
+    // unfinishable: the hauler alone cost more than the whole purse.
+    //
+    // #553 then made drill_hole a queued, vehicle-gated action: a
+    // driving_center ($12,000), training a driller on driving.drill_rig
+    // ($2,500) and a drill_rig ($35,000) — $49,500 more — without which the
+    // drill-plan step could never land a hole. #555 gated dig_ramp_segment
+    // (the box-cut step, which now takes real ticks to excavate instead of
+    // carving instantly) the same way: training a digger on driving.excavator
+    // ($2,500) and a rock_digger ($50,000) — $52,500 more, plus the extra
+    // payroll/fuel/maintenance drain of the ~130 ticks box-cut now spends
+    // actually digging instead of completing in the same tick it was
+    // ordered. Sandbox-measured (command mode, tutorial's own step order):
+    // $150,000 still went negative mid-dig; $170,000 finished box-cut with
+    // ~$4,600 left, no margin for drill-plan onward. $190,000 leaves ~$24,600
+    // at box-cut completion — this leaves headroom for salaries, fuel and
+    // maintenance across the run.
+    startingCash: 190000,
     availableExplosives: ['pop_rock', 'boomite'],
     unlockThreshold: 5000,
     eventFreqMultiplier: 0,
