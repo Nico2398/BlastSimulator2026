@@ -97,9 +97,16 @@ Batch issues are ordinary issues — `Blocked by` the enabler, one slice each, v
 
 ## Setting a dependency
 
-`gh` has no command for relationships; they are REST-only. The endpoint takes
-`issue_id` — the issue's **database id**, not its number — which is the one
-detail that makes this fail silently if guessed.
+Relationships are REST-only, on `/repos/{owner}/{repo}/issues/{number}/dependencies/blocked_by`.
+No CLI subcommand and no MCP tool wraps them — in particular the GitHub MCP's
+`sub_issue_write` is parent/child hierarchy, a different relationship that the
+queue does not read as a dependency. The endpoint takes `issue_id` — the
+issue's **database id**, not its number — which is the one detail that makes
+this fail silently if guessed.
+
+Use whichever transport the session has. Both call the same endpoint.
+
+**With `gh`:**
 
 ```bash
 REPO=Nico2398/BlastSimulator2026
@@ -108,6 +115,27 @@ gh api --method POST "repos/$REPO/issues/<blocked-number>/dependencies/blocked_b
   -F "issue_id=$BLOCKER_ID"
 ```
 
+**Without `gh`** — Claude Code on the web has no `gh` CLI, but does carry a
+`GITHUB_TOKEN` (and `GH_TOKEN`) in the environment, so `curl` reaches the same
+endpoint. Never echo the token; pass it straight from the variable.
+
+```bash
+API=https://api.github.com
+REPO=Nico2398/BlastSimulator2026
+BLOCKER_ID=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "$API/repos/$REPO/issues/<blocker-number>" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+curl -sS -X POST -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" \
+  -d "{\"issue_id\":$BLOCKER_ID}" \
+  "$API/repos/$REPO/issues/<blocked-number>/dependencies/blocked_by"
+```
+
+The blocker-id lookup is skippable when the blocker was created in this same
+session: `mcp__github__issue_write` returns the database id as `id` in its own
+response, which is exactly the value `issue_id` wants. Capture it at creation
+rather than re-fetching.
+
 Read them back, and remove one, with:
 
 ```bash
@@ -115,9 +143,25 @@ gh api "repos/$REPO/issues/<number>/dependencies/blocked_by" --jq '.[].number'
 gh api --method DELETE "repos/$REPO/issues/<blocked-number>/dependencies/blocked_by/$BLOCKER_ID"
 ```
 
+```bash
+curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+  "$API/repos/$REPO/issues/<number>/dependencies/blocked_by" \
+  | python3 -c "import sys,json; print([i['number'] for i in json.load(sys.stdin)])"
+```
+
 **Verify the relationship after setting it.** A `POST` that 4xx'd leaves an issue
 that reads as blocked to a human and is assignable to the queue — the one
-direction that matters. The read-back above is the check.
+direction that matters. A successful `POST` returns the *blocked* issue's own
+object, which looks identical whether or not the dependency landed, so the
+response body is not the confirmation. The read-back above is the check.
+
+**Never downgrade to a body-only dependency because the transport looked
+unavailable.** The body's `Blocked by` section is honoured — `assignability.cjs`
+unions it with the real relationships — so a body-only dependency does hold the
+queue, which is exactly why skipping the relationship is easy to miss: nothing
+fails, and the issue simply never gains the relationship a human reading the
+GitHub UI expects to see. Establish the transport first; both are available in
+every session this project runs in.
 
 When several issues are filed as a batch, set every relationship before adding
 `ready` to any of them: `ready` is the only thing standing between an issue and
@@ -130,7 +174,7 @@ recorded can be picked up in that window.
 - [ ] Context section explains the larger feature and this task's place in it
 - [ ] Task section states what changes
 - [ ] Complete shape only: Files and Test sections name every file and what it verifies
-- [ ] Dependencies set as GitHub `blocked_by` relationships, and read back to confirm
+- [ ] Dependencies set as GitHub `blocked_by` relationships — via `gh` or, with no `gh` CLI, `curl` with `$GITHUB_TOKEN` — and read back to confirm
 - [ ] The same dependencies written under a `Blocked by` heading as `#N` references
 - [ ] For a batch, every relationship set before `ready` goes on any of them
 - [ ] Verification is a concrete observable outcome
