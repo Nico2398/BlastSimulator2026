@@ -6,6 +6,7 @@ import { formatMoney } from '../economy/formatMoney.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { RAMP_DIG_VOXELS_PER_TICK_TIER1, VEHICLE_TIER_MULTIPLIERS } from '../config/balance.js';
 
 // ── Config ──
 
@@ -60,58 +61,23 @@ export function buildRamp(
   cash: number,
   emitter?: EventEmitter,
 ): RampResult {
-  const totalCost = ramp.length * RAMP_COST_PER_METER;
-
-  if (cash < totalCost) {
-    return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0, voxelsCleared: 0 };
+  const validation = validateRampOrder(ramp, cash);
+  if (!validation.success) {
+    return { success: false, message: validation.message, cost: 0, voxelsCleared: 0 };
   }
 
-  if (ramp.length <= 0) {
-    return { success: false, message: 'Ramp length must be positive', cost: 0, voxelsCleared: 0 };
-  }
+  const segments = defineRampSegments(grid, ramp);
 
-  if (ramp.targetDepth <= 0) {
-    return { success: false, message: 'Target depth must be positive', cost: 0, voxelsCleared: 0 };
-  }
-
-  const offset = DIR_OFFSETS[ramp.direction];
   let voxelsCleared = 0;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
 
-  // Perpendicular direction for width
-  const perpDx = offset.dz !== 0 ? 1 : 0;
-  const perpDz = offset.dx !== 0 ? 1 : 0;
-  const halfWidth = Math.floor(RAMP_WIDTH / 2);
-
-  for (let step = 0; step < ramp.length; step++) {
-    // Depth of descent at this step: grows linearly from 0 to targetDepth
-    const currentDepth = Math.floor((step / ramp.length) * ramp.targetDepth);
-    // Height clearance for vehicles: 3 voxels
-    const clearanceHeight = 3;
-
-    const cx = ramp.originX + offset.dx * step;
-    const cz = ramp.originZ + offset.dz * step;
-
-    // Carve relative to this column's live surface height, not an absolute
-    // world Y — real terrain sits far above y=0, so an absolute band would
-    // land buried under solid rock and never change the surface.
-    const surfaceY = computeColumnSurfaceY(grid, cx, cz);
-    const floorY = surfaceY - currentDepth;
-    const ceilingY = surfaceY + clearanceHeight;
-
-    for (let w = -halfWidth; w <= halfWidth; w++) {
-      const wx = cx + perpDx * w;
-      const wz = cz + perpDz * w;
-
-      for (let y = floorY; y < ceilingY; y++) {
-        if (grid.densityAt(wx, y, wz) > 0) {
-          grid.clearVoxel(wx, y, wz);
-          voxelsCleared++;
-          minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
-          minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-          minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
-        }
-      }
+  for (const segment of segments) {
+    const result = carveRampSegment(grid, segment);
+    voxelsCleared += result.voxelsCleared;
+    if (segment.region && result.voxelsCleared > 0) {
+      minX = Math.min(minX, segment.region.minX); maxX = Math.max(maxX, segment.region.maxX);
+      minY = Math.min(minY, segment.region.minY); maxY = Math.max(maxY, segment.region.maxY);
+      minZ = Math.min(minZ, segment.region.minZ); maxZ = Math.max(maxZ, segment.region.maxZ);
     }
   }
 
@@ -122,7 +88,7 @@ export function buildRamp(
   return {
     success: true,
     message: `Ramp built: ${ramp.length}m ${ramp.direction}, ${voxelsCleared} voxels cleared`,
-    cost: totalCost,
+    cost: validation.cost,
     voxelsCleared,
   };
 }
@@ -148,10 +114,39 @@ export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };
 /**
  * Validate a ramp order against `cash` without carving anything — the
  * order-time check `buildRampCommand` runs before queuing excavation work.
- * TODO: implement.
+ * Same length/depth/cash checks and messages `buildRamp` has always run,
+ * extracted so order-time validation and progressive excavation share one
+ * source of truth (#555).
  */
-export function validateRampOrder(_ramp: RampDef, _cash: number): { success: boolean; message: string; cost: number } {
-  return { success: false, message: 'not implemented', cost: 0 };
+export function validateRampOrder(ramp: RampDef, cash: number): { success: boolean; message: string; cost: number } {
+  const totalCost = ramp.length * RAMP_COST_PER_METER;
+
+  if (cash < totalCost) {
+    return { success: false, message: `Insufficient funds: need $${formatMoney(totalCost)}, have $${formatMoney(cash)}`, cost: 0 };
+  }
+
+  if (ramp.length <= 0) {
+    return { success: false, message: 'Ramp length must be positive', cost: 0 };
+  }
+
+  if (ramp.targetDepth <= 0) {
+    return { success: false, message: 'Target depth must be positive', cost: 0 };
+  }
+
+  return { success: true, message: '', cost: totalCost };
+}
+
+/**
+ * The column (x, z) ramp step `step` (0-indexed from the entrance) passes
+ * through, before width is applied — the same column `defineRampSegments`
+ * derives internally per iteration. Exposed so `buildRampCommand` can target
+ * a dispatched `dig_ramp_segment` PendingAction's ghost at the same place
+ * (row center, at the column's own surface Y via `computeColumnSurfaceY`)
+ * without duplicating the direction-offset math.
+ */
+export function rampStepColumn(ramp: RampDef, step: number): { x: number; z: number } {
+  const offset = DIR_OFFSETS[ramp.direction];
+  return { x: ramp.originX + offset.dx * step, z: ramp.originZ + offset.dz * step };
 }
 
 /** One excavation segment of an ordered ramp — the unit a `dig_ramp_segment` PendingAction carves. */
@@ -163,27 +158,89 @@ export interface RampSegmentDef {
 
 /**
  * Split `ramp` into per-segment excavation work, one segment per
- * `dig_ramp_segment` PendingAction.
- * TODO: implement.
+ * `dig_ramp_segment` PendingAction — one entry per `step` of `buildRamp`'s
+ * original loop (0-indexed from the entrance), using the exact same
+ * column/width/depth math, but only reading density (never mutating) and
+ * partitioning cells per step instead of accumulating across all of them.
+ * `region` is null when a step's footprint is already entirely clear.
  */
-export function defineRampSegments(_grid: VoxelGrid, _ramp: RampDef): RampSegmentDef[] {
-  return [];
+export function defineRampSegments(grid: VoxelGrid, ramp: RampDef): RampSegmentDef[] {
+  const offset = DIR_OFFSETS[ramp.direction];
+  const perpDx = offset.dz !== 0 ? 1 : 0;
+  const perpDz = offset.dx !== 0 ? 1 : 0;
+  const halfWidth = Math.floor(RAMP_WIDTH / 2);
+  const clearanceHeight = 3;
+
+  const segments: RampSegmentDef[] = [];
+
+  for (let step = 0; step < ramp.length; step++) {
+    const currentDepth = Math.floor((step / ramp.length) * ramp.targetDepth);
+    const cx = ramp.originX + offset.dx * step;
+    const cz = ramp.originZ + offset.dz * step;
+
+    const surfaceY = computeColumnSurfaceY(grid, cx, cz);
+    const floorY = surfaceY - currentDepth;
+    const ceilingY = surfaceY + clearanceHeight;
+
+    const cells: { x: number; y: number; z: number }[] = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+    for (let w = -halfWidth; w <= halfWidth; w++) {
+      const wx = cx + perpDx * w;
+      const wz = cz + perpDz * w;
+
+      for (let y = floorY; y < ceilingY; y++) {
+        if (grid.densityAt(wx, y, wz) > 0) {
+          cells.push({ x: wx, y, z: wz });
+          minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+          minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+          minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
+        }
+      }
+    }
+
+    segments.push({
+      index: step,
+      cells,
+      region: cells.length > 0 ? { minX, maxX, minY, maxY, minZ, maxZ } : null,
+    });
+  }
+
+  return segments;
 }
 
 /**
  * Carve one ramp segment's cells into `grid`, emitting `terrain:updated` for
- * the affected region.
- * TODO: implement.
+ * the affected region. Density is re-checked per cell at carve time — a cell
+ * already cleared by something else (a blast, another ramp) since
+ * `defineRampSegments` ran is silently skipped, not double-counted, not an
+ * error.
  */
-export function carveRampSegment(_grid: VoxelGrid, _segment: RampSegmentDef, _emitter?: EventEmitter): { voxelsCleared: number } {
-  return { voxelsCleared: 0 };
+export function carveRampSegment(grid: VoxelGrid, segment: RampSegmentDef, emitter?: EventEmitter): { voxelsCleared: number } {
+  let voxelsCleared = 0;
+
+  for (const cell of segment.cells) {
+    if (grid.densityAt(cell.x, cell.y, cell.z) > 0) {
+      grid.clearVoxel(cell.x, cell.y, cell.z);
+      voxelsCleared++;
+    }
+  }
+
+  if (voxelsCleared > 0 && segment.region) {
+    emitter?.emit('terrain:updated', { region: segment.region });
+  }
+
+  return { voxelsCleared };
 }
 
 /**
  * Work-duration ticks for a `rock_digger` of `tier` to excavate `voxelCount`
- * voxels of a ramp segment.
- * TODO: implement.
+ * voxels of a ramp segment. Scales inversely with the tier's workRate
+ * multiplier (VEHICLE_TIER_MULTIPLIERS) against the tier-1 baseline rate
+ * (RAMP_DIG_VOXELS_PER_TICK_TIER1), always at least 1 tick — a zero-voxel
+ * segment (row already flat) still takes a tick to "dig".
  */
-export function computeRampSegmentDurationTicks(_voxelCount: number, _tier: VehicleTier): number {
-  return 1;
+export function computeRampSegmentDurationTicks(voxelCount: number, tier: VehicleTier): number {
+  const tierWorkRateMultiplier = VEHICLE_TIER_MULTIPLIERS[tier].workRate;
+  return Math.max(1, Math.ceil(voxelCount / (RAMP_DIG_VOXELS_PER_TICK_TIER1 * tierWorkRateMultiplier)));
 }

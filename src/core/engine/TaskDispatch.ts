@@ -218,6 +218,7 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  * everything else. Used by cancelAction to compute the refund.
  */
 function actionOrderCost(action: PendingAction): number {
+  if (action.type === 'dig_ramp_segment') return (action.payload['segmentCost'] as number) ?? 0;
   if (action.type !== 'survey') return 0;
   const method = action.payload['method'];
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;

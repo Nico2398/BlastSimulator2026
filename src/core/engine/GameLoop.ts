@@ -18,7 +18,7 @@ import { tickArrivalGate, type ArrivalGateResult } from './ArrivalGate.js';
 import { completePendingAction, claimPendingAction, clearActiveTaskFields, interruptActiveAction } from './TaskDispatch.js';
 import {
   estimateActionCost, resolveActionCost, selectBestActionForEmployee,
-  computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields, type SelectedAction,
+  computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields, isRampSegmentClaimable, type SelectedAction,
 } from './ActionSelection.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, releaseVehicleOnCompletion } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
@@ -374,7 +374,7 @@ function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAc
 
   const selection = selectBestActionForEmployee(
     state, employee, poolCandidates,
-    candidate => findVehicleForClaim(state, candidate, employee).ok,
+    candidate => findVehicleForClaim(state, candidate, employee).ok && isRampSegmentClaimable(state, candidate),
   );
   if (selection === null) return null;
 
@@ -532,7 +532,10 @@ export function tryContinueVehicleGatedAction(
       // #552: re-checked here too — conditions (storage room, still
       // oversized) can drift between the original claim and this same-tick
       // continuity promotion.
-      && isHaulOrFragmentActionClaimable(state, a))
+      && isHaulOrFragmentActionClaimable(state, a)
+      // #555: same continuity gap for a ramp segment — a follow-up out of
+      // order (predecessor not yet done) is skipped, not grabbed early.
+      && isRampSegmentClaimable(state, a))
     .sort((a, b) => a.id - b.id);
 
   if (queuedFollowUps.length > 0) {
@@ -550,7 +553,9 @@ export function tryContinueVehicleGatedAction(
       a.requiredVehicleRole === role &&
       (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
       // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
-      isHaulOrFragmentActionClaimable(state, a))
+      isHaulOrFragmentActionClaimable(state, a) &&
+      // #555: see queuedFollowUps' own comment on the same check, just above.
+      isRampSegmentClaimable(state, a))
     .sort((a, b) => a.id - b.id);
 
   if (poolFollowUps.length === 0) return false;

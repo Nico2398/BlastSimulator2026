@@ -265,7 +265,7 @@ export class BuildMenu {
 
     controller.setConfirmHandler((sel) => {
       const cmd = this.gameConsole?.(`build_ramp start:${sel.x1},${sel.z1} end:${sel.x2},${sel.z2} depth:${this.rampDepth}`);
-      this.setStatus(cmd?.success ? t('ui.build.ramp_built') : (cmd?.output ?? ''));
+      this.setStatus(cmd?.success ? t('ui.build.ramp_ordered') : (cmd?.output ?? ''));
       overlay.flashConfirm();
     });
     controller.setChangeHandler(refresh);

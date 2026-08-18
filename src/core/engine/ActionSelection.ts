@@ -12,6 +12,8 @@ import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
 import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
+import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
+import type { VehicleTier } from '../entities/Vehicle.js';
 
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
@@ -43,6 +45,12 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
     }
     const needKey = resolveRestNeedKey(action.payload);
     return needKey !== null ? NEED_REST_DURATIONS[needKey] : BASE_TASK_DURATION_TICKS;
+  }
+
+  if (action.type === 'dig_ramp_segment') {
+    const voxelCount = (action.payload['cells'] as unknown[] | undefined)?.length ?? 0;
+    const vehicle = state.vehicles.vehicles.find(v => v.reservedForActionId === action.id);
+    return computeRampSegmentDurationTicks(voxelCount, (vehicle?.tier ?? 1) as VehicleTier);
   }
 
   if (typeof action.payload['durationTicks'] === 'number') {
@@ -163,12 +171,27 @@ export interface SelectedAction {
 /**
  * Claim-time gate for a `dig_ramp_segment` PendingAction — mirrors the shape
  * of GameLoop.ts's vehicle-availability `isClaimable` predicate passed into
- * `selectBestActionForEmployee` (see its doc above), but is not yet wired
- * into that call site.
- * TODO: implement.
+ * `selectBestActionForEmployee` (see its doc above). Enforces entrance-first
+ * excavation order: segment 0 is always claimable, and any later segment
+ * only once its immediate predecessor in the same `PlannedRamp` is `done`.
+ * Any non-`dig_ramp_segment` action, or a segment whose owning `PlannedRamp`
+ * can't be found (defensive — should never happen), is claimable — fail-open
+ * rather than stranding work nobody can ever pick up.
  */
-export function isRampSegmentClaimable(_state: GameState, _action: PendingAction): boolean {
-  return true;
+export function isRampSegmentClaimable(state: GameState, action: PendingAction): boolean {
+  if (action.type !== 'dig_ramp_segment') return true;
+
+  const rampId = action.payload['rampId'];
+  const segmentIndex = action.payload['segmentIndex'];
+  if (typeof rampId !== 'number' || typeof segmentIndex !== 'number') return true;
+
+  const ramp = state.plannedRamps.find(r => r.id === rampId);
+  if (!ramp) return true;
+
+  if (segmentIndex === 0) return true;
+
+  const previous = ramp.segments.find(s => s.index === segmentIndex - 1);
+  return previous?.done === true;
 }
 
 export function selectBestActionForEmployee(
