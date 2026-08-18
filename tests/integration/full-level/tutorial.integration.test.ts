@@ -9,6 +9,7 @@ import {
   performBlast,
   getStateSummary,
   driveDrillPlanToCompletion,
+  driveChargePlanToCompletion,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
@@ -126,7 +127,8 @@ describe('Tutorial Level — Full Walkthrough', () => {
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
-    expect(chargeResult.output).toContain('Charged');
+    expect(chargeResult.output).toContain('Ordered charges');
+    driveChargePlanToCompletion(ctx);
 
     // 9. Auto-sequence
     const seqResult = sequenceCommand(ctx as any, ['auto'], {});
@@ -164,8 +166,25 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(assignMgt.success).toBe(true);
     expect(assignMgt.output).toContain('assigned skill');
 
-    // 16. Accept contract #1
-    const acceptContract = contractCommand(ctx, ['accept', '1'], {});
+    // 16. Accept a contract for whichever ore this blast actually produced
+    // the most of, among what's currently on offer. Not hardcoded to id 1
+    // (#554): charging now takes real time, and the extra ticks
+    // driveChargePlanToCompletion spends draining the charge orders above
+    // are enough for the deadline-driven contract pool to cycle #1 out
+    // before this step runs — and the contract that replaces it is drawn
+    // from the full material catalog, not necessarily an ore this blast
+    // yielded at all (the dominant ore, dirtite at this seed, is common
+    // enough to not always be on offer itself). Ranking by yield rather than
+    // taking the first match still matters for step 22 below: storage is
+    // capacity-capped, so a contract for a barely-mined trace ore could
+    // still fail delivery even once matched to *some* mined material.
+    const oreYields = ctx.state!.lastOreReport?.oreYields ?? {};
+    const rankedByYield = [...ctx.state!.contracts.available]
+      .filter(c => (oreYields[c.materialId] ?? 0) > 0)
+      .sort((a, b) => (oreYields[b.materialId] ?? 0) - (oreYields[a.materialId] ?? 0));
+    const availableContract = rankedByYield[0] ?? ctx.state!.contracts.available[0]!;
+    const availableContractId = availableContract.id;
+    const acceptContract = contractCommand(ctx, ['accept', String(availableContractId)], {});
     expect(acceptContract.success).toBe(true);
     expect(acceptContract.output).toContain('Accepted contract');
 
@@ -203,7 +222,7 @@ describe('Tutorial Level — Full Walkthrough', () => {
     expect(buildResult.success).toBe(true);
     expect(ctx.state!.buildings.buildings.length).toBe(1);
 
-    // 22. Deliver 500kg to contract #1 — should generate positive payment.
+    // 22. Deliver to the accepted contract — should generate positive payment.
     // Ore must actually be in storage first (#456 — blasting alone no longer
     // credits cash/collectedOre; only hauled-and-stored fragments count).
     // Fragments are moved into storage via Logistics.pickupFragment/
@@ -212,18 +231,30 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // exercised by its own suites (HaulingTask.test.ts, ArrivalGate.test.ts);
     // these are the exact two primitives HaulingTask.tickHaulingProgress
     // calls internally on arrival.
+    //
+    // Every ground fragment is hauled (not stopped at a flat 500kg total),
+    // and the delivery amount is capped to what's actually in storage for
+    // the accepted contract's own material (#554): each fragment carries a
+    // mixed oreDensities breakdown, not a single ore, and the fixed-id
+    // contract this step used to hardcode happened to always be a
+    // majority-share ore — dirtite, at this seed — so a flat 500kg of mixed
+    // storage was always enough of it. The dynamic contract selection above
+    // can now land on a minor-share ore (rustite et al.) instead, for which
+    // 500kg of *total* stored mass is nowhere near 500kg of *that ore*.
     const groundFragments = ctx.state!.logistics.fragments.filter(f => f.state === 'on_ground');
     for (const f of groundFragments) {
-      if (ctx.state!.logistics.storedMassKg >= 500) break;
       // A blast throws off boulders heavier than an early warehouse holds, and
       // pickupFragment turns those away — so count what actually landed in
       // storage rather than what was attempted.
       if (!pickupFragment(ctx.state!.logistics, f.fragment.id, 'vehicle-test')) continue;
       deliverToDepot(ctx.state!.logistics, f.fragment.id, ctx.state!.collectedOre);
     }
-    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThanOrEqual(500);
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
 
-    const deliverResult = contractCommand(ctx, ['deliver', '1'], { amount: '500' });
+    const deliverableKg = Math.min(500, ctx.state!.collectedOre[availableContract.materialId] ?? 0);
+    expect(deliverableKg).toBeGreaterThan(0);
+
+    const deliverResult = contractCommand(ctx, ['deliver', String(availableContractId)], { amount: String(deliverableKg) });
     expect(deliverResult.success).toBe(true);
     expect(deliverResult.output).toContain('Payment: $');
     // Payment should be positive (> 0)

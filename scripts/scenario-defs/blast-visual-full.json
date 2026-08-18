@@ -3,22 +3,22 @@
   "description": "Comprehensive visual pipeline test covering all 7 blast system areas: drill plan, charge/sequence, software preview tiers, detonation execution, post-blast report, and voxel fragmentation with multi-angle screenshots at every stage",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000",
+      "command": "new_game seed:42 cash:200000",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000"
+          "command": "new_game seed:42 cash:200000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000,
+          "cash": 200000,
           "holeCount": 0
         }
       },
-      "description": "#553: cash bumped from $50,000 to $150,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, on top of the four blast-workshop software tiers it already buys."
+      "description": "#553: cash bumped from $50,000 to $150,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, on top of the four blast-workshop software tiers it already buys. Bumped again to $200,000 (#554): charging is now real work too -- three separate charge orders (Charge All plus two per-hole overrides), each drained by its own wait, add several hundred more ticks of the 3-driller roster's payroll/fuel upkeep before the tier:4 software purchase further down this file (observed short by ~10,400 at $150,000)."
     },
     {
       "command": "employee hire role:driller",
@@ -431,8 +431,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 12
+          "chargedCount": 12,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -491,10 +511,30 @@
       "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
       "role": "player",
       "expect": {
+        "note": "count is unchanged — every hole was already charged by Charge All; this step overrides H1 alone",
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 12
-        },
-        "note": "count is unchanged — every hole was already charged by Charge All; this step overrides H1 alone"
+          "chargedCount": 12,
+          "orderedChargeCount": 0
+        }
       }
     },
     {
@@ -580,8 +620,28 @@
       "description": "The opposite override on the neighbouring hole: 5 amount decrements (8 -> 3kg) and 10 stemming decrements (3.0 -> 1.0m) off what the H1 row left behind, then H2's own commit button.",
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 12
+          "chargedCount": 12,
+          "orderedChargeCount": 0
         }
       }
     },

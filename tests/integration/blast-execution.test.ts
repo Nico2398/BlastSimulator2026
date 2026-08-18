@@ -218,11 +218,50 @@ describe('Blast execution — confirmed-but-undrilled holes are not blastable (#
     expect(state.drillHoles.length).toBeGreaterThan(0);
 
     expect(run('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+
+    // #554: charging is real work too — drain the ordered charges the same
+    // way the drill plan above was drained before blasting.
+    for (let i = 0; i < 800 && Object.keys(state.plannedChargesByHole).length > 0; i++) run('tick 1');
+    expect(Object.keys(state.plannedChargesByHole)).toHaveLength(0);
+    expect(Object.keys(state.chargesByHole).length).toBeGreaterThan(0);
+
     expect(run('sequence auto delay_step:25').success).toBe(true);
 
     const result = run('blast');
 
     expect(result.success).toBe(true);
     expect(result.output).toContain('BLAST REPORT');
+  });
+});
+
+// ── #554: a confirmed charge order is not blastable until it has actually
+// loaded — chargesByHole, not plannedChargesByHole, is what blastCommand/
+// validateBlastPlan reads ─────────────────────────────────────────────────
+
+describe('Blast execution — outstanding (not yet landed) charge orders are not blastable (#554)', () => {
+  it('a blast plan with an outstanding charge_hole order for a hole is refused, with a message distinguishing "still loading" from "missing", and chargesByHole for that hole stays empty', () => {
+    const { runner, ctx } = createRunner();
+    const run = (cmd: string) => runner.run(cmd);
+
+    expect(run('new_game seed:42 size:32 staffed:true').success).toBe(true);
+    expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
+    const state = ctx.state!;
+
+    for (let i = 0; i < 800 && state.plannedDrillHoles.length > 0; i++) run('tick 1');
+    expect(state.drillHoles.length).toBeGreaterThan(0);
+
+    // Order charges for every drilled hole but do NOT wait for them to land —
+    // every hole should still be sitting in plannedChargesByHole.
+    expect(run('charge hole:* explosive:boomite amount:5 stemming:2').success).toBe(true);
+    expect(Object.keys(state.chargesByHole)).toHaveLength(0);
+    expect(Object.keys(state.plannedChargesByHole).length).toBeGreaterThan(0);
+
+    expect(run('sequence auto delay_step:25').success).toBe(true);
+    const result = run('blast');
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('loading');
+    expect(result.output.toLowerCase()).not.toContain('missing charge');
+    expect(Object.keys(state.chargesByHole)).toHaveLength(0);
   });
 });

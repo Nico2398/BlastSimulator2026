@@ -244,10 +244,30 @@
       ],
       "role": "player",
       "expect": {
+        "note": "Charge All reaches every hole that exists by this point — all 7, production and presplit alike, with boomite. The presplit row's real explosive is applied next, one hole at a time, overwriting these 3 with pop_rock — chargedCount stays 7 throughout, only the per-hole explosiveId changes",
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 7
-        },
-        "note": "Charge All reaches every hole that exists by this point — all 7, production and presplit alike, with boomite. The presplit row's real explosive is applied next, one hole at a time, overwriting these 3 with pop_rock — chargedCount stays 7 throughout, only the per-hole explosiveId changes"
+          "chargedCount": 7,
+          "orderedChargeCount": 0
+        }
       }
     },
     {
@@ -305,10 +325,30 @@
       "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The presplit line is exactly the case per-hole charging exists for: holes that must carry a different product from the production holes Charge All just loaded. Clicking the pop_rock product card also clamps the amount stepper into pop_rock's own [0.5, 3]kg range (ChargeStep.clampAmount), taking it 5 -> 3kg; 1 further decrement reaches the declared 2kg, and 5 stemming increments take 2.0 -> 3.0m. The Charge All step above pinned the panel to [data-step=\"2\"], so the Per Hole rows stay visible for all three. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed. Finding #7 class: the file previously charged bare-numeric hole:1..hole:5 with a fictional explosive:presplit id that does not exist in ExplosiveCatalog.ts (8 real products, none named presplit) — every charge silently failed on BOTH counts and chargedCount for these holes stayed 0 through this file's entire history. Fixed by using the real hole id (H5, drill_plan add's own numbering, continuing from the production grid's H1-H4 — #553 shrunk the production grid from H1-H9) and pop_rock — the catalog's lowest-energy, lowest-projection-risk, lowest-vibration product, the real product that matches a presplit line's job.",
       "role": "player",
       "expect": {
+        "note": "chargedCount does not move — Charge All had already loaded all 7 holes with boomite; what changes here is H5's explosiveId/amount/stemming",
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 7
-        },
-        "note": "chargedCount does not move — Charge All had already loaded all 7 holes with boomite; what changes here is H5's explosiveId/amount/stemming"
+          "chargedCount": 7,
+          "orderedChargeCount": 0
+        }
       }
     },
     {
@@ -338,8 +378,28 @@
       "description": "Same product and same stepper values as H5 — a player selects the product once and walks the presplit rows, so this step is one click on H6's own [data-action=\"charge-hole\"], with the panel state asserted first.",
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 7
+          "chargedCount": 7,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -369,12 +429,32 @@
       ],
       "description": "Same product and same stepper values as the row before it — a player selects the product once and walks the presplit rows, so this step is one click on H7's own [data-action=\"charge-hole\"], with the panel state asserted first.",
       "expect": {
-        "equals": {
-          "chargedCount": 7
-        },
-        "note": "all 3 presplit holes now carry pop_rock alongside the 4 production holes' boomite"
+        "note": "all 3 presplit holes now carry pop_rock alongside the 4 production holes' boomite",
+        "increased": [
+          "orderedChargeCount"
+        ]
       },
       "role": "player"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 7,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto delay_step:25",

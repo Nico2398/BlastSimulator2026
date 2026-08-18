@@ -60,11 +60,16 @@ import { killEmployee } from '../../src/core/entities/Employee.js';
  * grid/add now queues one drill_hole action per hole instead of writing it
  * straight into state.drillHoles, so a scenario proving a plan was queued
  * but not yet drilled had no field to check before this.
+ * orderedChargeCount (Object.keys(state.plannedChargesByHole).length) closes
+ * the same gap for a charge order still in flight (#554) — `charge` now
+ * queues one charge_hole action per hole instead of writing it straight into
+ * state.chargesByHole, so a scenario proving a charge was ordered but not
+ * yet loaded had no field to check before this.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'chargedCount',
+  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'deathCount',
@@ -301,6 +306,16 @@ describe('console-api', () => {
         runner.runner.run('tick 1');
       }
       runner.runner.run('charge hole:* explosive:boomite amount:5 stemming:2');
+      // #554: charging is real work too — drain the ordered charges the same
+      // way the drill plan above was drained before blasting.
+      for (let i = 0; i < 600 && Object.keys(runner.ctx.state!.plannedChargesByHole).length > 0; i++) {
+        for (const emp of runner.ctx.state!.employees.employees) {
+          emp.hunger = 100;
+          emp.fatigue = 100;
+          emp.breakNeed = 100;
+        }
+        runner.runner.run('tick 1');
+      }
       runner.runner.run('sequence auto delay_step:25');
       runner.runner.run('blast');
       const state = serializeGameState(runner.ctx as MiningContext)!;

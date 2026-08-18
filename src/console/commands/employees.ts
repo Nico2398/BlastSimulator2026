@@ -22,6 +22,7 @@ import {
 } from '../../core/entities/EmployeeTraining.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
+import { releasePlannedHoleForCancelledAction } from './mining.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
@@ -272,6 +273,10 @@ export function employeeCommand(
           : `Action #${id} not found.`;
         return { success: false, output: message };
       }
+      // A cancelled drill_hole/charge_hole order still has a ghost in
+      // plannedDrillHoles/plannedChargesByHole — cancelAction only removes
+      // the generic PendingAction record (#554 code review).
+      releasePlannedHoleForCancelledAction(state, result.action!);
       const refundMsg = result.refunded && result.refunded > 0
         ? ` $${formatMoney(result.refunded)} refunded.`
         : '';

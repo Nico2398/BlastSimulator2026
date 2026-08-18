@@ -21,6 +21,11 @@ const HOLE_SEGMENTS = 8;      // low-poly cylinder
 const GHOST_HOLE_COLOR = 0x8899aa;
 const GHOST_HOLE_OPACITY = 0.35;
 
+// Ordered-but-not-loaded charge marker (#554) — mirrors the ghost-hole
+// treatment above for a charge order still queued as a `charge_hole` action.
+export const CHARGE_ORDERED_COLOR = 0xffaa00; // matches ChargeHoleList's own amber "ordered" row (var(--bsx-amber))
+export const CHARGE_ORDERED_OPACITY = 0.4;
+
 // Charge color scale (empty → max charge)
 const CHARGE_COLORS: readonly number[] = [
   0x888888, // no charge
@@ -60,6 +65,8 @@ export interface HoleOverlayData {
   predictedFragSizeCm?: number;
   /** Predicted max projection speed (m/s) — for tier-3. */
   projectionSpeed?: number;
+  /** True while this hole's charge order is queued/in-progress as a `charge_hole` action, not yet landed in `charge` (#554). */
+  chargeOrdered?: boolean;
 }
 
 export interface BlastPlanOverlayOptions {
@@ -180,6 +187,16 @@ export class BlastPlanOverlay {
       { color: 0xff6644, side: THREE.DoubleSide }, 12, x, base - depth, z, pickId,
     );
     bottom.rotation.x = -Math.PI / 2;
+
+    // Charge order still loading (#554) — a distinct low-opacity fill so an
+    // ordered-but-unloaded hole reads differently from both an uncharged hole
+    // (nothing at all) and a landed charge's amount-scaled fill below.
+    if (!charge && hd.chargeOrdered) {
+      this.addXrayMesh(
+        new THREE.CylinderGeometry(HOLE_RADIUS * 0.4, HOLE_RADIUS * 0.4, depth * 0.3, HOLE_SEGMENTS),
+        { color: CHARGE_ORDERED_COLOR, transparent: true, opacity: CHARGE_ORDERED_OPACITY }, 13, x, base - depth + depth * 0.15, z, pickId,
+      );
+    }
 
     // Charge fill inside shaft + surface indicator
     if (charge && charge.amountKg > 0) {

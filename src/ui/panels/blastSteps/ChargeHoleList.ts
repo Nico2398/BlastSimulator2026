@@ -63,37 +63,50 @@ export class ChargeHoleList {
 
   get root(): HTMLElement { return this.el; }
 
-  render(holes: DrillHole[], charges: Record<string, HoleCharge>): void {
+  render(
+    holes: DrillHole[],
+    charges: Record<string, HoleCharge>,
+    /** Charges ordered but not yet loaded — the ordered/loading row state (#554). */
+    plannedCharges?: Record<string, HoleCharge>,
+  ): void {
     if (holes.length === 0) {
       this.listEl.replaceChildren(emptyState(t('ui.blast_workshop.charge.no_holes')));
       return;
     }
-    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id])));
+    this.listEl.replaceChildren(...holes.map(h => this.makeRow(h, charges[h.id], plannedCharges?.[h.id])));
   }
 
   refreshLocale(): void { this.locale.refresh(); }
 
-  private makeRow(hole: DrillHole, charge: HoleCharge | undefined): HTMLElement {
+  private makeRow(hole: DrillHole, charge: HoleCharge | undefined, planned: HoleCharge | undefined): HTMLElement {
     const charged = charge !== undefined;
+    const ordered = !charged && planned !== undefined;
     const row = el('div');
     row.style.cssText = [
       'display:flex', 'align-items:center', 'gap:9px', 'height:32px', 'padding:0 10px',
-      `border:1px solid ${charged ? 'rgba(79,199,107,.35)' : 'var(--bsx-hairline)'}`,
+      `border:1px solid ${charged ? 'rgba(79,199,107,.35)' : ordered ? 'rgba(255,170,0,.35)' : 'var(--bsx-hairline)'}`,
       'border-radius:4px',
-      `background:${charged ? 'rgba(79,199,107,.08)' : 'var(--bsx-card)'}`,
+      `background:${charged ? 'rgba(79,199,107,.08)' : ordered ? 'rgba(255,170,0,.08)' : 'var(--bsx-card)'}`,
     ].join(';');
     row.dataset['hole'] = hole.id;
-    // data-charged, same reasoning as the product cards' data-selected: the
-    // charged/uncharged difference lives in a cssText string full of var(...)
-    // refs, which jsdom does not reliably reflect back, so the state also gets
-    // an explicit attribute a test (and a scenario) can read.
+    // data-charged / data-ordered, same reasoning as the product cards'
+    // data-selected: the charged/ordered/uncharged difference lives in a
+    // cssText string full of var(...) refs, which jsdom does not reliably
+    // reflect back, so the state also gets explicit attributes a test (and a
+    // scenario) can read.
     row.dataset['charged'] = String(charged);
+    row.dataset['ordered'] = String(ordered);
 
     const tag = el('span', { text: hole.id, attrs: { style: 'font:600 11px/1 var(--bsx-font-mono);color:var(--bsx-ore);width:24px' } });
 
-    const statusStyle = `font:400 10px/1 var(--bsx-font-mono);color:${charged ? 'var(--bsx-text-secondary)' : 'var(--bsx-text-micro)'}`;
+    const statusColor = charged ? 'var(--bsx-text-secondary)' : ordered ? 'var(--bsx-amber)' : 'var(--bsx-text-micro)';
+    const statusStyle = `font:400 10px/1 var(--bsx-font-mono);color:${statusColor}`;
     const status = el('span', { attrs: { style: statusStyle } });
-    status.textContent = charge ? this.chargedLabel(charge) : t('ui.blast_workshop.charge.hole_uncharged');
+    status.textContent = charge
+      ? this.chargedLabel(charge)
+      : ordered
+        ? t('ui.blast_workshop.charge.hole_ordered')
+        : t('ui.blast_workshop.charge.hole_uncharged');
 
     const chargeBtn = el('button', { text: t('ui.blast_workshop.charge.charge_hole') });
     chargeBtn.style.cssText = [
@@ -106,6 +119,7 @@ export class ChargeHoleList {
 
     row.append(tag, status);
     if (charged) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-positive);display:flex' }, children: [iconEl('check', 11)] }));
+    else if (ordered) row.appendChild(el('div', { attrs: { style: 'color:var(--bsx-amber);display:flex' }, children: [iconEl('clock', 11)] }));
     row.appendChild(chargeBtn);
     return row;
   }

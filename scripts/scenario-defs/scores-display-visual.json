@@ -74,7 +74,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -130,7 +132,8 @@
       }
     },
     {
-      "command": "build living_quarters at:12,5",
+      "command": "build living_quarters at:22,21",
+      "description": "#554: relocated from (12,5) to (22,21), inside the drill/charge grid at (20,20)-(24,24) below (clear of every hole cell, roughly equidistant from all four) — charging is real work now (on foot, no vehicle gate, unlike drilling), and the solo driller's needs gauges crossing threshold mid-walk from a distant living_quarters repeatedly left them oscillating between the two forever, never actually landing every charge_hole action (observed: still 1-4 ordered, not landed, after 6000 ticks even from a nearer (17,17)). A living_quarters this close keeps every rest trip short enough to actually make forward progress on all four holes.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -142,8 +145,8 @@
         },
         {
           "type": "pickTile",
-          "x": 12,
-          "z": 5
+          "x": 22,
+          "z": 21
         },
         {
           "type": "screenshot"
@@ -221,7 +224,11 @@
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
@@ -232,13 +239,33 @@
           "command": "charge hole:* explosive:boomite amount:8 stemming:0.5"
         }
       ],
-      "description": "role: bootstrap (issue #515): `stemming:0.5` is the Charge panel's own floor \u2014 `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) \u2014 the minimal stemming value reachable by any click sequence. `createCharge` (ChargePlan.ts) now enforces the same MIN_STEMMING_M floor (#527), so this step stays a `bootstrap` role for its `hole:*` batch shorthand, not to reach a value a player could not.",
+      "description": "role: bootstrap (issue #515): `stemming:0.5` is the Charge panel's own floor — `adjustStemming` clamps at `Math.max(0.5, ...)` (Charge.ts) — the minimal stemming value reachable by any click sequence. `createCharge` (ChargePlan.ts) now enforces the same MIN_STEMMING_M floor (#527), so this step stays a `bootstrap` role for its `hole:*` batch shorthand, not to reach a value a player could not.",
       "expect": {
-        "equals": {
-          "chargedCount": 4
-        }
+        "increased": [
+          "orderedChargeCount"
+        ]
       },
       "role": "bootstrap"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "sequence auto",

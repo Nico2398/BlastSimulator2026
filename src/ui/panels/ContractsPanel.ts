@@ -257,6 +257,9 @@ export class ContractsPanel {
 
     const cardEl = card([headRow, progressBar(pct, color), progressLine, deliverRow, storedNote]);
     cardEl.dataset['contractId'] = String(c.id);
+    // See makeOfferedCard's own comment on data-contract-type/-material (#554).
+    cardEl.dataset['contractType'] = c.type;
+    cardEl.dataset['contractMaterial'] = c.materialId;
     return cardEl;
   }
 
@@ -333,6 +336,15 @@ export class ContractsPanel {
 
     const cardEl = card([headRow, statRow, haveRow, termsRow, negBox, btnRow]);
     cardEl.dataset['contractId'] = String(c.id);
+    // data-contract-type/data-contract-material, alongside data-contract-id
+    // (#554): a fixed id is a moving target once the tick-based offer pool
+    // has had time to refresh underneath it — every scenario file that
+    // scoped a click to `[data-contract-id="N"]` for exactly this "guaranteed
+    // same contract in both modes" reason (#513/#581) needs a selector that
+    // survives that rotation the same way the console's own `type:`/
+    // `material:` ContractSelector (#597) already does.
+    cardEl.dataset['contractType'] = c.type;
+    cardEl.dataset['contractMaterial'] = c.materialId;
     return cardEl;
   }
 

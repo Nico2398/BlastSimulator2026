@@ -583,7 +583,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2
         }
@@ -607,7 +609,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -666,38 +670,70 @@
     {
       "command": "tick 30",
       "description": "#553: drain the ordered plan in bounded tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). No staffed:true near-origin spawn here (campaign start), so this single driller/drill_rig takes real ticks to reach each hole. Sandbox-measured: all 4 holes land by cumulative +110 ticks post-drill_plan (30+30+30+20), traced in 10-tick steps to confirm no ticks are lost to mid-block event interruption at these chunk boundaries. `revolted` stays false throughout (command-mode traced).",
-      "interaction": [{"type": "command", "command": "tick 30"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 30",
-      "interaction": [{"type": "command", "command": "tick 30"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 30",
-      "interaction": [{"type": "command", "command": "tick 30"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 20",
       "description": "Fourth and final chunk — all 4 holes have landed by cumulative +110 ticks post-drill_plan (command-mode traced).",
-      "interaction": [{"type": "command", "command": "tick 20"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
       "role": "setup",
       "expect": {
         "equals": {
@@ -708,7 +744,11 @@
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
@@ -721,8 +761,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },

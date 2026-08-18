@@ -235,8 +235,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 9
+          "chargedCount": 9,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -311,10 +331,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 190,
+          "tickCount": 288,
           "holeCount": 0,
           "weather": "heavy_rain"
-        }
+        },
+        "note": "tickCount up from 190 (#554): charging is real work now -- the 9-hole charge order above, drained by its own wait step, adds real ticks between drilling landing and this final checkpoint."
       }
     }
   ]

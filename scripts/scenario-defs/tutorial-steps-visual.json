@@ -20,20 +20,20 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:202824",
+      "command": "campaign start level:tutorial_pit cash:218824",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:202824"
+          "command": "campaign start level:tutorial_pit cash:218824"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 202824
+          "cash": 218824
         },
-        "note": "#553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 16-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged."
+        "note": "#553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 16-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #554: bumped again to $218,824 -- charging is real work too now, and the charge order's own wait step burns more payroll/fuel before the freight_warehouse purchase further down this file, which came up $10,126 short at the old figure."
       }
     },
     {
@@ -524,10 +524,30 @@
       "role": "player",
       "description": "charge complete: Charge All Holes clicked. This step's own explosive/amount/stemming already match the Charge panel's real defaults (boomite/5kg/2m, confirmed throughout this suite's Finding #10 audit) so the click reproduces the declared command exactly, unlike most other files' charge steps. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
       "expect": {
+        "tutorialStep": "sequence",
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 16
-        },
-        "tutorialStep": "sequence"
+          "chargedCount": 16,
+          "orderedChargeCount": 0
+        }
       }
     },
     {
@@ -679,7 +699,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "contract accept 23",
+      "command": "contract accept type:rubble_disposal",
       "timeout": 15,
       "interaction": [
         {
@@ -688,7 +708,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"24\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         },
         {
           "type": "waitForTutorialStep",
@@ -696,7 +716,7 @@
         }
       ],
       "role": "player",
-      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one.",
+      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one. #554: `contract accept 23` -> `contract accept type:rubble_disposal`, and the interaction click re-scoped to the new `[data-contract-type]` attribute (ContractsPanel.ts, #554) -- charging is real work now too, shifting tickCount (and so the offered pool) in both modes independently and by different amounts, so even the two-different-fixed-ids workaround above stopped being reliable. `type:rubble_disposal` is exactly the contract kind command mode's own id-23 workaround was fighting to avoid (a random ore this pit never mined) and interaction mode's id-24 workaround already deliberately chose -- unifying both modes onto the same selector removes the divergence entirely rather than re-tuning two more ids.",
       "expect": {
         "equals": {
           "activeContractCount": 1
@@ -859,7 +879,7 @@
       }
     },
     {
-      "command": "contract deliver 23 amount:5000",
+      "command": "contract deliver type:rubble_disposal amount:5000",
       "timeout": 30,
       "interaction": [
         {

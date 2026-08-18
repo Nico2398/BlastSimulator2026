@@ -3,19 +3,19 @@
   "description": "Visual verification of blast preview overlays across 4 software tiers: tier 0 blind, tier 1 energy heatmap, tier 2 fragment distribution, tier 3 projection zones, tier 4 vibration propagation",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 staffed:true cash:90000",
       "timeout": 10,
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole. cash:90000, up from the 50000 default (#554): charging is real work now, and the staffed roster's payroll/fuel upkeep during the extra ticks the charge order below takes to land left too little for the tier:4 software purchase further down this file (observed short by ~1400 at the default).",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 staffed:true cash:90000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 90000,
           "holeCount": 0
         }
       }
@@ -100,8 +100,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },

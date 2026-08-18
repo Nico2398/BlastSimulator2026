@@ -237,6 +237,11 @@ export const DRILL_HOLE_REFERENCE_DEPTH_M = 8;
 /** Reference hole diameter (m) that DRILL_HOLE_BASE_DURATION_TICKS is calibrated against (#553). */
 export const DRILL_HOLE_REFERENCE_DIAMETER_M = 0.15;
 
+/** Ticks to load a charge at the reference amount (#554). */
+export const CHARGE_HOLE_BASE_DURATION_TICKS = 4;
+/** Reference charge amount (kg) that CHARGE_HOLE_BASE_DURATION_TICKS is calibrated against (#554). */
+export const CHARGE_HOLE_REFERENCE_AMOUNT_KG = 5;
+
 /** Minimum stemming column (m) a charge can carry. Matches the Charge
  *  panel's own floor (Charge.ts adjustStemming) so a console charge can
  *  never under-stem what a player could ever click. */

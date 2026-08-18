@@ -17,7 +17,7 @@ import { el, statGrid } from '../dom.js';
 import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { assembleBlastPlan, checkProtectedPositions } from '../../core/mining/BlastPlan.js';
+import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
@@ -93,7 +93,7 @@ export class PreflightModal {
     this.detonateBtn.style.cssText = 'flex:1.6;height:40px;gap:9px;font:800 12px/1 var(--bsx-font-ui);letter-spacing:.2em';
     this.detonateBtn.dataset['action'] = 'preflight-detonate';
     this.detonateBtn.append(iconEl('blast', 16), this.locale.bindText(el('span'), 'ui.blast_workshop.preflight.detonate'));
-    this.detonateBtn.addEventListener('click', () => this.detonate());
+    this.detonateBtn.addEventListener('click', () => { if (!this.detonateBtn.disabled) this.detonate(); });
 
     footer.append(cancelBtn, this.detonateBtn);
     box.append(stripe, header, body, footer);
@@ -127,14 +127,20 @@ export class PreflightModal {
         + state.vehicles.vehicles.filter(v => isInZone(v.x, v.z, zone)).length
       : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings);
+    const loadingHoleIds = new Set(Object.keys(state.plannedChargesByHole));
+    const validationErrors = validateBlastPlan(plan, loadingHoleIds);
+    const loadingCount = state.drillHoles.filter(h => loadingHoleIds.has(h.id) && !state.chargesByHole[h.id]).length;
 
     const signature = JSON.stringify({
       holes: state.drillHoles.length, chargeKg, planCost, estValue,
       preview: state.lastBlastPreview, wetCount: wet.length, occupantCount,
-      protectedCount: protectedHoles.length,
+      protectedCount: protectedHoles.length, loadingCount, errorCount: validationErrors.length,
     });
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
+
+    this.detonateBtn.disabled = validationErrors.length > 0;
+    this.detonateBtn.style.cursor = validationErrors.length > 0 ? 'not-allowed' : 'pointer';
 
     this.statsEl.replaceChildren(statGrid([
       { key: t('ui.blast_workshop.preflight.stat_holes'), value: `${state.drillHoles.length}` },
@@ -148,6 +154,9 @@ export class PreflightModal {
     const warnings: Warning[] = [
       ...(protectedHoles.length > 0
         ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_protected', { count: protectedHoles.length, hole: protectedHoles[0]!.holeId }) }]
+        : []),
+      ...(loadingCount > 0
+        ? [{ ok: false, text: t('ui.blast_workshop.preflight.warn_charge_loading', { count: loadingCount }) }]
         : []),
       wet.length > 0
         ? { ok: false, text: t('ui.blast_workshop.preflight.warn_wet', { count: wet.length }) }

@@ -27,10 +27,26 @@ function driveDrillPlanToCompletion(runner: ConsoleRunner, ctx: GameContext, max
   }
 }
 
+/**
+ * Ticks until every charge ordered by the last `charge hole:*` has landed in
+ * state.chargesByHole (#554), mirroring driveDrillPlanToCompletion above.
+ */
+function driveChargePlanToCompletion(runner: ConsoleRunner, ctx: GameContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    runner.run('tick 1');
+  }
+}
+
 function drillChargeSequenceBlast(runner: ConsoleRunner, ctx: GameContext, explosiveId: string) {
   runner.run('drill_plan grid rows:2 cols:3 spacing:4 depth:8 start:12,12');
   driveDrillPlanToCompletion(runner, ctx);
   runner.run(`charge hole:* explosive:${explosiveId} amount:8 stemming:2`);
+  driveChargePlanToCompletion(runner, ctx);
   runner.run('sequence auto delay_step:25');
   return runner.run('blast');
 }
@@ -83,6 +99,7 @@ describe('weather affects blast execution (wetHoleIds wiring)', () => {
       expect(installResult.success).toBe(true);
     }
     tubed.runner.run('charge hole:* explosive:boomite amount:8 stemming:2');
+    driveChargePlanToCompletion(tubed.runner, tubed.ctx);
     tubed.runner.run('sequence auto delay_step:25');
     const tubedBlast = tubed.runner.run('blast');
     expect(tubedBlast.success).toBe(true);

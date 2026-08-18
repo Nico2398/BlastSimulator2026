@@ -69,6 +69,22 @@ function driveDrillPlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
   }
 }
 
+/**
+ * Ticks the game loop until every charge ordered by the most recent `charge
+ * hole:*`/`charge hole:<id>` has landed in `state.chargesByHole` (#554),
+ * mirroring driveDrillPlanToCompletion above.
+ */
+function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
+  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 beforeEach(() => resetHoleIds());
 afterEach(() => vi.restoreAllMocks());
 
@@ -134,6 +150,7 @@ describe('drillPlanCommand — remove subcommand', () => {
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '25ms' });
     expect(ctx.state!.chargesByHole['H1']).toBeDefined();
     expect(ctx.state!.sequenceDelays['H1']).toBeDefined();
@@ -163,6 +180,7 @@ describe('drillPlanCommand — clear subcommand', () => {
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['auto'], {});
     expect(ctx.state!.drillHoles.length).toBe(2);
     expect(Object.keys(ctx.state!.chargesByHole).length).toBe(2);
@@ -299,6 +317,7 @@ describe('blast_preview', () => {
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
@@ -430,6 +449,7 @@ describe('blast_preview — state.lastBlastPreview', () => {
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
   }
 
@@ -837,9 +857,13 @@ describe('blastCommand — ore report event wiring', () => {
 
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
-    ctx.state!.tickCount = 7;
     chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+    // #554: charging is real work — driveChargePlanToCompletion above ticks
+    // the clock forward, so the tick this report should carry is set here,
+    // right before blasting, not before the charge (and its own ticks) ran.
+    ctx.state!.tickCount = 7;
 
     const result = blastCommand(ctx, [], {});
 
@@ -857,6 +881,7 @@ describe('blastCommand — ore report event wiring', () => {
     drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
     driveDrillPlanToCompletion(ctx);
     chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
     sequenceCommand(ctx, ['auto'], {});
 
     const result = blastCommand(ctx, [], {});
@@ -1006,6 +1031,7 @@ describe('chargeCommand — stemming floor', () => {
     const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: `${MIN_STEMMING_M}m` });
 
     expect(result.success).toBe(true);
+    driveChargePlanToCompletion(ctx);
     expect(ctx.state!.chargesByHole['H1']).toBeDefined();
     expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBe(MIN_STEMMING_M);
   });
@@ -1030,6 +1056,7 @@ describe('chargeCommand — stemming floor', () => {
     const result = chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg' });
 
     expect(result.success).toBe(true);
+    driveChargePlanToCompletion(ctx);
     expect(ctx.state!.chargesByHole['H1']).toBeDefined();
     expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBe(MIN_STEMMING_M);
   });

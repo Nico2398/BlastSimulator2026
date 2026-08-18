@@ -3,12 +3,13 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import type { GameState, PendingAction } from '../../core/state/GameState.js';
 import {
   createGridPlan, addHole, removeHole, resetHoleIds,
   computeDrillHoleDurationTicks,
 } from '../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
-import { createCharge, batchCharge } from '../../core/mining/ChargePlan.js';
+import { createCharge, batchCharge, computeChargeHoleDurationTicks } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
@@ -78,6 +79,15 @@ export interface DrillHoleActionPayload {
   durationTicks: number;
 }
 
+/** Payload carried by a queued `charge_hole` PendingAction (#554). */
+export interface ChargeHoleActionPayload {
+  holeId: string;
+  explosiveId: string;
+  amountKg: number;
+  stemmingM: number;
+  durationTicks: number;
+}
+
 /**
  * Cancel every outstanding `drill_hole` PendingAction (queued/assigned/
  * in_progress — anything not yet completed) and empty both hole pools
@@ -92,16 +102,63 @@ export function clearDrillPlan(ctx: MiningContext): number {
   const state = ctx.state!;
   const clearedCount = state.drillHoles.length + state.plannedDrillHoles.length;
 
-  for (const action of state.pendingActions.filter(a => a.type === 'drill_hole')) {
+  for (const action of state.pendingActions.filter(a => a.type === 'drill_hole' || a.type === 'charge_hole')) {
     cancelAction(state, action.id);
   }
 
   state.plannedDrillHoles = [];
   state.drillHoles = [];
   state.chargesByHole = {};
+  state.plannedChargesByHole = {};
   state.sequenceDelays = {};
 
   return clearedCount;
+}
+
+/**
+ * Cancel the outstanding `charge_hole` PendingAction for `holeId`, if any
+ * (#554, mirrors drill_hole's cancel-before-replace pattern). A no-op when
+ * the hole has no order in flight.
+ */
+function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
+  const action = state.pendingActions.find(a => a.type === 'charge_hole' && a.payload['holeId'] === holeId);
+  if (action) cancelAction(state, action.id);
+}
+
+/**
+ * Removes a cancelled `drill_hole`/`charge_hole` action's own ghost from the
+ * "ordered but not yet landed" pool it was tracked in (`plannedDrillHoles`/
+ * `plannedChargesByHole`) — `cancelAction` (`TaskDispatch.ts`) only removes
+ * the generic `PendingAction`/`ghostPreviews` record, deliberately staying
+ * ignorant of mining-specific state so it can cancel any action type; the
+ * planned-pool entry is this module's own bookkeeping and has to be cleared
+ * here.
+ *
+ * `drillPlanCommand`'s `remove hole:<id>` and `clearDrillPlan` above already
+ * call `cancelAction` immediately alongside their own splice/delete of the
+ * matching planned entry, so they need nothing further. The gap this closes
+ * is the *other* way a player cancels an order: the Operations panel's Work
+ * Queue cancel button, which reaches `cancelAction` only through the generic
+ * `employee cancel <id>` command (`employees.ts`) with no mining-specific
+ * cleanup of its own — leaving a permanent, un-clearable ghost on the hole
+ * (#554's code review, reproduced live: `orderedChargeCount`/
+ * `plannedChargesByHole` still carried the cancelled hole after
+ * `employee cancel <id>` reported success). The issue's own text is explicit
+ * that cancelling a charge order removes its ghost; this generic path is
+ * exactly where that promise broke, and — since `plannedDrillHoles` is
+ * populated at order time the same way (#553) — the identical gap existed
+ * for a cancelled drill order too.
+ */
+export function releasePlannedHoleForCancelledAction(state: GameState, action: PendingAction): void {
+  const holeId = action.payload['holeId'];
+  if (typeof holeId !== 'string') return;
+
+  if (action.type === 'drill_hole') {
+    const idx = state.plannedDrillHoles.findIndex(h => h.id === holeId);
+    if (idx !== -1) state.plannedDrillHoles.splice(idx, 1);
+  } else if (action.type === 'charge_hole') {
+    delete state.plannedChargesByHole[holeId];
+  }
 }
 
 // ── Drill plan commands ──
@@ -216,7 +273,9 @@ export function drillPlanCommand(
       : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
 
     if (removeHole(state.drillHoles, holeId)) {
+      cancelOutstandingChargeAction(state, holeId);
       delete state.chargesByHole[holeId];
+      delete state.plannedChargesByHole[holeId];
       delete state.sequenceDelays[holeId];
       return { success: true, output: `Removed hole ${holeId}` };
     }
@@ -225,8 +284,10 @@ export function drillPlanCommand(
     if (plannedIdx !== -1) {
       const action = state.pendingActions.find(a => a.type === 'drill_hole' && a.payload['holeId'] === holeId);
       if (action) cancelAction(state, action.id);
+      cancelOutstandingChargeAction(state, holeId);
       state.plannedDrillHoles.splice(plannedIdx, 1);
       delete state.chargesByHole[holeId];
+      delete state.plannedChargesByHole[holeId];
       delete state.sequenceDelays[holeId];
       return { success: true, output: `Removed hole ${holeId}` };
     }
@@ -254,6 +315,44 @@ export function drillPlanCommand(
 
 // ── Charge commands ──
 
+/**
+ * Queue a `charge_hole` PendingAction for `hole` with the given (already
+ * validated) charge, cancelling any outstanding order for the same hole
+ * first so a re-charge replaces rather than stacks (#554, mirrors drill_plan
+ * grid/add's drill_hole dispatch).
+ */
+function dispatchChargeAction(
+  ctx: MiningContext,
+  hole: { id: string; x: number; z: number },
+  explosiveId: string,
+  amountKg: number,
+  stemmingM: number,
+): void {
+  const state = ctx.state!;
+  cancelOutstandingChargeAction(state, hole.id);
+
+  const durationTicks = computeChargeHoleDurationTicks(amountKg);
+  const actionId = state.nextPendingActionId++;
+  // skipQualificationCheck (#554, mirrors drill_hole's #553 dispatch): a
+  // charge order must queue silently even when nobody on the roster
+  // currently holds 'blasting' yet.
+  dispatchPendingAction(state, {
+    id: actionId,
+    type: 'charge_hole',
+    requiredSkill: 'blasting',
+    requiredVehicleRole: null,
+    targetX: hole.x,
+    targetZ: hole.z,
+    targetY: 0,
+    payload: {
+      holeId: hole.id, explosiveId, amountKg, stemmingM, durationTicks,
+    } satisfies ChargeHoleActionPayload,
+    targetEmployeeId: null,
+  }, { skipQualificationCheck: true });
+
+  state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
+}
+
 export function chargeCommand(
   ctx: MiningContext,
   _args: string[],
@@ -263,12 +362,16 @@ export function chargeCommand(
   if (err) return { success: false, output: err };
 
   if (_args[0] === 'show') {
-    const entries = Object.entries(ctx.state!.chargesByHole);
-    if (entries.length === 0) return { success: true, output: 'No charges set.' };
-    const lines = entries.map(([id, c]) =>
+    const orderedEntries = Object.entries(ctx.state!.plannedChargesByHole);
+    const loadedEntries = Object.entries(ctx.state!.chargesByHole);
+    if (orderedEntries.length === 0 && loadedEntries.length === 0) return { success: true, output: 'No charges set.' };
+    const orderedLines = orderedEntries.map(([id, c]) =>
+      `  ${id}: ${c.explosiveId} ${c.amountKg}kg, stemming ${c.stemmingM}m [ORDERED]`,
+    );
+    const loadedLines = loadedEntries.map(([id, c]) =>
       `  ${id}: ${c.explosiveId} ${c.amountKg}kg, stemming ${c.stemmingM}m`,
     );
-    return { success: true, output: `Charges:\n${lines.join('\n')}` };
+    return { success: true, output: `Charges:\n${[...orderedLines, ...loadedLines].join('\n')}` };
   }
 
   const holeSpec = named['hole'] ?? '';
@@ -286,8 +389,12 @@ export function chargeCommand(
     if (result.errors.length > 0) {
       return { success: false, output: `Errors:\n${result.errors.map(e => `  ${e.holeId}: ${e.message}`).join('\n')}` };
     }
-    ctx.state!.chargesByHole = { ...ctx.state!.chargesByHole, ...result.charges };
-    return { success: true, output: `Charged ${holeIds.length} holes with ${explosiveId} ${amount}kg` };
+    for (const h of ctx.state!.drillHoles) {
+      const charge = result.charges[h.id];
+      if (!charge) continue;
+      dispatchChargeAction(ctx, h, charge.explosiveId, charge.amountKg, charge.stemmingM);
+    }
+    return { success: true, output: `Ordered charges for ${holeIds.length} holes with ${explosiveId} ${amount}kg` };
   }
 
   // Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format
@@ -304,8 +411,8 @@ export function chargeCommand(
   const result = createCharge(explosiveId, amount, stemming, hole.depth);
   if ('error' in result) return { success: false, output: result.error };
 
-  ctx.state!.chargesByHole[holeId] = result.charge;
-  return { success: true, output: `Charged ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
+  dispatchChargeAction(ctx, hole, explosiveId, amount, stemming);
+  return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${amount}kg, stemming ${stemming}m` };
 }
 
 // ── Sequence commands ──
@@ -358,7 +465,7 @@ export function blastCommand(
   if (err) return { success: false, output: err };
 
   const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
-  const errors = validateBlastPlan(plan);
+  const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
   if (errors.length > 0) {
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
@@ -468,6 +575,7 @@ export function blastCommand(
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];
   state.chargesByHole = {};
+  state.plannedChargesByHole = {};
   state.sequenceDelays = {};
 
   // Patch NavGrid to reflect terrain changes from the blast
@@ -530,7 +638,7 @@ export function blastPlanCommand(
 
   if (sub === 'validate') {
     const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
-    const errors = validateBlastPlan(plan);
+    const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
     if (errors.length === 0) return { success: true, output: 'Plan is valid and ready to blast.' };
     return { success: false, output: `Validation issues:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }
@@ -600,7 +708,7 @@ export function blastPreviewCommand(
   }
 
   const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
-  const errors = validateBlastPlan(plan);
+  const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
   if (errors.length > 0) {
     return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
   }

@@ -1,11 +1,11 @@
 {
   "name": "blast-charge-loading-ui",
-  "description": "Visual verification of charge loading UI: per-hole charges, explosive types, amounts, charge-all, visual indicators",
+  "description": "Visual verification of charge loading UI: per-hole charges, explosive types, amounts, charge-all, visual indicators. #554: charging a hole now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly — every commit click here is followed by a wait_until step proving the count only advances once the order actually lands, with a mid-loading screenshot proving the ordered-but-unloaded ghost/ORDERED overlay is visually distinct from a landed charge.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
       "timeout": 30,
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, a blaster with a bare blasting licence (no vehicle — #554's charge_hole actions are on-foot, requiredVehicleRole: null), plus an unmanned drill_rig, are hired/purchased for free at game-open.",
       "interaction": [
         {
           "type": "command",
@@ -83,6 +83,17 @@
       }
     },
     {
+      "command": "time speed 8",
+      "description": "Speed up the charge-loading waits below — real-clock auto-tick at 1x would take a long time to drain even a single blaster's queue.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "charge hole:H1 explosive:boomite amount:3 stemming:2",
       "interaction": [
         {
@@ -114,12 +125,13 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. 2 amount decrements (5 -> 3kg) reach this hole's declared 3kg; stemming is already at the 2.0m default and boomite is already the selected product, so neither needs a click. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. 2 amount decrements (5 -> 3kg) reach this hole's declared 3kg; stemming is already at the 2.0m default and boomite is already the selected product, so neither needs a click. #554: the commit click only *orders* the charge (queues one charge_hole PendingAction and writes a PlannedCharge into state.plannedChargesByHole) — chargesByHole, and therefore chargedCount, does not move until a blaster physically walks to the hole and finishes loading it, so chargedCount must still read 0 immediately after this click.",
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 1
-        }
+          "chargedCount": 0
+        },
+        "note": "#554: ordering a charge no longer lands it instantly — chargedCount stays 0 until the blaster's charge_hole action actually completes"
       }
     },
     {
@@ -162,12 +174,13 @@
           "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "5 amount increments (3 -> 8kg) off what the H1 row left behind. 8kg is exactly boomite's maxChargeKg, so this is the largest charge the amount stepper will hand a boomite hole — one more click is a no-op, not an overshoot.",
+      "description": "5 amount increments (3 -> 8kg) off what the H1 row left behind. 8kg is exactly boomite's maxChargeKg, so this is the largest charge the amount stepper will hand a boomite hole — one more click is a no-op, not an overshoot. Ordered while H1's own charge_hole action is still in flight (or already queued behind it) — a single blaster works one hole at a time, so this order and H1's sit side by side in plannedChargesByHole until each is claimed in turn.",
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 2
-        }
+          "chargedCount": 0
+        },
+        "note": "#554: still nothing landed — H1 and H2 are both ordered, neither loaded yet"
       }
     },
     {
@@ -222,12 +235,56 @@
           "selector": "#bs-blast-panel [data-hole=\"H3\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "3 amount decrements (8 -> 5kg) and 5 stemming decrements (2.0 -> 1.0m) — the first step in this file to move stemming off its default.",
+      "description": "3 amount decrements (8 -> 5kg) and 5 stemming decrements (2.0 -> 1.0m) — the first step in this file to move stemming off its default. Three holes (H1, H2, H3) are now ordered but not yet loaded at once — enough for the wait_until step right after this one to catch a genuinely mixed state (some landed, some still ghost) rather than draining a single order.",
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 3
+          "chargedCount": 0
+        },
+        "note": "#554: three orders queued (H1, H2, H3), none loaded yet — plannedChargesByHole holds all three"
+      }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:1 max_ticks:3000",
+      "description": "#554/#590: the blaster claims the nearest of the three ordered holes and finishes loading it — the first entry moves from plannedChargesByHole into chargesByHole. Screenshot taken right here on purpose: exactly one hole shows the loaded charge visuals while the other two (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — this is the shot that proves the two are visually distinct. maxTicks/timeoutMs widened to the implementer's own calibrated per-order wait budget (#554 landed).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 1,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        },
+        {
+          "type": "screenshot"
         }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 1
+        },
+        "note": "one of the three ordered charges has landed; the other two are still ordered-but-unloaded"
+      }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:3 max_ticks:6000",
+      "description": "#554/#590: drain the remaining two ordered charges (H2, H3) one at a time — a single blaster never loads two holes simultaneously. Budget doubled off the implementer's single-order figure to cover two sequential loads.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 3,
+          "maxTicks": 6000,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 3
+        },
+        "note": "all three individually-ordered charges (H1, H2, H3) have now landed"
       }
     },
     {
@@ -273,11 +330,65 @@
       "role": "player",
       "expect": {
         "equals": {
+          "chargedCount": 3
+        },
+        "note": "#554: Charge All queues a charge_hole order for every hole — including H1/H2/H3, replacing their outstanding order — but chargesByHole is untouched until each one actually lands, so the count stays at 3 right after the click"
+      },
+      "description": "Charge All commits whatever the steppers currently show, and the H3 row above left them at 5kg/1.0m — so reaching this step's declared 5kg/2m needs 5 stemming increments (1.0 -> 2.0m) before the click. Without them the click would silently order every hole at 1.0m stemming while the command field claimed 2m: exactly the class of drift the amount/stemming asserts are here to fail loudly on. #554: this orders 9 fresh charge_hole actions (one per hole, cancelling/replacing H1/H2/H3's already-landed entries with a new pending order and queuing H4-H9 for the first time) — none of the 9 lands the instant the button is clicked."
+    },
+    {
+      "command": "wait_until field:chargedCount equals:6 max_ticks:9000",
+      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (6 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. Budget widened to cover up to 6 sequential loads at the implementer's own per-order figure.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 6,
+          "maxTicks": 9000,
+          "timeoutMs": 300000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 6
+        },
+        "note": "6 of 9 holes loaded from the Charge All order; the remaining 3 are still ordered-but-unloaded"
+      }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:9 max_ticks:9000",
+      "description": "#554/#590: drain the rest of the Charge All order — every hole is now loaded.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 9,
+          "maxTicks": 9000,
+          "timeoutMs": 300000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
           "chargedCount": 9
         },
-        "note": "Charge All applies uniformly to every hole, overwriting the 3 individual per-hole charges set above — the H5 override below then re-charges just that one hole again after this"
-      },
-      "description": "Charge All commits whatever the steppers currently show, and the H3 row above left them at 5kg/1.0m — so reaching this step's declared 5kg/2m needs 5 stemming increments (1.0 -> 2.0m) before the click. Without them the click would silently charge every hole at 1.0m stemming while the command field claimed 2m: exactly the class of drift the amount/stemming asserts are here to fail loudly on."
+        "note": "Charge All has now landed on every hole"
+      }
+    },
+    {
+      "command": "time speed 1",
+      "description": "Restore normal speed before the remaining player-driven step.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 1"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "charge hole:H5 explosive:boomite amount:7 stemming:3",
@@ -331,13 +442,33 @@
           "selector": "#bs-blast-panel [data-hole=\"H5\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "A single hole re-charged after Charge All, which is the whole point of the per-hole rows. The explicit [data-step=\"2\"] click is required: Charge All completed the plan, so the still-armed autoAdvance had already moved the panel on to Sequence and the Per Hole rows were hidden. 2 amount increments (5 -> 7kg) and 5 stemming increments (2.0 -> 3.0m) then reach the declared values.",
+      "description": "A single hole re-ordered after Charge All has already fully landed, which is the whole point of the per-hole rows. The explicit [data-step=\"2\"] click is required: Charge All completed the plan, so the still-armed autoAdvance had already moved the panel on to Sequence and the Per Hole rows were hidden. 2 amount increments (5 -> 7kg) and 5 stemming increments (2.0 -> 3.0m) then reach the declared values. #554: this queues a fresh charge_hole order for H5 — chargesByHole['H5'] keeps its old (5kg/2m) value until the new order lands, so chargedCount is unaffected by this click.",
       "role": "player",
       "expect": {
         "equals": {
           "chargedCount": 9
         },
-        "note": "count is unchanged — H5 was already charged by Charge All; what this step proves is that one row can override one hole without disturbing the other 8"
+        "note": "count is unchanged — H5 was already loaded by Charge All; this step proves one row can re-order one hole without disturbing the other 8, and that the re-order doesn't land instantly either"
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554/#590: drain H5's re-order before the scenario ends, leaving the site in a fully-landed state rather than one hole still mid-load.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
       }
     }
   ],

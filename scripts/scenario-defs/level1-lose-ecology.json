@@ -1,6 +1,6 @@
 {
   "name": "level1-lose-ecology",
-  "description": "Level 1 losing scenario: a massive blast with max krackle triggers ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). Rewritten for the Employee.ts morale fix (computeAverageMorale now filters to `employees.filter(e => e.alive)` before averaging, where it previously summed every roster entry including corpses): the file's own prior 4-round design was tuned against the PRE-fix behaviour, where a dead crew member's morale, frozen at whatever it was at death, diluted-but-never-cleared the average forever -- with the fix live, that whole problem stops existing (a dead employee is dropped from the average outright, the instant they die), so this file no longer needs the old design's massive 15-employee filler cushion refreshed every round, nor the fire-everyone-and-rehire-fresh dance between rounds that pre-fix corpse-dilution forced. Rebuilt from scratch as a single round: 4 parallel driller+drill_rig crews (employee #1's staffed:true rig plus 3 freshly hired/equipped ones) drill one 7x7-hole grid (49 holes, 2m spacing -- tight on purpose, see below) alongside 15 idle filler employees who never leave the depot. The blast (max krackle, 10kg, minimum 1.0m stemming) then kills all 4 active crew -- confirmed via state.damage.accidents, ~90m throw radius is unavoidable on this 96x96 map -- while driving ecology to exactly 0.\n\nThe key mechanic this redesign leans on, confirmed by direct probe and not previously documented in this file: once ecology clamps to exactly 0, it stays there completely unassisted. ScoreManager.ts's applyDecay only pulls a score that is strictly between 0 and 100 back toward the neutral 50 -- its own `value > 0` check excludes exactly 0 -- and nothing on this site (no building anywhere in BuildingDefs.ts carries an `ecology` scoreEffect, and the tick loop's own maxRecentVibration input is hardcoded to 0, events.ts) ever pushes it back up from there. So a single, sufficiently large blast reaching exactly 0 is enough to start (and guarantee) the full 150-tick shutdown countdown; the old design's second blast/round existed only to compensate for a first blast that undershot 0 (it reached 5.70, not 0, at the old file's own hole count and spacing) -- sizing the single blast correctly here removes the need for a second one entirely.\n\nTwo further engine quirks, confirmed by direct probe while investigating whether a living_quarters building could stabilize wellBeing here, turned out to make one actively counterproductive for this file's purposes -- noted here rather than fixed, since fixing either is out of this file's scope (scenario-JSON-only edit): (1) GameLoop.ts's completeRestForEmployee, the completion path for a living_quarters-serviced rest, calls replenishNeed with a single tick's own replenish rate (e.g. +8 fatigue for a Tier 1 building) regardless of how many ticks the rest itself took (2/3/8 depending on gauge) -- resting at a building this way replenishes LESS than resting in place with no building at all (which flatly restores the gauge to NEED_REST_NO_BUILDING_CAP=70 in one shot, EmployeeNeeds.ts's own documented design). (2) autoInsertNeedTasks (GameLoop.ts), unlike tickCollapse's own building search, never checks needRestSearchRadius before routing an employee toward the nearest living_quarters -- an employee routed toward a distant one spends the whole walk there counted as `isWorking` (needs drain at the faster \"working\" rate the entire trip, not the slower idle rate), often crashing them into an actual collapse before they arrive. Together these made every living_quarters placement tried here (near the depot, near the drill site, Tier 1, Tier 2) stall the 4 crews' drilling indefinitely rather than help -- confirmed repeatedly by direct probe -- so this file builds no buildings at all and instead leans on two things it can actually control: the 15-employee filler cushion (unaffected by either bug, since they are never routed anywhere) and a drilling phase short enough that even the filler's own slow, unavoidable idle-gauge decay (EmployeeNeeds.ts's idle drain rates, 0.5/tick each for hunger and fatigue) has not yet crashed their morale to the floor by blast time.\n\nThat last constraint is what the tight 2m hole spacing is actually for: confirmed by direct probe, the same 49-hole pattern at the old file's 3m spacing takes long enough to drill (~600+ ticks solo, ~360 with 4 crews at 3m) that the 15 filler's own morale has already crashed to 0 by the time the crew dies -- avgMorale stays pinned at 0 (filler-only, post-death) straight through the 150-tick shutdown window, and worker_revolt (REVOLT_TICKS=120) wins the race. At 2m spacing the same 4 crews finish the same 49 holes in 230 ticks with wellBeing still at 51.16 -- confirmed by direct probe, run twice for determinism -- so avgMorale is still meaningfully positive when the crew dies, and even though wellBeing does still crash to (and stay at) 0 for a stretch afterward (the filler's own decay catches up eventually regardless), that stretch starts late enough that ecological_shutdown's already-running 150-tick countdown (started at the blast) reaches its threshold first: worker_revolt's own ticksAtZero streak is only at 97 of the 120 it needs when shutdown claims levelEndReason at tick 380 -- a 23-tick margin, confirmed by direct probe, run twice for determinism (identical tick 380 / ecological_shutdown / cash outcome both times). events.ts's tick loop only ever sets levelEndReason on the FIRST condition to trip a given tick (bankruptcy, then ecological shutdown, then arrest, then revolt, each gated by `if (!state.levelEnded)`) -- once shutdown locks it in at tick 380, nothing later (including revolt's own counter, which was still climbing) can overwrite it.",
+  "description": "Level 1 losing scenario: a massive blast with max krackle triggers ecology score collapse and, after a sustained 150-tick zero streak, the government shutdown that actually ends the level (ECOLOGICAL_SHUTDOWN_TICKS, EcologicalDisaster.ts). Rebuilt again for issue #554 (`charge hole:*` now queues one real, worker-performed `charge_hole` action per hole instead of writing charges instantly, mirroring #553's `drill_hole`): the file's own prior design (tuned for instant charging) blasted right after drilling finished, at tick 230, while wellBeing was still a comfortably positive 51 -- giving ecological_shutdown's 150-tick countdown a huge head start over worker_revolt's independent, wellBeing-driven one. With charging now taking real time, that head start is gone: landing all 49 queued charge_hole orders with only the original 4-crew (who also drilled) took ~305 ticks, during which the original static 15-employee filler cushion -- hired once, up front, and never touched again -- had already been idling since tick 0 and crashed to 0 wellBeing on its own clock, sustaining the 120-tick streak REVOLT_TICKS needs well before the delayed blast could even start ecology's own countdown. worker_revolt won every time.\n\nThe key mechanic this file leans on, confirmed by direct probe: once a score clamps to exactly 0, it stays there completely unassisted -- ScoreManager.ts's applyDecay only pulls a score that is strictly between 0 and 100 back toward the neutral 50 (its own `value > 0` check excludes exactly 0), and nothing on this site (no building anywhere in BuildingDefs.ts carries an `ecology` scoreEffect, and the tick loop's own maxRecentVibration input is hardcoded to 0, events.ts) ever pushes ecology back up from there. This is symmetric for wellBeing too (same applyDecay, same `value > 0` exclusion) -- which is exactly the lever this redesign uses: get wellBeing to cross zero AFTER the blast countdown has enough of a head start, rather than racing a wellBeing clock that started ticking at tick 0 and never stopped.\n\nThis redesign's fix has two parts, both scenario-JSON-only (no core change):\n\n(1) The 15-employee filler cushion is hired right AFTER drilling finishes (tick 230) instead of before it, so its own idle-decay clock starts fresh at tick 230 instead of tick 0. Confirmed by direct probe: with the original 4-crew drilling alone (no filler dilution at all, since none exist yet), wellBeing crashes to 0 by tick ~130 and sits there through the rest of drilling (with one brief, deterministic recovery blip around tick 170 from the crew's own scheduled break-need rest, back down by tick 180) -- but the instant a FRESH cushion is hired at tick 230, the composite average climbs back out, peaking around wellBeing 66 near tick 370 before beginning its own slow decline. That climb is only possible because the OLD cushion's damage (crashed since tick 0) is never inherited by the new one -- a fresh employee's `morale` starts at 60 (Employee.ts), not wherever the old cushion's had decayed to.\n\n(2) 30 temporary 'blaster'-role employees are hired at the same moment (also after drilling, before charging) purely to land the 49 queued charge_hole orders in parallel -- ROLE_STARTING_QUALIFICATION grants 'blasting' immediately at hire, and charge_hole's requiredVehicleRole is null, so no drill_rig purchase is needed for them. This cuts the charging phase from ~305 ticks (4 workers) to ~118 ticks (34 workers), landing blast at tick 348 instead of 535. They are never fired -- an earlier attempt at this exact fix tried hiring a similar temporary crew and firing them again before the blast, which hit two problems worth recording here: `employee fire` refuses a roster member who unionized while employed (`rng.chance(0.3)` at hire time, Employee.ts) -- with 20-45 temp hires, several always come up unionized and can't be dismissed, so the exact death toll became unpredictable -- and hiring at that volume also shifts the RNG-gated event-selection timer (`actionCountSinceEvent`, EventSystem.ts, incremented by every non-meta console command) enough that a normally-late random political/economic event can land inside the post-blast zero-ecology window and, if its auto-chosen option carries a positive `ecology` scoreDelta (e.g. politics_ev_mandate's default option, `{ecology: 18}`), break the sustained-zero streak outright. This redesign sidesteps both: the temp blasters are never fired (no unionization check to fail), and they die in the very blast they helped charge -- deathCount goes 0->34 (4 original crew + 30 temp blasters), while the fresh, never-tasked 15-employee filler cushion, standing at the depot the whole time, survives to carry wellBeing through the post-blast countdown.\n\nTiming, confirmed by direct probe (fully deterministic given the fixed seed and this exact command sequence -- no RNG in any of the formulas this race depends on): drilling ends at tick 230 (unchanged from every prior version of this file -- always 4 crew, always ~230 ticks for 49 holes at 2m spacing). Hiring the fresh filler + 30 temp blasters is instantaneous (hiring costs no ticks). Charging all 49 holes with 34 blasting-qualified workers takes 118 ticks, landing blast at tick 348. The blast clamps ecology to exactly 0 and kills all 34 present (deathCount 34); ecological_shutdown's 150-tick countdown then runs uninterrupted (nothing on this site ever pushes ecology back up), firing at tick 498. Meanwhile the fresh filler cushion's own wellBeing, no longer dragged down by the temp blasters' fast working-rate need drain once they die in the blast, climbs for a while before resuming its own decline, crossing back to 0 around tick 448 -- REVOLT_TICKS=120 after that is ~568, a comfortable 70-tick margin behind shutdown's tick 498. events.ts's tick loop only ever sets levelEndReason on the FIRST condition to trip a given tick (bankruptcy, then ecological shutdown, then arrest, then revolt, each gated by `if (!state.levelEnded)`) -- once shutdown locks it in at tick 498, nothing later (including revolt's own counter, which is still climbing) can overwrite it.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:true cash:5000000",
@@ -483,341 +483,6 @@
         "changedBy": {
           "cash": 0
         }
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "description": "15 idle filler employees, never given a task: avgMorale (computeAverageMorale, Employee.ts) averages every ALIVE roster entry equally, so this cushion keeps it (and wellBeing derived from it, ScoreManager.updateScores) off the floor while the 4-crew round below drills and, later, dies in the blast -- once dead, the .alive filter drops them out of the average for good (the pre-fix bug this file used to work around: a dead employee's morale, frozen at whatever it was at death, used to drag the average down forever with no way to clear it).",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "increased": [
-          "employeeCount"
-        ]
       }
     },
     {
@@ -1320,6 +985,1002 @@
       }
     },
     {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      },
+      "description": "#554 recalibration: moved here (right after drilling, instead of before it) so the filler cushion's own idle-decay clock starts at tick 230, not tick 0 -- see this file's own top-level description for why: with only the original 4-crew drilling first (no filler dilution at all), wellBeing already crashes to 0 by tick ~130 and sits there through the rest of drilling, but a FRESH 15-employee cushion hired the instant drilling ends climbs back out of that hole (peaking ~66 by tick ~370) instead of continuing to decay from a roster that had already been idling since tick 0 -- exactly the margin needed against REVOLT_TICKS=120 once real charging time (#554) pushes blast hundreds of ticks later than the old instant-charge design ever had to survive."
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      },
+      "description": "Temporary charging crew (30x 'blaster' role -- ROLE_STARTING_QUALIFICATION grants 'blasting' immediately, no drill_rig/vehicle needed since charge_hole's requiredVehicleRole is null): with only the original 4 driller crew able to charge, landing all 49 queued charge_hole orders took ~305 ticks serially/4-wide, long enough that even the fresh filler cushion above crashes and resolves worker_revolt before the delayed blast ever starts ecological_shutdown's own countdown. 30 more parallel charging hands land the same 49 holes in ~120 ticks instead. They are never fired -- they charge, then stand exactly where the blast needs everyone to stand for the catastrophe this file is testing, and die alongside the original 4 crew (deathCount 34) rather than surviving to dilute (or being routed through a firing dance that trips on random unionization, #554 finding). Once they're gone, only the still-fresh filler cushion remains to carry wellBeing through the post-blast countdown."
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "employeeCount"
+        ]
+      }
+    },
+    {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
@@ -1394,8 +2055,28 @@
       "role": "player",
       "description": "Max krackle (10kg, the level's strongest available explosive) at minimum stemming (1.0m) -- catastrophic overcharge, exactly the file's own point.",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 49
+          "chargedCount": 49,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -1464,14 +2145,14 @@
         }
       ],
       "role": "player",
-      "description": "The catastrophic blast -- this file's whole point. ~90m throw radius is unavoidable on this map for anyone standing at the drill site, so all 4 active crew (employees #1, #6, #7, #8) die (deathCount 0->4); the 15 filler, who never left the depot, do not. Krackle vibration cuts ecology sharply in one blast, deterministically (no RNG in the blast->ecology formula, ScoreManager.ts's recordVibration) -- 49 holes at this spacing/charge produce enough projections (~5300, confirmed by direct probe) to clamp ecology to exactly 0, not merely low. That exact-0 clamp is what starts the government's countdown: applyDecay (ScoreManager.ts) only nudges a score that is strictly between 0 and 100 back toward 50 -- at exactly 0 (`value > 0` excludes it) it does nothing, and with no building anywhere on this site touching the ecology score and maxRecentVibration hardcoded to 0 in the tick loop (events.ts), nothing else ever will either. Ecology stays pinned at exactly 0 from this tick on, unassisted, for the full ECOLOGICAL_SHUTDOWN_TICKS=150 streak below -- one sufficiently large blast is enough; no second round is needed.",
+      "description": "The catastrophic blast -- this file's whole point. ~90m throw radius is unavoidable on this map for anyone standing at the drill site, so all 34 present there die (deathCount 0->34: the original 4-crew (employees #1, #6, #7, #8) plus the 30 temporary 'blaster' hires that landed the charges above); the 15 filler cushion, hired right after drilling and never given a task, stay at the depot and survive. Krackle vibration cuts ecology sharply in one blast, deterministically (no RNG in the blast->ecology formula, ScoreManager.ts's recordVibration) -- 49 holes at this spacing/charge produce enough projections (confirmed by direct probe) to clamp ecology to exactly 0, not merely low. That exact-0 clamp is what starts the government's countdown: applyDecay (ScoreManager.ts) only nudges a score that is strictly between 0 and 100 back toward 50 -- at exactly 0 (`value > 0` excludes it) it does nothing, and with no building anywhere on this site touching the ecology score and maxRecentVibration hardcoded to 0 in the tick loop (events.ts), nothing else ever will either. Ecology stays pinned at exactly 0 from this tick on, unassisted, for the full ECOLOGICAL_SHUTDOWN_TICKS=150 streak below -- one sufficiently large blast is enough; no second round is needed.",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
           "ecology": 0,
-          "deathCount": 4
+          "deathCount": 34
         }
       }
     },
@@ -1813,13 +2494,13 @@
       "expect": {
         "equals": {
           "ecology": 0,
-          "tickCount": 380,
+          "tickCount": 498,
           "ecologicalShutdown": true,
           "levelEnded": true,
           "levelEndReason": "ecological_shutdown",
           "revolted": false
         },
-        "note": "Final state confirms the government shutdown -- fired for real at tick 380, exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above -- and that worker_revolt's own, independently-running streak (still short of REVOLT_TICKS=120 at this point) never got the chance to overwrite it. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself."
+        "note": "Final state confirms the government shutdown -- fired for real exactly ECOLOGICAL_SHUTDOWN_TICKS=150 after the single blast above, at tick 498 (blast now lands at tick 348: drilling still ends at 230 as always, and landing all 49 charge_hole orders with the 30-strong temporary blaster crew above takes ~118 ticks, #554: charging is real work now). worker_revolt's own, independently-running wellBeing streak crosses zero around tick 448 (the fresh 15-employee filler cushion, hired right after drilling instead of before it, climbs back toward positive wellBeing once the temporary blaster crew dies and stops dragging the average down, then decays back to 0 on its own clock) -- REVOLT_TICKS=120 after that is ~568, well after shutdown already claims levelEndReason at 498, confirmed by direct probe. cash stays comfortably positive throughout (never within remote reach of bankruptcy) -- the $5,000,000 starting cash in this file's own campaign-start command is headroom for direct, repeatable probing of the ecology/wellBeing pacing, not a requirement of the mechanic itself."
       }
     }
   ]

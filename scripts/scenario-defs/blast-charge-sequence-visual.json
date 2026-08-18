@@ -1,11 +1,11 @@
 {
   "name": "blast-charge-sequence-visual",
-  "description": "Visual verification of charge loading UI and detonation sequence: explosive selection, amount, stemming, tubing, auto/manual sequencing, and delay patterns",
+  "description": "Visual verification of charge loading UI and detonation sequence: explosive selection, amount, stemming, tubing, auto/manual sequencing, and delay patterns. #554: charging now queues a charge_hole PendingAction (a blaster loads one hole at a time, on foot) instead of writing chargesByHole instantly, so a Charge All order is followed by a wait_until proving the landed count only advances as the blaster works through the queue, with a mid-loading screenshot of the ordered/loaded mix.",
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
       "timeout": 10,
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, a blaster with a bare blasting licence (no vehicle — #554's charge_hole actions are on-foot, requiredVehicleRole: null), plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {
           "type": "command",
@@ -83,6 +83,17 @@
       }
     },
     {
+      "command": "time speed 8",
+      "description": "Speed up the charge-loading wait below — real-clock auto-tick at 1x would take a long time to drain even a single blaster's queue.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
       "interaction": [
         {
@@ -93,9 +104,65 @@
       "role": "player",
       "expect": {
         "equals": {
-          "chargedCount": 6
+          "chargedCount": 0
+        },
+        "note": "#554: Charge All only orders the 6 charge_hole actions — chargesByHole stays empty until the blaster actually loads each hole"
+      },
+      "description": "#554: this click queues one charge_hole PendingAction per hole (requiredSkill: 'blasting', requiredVehicleRole: null — on foot, unlike drilling's drill_rig gate). None of the 6 lands the instant the button is clicked; the wait_until steps right after this one drive the blaster through the queue."
+    },
+    {
+      "command": "wait_until field:chargedCount equals:3 max_ticks:3000",
+      "description": "#554/#590: the single staffed blaster claims the nearest ordered hole and loads it, one at a time. Screenshot taken here on purpose, halfway through the batch: 3 holes show the loaded charge visuals while the other 3 (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — proving the two are visually distinct. maxTicks/timeoutMs widened to the implementer's own calibrated per-order wait budget (#554 landed).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 3,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        },
+        {
+          "type": "screenshot"
         }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 3
+        },
+        "note": "half the Charge All order has landed; the other half is still ordered-but-unloaded"
       }
+    },
+    {
+      "command": "wait_until field:chargedCount equals:6 max_ticks:6000",
+      "description": "#554/#590: drain the rest of the Charge All order. Budget doubled off the implementer's single-order figure to cover the remaining sequential loads.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 6,
+          "maxTicks": 6000,
+          "timeoutMs": 240000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 6
+        },
+        "note": "Charge All has now landed on every hole"
+      }
+    },
+    {
+      "command": "time speed 1",
+      "description": "Restore normal speed before the remaining player-driven steps.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 1"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
@@ -153,13 +220,13 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The explicit [data-step=\"2\"] click is required: Charge All above completed the plan, so the still-armed autoAdvance had already moved the panel to Sequence. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach the declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The explicit [data-step=\"2\"] click is required: Charge All above completed the plan, so the still-armed autoAdvance had already moved the panel to Sequence. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach the declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed. #554: this queues a fresh charge_hole order for H1 — chargesByHole['H1'] keeps its already-landed (5kg/2m) value until the new order lands, so chargedCount is unaffected by this click, exactly as it was pre-#554 (Charge All had already charged all 6, and this proves one row overrides one hole without disturbing the count either way).",
       "role": "player",
       "expect": {
         "equals": {
           "chargedCount": 6
         },
-        "note": "count is unchanged — Charge All had charged all 6; this proves one row overrides one hole"
+        "note": "count is unchanged — Charge All had already loaded all 6; this proves one row can re-order one hole, and that the re-order doesn't land instantly either (#554)"
       }
     },
     {
@@ -180,7 +247,7 @@
           "sequencedCount": 6
         }
       },
-      "description": "The [data-step=\"3\"] click is new and load-bearing: the per-hole charge step above disarms autoAdvance by clicking a tab, so the panel no longer walks itself to Sequence. delay_step:25 is the panel's own DEFAULT_DELAY_STEP_MS, so no delay-step stepper click is needed."
+      "description": "The [data-step=\"3\"] click is new and load-bearing: the per-hole charge step above disarms autoAdvance by clicking a tab, so the panel no longer walks itself to Sequence. delay_step:25 is the panel's own DEFAULT_DELAY_STEP_MS, so no delay-step stepper click is needed. Sequencing reads state.drillHoles directly and is unaffected by #554 — it does not care whether a hole's charge has landed yet."
     },
     {
       "command": "sequence show",

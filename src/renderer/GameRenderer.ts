@@ -345,7 +345,7 @@ export class GameRenderer {
    */
   showBlastPlanOverlay(ctx: MiningContext): void {
     if (!this.blastOverlay || !ctx.state) return;
-    const { drillHoles, plannedDrillHoles, chargesByHole, sequenceDelays, softwareTier } = ctx.state;
+    const { drillHoles, plannedDrillHoles, chargesByHole, plannedChargesByHole, sequenceDelays, softwareTier } = ctx.state;
     const allHoles = [...drillHoles, ...plannedDrillHoles];
     if (allHoles.length === 0) { this.blastOverlay.hide(); return; }
 
@@ -375,6 +375,7 @@ export class GameRenderer {
             delayMs: sequenceDelays[h.id] ?? 0,
             surfaceY: this.getTerrainSurfaceY(h.x, h.z),
             drilled: true,
+            chargeOrdered: h.id in plannedChargesByHole,
           };
           const charge = chargesByHole[h.id];
           if (charge) hd.charge = charge;

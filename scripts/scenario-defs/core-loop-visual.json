@@ -173,7 +173,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "employeeCount": 2
         }
@@ -197,7 +199,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "vehicleCount": 1
         }
@@ -256,48 +260,89 @@
     {
       "command": "tick 50",
       "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts).",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup"
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
       "command": "tick 50",
       "description": "Fifth and final chunk — all 4 holes should have landed by now.",
-      "interaction": [{"type": "command", "command": "tick 50"}],
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
       "role": "setup",
       "expect": {
         "equals": {
@@ -308,7 +353,11 @@
     },
     {
       "command": "event choose 0",
-      "interaction": [{"type": "resolveEventIfPending"}],
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
       "role": "player"
     },
     {
@@ -322,10 +371,30 @@
       "description": "#553 interaction-mode finding: direct trace of the equivalent point in this file's own command sequence shows state.wellBeing pinned at 0 from tick 155 on (only 2 employees, no living quarters anywhere in this file) and state.revolted flipping true during the final tick-50 chunk (tickCount 205->255, REVOLT_TICKS=120, WorkerRevolt.ts) -- levelEndReason reads 'worker_revolt' by the time this step runs. LevelEndScreen shows its fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null, for every defeat reason including worker_revolt, and never hides it again (same mechanism level1-playthrough-revolt.json and level2/level3-playthrough-win.json hit for bankruptcy). Command mode's own headless engine has no such overlay, so its literal command list keeps passing straight through -- this divergence is purely a UI-reachability one. `expect.blocked` proves the real block; the command still runs directly so chargedCount reaches 4 exactly as before.",
       "role": "guard",
       "expect": {
+        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
-        },
-        "blocked": "#bs-blast-panel [data-action=\"charge-all\"]"
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
       }
     },
     {
@@ -412,11 +481,11 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 11",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "command",
-          "command": "contract accept 11"
+          "command": "contract accept type:rubble_disposal"
         }
       ],
       "role": "guard",
@@ -426,17 +495,17 @@
         },
         "blocked": "#bs-toolbar [data-panel=\"contracts\"]"
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #553 interaction-mode finding: moot regardless -- by this point in the run the same worker_revolt full-screen overlay covering charge/sequence/blast above also covers the contracts panel entirely (nothing at z-panel/z-rail is reachable once levelEndReason turns non-null), so this is a guard step now too, same class as the other post-revolt steps. #553-followup (issue #586 CI): `blocked` repointed from `[data-contract-id=\"11\"] .bs-contract-accept` to the static toolbar contracts button -- the offered contract pool refreshes on its own tick-based clock, and by CI's real pacing id 11 was never offered at all, so the harness correctly refused to trust a `blocked` result against a control that was never in the DOM for unrelated reasons. The static toolbar button is present regardless of which contracts are offered and still proves the whole panel is unreachable under the overlay, matching the fix already applied to level2-playthrough-win.json's own post-bankruptcy contract-accept guards."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #553 interaction-mode finding: moot regardless -- by this point in the run the same worker_revolt full-screen overlay covering charge/sequence/blast above also covers the contracts panel entirely (nothing at z-panel/z-rail is reachable once levelEndReason turns non-null), so this is a guard step now too, same class as the other post-revolt steps. #553-followup (issue #586 CI): `blocked` repointed from `[data-contract-id=\"11\"] .bs-contract-accept` to the static toolbar contracts button -- the offered contract pool refreshes on its own tick-based clock, and by CI's real pacing id 11 was never offered at all, so the harness correctly refused to trust a `blocked` result against a control that was never in the DOM for unrelated reasons. The static toolbar button is present regardless of which contracts are offered and still proves the whole panel is unreachable under the overlay, matching the fix already applied to level2-playthrough-win.json's own post-bankruptcy contract-accept guards. #554: `contract accept 11` -> `contract accept type:rubble_disposal` -- charging is real work now, and the extra ticks the charge-order wait above spends shift the tick-based contract pool refresh far enough that a fixed id is no longer a reliable bet at all; `type:`/`material:` selectors (ContractSelector, #597) name a contract by what it actually is rather than where it landed in generation order. rubble_disposal specifically needs no ore in storage to exist as an offer (only delivery, asserted failed below regardless, needs stock)."
     },
     {
-      "command": "contract deliver 11 amount:500",
+      "command": "contract deliver type:rubble_disposal amount:500",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 11 amount:500"
+          "command": "contract deliver type:rubble_disposal amount:500"
         }
       ],
-      "description": "BLOCKED for two independent reasons by this point: the ACTIVE card's DELIVER button is genuinely disabled (ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of dirtite in storage against a 320 kg contract -- nothing in this scenario ever hauls material into storage), AND the worker_revolt full-screen overlay (active since ~tick 230, see the charge step above) now covers the whole contracts panel regardless. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so `contract deliver 11 amount:500` is a silent no-op in both modes today. `expect.blocked` pins down the real (now doubly-blocked) control; `usable` on the panel's own storage link is dropped -- that control is covered by the same overlay as everything else past this point, not usable either (same adjustment level2-playthrough-win.json made for its own bankruptcy overlay). Forcing a click here would be asserting something the game correctly forbids.",
+      "description": "BLOCKED for two independent reasons by this point: the ACTIVE card's DELIVER button is genuinely disabled (ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg in storage -- nothing in this scenario ever hauls material into storage), AND the worker_revolt full-screen overlay (active since ~tick 230, see the charge step above) now covers the whole contracts panel regardless. The console command is no better: it returns success:false and command mode only fails a step on a thrown exception, so this is a silent no-op in both modes today. `expect.blocked` pins down the real (now doubly-blocked) control; `usable` on the panel's own storage link is dropped -- that control is covered by the same overlay as everything else past this point, not usable either (same adjustment level2-playthrough-win.json made for its own bankruptcy overlay). Forcing a click here would be asserting something the game correctly forbids. #554: `contract deliver 11` -> `contract deliver type:rubble_disposal`, same fixed-id-drift reason as the accept step above.",
       "expect": {
         "equals": {
           "activeContractCount": 1

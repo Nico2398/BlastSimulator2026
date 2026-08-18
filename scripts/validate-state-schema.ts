@@ -72,6 +72,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   finances: { type: 'object', description: 'Finance sub-state; cash mirrors the flat field' },
   holeCount: { type: 'number' },
   orderedHoleCount: { type: 'number', description: 'Holes ordered but not yet drilled (state.plannedDrillHoles.length, #553)' },
+  orderedChargeCount: { type: 'number', description: 'Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length, #554)' },
   chargedCount: { type: 'number' },
   sequencedCount: { type: 'number' },
   surveyCount: { type: 'number', description: 'Completed survey results (state.surveyResults.length)' },

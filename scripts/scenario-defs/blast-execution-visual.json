@@ -170,8 +170,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -395,11 +415,15 @@
       }
     },
     {
-      "command": "tick 50",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "description": "#554: was a flat `tick 50` -- tickCommand itself stops early and auto-pauses the instant any event fires mid-window (\"Pending event! Resolve it first\"), and the earlier charge-order wait for the first drill/blast cycle above shifts tickCount enough that a spontaneous event now sometimes lands inside this window (observed: a Burial Ground event at tick 135 cut a `tick 50` here off at 39 real ticks, one hole short). `waitUntil` (#590) resolves any pending event itself each tick it advances (command-runner.ts's own runWaitUntil, #554 finding) instead of needing a paired `event choose 0` step to still be reachable before this step's own assertion runs.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 60000
         }
       ],
       "role": "setup",
@@ -412,6 +436,7 @@
     },
     {
       "command": "event choose 0",
+      "description": "#554: kept as a defensive no-op (resolveEventIfPending) -- the wait step above already resolves any event that fires during its own tick loop, but interaction mode's real clock can still leave one pending in the gap between that wait ending and this step starting.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -433,8 +458,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -779,8 +824,28 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },
@@ -1550,9 +1615,28 @@
       "role": "player",
       "expect": {
         "increased": [
-          "chargedCount"
+          "orderedChargeCount"
         ],
         "note": "#586 CI: not pinned to 64 -- see the tick-150 step above's own note. Charge All charges every hole actually drilled by then, not necessarily the full 64-hole grid; command mode and interaction mode reach a different count here (49 vs 64, both sandbox-confirmed, real and reproducible -- command mode's raw `tick 150` and interaction mode's real click-driven dispatch settle drilling assignment order differently), so this checks real progress rather than pinning to whichever mode happened to finish more of the grid. Either count is still far more than enough to exceed MAX_ACTIVE_PROJECTILES (256) once heavily overcharged below."
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "chargedCount"
+        ]
       }
     },
     {
@@ -1857,8 +1941,22 @@
       ],
       "role": "player",
       "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        { "type": "waitUntil", "field": "orderedChargeCount", "equals": 0, "maxTicks": 3000, "timeoutMs": 120000 }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "chargedCount": 4
+          "chargedCount": 4,
+          "orderedChargeCount": 0
         }
       }
     },

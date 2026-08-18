@@ -10,6 +10,7 @@ import {
   makeCampaignCtx,
   tickWithEvents,
   driveDrillPlanToCompletion,
+  driveChargePlanToCompletion,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
@@ -102,7 +103,8 @@ describe('Tutorial Level — Contract Delivery', () => {
       stemming: '2m',
     });
     expect(chargeResult.success).toBe(true);
-    expect(chargeResult.output).toContain('Charged');
+    expect(chargeResult.output).toContain('Ordered charges');
+    driveChargePlanToCompletion(ctx);
 
     // 6. Auto-sequence
     const seqResult = sequenceCommand(ctx as any, ['auto'], {});

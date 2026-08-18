@@ -87,6 +87,10 @@ describe('survey-ore-vein-visibility scenario definition', () => {
       'fragments', 'preview', 'blast_preview', 'install_tubing',
       'build_ramp', 'set_policy', 'terrain_info', 'help',
       'blast_plan', 'needs',
+      // wait_until (#590/#554): a descriptive-only pseudo-command, never
+      // executed as one -- the real spec lives in the step's own
+      // `interaction` array (see scenario-types.ts's InteractionStepAction).
+      'wait_until',
     ];
     const scenario = loadScenario();
     for (let i = 0; i < scenario.steps.length; i++) {

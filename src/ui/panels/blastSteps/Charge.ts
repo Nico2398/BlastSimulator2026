@@ -146,6 +146,7 @@ export class ChargeStep {
       // count-only signature would leave the row it was fired from stale.
       holes: holes.map(h => h.id),
       charges: holes.map(h => holeChargeSignature(state.chargesByHole[h.id])),
+      planned: holes.map(h => holeChargeSignature(state.plannedChargesByHole[h.id])),
       wet, tub: state.tubingState.inventory,
     });
     if (signature === this.lastSignature) return;
@@ -153,7 +154,7 @@ export class ChargeStep {
 
     this.renderProductList(wet.length > 0);
     this.updateChargeLine(holes.length);
-    this.holeList.render(holes, state.chargesByHole);
+    this.holeList.render(holes, state.chargesByHole, state.plannedChargesByHole);
     this.renderTubingCard(wet, state.tubingState.inventory);
   }
 

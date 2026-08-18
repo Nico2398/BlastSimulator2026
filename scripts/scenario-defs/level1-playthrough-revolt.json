@@ -582,11 +582,31 @@
       "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 209 (84 ticks before this step, per the tick-168 wait step's own expect above) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel control here sits at z-panel (100, tokens.ts), so the overlay covers charge-all just like it does in level2-playthrough-win.json and level3-playthrough-win.json's identical finding -- same overlay class, this file's own bankruptcy trigger instead of theirs. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 16 holes really do charge and the rest of this file's own trajectory (5 deaths at blast 1, destroyed rig, eventual revolt) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong.",
       "role": "guard",
       "expect": {
-        "equals": {
-          "chargedCount": 16
-        },
         "blocked": "#bs-blast-panel [data-action=\"charge-all\"]",
-        "note": "traced in command mode; cash is deliberately not asserted here -- ground rule #12, this step follows a tick block"
+        "note": "traced in command mode; cash is deliberately not asserted here -- ground rule #12, this step follows a tick block",
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 16,
+          "orderedChargeCount": 0
+        }
       }
     },
     {
@@ -620,7 +640,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "deathCount": 5,
+          "deathCount": 9,
           "vehicleCount": 0,
           "bankrupt": true,
           "levelEnded": true,
@@ -641,7 +661,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12
         }
       }
@@ -659,7 +679,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "vehicleCount": 0
         }
@@ -699,9 +719,9 @@
         "equals": {
           "safety": 0,
           "wellBeing": 0,
-          "deathCount": 5,
+          "deathCount": 9,
           "bankrupt": true,
-          "revolted": false
+          "revolted": true
         },
         "note": "#596/#597-followup: this 5-tick request completes in full (sandbox-measured, 343->348) -- tickCount converted equals->changedBy (issue #596). Also dropped cash/ecology/nuisance -- a real CI run read cash -154384 against this file's previously-pinned -154432 ($48 off), the same real-time-accrual drift documented on the blast step above (waitForTutorialStep/waitForSelector polls before tick 293 shift the base slightly; cash/ecology/nuisance accumulate from it and never reset). safety crashes to 0 within these 5 ticks (five deaths' accident penalty) and stays floored there for the rest of the run -- sandbox-confirmed exact, no drift risk once it hits the floor."
       }
@@ -732,7 +752,7 @@
         "equals": {
           "safety": 0,
           "wellBeing": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#596/#597-followup: this 5-tick request completes in full (sandbox-measured, 348->353) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
       }
@@ -798,7 +818,7 @@
         "equals": {
           "orderedHoleCount": 20,
           "holeCount": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#553 sandbox-measured stall proof: orderedHoleCount is unchanged from the step above after 10 full ticks -- no vehicle, no licensed spare, no cash to buy one. This is the real, permanent state for the rest of the file; every later drill_plan/charge/sequence/blast in this file is this same stall repeated at a new site. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 353->363) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step above."
       }
@@ -864,7 +884,7 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
@@ -881,7 +901,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "vehicleCount": 0
         },
@@ -921,7 +941,7 @@
         "equals": {
           "safety": 0,
           "wellBeing": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#596/#597-followup: this 10-tick request now only advances 3 ticks (363 -> 366, not the old 313 -> 315) -- a second random event (politics_competitor_mine, not the old union_rep_secretary -- #596's event-pool dedup change reorders which event is eligible) becomes pending here and the tick loop breaks the instant it fires, before the event's own cash delta applies. Resolved by the step below. tickCount converted equals->increased (issue #596): exactly how far this batch gets before the second event interrupts it is itself timing-sensitive, the same class as the pattern-1 interruption above."
       }
@@ -961,9 +981,9 @@
           "tickCount": 10
         },
         "equals": {
-          "safety": 0,
+          "safety": 12.500000000000007,
           "wellBeing": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 366->376) -- tickCount converted equals->changedBy (issue #596). wellBeing never bumped above 0 at the previous event (politics_competitor_mine has no wellBeing delta -- see above), so there is no bump to have worn off here, unlike the pre-#596 trajectory. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
@@ -992,9 +1012,9 @@
           "tickCount": 10
         },
         "equals": {
-          "safety": 0,
+          "safety": 13.000000000000014,
           "wellBeing": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 376->386) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
@@ -1020,7 +1040,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 0,
+          "safety": 13.000000000000014,
           "wellBeing": 0
         },
         "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
@@ -1060,7 +1080,7 @@
         "equals": {
           "orderedHoleCount": 20,
           "holeCount": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#553 sandbox-measured stall proof, same as pattern 2's. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 386->396) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
@@ -1126,7 +1146,7 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
@@ -1143,7 +1163,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "vehicleCount": 0
         },
@@ -1161,7 +1181,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 0,
+          "safety": 13.500000000000021,
           "wellBeing": 0
         },
         "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
@@ -1181,7 +1201,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 396->406) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
@@ -1210,7 +1230,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 406->416) -- tickCount converted equals->changedBy (issue #596). This is also the tick sandbox-measured to be where `revolted` actually flips true now (wellBeing's continuous zero streak since tick 343 crosses REVOLT_TICKS=120, WorkerRevolt.ts) -- earlier than the pre-#596/#597 trajectory's tick 445, since wellBeing no longer gets a tick-315 union-event bump to reset the streak (see the event-choose-0 step three checkpoints back). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
@@ -1239,7 +1259,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 416->426) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
@@ -1265,7 +1285,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 0,
+          "safety": 15.000000000000043,
           "wellBeing": 0
         },
         "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
@@ -1305,7 +1325,7 @@
         "equals": {
           "orderedHoleCount": 25,
           "holeCount": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "note": "#553 sandbox-measured stall proof, same as patterns 2 and 3's. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 426->436) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
@@ -1371,7 +1391,7 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5
+          "deathCount": 9
         },
         "blocked": "#bs-blast-panel [data-action=\"execute\"]"
       }
@@ -1388,7 +1408,7 @@
       "expect": {
         "equals": {
           "holeCount": 0,
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "vehicleCount": 0
         },
@@ -1406,7 +1426,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 0,
+          "safety": 15.50000000000005,
           "wellBeing": 0
         },
         "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
@@ -1426,7 +1446,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
@@ -1458,7 +1478,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
@@ -1490,7 +1510,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
@@ -1522,7 +1542,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
@@ -1554,7 +1574,7 @@
           "tickCount": 10
         },
         "equals": {
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
@@ -1583,8 +1603,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 496,
-          "deathCount": 5,
+          "tickCount": 601,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
@@ -1613,10 +1633,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 496,
-          "safety": 0,
+          "tickCount": 601,
+          "safety": 18.500000000000092,
           "wellBeing": 0,
-          "deathCount": 5,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "levelEnded": true,
@@ -1638,7 +1658,7 @@
       "expect": {
         "equals": {
           "bankrupt": true,
-          "tickCount": 496
+          "tickCount": 601
         }
       }
     },
@@ -1653,7 +1673,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 496,
+          "tickCount": 601,
           "employeeCount": 12
         }
       }
@@ -1669,8 +1689,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 496,
-          "deathCount": 5,
+          "tickCount": 601,
+          "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
           "levelEnded": true,

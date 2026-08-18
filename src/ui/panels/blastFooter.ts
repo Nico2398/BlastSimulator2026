@@ -82,7 +82,7 @@ export class BlastFooter {
 
   update(state: GameState): void {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
-    const errors = validateBlastPlan(plan);
+    const errors = validateBlastPlan(plan, new Set(Object.keys(state.plannedChargesByHole)));
     const hasHoles = plan.holes.length > 0;
     const fireOk = hasHoles && errors.length === 0;
 

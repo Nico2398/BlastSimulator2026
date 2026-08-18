@@ -16,13 +16,25 @@ export interface ValidationError {
   issue: string;
 }
 
-/** Validate that a blast plan is complete (all holes charged and sequenced). */
-export function validateBlastPlan(plan: BlastPlan): ValidationError[] {
+/**
+ * Validate that a blast plan is complete (all holes charged and sequenced).
+ * `loadingHoleIds`, when given, is the set of holes whose charge order has
+ * been placed but not yet loaded (#554) — a hole with no landed charge whose
+ * id is in this set gets a distinct "still loading" issue instead of the
+ * generic "missing charge" one.
+ */
+export function validateBlastPlan(
+  plan: BlastPlan,
+  loadingHoleIds?: ReadonlySet<string>,
+): ValidationError[] {
   const errors: ValidationError[] = [];
 
   for (const hole of plan.holes) {
     if (!plan.charges[hole.id]) {
-      errors.push({ holeId: hole.id, issue: 'Missing charge' });
+      errors.push({
+        holeId: hole.id,
+        issue: loadingHoleIds?.has(hole.id) ? 'Charge still loading' : 'Missing charge',
+      });
     }
     if (plan.delays[hole.id] === undefined) {
       errors.push({ holeId: hole.id, issue: 'Missing sequence delay' });
