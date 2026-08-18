@@ -1229,6 +1229,9 @@
         {
           "type": "command",
           "command": "tick 15"
+        },
+        {
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "setup",
@@ -1246,7 +1249,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "#586-followup (this session's own fix): tickCount dropped from 360 to 265 -- this session removed ~100 ticks of dead post-drilling/post-hiring tick padding earlier in this file (holes and the 7-employee hire were both already done by real tick 260, but the charge step wasn't issued until tick 360), the same class of interaction-mode CI fix as level1-win-efficient.json's pattern-1 padding removal."
+        "note": "#586-followup (this session's own fix): tickCount dropped from 360 to 265 -- this session removed ~100 ticks of dead post-drilling/post-hiring tick padding earlier in this file (holes and the 7-employee hire were both already done by real tick 260, but the charge step wasn't issued until tick 360), the same class of interaction-mode CI fix as level1-win-efficient.json's pattern-1 padding removal. resolveEventIfPending added after this last tick batch (real CI finding: the charge step's own toolbar reopen click failed with 'covered by div.bs-confirm-overlay') -- command mode's own tick loop auto-resolves any pending random event every iteration (command-runner.ts), interaction mode's raw `tick 15` command does not, so a fatigue-collapse/random event spawned on the closing ticks of this batch could leave its dialog up (isPaused:true) blocking every subsequent toolbar click, same event-freeze asymmetry already fixed elsewhere in this batch (blast-execution-visual.json, level1-lose-ecology.json)."
       }
     },
     {

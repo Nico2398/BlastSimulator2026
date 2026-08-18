@@ -1313,11 +1313,135 @@
       }
     },
     {
-      "command": "tick 20",
+      "command": "tick 5",
+      "description": "#554-followup (issue #586 CI, real failure): this last round split from one tick-20/event-choose-0 pair into four tick-5/event-choose-0 pairs -- tickCommand itself stops early and auto-pauses the instant any event fires mid-window, so real interaction-mode CI can lose a few of a tick-20 batch's ticks to a single mid-batch event (command mode's own deterministic trace never loses any, which is why this file's baseline passes command mode cleanly at 80 total ticks across all four rounds but real CI still landed the charge step below at 14/16 holes instead of 16/16). MIN_EVENT_INTERVAL_TICKS (120, balance.ts) means at most one event can plausibly fire inside this 20-tick window, so four 5-tick sub-batches each with their own event-choose-0 recovers however many ticks that one event would otherwise have cost, without changing this round's total tick budget (still 20) or any downstream absolute tickCount/cash figure.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 4,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 4,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 4,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 4,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 4,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "increased": [
+          "tickCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 0,
+          "employeeCount": 4,
+          "activeContractCount": 0,
+          "surveyCount": 2
+        },
+        "changedBy": {
+          "tickCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
         }
       ],
       "role": "setup",
@@ -1359,7 +1483,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step and every step through the rest of pattern 1 (charge/sequence/blast/state full/finances/scores/stats/tick/contract-accept/contract-deliver) -- this whole stretch reuses the same cash value the preceding resolveEventIfPending checkpoint already stopped pinning (its own note above has the mechanism), and any drift baked in there would otherwise resurface unchanged at every one of these free (zero-tick-cost) actions. tickCount/holeCount/chargedCount/sequencedCount/deathCount/employeeCount/activeContractCount stay exact throughout -- none of those are wall-clock-sensitive.",
+      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step and every step through the rest of pattern 1 (charge/sequence/blast/state full/finances/scores/stats/tick/contract-accept/contract-deliver) -- this whole stretch reuses the same cash value the preceding resolveEventIfPending checkpoint already stopped pinning (its own note above has the mechanism), and any drift baked in there would otherwise resurface unchanged at every one of these free (zero-tick-cost) actions. tickCount/holeCount/chargedCount/sequencedCount/deathCount/employeeCount/activeContractCount stay exact throughout -- none of those are wall-clock-sensitive. #554-followup (issue #586 CI, real failure): real CI landed here at 14/16 holes instead of 16 -- fixed at the source, not by loosening this check: see the four-round drilling wait's own last-round note above for the tickCommand-stops-early mechanism and the finer tick-5 chunking that recovers it.",
       "interaction": [
         {
           "type": "clickSelector",

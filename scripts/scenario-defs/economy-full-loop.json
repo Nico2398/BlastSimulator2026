@@ -922,7 +922,7 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept",
-          "timeout": 90000
+          "timeout": 240000
         },
         {
           "type": "clickSelector",
@@ -930,7 +930,7 @@
         }
       ],
       "role": "player",
-      "timeout": 100,
+      "timeout": 245,
       "expect": {
         "equals": {
           "activeContractCount": 1

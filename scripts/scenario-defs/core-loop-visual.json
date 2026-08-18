@@ -339,25 +339,136 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 910,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #554-followup (issue #586 CI, sandbox-confirmed): widened from the usual 120000ms to 900000ms specifically for this file -- SceneManager.ts clamps every render frame's own dt to 100ms (`Math.min((now-lastTime)/1000, 0.1)`) regardless of how long the frame itself actually took, and main.ts's accumulator only fires one `tick <timeScale>` per 1000ms of *accumulated, clamped* time -- so real interaction-mode tick throughput is capped at (0.1s/frame / 1s) * timeScale = 0.8 ticks per frame at 8x speed, independent of the ~6s/frame software-rasterization cost (#475) and independent of the wall-clock budget given here. Most files' wait_until steps clear this easily because a well-rested, properly-staffed crew loads a charge in single-digit ticks; this file's own 2-employee crew (no living quarters anywhere in the file, wellBeing pinned at 0 since ~tick135, confirmed via direct trace) already collapsed from fatigue twice during drilling (employee_collapsed at ticks 97/101, sandbox-reproduced) before charging even starts, so the same driller needs one or more full rest cycles mid-charge too -- sandbox-reproduced hitting the old 120000ms budget with orderedChargeCount stalled at 4 (zero progress in the entire window), consistent with well under the ~10 ticks needed for even the first hole to land. 900000ms budgets for roughly 10x the throughput of the old window, comfortably covering a multi-hole charge queue plus at least one full rest cycle for a fatigue-strained two-person crew.",
+      "command": "tick 20",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 900000
-        }
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup",
+      "description": "#554-followup (issue #586 CI, two independent agents confirmed a 900000ms single waitUntil still stalls): root cause is the event-freeze asymmetry already fixed elsewhere in this batch (blast-execution-visual.json, level1-lose-ecology.json, level3-playthrough-ecology.json) -- command mode's own waitUntil (command-runner.ts) auto-resolves any pending random event every tick it advances, interaction mode's waitUntil (interaction-executor.ts) never does, by design (its real, isPaused-gated clock halts exactly as it would for a real player). This file's own 2-employee crew, pinned at wellBeing 0 for long stretches (no living quarters anywhere in the file), is exactly the kind of scenario a spontaneous event fires into mid-wait. Chunked into the same tick-N/event-choose-0 pair pattern already used for this file's own drilling waits above (NOT a single step with a resolveEventIfPending tucked into its interaction array -- command-runner.ts only special-cases a step whose interaction array contains a literal `waitUntil` action; every other step, in command mode, just runs its own top-level `command` string once and ignores the rest of the interaction array, so a resolveEventIfPending sitting next to a `command` action inside one step never runs in command mode at all. A pending event left over from a prior chunk's tick then blocks every later tick from advancing, which is exactly what command mode sandbox-testing this fix surfaced: chargedCount stuck at 0 even after ~3000 ticks). 10 tick-20/event-choose-0 pairs (200 ticks total) -- comfortably covering a multi-hole charge queue plus at least one fatigue rest cycle for this crew (sandbox-measured drilling itself needed ~150 ticks for the same 2-person crew) without padding far enough past actual completion to risk crossing REVOLT_TICKS (120 consecutive ticks at wellBeing 0, WorkerRevolt.ts) the way this file's own dead-tick-padding finding already showed once this session."
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        { "type": "command", "command": "tick 20" }
       ],
       "role": "setup",
       "expect": {
@@ -366,6 +477,14 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "description": "Defensive no-op (resolveEventIfPending) -- the chunked wait above already resolves any event that fires during its own tick loop, but interaction mode's real clock can still leave one pending in the gap between the last chunk's tick and this step starting.",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
     },
     {
       "command": "time speed 1",

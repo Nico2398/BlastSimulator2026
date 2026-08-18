@@ -487,12 +487,8 @@
       "description": "#554: drain the charge order queued by the step above (charging is real work, not instant) — the tutorial only advances to the sequence stage once every hole has actually landed.",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "time speed:8"
         },
         {
           "type": "waitUntil",

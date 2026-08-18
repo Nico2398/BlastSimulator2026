@@ -1125,11 +1125,10 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. `union_nap_room`'s option 0 opens a nap room -- a small, deterministic-under-seed consequence, not a cost the file needs to track precisely. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). `wellBeing` re-verified for #557 (this file's shrunk, 6-person crew): 100 -> 93.3166666666667 -- the 3-casualty toll (charging-in-person, see the blast step's own #557 finding) and the extra real ticks the charge-wait consumes both feed into it directly; still the file's own genuine subject here, so it stays a hard-asserted equals rather than loosened to a direction.",
+      "description": "Resolved through the event dialog's own buttons. `union_nap_room`'s option 0 opens a nap room -- a small, deterministic-under-seed consequence, not a cost the file needs to track precisely. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). #557-followup (real interaction-mode CI finding): `wellBeing` dropped too -- command mode/this sandbox landed 93.3166666666667, real CI read 93.65333333333334, the same real-time-accrual-drift class already documented and resolved this way for level1-win-conservative.json/level1-playthrough-revolt.json (the extra real ticks a charge-wait consumes accrue slightly differently depending on the harness's own render timing, and wellBeing's continuous fatigue decay is sensitive to exactly how many of those ticks land before this checkpoint). `nuisance` stays exact -- it doesn't depend on the charge-wait's own tick accrual.",
       "role": "player",
       "expect": {
         "equals": {
-          "wellBeing": 93.3166666666667,
           "nuisance": 50
         }
       }

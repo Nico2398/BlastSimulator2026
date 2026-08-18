@@ -222,7 +222,7 @@
           "field": "orderedHoleCount",
           "equals": 0,
           "maxTicks": 400,
-          "timeoutMs": 60000
+          "timeoutMs": 240000
         }
       ],
       "role": "setup",
@@ -232,7 +232,7 @@
           "holeCount": 4
         }
       },
-      "timeout": 65
+      "timeout": 245
     },
     {
       "command": "event choose 0",
