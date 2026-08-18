@@ -44,16 +44,17 @@ Every AI solution wants to name branches its own way, and several create one bef
 
 | Branch | Owner | Role |
 |--------|-------|------|
-| `pipeline/tests-<N>`, `pipeline/impl-<N>`, `pipeline/feature-<N>` | The orchestrator, via plain git | The only branches the pipeline uses. `pipeline/feature-<N>` is always the PR head. |
+| `pipeline/tests-<label>`, `pipeline/impl-<label>`, `pipeline/feature-<label>` | The orchestrator, via plain git | The only branches the pipeline uses, where `<label>` is `<issue>-<runId>`. `pipeline/feature-<label>` is always the PR head. Shorthand elsewhere in these docs is `pipeline/feature-<N>`; the branch on the remote carries the run id too. |
 | `pipeline/scratch-*` | `claude-code-action` (`branch_prefix`) | A harness branch, never the deliverable |
 | `copilot/*` | GitHub Copilot coding agent | A harness branch, never the deliverable |
 | anything else | Whatever runtime is in use | A harness branch, never the deliverable |
 
 Three rules make this hold under any solution:
 
-1. **Branch from `main` by name, never from `HEAD`.** `git checkout -b pipeline/tests-<N> main` is unaffected by whatever the harness checked out. Runners clone with `fetch-depth: 0` and materialise a local `main` first, because `git rev-parse main` fails when only `origin/main` exists — which is exactly what a PR-review-comment checkout leaves behind.
+1. **Branch from `main` by name, never from `HEAD`.** `git checkout -b pipeline/tests-<label> main` is unaffected by whatever the harness checked out. Runners clone with `fetch-depth: 0` and materialise a local `main` first, because `git rev-parse main` fails when only `origin/main` exists — which is exactly what a PR-review-comment checkout leaves behind.
 2. **`branch-sanity` before every agent step.** `git branch --show-current` must match the expected pipeline branch; if it does not, check it out before continuing. This catches a harness that switched branches underneath the run.
-3. **The PR head is always `pipeline/feature-<N>`.** Never open a PR from a harness branch, even when the harness offers to.
+3. **The PR head is always `pipeline/feature-<label>`.** Never open a PR from a harness branch, even when the harness offers to.
+4. **Every branch a run creates carries that run's id** (`<label>` = `<issue>-<runId>`), so no two runs on one issue ever contend for a name. #554 spent two six-hour budgets proving why: the second run rebuilt `pipeline/feature-554` from `main` while the first run's abandoned branch still held the name, and the rescue push was refused `non-fast-forward` with the whole run on it. `agentic-pipeline-tdd` holds the naming rule; everything that matches a branch accepts the bare name too, so nothing older stops being found.
 
 Harness prefixes are also skipped by `claude-code-review.yml`, so a stray branch cannot trigger a review of itself.
 
@@ -63,21 +64,21 @@ Critical to unbiased implementation: test code and implementation code never mix
 
 ```
 main
- └─ pipeline/tests-<issue-number>   (test branch — skeleton → tests)
- │    └─ pipeline/impl-<issue-number>  (impl branch — forked from skeleton commit)
+ └─ pipeline/tests-<label>   (test branch — skeleton → tests)
+ │    └─ pipeline/impl-<label>  (impl branch — forked from skeleton commit)
  │
- └─ pipeline/feature-<issue-number> (deliverable branch — created from tests branch HEAD)
+ └─ pipeline/feature-<label> (deliverable branch — created from tests branch HEAD)
                                      ↓ cherry-pick impl → quality gates + PR → main
 ```
 
-1. **Skeleton branch:** create `pipeline/tests-<issue-number>` from `main`, write empty stubs, record `skeleton_commit_sha`
-2. **Fork impl branch:** create `pipeline/impl-<issue-number>` from that skeleton commit
-3. **Write tests** on `pipeline/tests-<issue-number>` (test branch)
-4. **Implement** on `pipeline/impl-<issue-number>` (impl branch) — agent never sees test commits
-5. **Create feature branch:** create `pipeline/feature-<issue-number>` from `pipeline/tests-<issue-number>` HEAD
-6. **Cherry-pick** the implementation commit onto `pipeline/feature-<issue-number>`
+1. **Skeleton branch:** create `pipeline/tests-<label>` from `main`, write empty stubs, record `skeleton_commit_sha`
+2. **Fork impl branch:** create `pipeline/impl-<label>` from that skeleton commit
+3. **Write tests** on `pipeline/tests-<label>` (test branch)
+4. **Implement** on `pipeline/impl-<label>` (impl branch) — agent never sees test commits
+5. **Create feature branch:** create `pipeline/feature-<label>` from `pipeline/tests-<label>` HEAD
+6. **Cherry-pick** the implementation commit onto `pipeline/feature-<label>`
 7. **Resolve conflicts** if the cherry-pick fails — a conflict resolver agent merges both sides and stages the result; on resolution failure the implementer re-runs
-8. **All subsequent quality gates** run on `pipeline/feature-<issue-number>`
+8. **All subsequent quality gates** run on `pipeline/feature-<label>`
 
 ## What the loop stops for
 

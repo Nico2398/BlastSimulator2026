@@ -142,6 +142,42 @@ describe('foreground guard registration', () => {
   });
 });
 
+// Volumetric work — the same edit across N files — is what spends a job budget.
+// #554's run 166 walked 94 files one at a time and was cancelled at 360 minutes
+// with nothing pushed; #553's run before it ended the same way. The fan-out is a
+// procedure, and a procedure that lives in only one of the three runtime trees is
+// a procedure two runtimes do not have.
+describe('volumetric work fans out instead of iterating', () => {
+  const TDD_SKILL = 'skills/agentic-pipeline-tdd/SKILL.md';
+
+  it.each(['.claude', '.github', '.opencode'])('%s carries the batch procedure', (runtime) => {
+    const text = readFileSync(join(ROOT, runtime, TDD_SKILL), 'utf8');
+    expect(text).toContain('Volumetric work goes out in parallel batches');
+    // The three properties that make it safe on a runner: one message so every
+    // batch is awaited in the turn that issued it, disjoint files so two agents
+    // never edit one file, and no commit inside a batch so they cannot race the
+    // index.
+    expect(text).toContain('Delegate every batch in a single message');
+    expect(text).toContain('disjoint by file');
+    expect(text).toContain('commits nothing');
+  });
+
+  // The browser harness is the most expensive thing the pipeline runs, so the
+  // visual loop is where fanning out is worth the most.
+  it.each(['.claude', '.github', '.opencode'])('%s points the visual loop at it', (runtime) => {
+    const text = readFileSync(join(ROOT, runtime, 'skills/agentic-pipeline-full/SKILL.md'), 'utf8');
+    expect(text).toContain('Volumetric iterations fan out');
+  });
+
+  // Fanning out only helps if the branches are the run's own; otherwise the wave
+  // finishes into a branch the rescue cannot push (#554).
+  it.each(['.claude', '.github', '.opencode'])('%s ties the label to the run id', (runtime) => {
+    const text = readFileSync(join(ROOT, runtime, TDD_SKILL), 'utf8');
+    expect(text).toContain('`<label>` is `<issue>-<runId>`');
+    expect(text).toContain('Never reuse a branch from an earlier run');
+  });
+});
+
 describe('a run that settles nothing is retried', () => {
   it('measures the terminal state of every issue-backed run', () => {
     for (const name of RUNNERS) {

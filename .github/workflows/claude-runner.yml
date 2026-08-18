@@ -139,7 +139,7 @@ jobs:
             actions: read
           # Any branch the harness generates for itself lands inside the
           # pipeline namespace, where it cannot be mistaken for the deliverable
-          # `pipeline/feature-<N>` and is already skipped by claude-code-review.
+          # `pipeline/feature-<N>-<runId>` and is already skipped by claude-code-review.
           branch_prefix: 'pipeline/scratch-'
           # `/agentic-run` forks straight into the `orchestrator` agent, so the
           # orchestrator is the first thing that runs — the equivalent of
@@ -270,6 +270,7 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           issue: ${{ steps.context.outputs.issue }}
+          branch: ${{ steps.context.outputs.feature_branch }}
 
       # The run just opened its PR, so this is the moment the PR came into
       # existence — and the only moment that does not depend on who opened it.
@@ -287,7 +288,7 @@ jobs:
         uses: ./.github/actions/agentic-auto-merge
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
-          head: pipeline/feature-${{ steps.context.outputs.issue }}
+          head: ${{ steps.context.outputs.feature_branch }}
 
       # No chaining step here, deliberately. A run whose deliverable was an
       # answer or an executed command closes its own issue and stops there: it

@@ -8,7 +8,7 @@ This is an autonomous pipeline run triggered from GitHub. You are the orchestrat
 
 $ARGUMENTS opens with the entity that triggered the run (`issue <N>` or `pr <N>`), and is usually followed by the trigger message and the entity description. If everything after that reference is missing, read the thread yourself: `gh issue view <N> --comments` or `gh pr view <N> --comments`. The comment that triggered this run is the most recent one on that thread.
 
-Branch from `main`, never from whatever branch this session happens to start on. A GitHub Actions runner may check out a detached or generated branch before you get control; `pipeline/tests-<N>` must still fork from `main`.
+Branch from `main`, never from whatever branch this session happens to start on. A GitHub Actions runner may check out a detached or generated branch before you get control; `pipeline/tests-<label>` must still fork from `main`. `<label>` is `<issue>-<runId>` — in a GitHub Actions run the trigger prompt names the three branches outright; in a CLI session pick `local-$(openssl rand -hex 4)` once and use it for all three.
 
 One task type is the exception, and only because its branch already exists: a red CI handed back on an open `pipeline/feature-<N>` pull request. There the work is on that branch and the pull request is built on it, so `agentic-pipeline-ci-fix` checks it out and pushes to it — it creates nothing and rebuilds nothing.
 

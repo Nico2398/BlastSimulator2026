@@ -195,7 +195,7 @@ function dependencyVerdict(dep, deliverable) {
 
   // The dep is closed; what is left to check is whether its code landed. Only
   // deliverable pull requests count — a PR whose head is the dep's own
-  // `pipeline/feature-<N>` branch, or one GitHub records as closing it. A
+  // `pipeline/feature-<N>-<runId>` branch, or one GitHub records as closing it. A
   // timeline mention counts for nothing: any PR that writes "#N" in prose
   // raises one, and a docs PR citing a closed dep must not block everything
   // built on it (#568's predicate, applied to the shared rules).
@@ -299,7 +299,7 @@ async function assessCandidate(api, issue) {
   if (!labels.assignable) return labels;
 
   // An issue that already has an open PR carrying it has a branch with commits
-  // on it. A second run would be told to build `pipeline/feature-<N>` from
+  // on it. A second run would be told to build its own `pipeline/feature-<N>-<runId>` from
   // scratch and would either collide with that branch or silently duplicate it.
   // This is the state #547 was left in, and the state a human re-adding `ready`
   // to a rescued issue would recreate. Deliverable PRs only — an open PR that

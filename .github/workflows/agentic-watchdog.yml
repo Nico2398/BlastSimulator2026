@@ -69,15 +69,31 @@ jobs:
             // agentic-run-state and agentic-assign (no shared file — this
             // workflow runs without a checkout to read one from).
             const deliverablePr = async (issueNumber) => {
-              const { data: headPrs } = await github.rest.pulls.list({
-                owner, repo, state: 'all',
-                head: `${owner}:pipeline/feature-${issueNumber}`, per_page: 20
-              });
-              const fromPipeline = headPrs.find((pr) => pr.state === 'open' || pr.merged_at);
+              // A work branch is `pipeline/<role>-<issue>-<runId>`: unique per run, so
+              // no run can collide with the branch an earlier one abandoned (#554,
+              // run 166, lost six hours to exactly that). `head` takes one exact ref,
+              // so the family is enumerated first; the bare name is always asked too,
+              // for the pull requests that predate the convention and for a merged
+              // one whose branch has since been deleted.
+              const family = new RegExp(`^pipeline/feature-${issueNumber}(?:-[A-Za-z0-9._-]+)?$`);
+              const refs = await github.rest.git
+                .listMatchingRefs({ owner, repo, ref: `heads/pipeline/feature-${issueNumber}` })
+                .then(({ data }) => data.map((entry) => entry.ref.replace('refs/heads/', '')))
+                .catch(() => []);
+              const heads = [`pipeline/feature-${issueNumber}`, ...refs.filter((ref) => family.test(ref))];
+              const headPrs = [];
+              for (const head of new Set(heads)) {
+                const { data } = await github.rest.pulls.list({
+                  owner, repo, state: 'all', head: `${owner}:${head}`, per_page: 20
+                });
+                headPrs.push(...data);
+              }
+              const fromPipeline =
+                headPrs.find((pr) => pr.state === 'open') || headPrs.find((pr) => pr.merged_at);
               if (fromPipeline) {
                 return {
                   number: fromPipeline.number,
-                  how: `from pipeline/feature-${issueNumber}, ${fromPipeline.merged_at ? 'merged' : 'open'}`
+                  how: `from ${fromPipeline.head?.ref || `pipeline/feature-${issueNumber}`}, ${fromPipeline.merged_at ? 'merged' : 'open'}`
                 };
               }
               const linked = await github.graphql(

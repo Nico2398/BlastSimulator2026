@@ -26,7 +26,7 @@ Write **empty stubs only**. No implementation logic. No tests. Establish the sha
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
-0. `git branch --show-current` → verify branch is `pipeline/tests-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<N>` and return FAIL.
+0. `git branch --show-current` → verify you are on the tests branch the orchestrator named, `pipeline/tests-<label>` (`<label>` is `<issue>-<runId>`). If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<label>` and return FAIL.
 1. Read planner output — `## Plan` section, files to create/modify, acceptance criteria.
 2. For each new file: create with empty exports (interfaces, types, function stubs returning `undefined`/`null`/empty).
 3. For each modified file: add new function/method/type signatures only — do not alter existing logic.

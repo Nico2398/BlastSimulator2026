@@ -33,7 +33,7 @@ Write failing tests capturing expected behavior **before** implementation.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
-0. `git branch --show-current` → verify branch is `pipeline/tests-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<N>` and return FAIL.
+0. `git branch --show-current` → verify you are on the tests branch the orchestrator named, `pipeline/tests-<label>` (`<label>` is `<issue>-<runId>`). If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/tests-<label>` and return FAIL.
 1. Read planner output + existing stubs — understand expected behavior.
 2. Write failing tests following existing test patterns.
 3. `npx tsc --noEmit` → verify test files compile.

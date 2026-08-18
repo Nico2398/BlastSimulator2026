@@ -57,6 +57,26 @@ function isTransient(error) {
 const closingKeyword = (number) =>
   new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s+#${number}\\b`, 'i');
 
+/**
+ * The branch family one issue's runs build on.
+ *
+ * A work branch is `pipeline/<role>-<issue>-<runId>` — unique per run, so a run
+ * can never inherit, collide with, or be refused by the branch an earlier run
+ * left behind. Run 166 on issue #554 is the incident: it built
+ * `pipeline/feature-554` from `main` while the abandoned branch of run 160 still
+ * held that exact name, and six hours of finished work died on
+ * `! [rejected] (non-fast-forward)` because the rescue push had nowhere to land.
+ *
+ * Matching therefore has to accept the family, not one name. The bare
+ * `pipeline/feature-<N>` stays matchable for every branch and pull request that
+ * predates the convention.
+ */
+const pipelineHeadPattern = (number) =>
+  new RegExp(`^pipeline/feature-${number}(?:-[A-Za-z0-9._-]+)?$`);
+
+/** Every head ref in that family, exact name first. */
+const isPipelineHead = (ref, number) => pipelineHeadPattern(number).test(ref || '');
+
 /** Labels arrive as strings from some endpoints and objects from others. */
 const labelNames = (issue) =>
   (issue.labels || []).map((label) => (typeof label === 'string' ? label : label.name));
@@ -147,6 +167,48 @@ function createIssueApi(
       timelines.set(number, events);
     }
     return timelines.get(number);
+  };
+
+  /**
+   * Every pull request opened from this issue's branch family.
+   *
+   * `pulls.list`'s `head` filter takes one exact ref, and the family is now
+   * open-ended (`pipeline/feature-<N>-<runId>`), so the refs are enumerated
+   * first: `git/matching-refs` filters server-side on the prefix, which is one
+   * call rather than a walk of every pull request in the repository. The bare
+   * name is always queried too — a merged pull request whose branch was deleted
+   * is no longer in the ref list but is still the deliverable.
+   */
+  const pipelinePullRequests = async (number) => {
+    const refs = await read(`#${number}: pipeline branches`, () =>
+      github.rest.git.listMatchingRefs({ owner, repo, ref: `heads/pipeline/feature-${number}` })
+    ).catch((error) => {
+      // A prefix that matches nothing 404s on some hosts and returns [] on
+      // others. Either way the exact name below still gets asked.
+      if ((error.status ?? 0) !== 404) throw error;
+      return { data: [] };
+    });
+
+    const names = new Set([`pipeline/feature-${number}`]);
+    for (const entry of refs.data || []) {
+      const name = String(entry.ref || '').replace(/^refs\/heads\//, '');
+      if (isPipelineHead(name, number)) names.add(name);
+    }
+
+    const found = [];
+    for (const name of names) {
+      const { data } = await read(`#${number}: pull requests from ${name}`, () =>
+        github.rest.pulls.list({
+          owner,
+          repo,
+          state: 'all',
+          head: `${owner}:${name}`,
+          per_page: 20,
+        })
+      );
+      found.push(...data);
+    }
+    return found;
   };
 
   /**
@@ -261,16 +323,11 @@ function createIssueApi(
       let pipeline = null;
       let unknown = false;
       try {
-        const { data: headPrs } = await read(`#${number}: pipeline branch`, () =>
-          github.rest.pulls.list({
-            owner,
-            repo,
-            state: 'all',
-            head: `${owner}:pipeline/feature-${number}`,
-            per_page: 20,
-          })
-        );
-        const fromPipeline = headPrs.find((pr) => pr.state === 'open' || pr.merged_at);
+        const headPrs = await pipelinePullRequests(number);
+        // Open outranks merged: an open one is a run in flight, and that is the
+        // state every caller of this is trying not to collide with.
+        const fromPipeline =
+          headPrs.find((pr) => pr.state === 'open') ?? headPrs.find((pr) => pr.merged_at);
         pipeline = fromPipeline
           ? { number: fromPipeline.number, merged: Boolean(fromPipeline.merged_at) }
           : null;
@@ -432,6 +489,8 @@ function createIssueApi(
 module.exports = {
   createIssueApi,
   closingKeyword,
+  isPipelineHead,
+  pipelineHeadPattern,
   isTransient,
   labelNames,
   normalise,

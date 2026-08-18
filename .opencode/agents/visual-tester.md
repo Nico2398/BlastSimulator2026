@@ -29,14 +29,14 @@ Two paths invoke this agent:
 
 | Context | When | Branch | Expected output |
 |---------|------|--------|----------------|
-| Standard verification | End of full pipeline, after @validator | `pipeline/feature-<N>` | Pass/fail with evidence |
-| Visual feedback loop | Iterative loop with @implementer | `pipeline/feature-<N>` | **All failures in one pass**, ranked by severity |
+| Standard verification | End of full pipeline, after @validator | `pipeline/feature-<label>` | Pass/fail with evidence |
+| Visual feedback loop | Iterative loop with @implementer | `pipeline/feature-<label>` | **All failures in one pass**, ranked by severity |
 
 In both contexts: run the full scenario suite, inspect every screenshot (including multi-angle shots), and report ALL visual failures found.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
-1. Verify branch: `git branch --show-current` → must be `pipeline/feature-<N>`
+1. Verify branch: `git branch --show-current` → must be the feature branch the orchestrator named, `pipeline/feature-<label>` (`<label>` is `<issue>-<runId>`)
 2. Confirm the channel is live: `npm run verify:env` → `visual` must report READY
 3. Start dev server if not running
 4. Run scenario tests (predefined or custom)

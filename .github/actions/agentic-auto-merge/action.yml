@@ -10,7 +10,10 @@ inputs:
     required: false
     default: ''
   head:
-    description: 'Restrict to the open PR opened from this head branch, e.g. pipeline/feature-404.'
+    description: >
+      Restrict to the open PR opened from this head branch, e.g.
+      `pipeline/feature-404-18273645`. Exact ref: the caller knows its own run id,
+      so it can name the branch it just built.
     required: false
     default: ''
   merge_method:
@@ -176,7 +179,10 @@ runs:
           // that never happens, and the watchdog skips any issue with a linked
           // PR, so issue #504 held `in-progress` for a day with every
           // assignment behind it waiting. This is the only place that sees it.
-          const PIPELINE_HEAD = /^pipeline\/feature-\d+$/;
+          // The `-<runId>` tail is what makes a work branch unique per run (#554,
+          // run 166: two runs, one branch name, six hours lost on a refused push).
+          // Branches from before the convention carry no tail, so both match.
+          const PIPELINE_HEAD = /^pipeline\/feature-\d+(?:-[A-Za-z0-9._-]+)?$/;
 
           const enabled = [];
           const unarmed = [];

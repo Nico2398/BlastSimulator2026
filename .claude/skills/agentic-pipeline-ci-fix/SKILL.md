@@ -16,10 +16,12 @@ The pull request already exists, its branch already carries the work, and its is
 
  1. [scope]        → Read the trigger comment for the PR number and the failing jobs.
                        `gh pr view <number> --json headRefName,isDraft,body,state`
-                       Head must be `pipeline/feature-<N>`. Not that → wrong pipeline, stop.
+                       Head must be in the issue's family — `pipeline/feature-<N>` or
+                       `pipeline/feature-<N>-<runId>`. Not that → wrong pipeline, stop.
+                       Read `<head>` off the PR; it is the branch the run that opened it built.
                        Draft or closed → already escalated, comment saying so and stop.
- 2. [checkout]     → `git fetch origin && git checkout pipeline/feature-<N> &&
-                       git reset --hard origin/pipeline/feature-<N>`
+ 2. [checkout]     → `git fetch origin && git checkout <head> &&
+                       git reset --hard origin/<head>`
                        Never create the branch, never branch from `main`, never cherry-pick.
  3. [read-failure] → `gh run view <run-id> --log-failed` for each failing job the comment named.
                        Interaction-mode failure → download the run's artifacts and open the FAIL
@@ -34,7 +36,7 @@ The pull request already exists, its branch already carries the work, and its is
                        Pick by what the log says, not by which is cheapest.
  6. [verify]       → Every channel the fix touches, per the Verification Gate. Then commit.
                        Never `[skip ci]` — `agentic-pipeline-pr-management`.
- 7. [push]         → `git push origin pipeline/feature-<N>`
+ 7. [push]         → `git push origin <head>`
  8. [await-ci]     → `npm run ci:await -- --pr <number>`. RED → back to step 3.
                        GREEN → done: auto-merge takes the PR from here.
 ```
@@ -46,7 +48,7 @@ Rounds are bounded exactly as `agentic-pipeline-finalization`'s CI-fix loop boun
 | Never | Why |
 |-------|-----|
 | Open a second PR | The existing one closes the issue. A second PR from a second branch makes the issue unassignable and merges nothing |
-| Recreate `pipeline/feature-<N>` | Its commits are the deliverable and exist on `origin`. Rebuilding drops the reviewed work |
+| Recreate the PR's head branch under a new name | Its commits are the deliverable and exist on `origin`. Rebuilding drops the reviewed work |
 | Remove or re-add `READY TO MERGE` | It is already there and it is already correct — the marker was never a claim about CI. Auto-merge merges the PR the moment CI reports green |
 | Touch the issue's labels on success | The merge releases the issue. Labelling it here would fight the chain |
 | Widen the fix beyond the failure | A red channel is the task. Anything else belongs in its own issue |

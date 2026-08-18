@@ -26,6 +26,16 @@ outputs:
       Single-line reference to what triggered the run ("issue 42", "pr 17",
       "manual"). Safe to pass as a slash-command argument.
     value: ${{ steps.build.outputs.entity }}
+  branch_suffix:
+    description: >
+      Suffix every work branch this run creates carries: `<issue>-<run id>`, or
+      just the run id when the trigger names no issue. Unique per run, which is
+      what keeps one run's branch from colliding with the branch an earlier run
+      abandoned.
+    value: ${{ steps.build.outputs.branch_suffix }}
+  feature_branch:
+    description: "The branch this run's deliverable lands on, `pipeline/feature-<suffix>`."
+    value: ${{ steps.build.outputs.feature_branch }}
 
 runs:
   using: composite
@@ -118,9 +128,38 @@ runs:
             prompt = 'A user triggered you. Read the context and respond appropriately.';
           }
 
+          // --- Branch names for this run ---
+          // Every work branch carries the run id, so two runs on the same issue
+          // never contend for one name. Issue #554 is why: run 166 built
+          // `pipeline/feature-554` from `main` while run 160's abandoned branch
+          // of that exact name was still on the remote, and the rescue push died
+          // `non-fast-forward` with six hours of finished work on it. The names
+          // are stated here rather than in the assignment comment because only
+          // the runner knows its own run id.
+          const suffix = (issue ? issue + '-' : '') + context.runId;
+          const featureBranch = 'pipeline/feature-' + suffix;
+          if (event !== 'pull_request_review_comment') {
+            prompt += [
+              '',
+              '',
+              '--- BRANCHES FOR THIS RUN ---',
+              'Every branch you create carries this run\'s id, so nothing you build can collide',
+              'with a branch an earlier run left behind. Use exactly these names:',
+              '',
+              '- `pipeline/tests-' + suffix + '` — the failing tests',
+              '- `pipeline/impl-' + suffix + '` — the implementation, cut from `main` and blind to the tests',
+              '- `' + featureBranch + '` — the deliverable, and the head of the pull request you open',
+              '',
+              'Never reuse a branch from a previous run, and never force-push over one.',
+              '--- END BRANCHES FOR THIS RUN ---'
+            ].join('\n');
+          }
+
           // OpenCode reads the task from $PROMPT; Claude Code reads the step output.
           const delimiter = 'PROMPT_EOF_' + context.runId;
           fs.appendFileSync(process.env.GITHUB_ENV, 'PROMPT<<' + delimiter + '\n' + prompt + '\n' + delimiter + '\n', 'utf8');
           core.setOutput('prompt', prompt);
           core.setOutput('issue', issue);
           core.setOutput('entity', entity);
+          core.setOutput('branch_suffix', suffix);
+          core.setOutput('feature_branch', featureBranch);

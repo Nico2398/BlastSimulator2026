@@ -34,7 +34,7 @@ When selecting a pipeline, apply these heuristics in order. First match wins —
 
 | If task... | Then pipeline |
 |------------|---------------|
-| Names a red CI on an open `pipeline/feature-<N>` PR — a handback from `agentic-ci-failure.yml`, or a failing check on a PR that already exists | `agentic-pipeline-ci-fix` (checked first: it reads as a bug report, and the fix-bug pipeline would rebuild a branch that already carries the work) |
+| Names a red CI on an open pipeline PR (head `pipeline/feature-<N>` or `pipeline/feature-<N>-<runId>`) — a handback from `agentic-ci-failure.yml`, or a failing check on a PR that already exists | `agentic-pipeline-ci-fix` (checked first: it reads as a bug report, and the fix-bug pipeline would rebuild a branch that already carries the work) |
 | Is a bug report, mentions "bug", "fix", "broken", "regression", "error", "unexpected behavior" | `agentic-pipeline-fix-bug` |
 | Requests a new feature, component, mechanic, or enhancement | `agentic-pipeline-full` |
 | Changes rendering, canvas, Three.js, UI, visuals | `agentic-pipeline-full` |

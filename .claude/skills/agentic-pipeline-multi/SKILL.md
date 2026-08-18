@@ -21,15 +21,15 @@ Use when the prompt mixes multiple task types.
   3. For each section K in [1..N]:
          Route by task_type:
          - Code-producing (feature, fix-bug, full) → `agentic-pipeline-tdd` with
-             label = <issue-number>-section-<K>,
-             base_branch = (K=1 ? `main` : `pipeline/feature-<issue-number>`)
+             label = <run-label>-section-<K>,
+             base_branch = (K=1 ? `main` : `pipeline/feature-<run-label>`)
          - Ask  → `agentic-pipeline-ask`
          - Executor → `agentic-pipeline-executor`
          - Review-pr → `agentic-pipeline-review-pr`
 
          For code-producing sections:
-         - Section 1 creates pipeline/feature-<issue-number> (shared across all sections)
-         - Sections 2..N cherry-pick onto the EXISTING pipeline/feature-<issue-number>
+         - Section 1 creates pipeline/feature-<run-label> (shared across all sections)
+         - Sections 2..N cherry-pick onto the EXISTING pipeline/feature-<run-label>
          - [test-runner] runs after EACH code-producing section (catch regressions early)
          - If test-runner fails → @fixer → re-run test-runner (tight loop, max 7 retries)
          - If cherry-pick conflicts → @conflict-resolver → retry cherry-pick (max 3 retries)
@@ -48,13 +48,17 @@ Use when the prompt mixes multiple task types.
 
 ### Branch Strategy
 
+`<run-label>` is `<issue>-<runId>` — the run id is what keeps this run's branches
+its own, and `agentic-pipeline-tdd`'s Branch naming holds the rule and the
+incident behind it (#554). Every branch below carries it.
+
 ```
 main
- └─ pipeline/tests-<N>-section-1   (stubs + tests, forked from main)
- │    └─ pipeline/impl-<N>-section-1  (implementer)
- └─ pipeline/tests-<N>-section-2   (stubs + tests, forked from pipeline/feature-<N>)
- │    └─ pipeline/impl-<N>-section-2  (implementer)
- └─ pipeline/feature-<N>           (accumulated — ALL sections cherry-picked here)
+ └─ pipeline/tests-<run-label>-section-1   (stubs + tests, forked from main)
+ │    └─ pipeline/impl-<run-label>-section-1  (implementer)
+ └─ pipeline/tests-<run-label>-section-2   (stubs + tests, forked from pipeline/feature-<run-label>)
+ │    └─ pipeline/impl-<run-label>-section-2  (implementer)
+ └─ pipeline/feature-<run-label>           (accumulated — ALL sections cherry-picked here)
       └─ qualimetry → finalization → PR to main
 ```
 
@@ -62,7 +66,7 @@ Each section preserves branch isolation. Feature branch accumulates all changes.
 
 ### Rules
 
-- Section 1 creates pipeline/feature-<N> with base_branch=main. Sections 2..N use base_branch=pipeline/feature-<N> (includes prior sections' code).
+- Section 1 creates pipeline/feature-<run-label> with base_branch=main. Sections 2..N use base_branch=pipeline/feature-<run-label> (includes prior sections' code).
 - Test-runner runs after every section to catch cross-section regressions early.
 - Qualimetry and finalization run once, after all sections merged.
 - Each section has its own retry budget (max 7 failures before escalation). One section's flakiness doesn't affect another's budget.
