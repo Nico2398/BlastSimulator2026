@@ -3,7 +3,9 @@
 // Each benchmark includes a warmup run to avoid cold-start bias.
 
 import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
+import { TerrainMesh } from '../../../src/renderer/TerrainMesh.js';
 import { findPath, type PathRequest } from '../../../src/core/nav/Pathfinding.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -481,6 +483,79 @@ describe('Performance Benchmarks', () => {
 
       expect(result.success).toBe(true);
       expect(elapsed).toBeLessThan(200);
+    });
+  });
+
+  describe('TerrainMesh rebuild timing with the #560 depth-limited skirt + chunk-skip', () => {
+    // #560: canSkipChunkMarch/boundarySkirtFloorY don't exist yet (skeleton
+    // stubs throw 'not implemented', not wired into rebuildChunk's march loop
+    // either) -- these three benchmarks assert the same budgets an
+    // unconditional full march already has to hit today (matching the
+    // existing "re-meshing a 16^3 chunk completes in under 200ms" convention
+    // in TerrainMesh.test.ts). The real, wired-in implementation should only
+    // ever do LESS work than today's unconditional march, so it must clear
+    // these same budgets comfortably too.
+
+    function representativeSite(): VoxelGrid {
+      // 4x4 chunks (64m x 64m footprint), 2 y-chunks deep, solid to y=20 --
+      // large enough to exercise multiple boundary AND interior chunks at
+      // once, the shape #560's chunk-skip is meant to matter for.
+      const grid = new VoxelGrid(64, 32, 64);
+      for (let x = 0; x < 64; x++)
+        for (let y = 0; y < 20; y++)
+          for (let z = 0; z < 64; z++)
+            grid.setVoxel(x, y, z, solidVoxel());
+      return grid;
+    }
+
+    it('buildAll on a representative multi-chunk site completes in under 2000ms', () => {
+      const scene = new THREE.Scene();
+      const tm = new TerrainMesh(scene, representativeSite());
+      tm.setEdgeHeightSampler(() => 19.5); // neighbour ground at the same height as the site surface
+
+      const start = performance.now();
+      tm.buildAll();
+      const elapsed = performance.now() - start;
+
+      expect(elapsed).toBeLessThan(2000);
+      tm.dispose();
+    });
+
+    it('a single-chunk remesh completes in under 200ms', () => {
+      const scene = new THREE.Scene();
+      const grid = representativeSite();
+      const tm = new TerrainMesh(scene, grid);
+      tm.setEdgeHeightSampler(() => 19.5);
+      tm.buildAll();
+
+      grid.clearVoxel(20, 10, 20);
+      const start = performance.now();
+      tm.remeshRegion({ minX: 20, minY: 10, minZ: 20, maxX: 20, maxY: 10, maxZ: 20 });
+      const elapsed = performance.now() - start;
+
+      expect(elapsed).toBeLessThan(200);
+      tm.dispose();
+    });
+
+    it('a post-blast remesh (a small crater carved at the site edge) completes in under 200ms', () => {
+      const scene = new THREE.Scene();
+      const grid = representativeSite();
+      const tm = new TerrainMesh(scene, grid);
+      tm.setEdgeHeightSampler(() => 19.5);
+      tm.buildAll();
+
+      for (let y = 0; y < 20; y++) {
+        for (let z = 2; z < 6; z++) {
+          grid.clearVoxel(63, y, z);
+          grid.clearVoxel(62, y, z);
+        }
+      }
+      const start = performance.now();
+      tm.remeshRegion({ minX: 62, minY: 0, minZ: 2, maxX: 63, maxY: 19, maxZ: 5 });
+      const elapsed = performance.now() - start;
+
+      expect(elapsed).toBeLessThan(200);
+      tm.dispose();
     });
   });
 
