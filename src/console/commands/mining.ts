@@ -880,6 +880,16 @@ export function buildRampCommand(
   return { success: true, output: result.message };
 }
 
+/**
+ * Cancel an ordered ramp still excavating (#555, mirrors `cancelAction`'s use
+ * for drill/charge orders) — releases any in-flight `dig_ramp_segment`
+ * actions and refunds the order-time cost.
+ * TODO: implement.
+ */
+export function cancelRampCommand(_ctx: MiningContext, _rampId: number): { success: boolean; output: string } {
+  return { success: false, output: 'not implemented' };
+}
+
 /** The cells a ramp of `length` cuts through, running `direction` from (originX, originZ). Max inclusive. */
 function rampFootprint(
   originX: number, originZ: number, direction: RampDirection, length: number,

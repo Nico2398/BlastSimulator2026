@@ -96,6 +96,25 @@ function migrateV11ToV12(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v12 -> v13: GameState gained `plannedRamps: PlannedRamp[]` and
+ * `nextPlannedRampId: number` (#555 ramp excavation becomes work — a ramp
+ * order queues one `dig_ramp_segment` action per segment instead of carving
+ * voxels into the grid instantly). A pre-v13 save has no ramps in flight —
+ * `plannedRamps` defaults to an empty array and `nextPlannedRampId` to 1,
+ * matching `createGame`'s own defaults. Mutates `obj` in place, matching
+ * every other migration block in `deserialize` below.
+ */
+function migrateV12ToV13(obj: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(obj['plannedRamps'])) {
+    obj['plannedRamps'] = [];
+  }
+  if (typeof obj['nextPlannedRampId'] !== 'number') {
+    obj['nextPlannedRampId'] = 1;
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -315,6 +334,11 @@ export function deserialize(json: string): GameState {
   // v11 -> v12: GameState.plannedChargesByHole (#554).
   if ((obj['version'] as number) < 12) {
     migrateV11ToV12(obj);
+  }
+
+  // v12 -> v13: GameState.plannedRamps / nextPlannedRampId (#555).
+  if ((obj['version'] as number) < 13) {
+    migrateV12ToV13(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

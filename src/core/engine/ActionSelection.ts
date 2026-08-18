@@ -160,6 +160,17 @@ export interface SelectedAction {
  * Returns `null` when `candidates` is empty or none of the top-ranked ones
  * are both reachable and claimable.
  */
+/**
+ * Claim-time gate for a `dig_ramp_segment` PendingAction — mirrors the shape
+ * of GameLoop.ts's vehicle-availability `isClaimable` predicate passed into
+ * `selectBestActionForEmployee` (see its doc above), but is not yet wired
+ * into that call site.
+ * TODO: implement.
+ */
+export function isRampSegmentClaimable(_state: GameState, _action: PendingAction): boolean {
+  return true;
+}
+
 export function selectBestActionForEmployee(
   state: GameState,
   employee: Employee,

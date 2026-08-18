@@ -5,6 +5,7 @@
 import { formatMoney } from '../economy/formatMoney.js';
 import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import type { VehicleTier } from '../entities/Vehicle.js';
 
 // ── Config ──
 
@@ -141,3 +142,48 @@ function computeColumnSurfaceY(grid: VoxelGrid, x: number, z: number): number {
 }
 
 export { RAMP_COST_PER_METER, RAMP_WIDTH, computeColumnSurfaceY };
+
+// ── Ordered ramp excavation (#555 — order-then-work, mirrors #554) ──
+
+/**
+ * Validate a ramp order against `cash` without carving anything — the
+ * order-time check `buildRampCommand` runs before queuing excavation work.
+ * TODO: implement.
+ */
+export function validateRampOrder(_ramp: RampDef, _cash: number): { success: boolean; message: string; cost: number } {
+  return { success: false, message: 'not implemented', cost: 0 };
+}
+
+/** One excavation segment of an ordered ramp — the unit a `dig_ramp_segment` PendingAction carves. */
+export interface RampSegmentDef {
+  index: number;
+  cells: { x: number; y: number; z: number }[];
+  region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
+}
+
+/**
+ * Split `ramp` into per-segment excavation work, one segment per
+ * `dig_ramp_segment` PendingAction.
+ * TODO: implement.
+ */
+export function defineRampSegments(_grid: VoxelGrid, _ramp: RampDef): RampSegmentDef[] {
+  return [];
+}
+
+/**
+ * Carve one ramp segment's cells into `grid`, emitting `terrain:updated` for
+ * the affected region.
+ * TODO: implement.
+ */
+export function carveRampSegment(_grid: VoxelGrid, _segment: RampSegmentDef, _emitter?: EventEmitter): { voxelsCleared: number } {
+  return { voxelsCleared: 0 };
+}
+
+/**
+ * Work-duration ticks for a `rock_digger` of `tier` to excavate `voxelCount`
+ * voxels of a ramp segment.
+ * TODO: implement.
+ */
+export function computeRampSegmentDurationTicks(_voxelCount: number, _tier: VehicleTier): number {
+  return 1;
+}
