@@ -391,7 +391,7 @@
         ],
         "equals": {
           "tickCount": 5,
-          "wellBeing": 50.95000000000002
+          "wellBeing": 51.05
         }
       }
     },
@@ -420,7 +420,7 @@
         ],
         "equals": {
           "tickCount": 10,
-          "wellBeing": 52.400000000000034
+          "wellBeing": 52.599999999999994
         }
       }
     },
@@ -448,7 +448,7 @@
           "tickCount": 10,
           "ecology": 50,
           "safety": 50,
-          "wellBeing": 52.400000000000034,
+          "wellBeing": 52.599999999999994,
           "nuisance": 50
         }
       }
@@ -981,7 +981,7 @@
           "tickCount": 10
         },
         "equals": {
-          "safety": 12.500000000000007,
+          "safety": 12.299999999999994,
           "wellBeing": 0,
           "deathCount": 9
         },
@@ -1012,7 +1012,7 @@
           "tickCount": 10
         },
         "equals": {
-          "safety": 13.000000000000014,
+          "safety": 12.599999999999987,
           "wellBeing": 0,
           "deathCount": 9
         },
@@ -1040,7 +1040,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 13.000000000000014,
+          "safety": 12.599999999999987,
           "wellBeing": 0
         },
         "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
@@ -1181,7 +1181,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 13.500000000000021,
+          "safety": 12.89999999999998,
           "wellBeing": 0
         },
         "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
@@ -1285,7 +1285,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 15.000000000000043,
+          "safety": 13.799999999999962,
           "wellBeing": 0
         },
         "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
@@ -1426,7 +1426,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 15.50000000000005,
+          "safety": 14.099999999999955,
           "wellBeing": 0
         },
         "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
@@ -1634,7 +1634,7 @@
       "expect": {
         "equals": {
           "tickCount": 601,
-          "safety": 18.500000000000092,
+          "safety": 15.899999999999917,
           "wellBeing": 0,
           "deathCount": 9,
           "employeeCount": 12,

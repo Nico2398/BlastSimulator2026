@@ -473,7 +473,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "wellBeing": 58.55000000000027,
+          "wellBeing": 60.16999999999995,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
@@ -1248,7 +1248,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "wellBeing": 54.05000000000052,
+          "wellBeing": 57.46999999999985,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
@@ -1755,7 +1755,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 56.60000000000072,
+          "wellBeing": 61.39999999999977,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
@@ -1781,7 +1781,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 56.60000000000072,
+          "wellBeing": 61.39999999999977,
           "safety": 0
         }
       }
@@ -1802,7 +1802,7 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 56.60000000000072,
+          "wellBeing": 61.39999999999977,
           "safety": 0,
           "bankrupt": false,
           "levelEnded": false,

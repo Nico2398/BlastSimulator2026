@@ -1343,11 +1343,11 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. `weather_geomagnetic_storm`'s option 0 (Faraday Cages) costs a further $18,000 -- deterministic under this file's fixed seed, and by this point purely academic: the mine is already bankrupt. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). `wellBeing` re-verified for #554 (renumbered again): 99.95 -> 94.67250000000006 -- the 5-casualty toll (charging-in-person, see the blast step's own #554 finding) and the extra real ticks the charge-wait consumes both feed into it directly, so the old pre-#554 figure no longer applies; still the file's own genuine subject here, so it stays a hard-asserted equals rather than loosened to a direction.",
+      "description": "Resolved through the event dialog's own buttons. `weather_geomagnetic_storm`'s option 0 (Faraday Cages) costs a further $18,000 -- deterministic under this file's fixed seed, and by this point purely academic: the mine is already bankrupt. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). `wellBeing` re-verified for #554 (renumbered again): 99.95 -> 95.03249999999998 -- the 5-casualty toll (charging-in-person, see the blast step's own #554 finding) and the extra real ticks the charge-wait consumes both feed into it directly, so the old pre-#554 figure no longer applies; still the file's own genuine subject here, so it stays a hard-asserted equals rather than loosened to a direction.",
       "role": "player",
       "expect": {
         "equals": {
-          "wellBeing": 94.67250000000006,
+          "wellBeing": 95.03249999999998,
           "nuisance": 50
         }
       }
