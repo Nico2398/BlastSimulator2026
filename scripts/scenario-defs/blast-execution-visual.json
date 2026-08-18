@@ -1780,6 +1780,46 @@
     },
     {
       "command": "tick 50",
+      "description": "#560: waitUntil was tried here first and does not fit -- runWaitUntil (command-runner.ts) loops bare `tick 1` calls with no event handling, and tickCommand (events.ts) refuses to advance at all once a random event leaves state.events.pendingEvent set (returns success:false, 'Pending event!...'), so once one fires mid-wait every remaining tick in the budget is a silent no-op and the field never settles no matter how large maxTicks is -- sandbox-confirmed stalled at orderedHoleCount:4 for 300+ ticks. This cycle drills at the site's true edge (start:59,59), far enough from the driller/drill_rig spawn that a single `tick 50` pad (enough for interior cycles 1-4) can still leave holes undrilled if an event happens to fire and eat part of the budget, so it's paired with two more tick/event-choose rounds below (3 total, sandbox-measured to land all 4 holes), mirroring the established pattern the 8x8 grid cycle above already uses for the same reason.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 50",
+      "description": "#560: third round -- sandbox-measured, a single driller/drill_rig pair takes 3 full tick-50 rounds (~150 ticks total, vs interior cycles 1-4's single round) to land all 4 holes at this corner-of-map location, round-tripping across the site's own outer edge instead of a compact interior cluster.",
       "interaction": [
         {
           "type": "command",
