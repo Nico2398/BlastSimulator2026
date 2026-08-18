@@ -382,6 +382,16 @@ export class TerrainMesh {
     return ((cx + 1024) * 2048 + (cz + 1024)) * 1024 + cy;
   }
 
+  /** Which horizontal neighbours of chunk (cx, cz) are owned — computed once per rebuild and shared by rebuildChunk/canSkipChunkMarch/boundarySkirtFloorY instead of each recomputing it (#560). */
+  private neighbourFlags(cx: number, cz: number): { hasWest: boolean; hasEast: boolean; hasNorth: boolean; hasSouth: boolean } {
+    return {
+      hasWest: this.grid.hasChunk(cx - 1, cz),
+      hasEast: this.grid.hasChunk(cx + 1, cz),
+      hasNorth: this.grid.hasChunk(cx, cz - 1),
+      hasSouth: this.grid.hasChunk(cx, cz + 1),
+    };
+  }
+
   private disposeAllChunks(): void {
     for (const mesh of this.chunks.values()) {
       if (!mesh) continue;
@@ -420,18 +430,15 @@ export class TerrainMesh {
       this.chunks.set(key, null);
       return 0;
     }
-    if (this.canSkipChunkMarch(cx, cy, cz, rect)) {
+    // Extend one cube outward only where no owned chunk lies beyond that
+    // side: an owned neighbour marches those cubes itself, and marching them
+    // twice would emit the interior wall between two claimed chunks.
+    const { hasWest, hasEast, hasNorth, hasSouth } = this.neighbourFlags(cx, cz);
+    if (this.canSkipChunkMarch(cx, cy, cz, rect, hasWest, hasEast, hasNorth, hasSouth)) {
       this.chunks.set(key, null);
       return 0;
     }
     const oy = cy * CHUNK_SIZE;
-    // Extend one cube outward only where no owned chunk lies beyond that
-    // side: an owned neighbour marches those cubes itself, and marching them
-    // twice would emit the interior wall between two claimed chunks.
-    const hasWest = this.grid.hasChunk(cx - 1, cz);
-    const hasEast = this.grid.hasChunk(cx + 1, cz);
-    const hasNorth = this.grid.hasChunk(cx, cz - 1);
-    const hasSouth = this.grid.hasChunk(cx, cz + 1);
     const xStart = hasWest ? rect.minX : rect.minX - 1;
     const zStart = hasNorth ? rect.minZ : rect.minZ - 1;
     const yStart = oy;
@@ -526,17 +533,35 @@ export class TerrainMesh {
   private canSkipChunkMarch(
     cx: number, cy: number, cz: number,
     rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+    hasWest: boolean, hasEast: boolean, hasNorth: boolean, hasSouth: boolean,
   ): boolean {
     const range = this.grid.chunkDensityRange(cx, cz, cy);
     if (!range) return false;
     if (range.max < SURFACE_THRESHOLD) return true; // uniformly air
     if (range.min < SURFACE_THRESHOLD) return false; // genuinely mixed — a surface crosses this slab
 
-    // Uniformly solid. A fully interior chunk never emits geometry.
-    const hasWest = this.grid.hasChunk(cx - 1, cz);
-    const hasEast = this.grid.hasChunk(cx + 1, cz);
-    const hasNorth = this.grid.hasChunk(cx, cz - 1);
-    const hasSouth = this.grid.hasChunk(cx, cz + 1);
+    // Uniformly solid. Unlike x/z, rebuildChunk's y-loop has no "-1" halo
+    // start (yStart is always oy, never oy-1) — the only vertical read past
+    // this chunk's own slab is its topmost cube's far corner, which lands
+    // one row into slab cy+1 (see yEnd's dy=1 corner in rebuildChunk). If
+    // that neighbouring slab isn't ALSO uniformly solid, the real surface
+    // may sit exactly on this chunk's own top boundary, and nothing else
+    // ever marches that cube — so it is never safe to skip on the strength
+    // of this slab's own density range alone (#560, reviewer repro: a flat
+    // surface landing exactly on a CHUNK_SIZE multiple). Checked
+    // symmetrically below for completeness, though the chunk below's own
+    // topmost-cube march (its own "above" check, targeting this slab) is
+    // what actually owns that seam.
+    const aboveRange = this.grid.chunkDensityRange(cx, cz, cy + 1);
+    const aboveSafe = aboveRange === null || aboveRange.min >= SURFACE_THRESHOLD;
+    if (!aboveSafe) return false;
+    if (cy > 0) {
+      const belowRange = this.grid.chunkDensityRange(cx, cz, cy - 1);
+      const belowSafe = belowRange === null || belowRange.min >= SURFACE_THRESHOLD;
+      if (!belowSafe) return false;
+    }
+
+    // A fully interior chunk never emits geometry.
     if (hasWest && hasEast && hasNorth && hasSouth) return true;
 
     // Boundary chunk: only skippable if every bordering edge column proves a
@@ -551,23 +576,38 @@ export class TerrainMesh {
       return true;
     };
 
+    // Loop ranges below reach one cell past [rect.minZ, rect.maxZ) / [rect.minX,
+    // rect.maxX) on the LOW end only, to include the diagonal corner cube
+    // (e.g. (rect.minX-1, rect.minZ-1)) that rebuildChunk's own march loop
+    // does visit when both an x-side and a z-side are unclaimed (xStart/
+    // zStart both shift to rect.minX-1/rect.minZ-1 in that case), but which
+    // neither a west-only nor a north-only scan of [rect.minZ, rect.maxZ) /
+    // [rect.minX, rect.maxX) alone would ever pass to boundarySkirtFloorY.
+    // The high end never needs a matching +1: rebuildChunk's xEnd/zEnd stay
+    // at rect.maxX/rect.maxZ regardless of hasEast/hasSouth (the east/south
+    // halo is reached through the last owned cube's high corner, not a
+    // shifted loop start), so rect.maxX-1/rect.maxZ-1 are already the last
+    // values these ranges cover. boundarySkirtFloorY itself combines
+    // multiple borders via min when called at a shared corner index, so the
+    // handful of extra calls this adds where a corner was already covered by
+    // the other side's scan are redundant, not incorrect.
     if (!hasWest) {
-      for (let z = rect.minZ; z < rect.maxZ; z++) {
+      for (let z = rect.minZ - 1; z < rect.maxZ; z++) {
         if (!consider(rect.minX - 1, z)) return false;
       }
     }
     if (!hasEast) {
-      for (let z = rect.minZ; z < rect.maxZ; z++) {
+      for (let z = rect.minZ - 1; z < rect.maxZ; z++) {
         if (!consider(rect.maxX - 1, z)) return false;
       }
     }
     if (!hasNorth) {
-      for (let x = rect.minX; x < rect.maxX; x++) {
+      for (let x = rect.minX - 1; x < rect.maxX; x++) {
         if (!consider(x, rect.minZ - 1)) return false;
       }
     }
     if (!hasSouth) {
-      for (let x = rect.minX; x < rect.maxX; x++) {
+      for (let x = rect.minX - 1; x < rect.maxX; x++) {
         if (!consider(x, rect.maxZ - 1)) return false;
       }
     }

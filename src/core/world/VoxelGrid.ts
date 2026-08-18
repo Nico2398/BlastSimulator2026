@@ -702,18 +702,32 @@ export class VoxelGrid {
     // that maintain the conservative widening summary, and a save/load
     // shouldn't carry forward stale bounds from before the save — an O(n)
     // rescan is cheap here since restoring the chunk's arrays already was.
+    //
     // Every owned (x, z) column is scanned across the full y range, so each
     // touched position is marked and counted exactly once — chunkDensityRange
     // reports the exact restored min/max for a fully-scanned slab, and
     // honestly falls back to {min:0, max:0} for one no owned column reaches.
+    //
+    // `rect` (and therefore chunk.x0/x1/z0/z1, just assigned above) comes
+    // straight from deserialized save JSON and is never validated against
+    // the grid's real dimensions — a corrupted/hand-edited save with an
+    // absurd rect (e.g. maxX/maxZ ~1e12) must not turn this loop into an
+    // unbounded scan. Clamp to the chunk's actual storage span, the same
+    // defensive clamping forEachInRegion already does against real grid
+    // bounds elsewhere in this file.
+    const zLo = Math.max(chunk.z0, chunk.cz * CHUNK_SIZE);
+    const zHi = Math.min(chunk.z1, chunk.cz * CHUNK_SIZE + CHUNK_SIZE);
+    const xLo = Math.max(chunk.x0, chunk.cx * CHUNK_SIZE);
+    const xHi = Math.min(chunk.x1, chunk.cx * CHUNK_SIZE + CHUNK_SIZE);
+
     chunk.slabMinDensity.fill(Infinity);
     chunk.slabMaxDensity.fill(-Infinity);
     chunk.slabTouchedCount.fill(0);
     chunk.touched.fill(0);
-    for (let z = chunk.z0; z < chunk.z1; z++) {
+    for (let z = zLo; z < zHi; z++) {
       for (let y = 0; y < this.sizeY; y++) {
         const slab = Math.floor(y / CHUNK_SIZE);
-        for (let x = chunk.x0; x < chunk.x1; x++) {
+        for (let x = xLo; x < xHi; x++) {
           const i = VoxelGrid.localIndex(chunk, x, y, z, this.sizeY);
           const d = chunk.density[i]!;
           if (d < chunk.slabMinDensity[slab]!) chunk.slabMinDensity[slab] = d;
