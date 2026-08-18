@@ -140,6 +140,10 @@ interface VoxelChunk {
   readonly fracture: Float64Array;
   /** Sparse, keyed by chunk-local flat index. Only voxels with ore pay for a Record. */
   readonly ores: Map<number, Record<string, number>>;
+  /** Conservative per-y-slab [min, max] density summary (#560). Index = slabIndex (this
+   *  chunk's own CHUNK_SIZE-tall vertical banding), length = ceil(sizeY / CHUNK_SIZE). */
+  readonly slabMinDensity: Float64Array;
+  readonly slabMaxDensity: Float64Array;
 }
 
 /** Packs a chunk coordinate pair into one collision-free numeric key. Range ±32768 chunks (±524 km). */
@@ -394,6 +398,7 @@ export class VoxelGrid {
 
   private allocateChunk(cx: number, cz: number): VoxelChunk {
     const n = CHUNK_SIZE * this.sizeY * CHUNK_SIZE;
+    const nSlabs = Math.ceil(this.sizeY / CHUNK_SIZE);
     const chunk: VoxelChunk = {
       cx, cz,
       x0: cx * CHUNK_SIZE, z0: cz * CHUNK_SIZE,
@@ -402,6 +407,11 @@ export class VoxelGrid {
       compId: new Uint16Array(n),
       fracture: new Float64Array(n).fill(1.0),
       ores: new Map(),
+      // TODO(#560): implementer decides the correct initial min/max fill
+      // (e.g. min=1/max=0 sentinel vs. 0/0) once touchDensity's widening
+      // convention is implemented.
+      slabMinDensity: new Float64Array(nSlabs),
+      slabMaxDensity: new Float64Array(nSlabs),
     };
     this.chunks.set(chunkKey(cx, cz), chunk);
     this.cacheKey = -1;
@@ -422,6 +432,24 @@ export class VoxelGrid {
       if (chunk.z1 > maxZ) maxZ = chunk.z1;
     }
     this.bMinX = minX; this.bMinZ = minZ; this.bMaxX = maxX; this.bMaxZ = maxZ;
+  }
+
+  // ── Per-chunk density summary (#560) ──
+
+  /**
+   * Conservative [min, max] density observed in chunk (cx, cz)'s y-slab
+   * `slabIndex` (VoxelGrid's own CHUNK_SIZE-tall vertical banding). Widens
+   * monotonically on every voxel write in that slab, never narrowed back down
+   * except on a full reload (#560). Returns null for an unowned chunk or a
+   * slab index past the grid's height.
+   */
+  chunkDensityRange(_cx: number, _cz: number, _slabIndex: number): { min: number; max: number } | null {
+    throw new Error('not implemented');
+  }
+
+  /** Widens chunk's per-slab min/max density summary to include a write of `density` at world y (#560). */
+  private touchDensity(_chunk: VoxelChunk, _y: number, _density: number): void {
+    throw new Error('not implemented');
   }
 
   // ── Dirty tracking — what a save has to store voxel-by-voxel (#473 D4) ──
@@ -519,6 +547,10 @@ export class VoxelGrid {
     if (ores && Object.keys(ores).length > 0) chunk.ores.set(i, { ...ores });
     else chunk.ores.delete(i);
     this.touch(chunk);
+    // TODO(#560): call touchDensity(chunk, y, density) here. Referenced (not
+    // called) below only so the skeleton stub isn't flagged as unused before
+    // implementer wires it in.
+    void this.touchDensity;
   }
 
   setFractureAt(x: number, y: number, z: number, value: number): void {
@@ -569,6 +601,7 @@ export class VoxelGrid {
     if (Object.keys(voxel.oreDensities).length > 0) chunk.ores.set(i, { ...voxel.oreDensities });
     else chunk.ores.delete(i);
     this.touch(chunk);
+    // TODO(#560): call touchDensity(chunk, y, voxel.density) here
   }
 
   clearVoxel(x: number, y: number, z: number): void {
@@ -580,6 +613,7 @@ export class VoxelGrid {
     chunk.fracture[i] = 1.0;
     chunk.ores.delete(i);
     this.touch(chunk);
+    // TODO(#560): call touchDensity(chunk, y, 0) here
   }
 
   // ── Raw chunk storage access — for VoxelGridCodec (save serialization) only ──

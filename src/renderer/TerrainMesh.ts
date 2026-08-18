@@ -31,6 +31,11 @@ const CHUNK_SIZE = VOXEL_CHUNK_SIZE;
 // Density ≥ this is considered solid material (0.5 = half-filled)
 const SURFACE_THRESHOLD = 0.5;
 
+/** Metres of buffer below the neighbouring landscape's sampled ground height
+ *  at which a boundary/skirt wall may stop (#560). Exported so tests can
+ *  assert against the same constant the implementation uses. */
+export const SKIRT_VISIBILITY_MARGIN_M = 2;
+
 export interface DirtyRegion {
   minX: number; minY: number; minZ: number;
   maxX: number; maxY: number; maxZ: number;
@@ -421,10 +426,20 @@ export class TerrainMesh {
     // twice would emit the interior wall between two claimed chunks.
     const xStart = this.grid.hasChunk(cx - 1, cz) ? rect.minX : rect.minX - 1;
     const zStart = this.grid.hasChunk(cx, cz - 1) ? rect.minZ : rect.minZ - 1;
-    const yStart = cy === 0 ? -1 : oy;
+    const yStart = oy;
     const xEnd = rect.maxX;
     const zEnd = rect.maxZ;
     const yEnd = Math.min(oy + CHUNK_SIZE, this.grid.sizeY);
+
+    // TODO(#560): call this.canSkipChunkMarch(cx, cy, cz, rect) here — return
+    // early (chunks.set(key, null); return 0;) when it's true.
+    // TODO(#560): call this.boundarySkirtFloorY(x, z, rect, hasWest, hasEast,
+    // hasNorth, hasSouth) per boundary column and clamp the y loop's lower
+    // bound to it, instead of marching the skirt wall all the way to y=0.
+    // Referenced (not called) here only so the skeleton stubs below aren't
+    // flagged as unused before implementer wires them in.
+    void this.canSkipChunkMarch;
+    void this.boundarySkirtFloorY;
 
     for (let z = zStart; z < zEnd; z++) {
       for (let y = yStart; y < yEnd; y++) {
@@ -461,6 +476,33 @@ export class TerrainMesh {
     this.scene.add(mesh);
     this.chunks.set(key, mesh);
     return positions.length / 3;
+  }
+
+  /**
+   * Lowest world Y at which a wall/skirt cube may still be emitted for column
+   * (x, z), or null when this column borders no unclaimed neighbour (ordinary
+   * interior geometry) or no EdgeHeightSampler is installed (full-depth
+   * fallback). A column bordering unclaimed land on more than one side (site
+   * corner) returns the minimum of the applicable sides' floors (#560).
+   */
+  private boundarySkirtFloorY(
+    _x: number, _z: number,
+    _rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+    _hasWest: boolean, _hasEast: boolean, _hasNorth: boolean, _hasSouth: boolean,
+  ): number | null {
+    throw new Error('not implemented');
+  }
+
+  /**
+   * True when chunk mesh (cx, cy, cz) is provably empty/solid-interior without
+   * marching a single cube (#560), using VoxelGrid's per-chunk density summary.
+   * False always falls through to the normal march — never a false positive.
+   */
+  private canSkipChunkMarch(
+    _cx: number, _cy: number, _cz: number,
+    _rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+  ): boolean {
+    throw new Error('not implemented');
   }
 
   private marchCube(
