@@ -566,6 +566,15 @@ window.__gameState = () => {
     // mirrors serializeGameState's own field (console-api.ts), same
     // rationale as orderedHoleCount above (#554).
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    // Remaining not-yet-`done` segments across every in-flight
+    // state.plannedRamps entry -- mirrors serializeGameState's own field
+    // (console-api.ts), same rationale as orderedHoleCount/orderedChargeCount
+    // above (#555). A ramp is spliced out of plannedRamps entirely once its
+    // last segment lands, so this reaches 0 exactly when every ordered ramp
+    // has finished.
+    orderedRampSegmentCount: s.plannedRamps.reduce(
+      (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
+    ),
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
     surveyCount: s.surveyResults.length,
