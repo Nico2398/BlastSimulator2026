@@ -434,7 +434,7 @@ export class TerrainMesh {
     // side: an owned neighbour marches those cubes itself, and marching them
     // twice would emit the interior wall between two claimed chunks.
     const { hasWest, hasEast, hasNorth, hasSouth } = this.neighbourFlags(cx, cz);
-    if (this.canSkipChunkMarch(cx, cy, cz, rect, hasWest, hasEast, hasNorth, hasSouth)) {
+    if (this.canSkipChunkMarch(cx, cy, cz, rect)) {
       this.chunks.set(key, null);
       return 0;
     }
@@ -533,8 +533,8 @@ export class TerrainMesh {
   private canSkipChunkMarch(
     cx: number, cy: number, cz: number,
     rect: { minX: number; minZ: number; maxX: number; maxZ: number },
-    hasWest: boolean, hasEast: boolean, hasNorth: boolean, hasSouth: boolean,
   ): boolean {
+    const { hasWest, hasEast, hasNorth, hasSouth } = this.neighbourFlags(cx, cz);
     const range = this.grid.chunkDensityRange(cx, cz, cy);
     if (!range) return false;
     if (range.max < SURFACE_THRESHOLD) return true; // uniformly air
