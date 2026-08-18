@@ -2,8 +2,7 @@
 name: agentic-pipeline-fix-bug
 description: >
   Fix-bug pipeline. Uses `agentic-pipeline-tdd` for the TDD cycle and
-  `agentic-pipeline-finalization` for code review through PR
-  (refactorer skipped).
+  `agentic-pipeline-finalization` for code review through PR (refactorer skipped).
 ---
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
@@ -11,7 +10,7 @@ description: >
 ```
  1. @planner                  → Plan the fix
  2. TDD cycle                 → Delegate to `agentic-pipeline-tdd` skill
-                                label = <issue-number>
+                                label = <issue-number>-<run-id>
  3. [switch-to-feature]       → switch to pipeline/feature-<N>
  4. [branch-sanity]           → verify on pipeline/feature-<N>
  5. [test-runner]             → run tests on feature branch

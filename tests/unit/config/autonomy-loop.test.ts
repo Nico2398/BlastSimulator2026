@@ -315,7 +315,7 @@ describe('auto-merge does not depend on the PR author', () => {
       const next = text.indexOf('\n      - name:', start);
       const step = text.slice(start, next > -1 ? next : undefined);
       expect(step).toContain(AUTO_MERGE_ACTION);
-      expect(step).toContain('head: pipeline/feature-${{ steps.context.outputs.issue }}');
+      expect(step).toContain('head: ${{ steps.context.outputs.feature_branch }}');
       expect(step).toMatch(/if:\s*always\(\)/);
     }
   );
@@ -818,6 +818,62 @@ describe('an unread queue is reported as a failure', () => {
   });
 });
 
+// Two runs on one issue used to build the same three branch names. #554 spent
+// two six-hour budgets on that: run 160 timed out and its `pipeline/feature-554`
+// was rescued into PR #603, closed unmerged, branch left behind; run 166 built
+// `pipeline/feature-554` again from `main`, and its rescue push was refused
+// `non-fast-forward` with 94 files of finished work on it. A branch that carries
+// the run that built it cannot be contended for at all.
+describe('a work branch belongs to exactly one run', () => {
+  const prompt = readFileSync(join(ROOT, '.github/actions/agentic-prompt/action.yml'), 'utf8');
+
+  it('names this run\'s branches in the prompt the runner hands the agent', () => {
+    expect(prompt).toContain("const suffix = (issue ? issue + '-' : '') + context.runId;");
+    expect(prompt).toContain("'- `pipeline/tests-' + suffix");
+    expect(prompt).toContain("'- `pipeline/impl-' + suffix");
+    expect(prompt).toContain("const featureBranch = 'pipeline/feature-' + suffix;");
+    expect(prompt).toContain('Never reuse a branch from a previous run');
+  });
+
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])(
+    '%s hands that exact branch to rescue and to auto-merge',
+    (name) => {
+      const text = workflow(name);
+      expect(text).toContain('branch: ${{ steps.context.outputs.feature_branch }}');
+      expect(text).toContain('head: ${{ steps.context.outputs.feature_branch }}');
+    }
+  );
+
+  // The rescue is the step that pays for a collision, so it resolves the branch
+  // rather than assuming one: the name the runner passed, else whatever of that
+  // family this VM actually built.
+  it('rescues the branch this run built, by name or by discovery', () => {
+    const rescue = readFileSync(join(ROOT, '.github/actions/agentic-rescue/action.yml'), 'utf8');
+    expect(rescue).toContain('EXPECTED_BRANCH');
+    expect(rescue).toContain('refs/heads/pipeline/feature-${ISSUE}-*');
+    // Never force: with a unique name there is nothing to overwrite, and a
+    // force-push is how a rescue could destroy the branch it came to save.
+    expect(rescue).not.toMatch(/git push[^\n]*--force/);
+  });
+
+  // Everything that matches a branch has to see the family, or an in-flight run
+  // becomes invisible to the queue the moment its branch carries a run id.
+  it.each([
+    '.github/workflows/agentic-watchdog.yml',
+    '.github/actions/agentic-run-state/action.yml',
+  ])('%s matches the whole family', (file) => {
+    const text = readFileSync(join(ROOT, file), 'utf8');
+    expect(text).toContain('listMatchingRefs');
+    expect(text).toContain('pipeline/feature-${issueNumber}(?:-[A-Za-z0-9._-]+)?$');
+  });
+
+  it('shares one family predicate with the assignment rules', () => {
+    const api = readFileSync(join(ROOT, '.github/scripts/issue-api.cjs'), 'utf8');
+    expect(api).toContain('pipelineHeadPattern');
+    expect(api).toContain('listMatchingRefs');
+  });
+});
+
 // Only two comments in the system may carry a mention, and both are written by
 // a workflow rather than by a session. Anything else that comments would wake a
 // run nobody asked for.
@@ -1009,10 +1065,17 @@ describe('a pipeline PR that is neither marked nor draft', () => {
   const pattern = /const PIPELINE_HEAD = (\/.+\/);/.exec(source)?.[1] ?? '';
   const pipelineHead = new Function(`return ${pattern};`)() as RegExp;
 
+  // A work branch carries the run that built it — `pipeline/feature-<N>-<runId>`
+  // — so no two runs on one issue contend for a name (#554 lost six hours to
+  // exactly that collision). Both forms are the pipeline's own branch here: the
+  // bare one for everything opened before the convention, the suffixed one for
+  // everything after.
   it('recognises the branch the assignment told the run to build', () => {
     expect(pattern, 'PIPELINE_HEAD is gone').not.toBe('');
     expect(pipelineHead.test('pipeline/feature-504')).toBe(true);
     expect(pipelineHead.test('pipeline/feature-1')).toBe(true);
+    expect(pipelineHead.test('pipeline/feature-504-18273645')).toBe(true);
+    expect(pipelineHead.test('pipeline/feature-504-local-9f2c1ab8')).toBe(true);
   });
 
   // The guard says "the pipeline opened this and did not finish the sentence".
@@ -1022,8 +1085,9 @@ describe('a pipeline PR that is neither marked nor draft', () => {
     'main',
     'pipeline/tests-504',
     'pipeline/impl-504',
+    'pipeline/scratch-504-abc',
     'claude/agentic-github-action-issues-4dtero',
-    'pipeline/feature-504-followup',
+    'pipeline/feature-504x',
   ])('leaves `%s` alone', (ref) => {
     expect(pipelineHead.test(ref)).toBe(false);
   });

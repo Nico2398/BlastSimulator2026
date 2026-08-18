@@ -8,7 +8,7 @@ description: >
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER. DO NOT SKIP. DO NOT IMPROVISE.
 
-Runs after qualimetry passes. Branch: `pipeline/feature-<N>`.
+Runs after qualimetry passes. Branch: `pipeline/feature-<label>` — `<label>` is `<issue>-<runId>`, per `agentic-pipeline-tdd`'s Branch naming.
 
 **Parameters:**
 - `skip_refactorer` (default: `false`) — set to `true` for bug-fix pipelines to skip refactoring phase.
@@ -84,7 +84,7 @@ On RED, bounded at **3 rounds**, counted per finalization invocation:
 
 1. Read the failing jobs the script named. Fetch the log; for an interaction-mode failure read the FAIL screenshots in the run's artifacts. Never re-run the whole suite locally to "confirm" it — a sandbox without a GPU cannot reproduce that channel, and #581's session already proved a local run of those exact files times out on load contention.
 2. Decide which side is wrong, the change or the expectation, then delegate: `@fixer` for a test/expectation disagreement, `@implementer` for a defect in the change, `@visual-tester` when the failure is a rendering or click-reachability claim.
-3. Commit and push to `pipeline/feature-<N>`. Never `[skip ci]` — `agentic-pipeline-pr-management` holds why.
+3. Commit and push to `pipeline/feature-<label>`. Never `[skip ci]` — `agentic-pipeline-pr-management` holds why.
 4. Run `[await-ci]` again. The script reads one run per workflow, newest first, so the run CI cancelled on the previous head does not count against you.
 
 After 3 rounds still red: convert the PR to a draft, comment naming the channel, what fails and what would unblock it, label the issue `blocked`, and stop with `ESCALATED: CI red after 3 fix rounds`. That is a terminal state — `handle-failure.yml` chains the queue past it.
@@ -102,7 +102,7 @@ Do NOT re-run skeleton-writer or test-writer — branches and tests already exis
 | merge-findings | Deduplicate and merge all reviewer outputs → pass/fail (evaluate after ALL reviewers complete) |
 | After refactorer | `npx vitest run` — PASS → @validator, FAIL → @implementer (big loop) |
 | verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
-| open-pr | `gh pr create --base main --head pipeline/feature-<N> --title "<type>: Resolve #<N>" --body "Closes #<N>\n\n<test_count> tests — all passing\n\n<decisions_block>\n\nREADY TO MERGE"`. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. Count test cases: `npx vitest list --reporter=json 2>$null | ConvertFrom-Json | ForEach-Object { $_.testModules } | Measure-Object`. `<decisions_block>` is the `## Decisions taken` section, omitted when the run defaulted nothing. For draft: add `--draft`, omit `READY TO MERGE` line. Then apply the `full-ci` label if and only if `agentic-pipeline-pr-management`'s test says so: `gh pr edit <number> --add-label "full-ci"`. |
-| await-ci | `npm run ci:await -- --pr <number>` (or `--head pipeline/feature-<N>` before the number is known). Exit codes: `0` GREEN, `1` RED with the failing jobs and their log URLs printed, `2` TIMEOUT (only reachable if you pass `--timeout-minutes`, which a pipeline run never does), `3` the PR is gone, `4` bad arguments or `gh` could not answer. It listens to the workflow runs on the PR head; it never re-runs a channel, and no verdict it reports depends on a duration. |
+| open-pr | `gh pr create --base main --head pipeline/feature-<label> --title "<type>: Resolve #<N>" --body "Closes #<N>\n\n<test_count> tests — all passing\n\n<decisions_block>\n\nREADY TO MERGE"`. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. Count test cases: `npx vitest list --reporter=json 2>$null | ConvertFrom-Json | ForEach-Object { $_.testModules } | Measure-Object`. `<decisions_block>` is the `## Decisions taken` section, omitted when the run defaulted nothing. For draft: add `--draft`, omit `READY TO MERGE` line. Then apply the `full-ci` label if and only if `agentic-pipeline-pr-management`'s test says so: `gh pr edit <number> --add-label "full-ci"`. |
+| await-ci | `npm run ci:await -- --pr <number>` (or `--head pipeline/feature-<label>` before the number is known). Exit codes: `0` GREEN, `1` RED with the failing jobs and their log URLs printed, `2` TIMEOUT (only reachable if you pass `--timeout-minutes`, which a pipeline run never does), `3` the PR is gone, `4` bad arguments or `gh` could not answer. It listens to the workflow runs on the PR head; it never re-runs a channel, and no verdict it reports depends on a duration. |
 | decision-followup | `gh label create decision-review --description "A default the pipeline chose; revisit when convenient" --color ededed --force` then `gh issue create --label decision-review --title "Decision review: <summary> (from #<N>)" --body "<decisions block + PR link>"`. `--force` makes the label step idempotent — it updates an existing label instead of failing the run on every issue after the first. |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |

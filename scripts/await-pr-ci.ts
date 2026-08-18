@@ -31,7 +31,7 @@
  *
  * Usage:
  *   npm run ci:await -- --pr 581
- *   npm run ci:await -- --head pipeline/feature-552
+ *   npm run ci:await -- --head pipeline/feature-552-18273645
  *   npm run ci:await -- --pr 581 --interval-seconds 15
  *   npm run ci:await -- --pr 581 --timeout-minutes 20   # opt-in, for a human
  *

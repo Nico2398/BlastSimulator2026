@@ -13,9 +13,10 @@ description: >
 
  1. @planner                  → Create implementation plan
  2. TDD cycle                 → Delegate to `agentic-pipeline-tdd` skill
-                                label = <issue-number>
- 3. [switch-to-feature]       → switch to pipeline/feature-<N>
- 4. [branch-sanity]           → verify on pipeline/feature-<N>
+                                label = <issue-number>-<run-id>   (see that skill's Branch naming:
+                                the run id is what makes this run's branches its own)
+ 3. [switch-to-feature]       → switch to pipeline/feature-<label>
+ 4. [branch-sanity]           → verify on pipeline/feature-<label>
  5. [test-runner]             → run full test suite on feature branch
                                 if fail → @fixer → re-run test-runner (tight loop, max 7 retries)
  6. [verify-commit]           → confirm fix commit; auto-commit if dirty
@@ -61,7 +62,7 @@ LOOP:
                         If VISUAL: BLOCKED → halt pipeline immediately (escalate).
                         If no failures → exit loop (continue to step 9).
   b. @implementer     → Fix ALL reported visual issues.
-                        Runs on feature branch (branch-sanity: pipeline/feature-<N>).
+                        Runs on feature branch (branch-sanity: pipeline/feature-<label>).
                         Does NOT switch to impl branch — this is not TDD, it's visual iteration.
   c. [test-runner]    → Verify no test regression.
                         if fail → @fixer → re-run [test-runner]
@@ -69,6 +70,11 @@ LOOP:
 ```
 
 **Key rules:**
+- **Volumetric iterations fan out.** Five or more screenshots to capture and read
+  back, or five or more scenario definitions to adapt, is a parallel batch wave —
+  `agentic-pipeline-tdd`'s "Volumetric work goes out in parallel batches" holds the
+  procedure. A browser harness is the most expensive thing this pipeline runs
+  (~6.4 s/frame without a GPU), so this is where the job budget is won or lost.
 - `@implementer` during visual loop: fix ALL reported visual issues, commit, hand back to visual-tester
 - `@visual-tester` each iteration: re-run full scenario suite, report remaining failures
 - No qualimetry, code review, or refactorer inside the loop — those run once after loop exits

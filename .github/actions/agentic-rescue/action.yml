@@ -31,6 +31,13 @@ inputs:
   issue:
     description: "Issue number the run was working on. Empty disables the step."
     required: true
+  branch:
+    description: >
+      The feature branch this run was told to build, `pipeline/feature-<issue>-<runId>`.
+      Optional: when it is empty, or the run named its branch differently, the
+      step falls back to whichever branch of that issue's family is on disk.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -40,6 +47,7 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.token }}
         ISSUE: ${{ inputs.issue }}
+        EXPECTED_BRANCH: ${{ inputs.branch }}
       run: |
         set -euo pipefail
 
@@ -73,7 +81,29 @@ runs:
           echo "Issue #${ISSUE} labelled \`blocked\` — the assignment chain is released."
         }
 
-        BRANCH="pipeline/feature-${ISSUE}"
+        # Which branch this run built. A work branch is
+        # `pipeline/feature-<issue>-<runId>`, unique per run, which is what stops
+        # a run from ever contending for the name an earlier one left behind:
+        # run 166 on #554 built `pipeline/feature-554` while run 160's abandoned
+        # branch of that name was still on the remote, and this push died
+        # `non-fast-forward` with six hours of finished work on it.
+        #
+        # The name the runner passed in comes first. If the session named its
+        # branch something else in the family, take the one with the most recent
+        # commit — but never a bare-named branch from an older run: only a local
+        # branch this VM created can hold work worth rescuing, and the
+        # `fetch-depth` checkout brings no other `pipeline/*` ref down.
+        BRANCH=""
+        if [ -n "${EXPECTED_BRANCH}" ] && git rev-parse --verify --quiet "${EXPECTED_BRANCH}" >/dev/null; then
+          BRANCH="${EXPECTED_BRANCH}"
+        else
+          BRANCH="$(git for-each-ref --sort=-committerdate --format='%(refname:short)' \
+            "refs/heads/pipeline/feature-${ISSUE}" "refs/heads/pipeline/feature-${ISSUE}-*" | head -n 1)"
+        fi
+        # Nothing on disk: keep the name the run was supposed to build, so the
+        # "produced nothing" comment below still says which branch is missing.
+        BRANCH="${BRANCH:-${EXPECTED_BRANCH:-pipeline/feature-${ISSUE}}}"
+        echo "Rescue target: ${BRANCH}"
         # "Check the runner logs" is not actionable without the link. Every
         # comment and PR body below carries it, because the run that wrote them
         # is the only place the failure is explained.

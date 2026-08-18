@@ -31,7 +31,7 @@ Arbiter between test expectation and implementation behavior. When a test fails,
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
-0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
+0. `git branch --show-current` → verify you are on the feature branch the orchestrator named, `pipeline/feature-<label>` (`<label>` is `<issue>-<runId>`). If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<label>` and return FAIL.
 1. Read test failure output in system context.
 2. Read the failing test file(s) — understand what the test expects.
 3. Identify responsible source file(s) + function(s) from stack traces.

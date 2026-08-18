@@ -33,8 +33,10 @@ interface FakeIssue {
   body?: string;
   isPullRequest?: boolean;
   prMergedAt?: string | null;
-  /** The PR from this issue's own `pipeline/feature-<N>` branch, if one exists. */
+  /** The PR from this issue's own `pipeline/feature-<N>[-<runId>]` branch, if one exists. */
   pipelinePr?: { number: number; merged: boolean } | null;
+  /** Head branch that PR sits on. Defaults to the bare pre-convention name. */
+  pipelineBranch?: string;
   /** PRs GitHub records as closing this issue (open and merged only). */
   closers?: { number: number; merged: boolean }[];
   /** The deliverable-PR read failed — callers must fail closed. */
@@ -66,6 +68,7 @@ const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   isPullRequest: false,
   prMergedAt: null,
   pipelinePr: null,
+  pipelineBranch: '',
   closers: [],
   deliverableUnknown: false,
   blockedAt: null,
@@ -701,6 +704,9 @@ describe('the GitHub half', () => {
         ...overrides,
       },
       pulls: { list: async () => ({ data: [] }) },
+      // A work branch is `pipeline/feature-<N>-<runId>`, so the refs in that
+      // family are enumerated before any of them can be asked about by head.
+      git: { listMatchingRefs: async () => ({ data: [] }) },
     },
     graphql: async () => ({
       repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } },
@@ -770,6 +776,7 @@ describe('the GitHub half', () => {
         {
           rest: {
             issues: octokit().rest.issues,
+            git: octokit().rest.git,
             pulls: {
               list: async (params: { head: string }) => {
                 askedHead = params.head;
@@ -800,6 +807,95 @@ describe('the GitHub half', () => {
       });
     });
 
+    // Every run names its branches after itself — `pipeline/feature-<N>-<runId>`
+    // — so two runs on one issue can never contend for a name. #554 is the
+    // incident: run 166 rebuilt `pipeline/feature-554` while run 160's abandoned
+    // branch still held it, and the rescue push was refused `non-fast-forward`
+    // with six hours of work on it. The predicate has to see the whole family,
+    // or an in-flight run stops being visible to the queue.
+    describe('the branch family a run builds under', () => {
+      const withRefs = (refs: string[], prs: Record<string, { number: number; state: string; merged_at: string | null }[]>) =>
+        createIssueApi(
+          {
+            rest: {
+              issues: octokit().rest.issues,
+              git: { listMatchingRefs: async () => ({ data: refs.map((ref) => ({ ref: `refs/heads/${ref}` })) }) },
+              pulls: {
+                list: async ({ head }: { head: string }) => ({
+                  data: prs[head.replace('o:', '')] ?? [],
+                }),
+              },
+            },
+            graphql: async () => ({
+              repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } },
+            }),
+          },
+          { owner: 'o', repo: 'r', sleep: instant }
+        );
+
+      it('finds the pull request on a run-suffixed branch', async () => {
+        const client = withRefs(['pipeline/feature-554-32056002769'], {
+          'pipeline/feature-554-32056002769': [{ number: 610, state: 'open', merged_at: null }],
+        });
+        expect((await client.deliverableFor(554)).pipeline).toEqual({ number: 610, merged: false });
+      });
+
+      // A merged branch is deleted; the pull request is still the deliverable.
+      it('still finds a merged pull request whose branch is gone', async () => {
+        const client = withRefs([], {
+          'pipeline/feature-554': [{ number: 586, state: 'closed', merged_at: '2026-08-15T18:25:39Z' }],
+        });
+        expect((await client.deliverableFor(554)).pipeline).toEqual({ number: 586, merged: true });
+      });
+
+      // An open run is what a second assignment must not collide with, so it
+      // outranks the merged branch of a run that already finished.
+      it('prefers the open pull request over a merged one', async () => {
+        const client = withRefs(['pipeline/feature-554-99'], {
+          'pipeline/feature-554': [{ number: 586, state: 'closed', merged_at: '2026-08-15T18:25:39Z' }],
+          'pipeline/feature-554-99': [{ number: 610, state: 'open', merged_at: null }],
+        });
+        expect((await client.deliverableFor(554)).pipeline).toEqual({ number: 610, merged: false });
+      });
+
+      // The dash is the boundary: `pipeline/feature-55-<runId>` belongs to #55,
+      // and reading it as #554's would block an issue that has no PR at all.
+      it('never reads another issue\'s branch as this one\'s', async () => {
+        const client = withRefs(['pipeline/feature-55-32056002769', 'pipeline/feature-5541'], {
+          'pipeline/feature-55-32056002769': [{ number: 700, state: 'open', merged_at: null }],
+          'pipeline/feature-5541': [{ number: 701, state: 'open', merged_at: null }],
+        });
+        expect((await client.deliverableFor(554)).pipeline).toBeNull();
+      });
+
+      // The ref listing 404s on a prefix that matches nothing. That is an empty
+      // family, not an unreadable one — the queue must keep moving.
+      it('treats a 404 from the ref listing as an empty family', async () => {
+        const client = createIssueApi(
+          {
+            rest: {
+              issues: octokit().rest.issues,
+              git: {
+                listMatchingRefs: async () => {
+                  throw Object.assign(new Error('Not Found'), { status: 404 });
+                },
+              },
+              pulls: { list: async () => ({ data: [] }) },
+            },
+            graphql: async () => ({
+              repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } },
+            }),
+          },
+          { owner: 'o', repo: 'r', sleep: instant }
+        );
+        expect(await client.deliverableFor(554)).toEqual({
+          pipeline: null,
+          closers: [],
+          unknown: false,
+        });
+      });
+    });
+
     // A closed-unmerged head-branch PR is a rejected deliverable — reported as
     // no pipeline PR, so the issue becomes assignable again.
     it('ignores a closed-unmerged pipeline pull request', async () => {
@@ -807,6 +903,7 @@ describe('the GitHub half', () => {
         {
           rest: {
             issues: octokit().rest.issues,
+            git: octokit().rest.git,
             pulls: { list: async () => ({ data: [{ number: 566, state: 'closed', merged_at: null }] }) },
           },
           graphql: async () => ({
@@ -825,6 +922,7 @@ describe('the GitHub half', () => {
         {
           rest: {
             issues: octokit().rest.issues,
+            git: octokit().rest.git,
             pulls: { list: async () => { throw Object.assign(new Error('boom'), { status: 500 }); } },
           },
           graphql: async () => ({ repository: { issue: { closedByPullRequestsReferences: { nodes: [] } } } }),
@@ -859,7 +957,11 @@ describe('the GitHub half', () => {
         const log: string[] = [];
         const client = createIssueApi(
           {
-            rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
+            rest: {
+            issues: octokit().rest.issues,
+            git: octokit().rest.git,
+            pulls: { list: async () => ({ data: [] }) },
+          },
             graphql: flaky(2, 503, nodes([{ number: 570, merged: true }])),
           },
           { owner: 'o', repo: 'r', sleep: instant, log: (m: string) => log.push(m) }
@@ -877,7 +979,11 @@ describe('the GitHub half', () => {
         let calls = 0;
         const client = createIssueApi(
           {
-            rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
+            rest: {
+            issues: octokit().rest.issues,
+            git: octokit().rest.git,
+            pulls: { list: async () => ({ data: [] }) },
+          },
             graphql: async () => {
               calls += 1;
               throw Object.assign(new Error('Not Found'), { status: 404 });
@@ -918,6 +1024,7 @@ describe('the GitHub half', () => {
         const client = createIssueApi(
           {
             rest: {
+              git: octokit().rest.git,
               issues: {
                 ...octokit().rest.issues,
                 ...timelineWith([
@@ -946,7 +1053,11 @@ describe('the GitHub half', () => {
       it('reports an empty timeline as no closer, so the queue keeps moving', async () => {
         const client = createIssueApi(
           {
-            rest: { issues: octokit().rest.issues, pulls: { list: async () => ({ data: [] }) } },
+            rest: {
+            issues: octokit().rest.issues,
+            git: octokit().rest.git,
+            pulls: { list: async () => ({ data: [] }) },
+          },
             graphql: async () => {
               throw Object.assign(new Error('unavailable'), { status: 503 });
             },
@@ -965,6 +1076,7 @@ describe('the GitHub half', () => {
         const client = createIssueApi(
           {
             rest: {
+              git: octokit().rest.git,
               issues: {
                 ...octokit().rest.issues,
                 listEventsForTimeline: async () => {
@@ -989,6 +1101,7 @@ describe('the GitHub half', () => {
       {
         rest: {
           issues: octokit().rest.issues,
+          git: octokit().rest.git,
           pulls: {
             list: async () => ({
               data: [
@@ -1180,12 +1293,24 @@ describe('running the assign action end to end', () => {
             return { data: {} };
           },
         },
+        git: {
+          // The branch family for an issue: `pipeline/feature-<N>` from before
+          // the convention, `pipeline/feature-<N>-<runId>` since.
+          listMatchingRefs: async ({ ref }: { ref: string }) => {
+            const match = /heads\/pipeline\/feature-(\d+)$/.exec(ref);
+            const found = match ? state.get(parseInt(match[1], 10)) : undefined;
+            const branch = found?.pipelineBranch;
+            return { data: branch ? [{ ref: `refs/heads/${branch}` }] : [] };
+          },
+        },
         pulls: {
           list: async (params: { head?: string }) => {
             if (params.head) {
-              const match = /pipeline\/feature-(\d+)$/.exec(params.head);
+              const match = /pipeline\/feature-(\d+)(?:-[A-Za-z0-9._-]+)?$/.exec(params.head);
               const found = match ? state.get(parseInt(match[1], 10)) : undefined;
-              const pr = found?.pipelinePr;
+              const onThisBranch =
+                !found?.pipelineBranch || params.head.endsWith(`:${found.pipelineBranch}`);
+              const pr = onThisBranch ? found?.pipelinePr : null;
               return {
                 data: pr
                   ? [{ number: pr.number, state: pr.merged ? 'closed' : 'open', merged_at: pr.merged ? '2026-08-11T00:00:00Z' : null }]
@@ -1299,6 +1424,25 @@ describe('running the assign action end to end', () => {
     expect(result.outputs.issue).toBe('');
     expect(result.failed).toBeNull();
     expect(result.log.join('\n')).toContain('Nothing assigned');
+  });
+
+  // The state #554 was left in twice over: a run's branch is its own, so an open
+  // PR on `pipeline/feature-<N>-<runId>` is exactly as much a reason not to
+  // assign as one on the bare name ever was.
+  it('skips an issue whose run-suffixed pull request is open', async () => {
+    const result = await run({
+      issues: [
+        {
+          number: 554,
+          labels: ['ready'],
+          pipelinePr: { number: 610, merged: false },
+          pipelineBranch: 'pipeline/feature-554-32056002769',
+        },
+        { number: 555, labels: ['ready'] },
+      ],
+    });
+    expect(result.outputs.issue).toBe('555');
+    expect(result.log.join('\n')).toContain('#610');
   });
 
   // One unreadable candidate is not a reason to park a queue that still has an

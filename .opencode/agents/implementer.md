@@ -27,7 +27,7 @@ Write **minimum code** to pass failing tests.
 
 ## ▶ PROCEDURE — Standard TDD
 
-0. `git branch --show-current` → verify branch is `pipeline/impl-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/impl-<N>` and return FAIL.
+0. `git branch --show-current` → verify you are on the impl branch the orchestrator named, `pipeline/impl-<label>` (`<label>` is `<issue>-<runId>`). If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/impl-<label>` and return FAIL.
 1. Read failing tests → understand expected behavior
 2. Identify source files needing changes
 3. Write minimum code → all failing tests pass
@@ -39,9 +39,9 @@ Write **minimum code** to pass failing tests.
 
 ## ▶ PROCEDURE — Visual Feedback Loop
 
-Use when invoked from the visual feedback loop (orchestrator confirms `pipeline/feature-<N>`).
+Use when invoked from the visual feedback loop (orchestrator confirms `pipeline/feature-<label>`).
 
-0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
+0. `git branch --show-current` → verify you are on the feature branch the orchestrator named, `pipeline/feature-<label>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<label>` and return FAIL.
 1. Read visual failure report from @visual-tester — fix **all reported visual issues**.
 2. Identify source files responsible for the visual issue (renderer, mesh, overlay, etc.).
 3. Apply minimal fix — change only what that one issue requires.

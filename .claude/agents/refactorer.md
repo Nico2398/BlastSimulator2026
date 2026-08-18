@@ -52,7 +52,7 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
-0. `git branch --show-current` → verify branch is `pipeline/feature-<issue-number>`. If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<N>` and return FAIL.
+0. `git branch --show-current` → verify you are on the feature branch the orchestrator named, `pipeline/feature-<label>` (`<label>` is `<issue>-<runId>`). If mismatch, print `## WRONG BRANCH: on <actual>, expected pipeline/feature-<label>` and return FAIL.
 1. `git diff main...HEAD` — full diff of changed files
 2. **Diff Review** — per file:
    - Stale comments ("not yet implemented", "placeholder", "will be added later")
