@@ -184,10 +184,31 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20'], TOOLBAR_TARGET.blast),
 
   // ── Step 5: charge ──
-  createComparisonStep('charge', 'tutorial.step6.title', 'tutorial.step6', (s) => Object.keys(s.chargesByHole ?? {}).length, ['charge hole:* explosive:boomite amount:5 stemming:2'], TOOLBAR_TARGET.blast),
+  // #554: charging is real, queued work now (was instant) -- without
+  // waitsOnWork the rail's clock-hold (tutorialGuide.ts's decideClock) has no
+  // way to tell "still charging" from "stuck", and holds the game paused the
+  // instant DEFAULT_TICK_BUDGET (10 ticks) elapses without every hole done,
+  // which a 16-hole charge order never finishes that fast. Matches the same
+  // fix already applied to every other real-queued-work step (survey,
+  // contract-deliver, etc.) above.
+  createComparisonStep('charge', 'tutorial.step6.title', 'tutorial.step6', (s) => Object.keys(s.chargesByHole ?? {}).length, ['charge hole:* explosive:boomite amount:5 stemming:2'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 6: sequence ──
-  createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['sequence auto delay_step:25'], TOOLBAR_TARGET.blast),
+  // #554: `createComparisonStep`'s own isComplete fires the instant its
+  // tracked value first ticks up past its snapshot -- the preceding 'charge'
+  // step (see its own note above) advances to this one after the FIRST of 16
+  // holes charges, not after all of them, since charging is now real, queued
+  // work (was instant pre-#554). The crew is still genuinely mid-charge for
+  // a while after this stage's card is showing, so it needs the same
+  // waitsOnWork treatment as 'charge' -- otherwise the clock holds after
+  // DEFAULT_TICK_BUDGET ticks of sequencedCount staying at 0, permanently:
+  // once held, the driller can never finish charging (task dispatch only
+  // runs on ticks, and each subsequent `tick N` scenario command is capped
+  // to 1 real tick while the clock is held), so nothing can ever un-hold it.
+  // isWorkInProgress (tutorialGuide.ts) checks global pending actions/active
+  // employee work, not this step's own subject, so it correctly keeps the
+  // clock running while the charging crew is still busy.
+  createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['sequence auto delay_step:25'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 7: blast ──
   // Counts blasts fired as well as ore types collected. Keying only on ore

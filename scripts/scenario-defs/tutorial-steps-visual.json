@@ -20,20 +20,20 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:218824",
+      "command": "campaign start level:tutorial_pit cash:224000",
       "timeout": 15,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:218824"
+          "command": "campaign start level:tutorial_pit cash:224000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 218824
+          "cash": 224000
         },
-        "note": "#553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 16-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #554: bumped again to $218,824 -- charging is real work too now, and the charge order's own wait step burns more payroll/fuel before the freight_warehouse purchase further down this file, which came up $10,126 short at the old figure."
+        "note": "#553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 16-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #554: bumped again to $218,824 -- charging is real work too now, and the charge order's own wait step burns more payroll/fuel before the freight_warehouse purchase further down this file, which came up $10,126 short at the old figure. #554-followup (issue #586 CI): bumped once more to $224,000 -- switching the charge-drain wait from chunked tick-N rounds to a single giant tick 225 (see that step's own note, fixing a real interaction-mode deadlock) burns marginally different real fuel/payroll than the chunked version did over the identical 225-tick span, and the freight_warehouse purchase further down came up ~$2,534 short at the old figure. Sandbox-confirmed at the new figure."
       }
     },
     {
@@ -535,122 +535,10 @@
       }
     },
     {
-      "command": "tick 25",
-      "description": "#554-followup round 3 (issue #586 CI): a real-time waitUntil here (widened to 240000ms) still stalled at 13 -- CI's browser-driven real-time throughput is frame-cost-bound (#475), not budget-size-bound. Sandbox-measured: charging 16 holes converges 215 ticks after this wait starts (tick 465 -> 680) in command mode's own deterministic trace. Switched to the same deterministic tick-N/event-choose-0 chunked pattern proven for this class of issue elsewhere this session -- 9 rounds of tick 25 (225 ticks) replay the identical trajectory in both modes. `time speed:8` dropped -- it only sped up real-time-driven ticking, which this step no longer does.",
+      "command": "tick 225",
+      "description": "#554-followup round 4 (issue #586 CI): rounds 1-3's fix (chunked tick-N/event-choose-0 rounds, 9x25 then consolidated to 3x100/3x75) still stalled intermittently in real interaction-mode CI -- root-caused via local reproduction to a genuine deadlock in the tutorial rail's own clock-hold logic (tutorialGuide.ts's decideClock/workSignature), not a tick-budget sizing problem. `createComparisonStep`'s isComplete (tutorialStepHelpers.ts) fires the instant its tracked count first ticks up past its snapshot, so the 'charge' tutorial stage (tutorialSteps.ts) advances to 'sequence' after the FIRST of 16 holes charges, not after all of them, since charging is real queued work post-#554 (was instant pre-#554) -- the same root cause already found and fixed for the 'drill-plan' stage's own tick-400 step above. Fixed at the source (tutorialSteps.ts): both 'charge' and 'sequence' steps now carry `waitsOnWork: true`, but that alone isn't sufficient -- TutorialOverlay's 250ms-interval tickGuide poll runs on a real setInterval, so ANY chunked-tick pattern that returns control to the JS event loop between ticks gives it a chance to fire mid-charge, and once it holds the clock (state.isPaused=true) the deadlock is permanent: every subsequent scenario `tick N` command is capped to exactly 1 real tick per call (events.ts's tickCommand loop checks `if (state.isPaused) break` at the END of each iteration), so real progress crawls far too slowly for the rail's own WORK_GRACE_TICKS(40)-tick recovery window to ever close before this file's own remaining tick budget runs out. Splitting the budget into fewer, bigger rounds (3x100, 3x75) only reduced the number of vulnerable gaps, it didn't close them -- reproduced the identical permanent stall at chargedCount=7 in two independent local runs regardless of chunk shape. Switched to the exact same single-giant-tick pattern the drill-plan step above already uses successfully: one synchronous `tick 225` call blocks the JS main thread for its entire duration, so the poll's setInterval callback cannot fire until it returns -- by which point all 16 holes are already charged and decideClock never gets a chance to observe a mid-charge gap at all. 225 ticks matches this session's earlier chunked-budget total (comfortable margin over the ~215 measured).",
       "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 25",
-      "interaction": [
-        { "type": "command", "command": "tick 25" }
+        { "type": "command", "command": "tick 225" }
       ],
       "role": "setup",
       "expect": {
@@ -937,6 +825,10 @@
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
         },
         {
           "type": "clickSelector",
