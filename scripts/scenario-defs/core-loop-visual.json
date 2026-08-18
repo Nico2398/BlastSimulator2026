@@ -445,8 +445,12 @@
     },
     {
       "command": "blast_preview",
-      "description": "This file never buys any software tier, so the preview prints '[Requires software tier N]' for every section (see safety-projection-visual.json for the unlocked version) -- still a real, clickable control either way. #554-followup (issue #586 CI): restored to a real click -- the level is alive again by this point (see the charge-all step's description above), so run-analysis is genuinely reachable, not covered by a level-end overlay.",
+      "description": "This file never buys any software tier, so the preview prints '[Requires software tier N]' for every section (see safety-projection-visual.json for the unlocked version) -- still a real, clickable control either way. #554-followup (issue #586 CI): restored to a real click -- the level is alive again by this point (see the charge-all step's description above), so run-analysis is genuinely reachable, not covered by a level-end overlay. #554-followup round 2 (issue #586 CI, real failure): 'element has zero size (0x0)' -- run-analysis lives on the Preview tab ([data-step=\"4\"]), which the panel never auto-navigates to on its own (BlastWorkshop.ts's suggestStep only advances through drill/charge/sequence); the panel was still showing the Sequence tab from the auto-sequence step above, so run-analysis's own tab content was display:none. Added the missing tab click, matching the same panel-still-on-a-different-tab class already fixed elsewhere this session (blast-execution-visual.json, level3-playthrough-ecology.json).",
       "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-step=\"4\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"run-analysis\"]"
