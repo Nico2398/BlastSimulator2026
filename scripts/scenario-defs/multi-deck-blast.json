@@ -212,6 +212,14 @@
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
@@ -284,6 +292,14 @@
       "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -358,6 +374,14 @@
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
@@ -431,6 +455,14 @@
       "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",

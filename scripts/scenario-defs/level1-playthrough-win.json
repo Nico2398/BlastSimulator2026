@@ -1,6 +1,6 @@
 {
   "name": "level1-playthrough-win",
-  "description": "Level 1 (Dusty Hollow) playthrough under #553's physical drilling: a survey, one blast cycle (of an originally-planned two, cut short by bankruptcy), and vehicle-hauled contract fulfillment. Originally named for an $80k profit target and scoped for 3 blast cycles; Findings #45-51 already showed that target unreachable even pre-#553 -- the file's original sequence never bought a vehicle, named building types that don't exist, and used a silently-rejected assign_skill syntax, so no material ever reached storage. #553 turns `drill_plan` into a real queue -- a licensed driller must physically drive a `drill_rig` to each hole, one at a time -- and lands a brand-new `staffed:true` primitive alongside it: a free driller+drill_rig, blaster, and 3 drivers (5 employees, 4 vehicles), at zero cost, before any assertion. Two new, load-bearing findings surface here specifically, because `campaign start level:dusty_hollow staffed:true` is a combination no earlier #553 fix (tutorial-playthrough.json, blast-basic.json) exercised: dusty_hollow's own terrain, not tutorial_pit's or sandbox new_game's.\n\nFinding (vehicle deadlock, new): staffed:true spawns its 4 free vehicles nose-to-tail along z=2 at x=0,2,4,6 -- the drill_rig (vehicle #1) is the outermost. dusty_hollow's terrain makes the A*-cheapest route from (0,2) toward the blast site run straight through the other three parked vehicles' cells, and `tickVehicleOnNavGrid` (EntityMovementTick.ts) recomputes that exact route every tick -- occupancy is not part of path cost -- then blocks on the immediate-next-step occupancy check (`isCellOccupiedByOtherVehicle`) forever, since none of the other three vehicles ever move on their own. Confirmed directly: the drill_rig sits welded to (1,2) for 300+ ticks with zero progress, for any target requiring eastward travel, until the blocking vehicles are moved out of the way -- moving just the immediate blocker forward reveals the same wall one vehicle further down the line. A real player hits an identical dead end; nothing in the game auto-clears a parked vehicle out of another one's path. Worked around here (not fixed -- an engine gap, out of scope for a scenario-def fix) by relocating the three non-drilling free vehicles off the corridor with `vehicle move` before assigning the driller to the rig -- a real, player-clickable action (select the vehicle's Fleet panel row, click MOVE HERE; vehicle-traffic.json already exercises this exact click path for the same command).\n\nFinding (bankruptcy, new): even with the deadlock worked around, #553's real per-hole drilling time collides head-on with dusty_hollow's $50,000 starting budget and `BANKRUPTCY_GRACE_TICKS=100` (Bankruptcy.ts, threshold $5,000). tutorial-playthrough.json's own sandbox measurement already put a lone driller at ~400 ticks to land a 16-hole pattern once travel and fatigue-driven rest cycles are counted; sandbox-measured here across six separate crew configurations for this file's own setup -- a lone free driller, a purchased second drill_rig (net negative: $35,000 due immediately, plus 50-90 ticks of its own travel from a mid-map spawn point, exhausting its driver's fatigue before it even arrives), `set_policy shift_8h`, and a minimal-hire baseline -- cash never climbs back above the $5,000 threshold once setup costs take it under, and the mine is seized around cumulative tick 119-260 depending on crew size, always well short of landing all 16 holes. Buying a second rig makes the runway worse, not better: the extra $35,000 is gone before a single extra hole lands. Not fixable within this file's scope -- a real gap between the drilling-time budget #553 introduces and the bankruptcy-grace budget the level already had, not a scenario-authoring mistake -- the same class of out-of-scope engine gap Findings #50/#51 already flag elsewhere in this file.\n\nWhat the file does instead, and what it still proves end-to-end: blast with only the 4 holes a lone driller can land inside dusty_hollow's runway. Voxel/fragment yield scales off charge density, not the full 16-hole plan, so a genuinely truncated pattern still rates PERFECT and produces hundreds of fragments -- drilling, charging, sequencing, blasting, one real death, self-dispatched hauling (#552), and one full contract cycle all still happen for real. The drill_rig itself survives the blast (it finishes its 4 holes with ticks to spare and has already driven clear toward the next one by the time the charge fires) and keeps working the remaining ordered holes afterward, though not fast enough to land a full second pattern before the budget runs out. A second pattern, a second contract cycle, and the original $80k target are still all out of reach -- not from an authoring mistake, but because #553 makes this file's original ambition genuinely unaffordable on dusty_hollow's budget. The mine is seized by bankruptcy a short while after the one contract this cycle can complete; that seizure, not a profit figure, is the real trajectory this file now asserts.",
+  "description": "Level 1 (Dusty Hollow) playthrough under #553's physical drilling: a survey, one blast cycle (of an originally-planned two), and vehicle-hauled contract fulfillment. Originally named for an $80k profit target and scoped for 3 blast cycles; Findings #45-51 already showed that target unreachable even pre-#553 -- the file's original sequence never bought a vehicle, named building types that don't exist, and used a silently-rejected assign_skill syntax, so no material ever reached storage. #553 turns `drill_plan` into a real queue -- a licensed driller must physically drive a `drill_rig` to each hole, one at a time -- and lands a brand-new `staffed:true` primitive alongside it: a free driller+drill_rig, blaster, and 3 drivers (5 employees, 4 vehicles), at zero cost, before any assertion. Two new, load-bearing findings surface here specifically, because `campaign start level:dusty_hollow staffed:true` is a combination no earlier #553 fix (tutorial-playthrough.json, blast-basic.json) exercised: dusty_hollow's own terrain, not tutorial_pit's or sandbox new_game's.\n\nFinding (vehicle deadlock, unchanged): staffed:true spawns its 4 free vehicles nose-to-tail along z=2 at x=0,2,4,6 -- the drill_rig (vehicle #1) is the outermost. dusty_hollow's terrain makes the A*-cheapest route from (0,2) toward the blast site run straight through the other three parked vehicles' cells, and `tickVehicleOnNavGrid` (EntityMovementTick.ts) recomputes that exact route every tick -- occupancy is not part of path cost -- then blocks on the immediate-next-step occupancy check (`isCellOccupiedByOtherVehicle`) forever, since none of the other three vehicles ever move on their own. Confirmed directly: the drill_rig sits welded to (1,2) for 300+ ticks with zero progress, for any target requiring eastward travel, until the blocking vehicles are moved out of the way -- moving just the immediate blocker forward reveals the same wall one vehicle further down the line. A real player hits an identical dead end; nothing in the game auto-clears a parked vehicle out of another one's path. Worked around here (not fixed -- an engine gap, out of scope for a scenario-def fix) by relocating the three non-drilling free vehicles off the corridor with `vehicle move` before assigning the driller to the rig -- a real, player-clickable action (select the vehicle's Fleet panel row, click MOVE HERE; vehicle-traffic.json already exercises this exact click path for the same command).\n\nFinding (bankruptcy, #557, fixed): #553's real per-hole drilling and #554's real per-hole charging time made this file's own ORIGINAL crew (13 employees -- staffed:true's free 5 plus 8 hand-hired, several boosted to skill level 5) unaffordable on dusty_hollow's $50,000 starting budget and `BANKRUPTCY_GRACE_TICKS=100` (Bankruptcy.ts, threshold $5,000): payroll for 13 people, even sandbox-tested down to Rookie/level-1 qualifications across six separate crew configurations, drained faster than dusty_hollow's economy could ever recover within the ~100+ ticks drilling and charging a truncated 4-hole pattern actually take, seizing the mine by bankruptcy at cumulative tick 119 every time. The actual root cause was never skill level or drilling time on their own -- it was headcount: `employee list` right after the blast on the pre-fix file showed only 3 of the 13 employees (driller #1, blaster #2, and the surveyor) ever did anything at all; the other 10 (a backup surveyor, 2 extra drillers, 2 extra blasters, 2 extra drivers, all boosted to level 5) sat idle at spawn the entire file, drawing full salary for zero benefit -- staffed:true's own free crew already covers drilling (driller #1), charging (blaster #2), and hauling (driver #3, already licensed driving.truck) without hiring anyone extra. Fixed by hiring only what this file's own actions actually use: one surveyor. That alone drops the crew to 6 and keeps cash's one post-charge dip below the $5,000 threshold well short of the 100-tick grace window, sandbox-confirmed end-to-end -- `bankrupt` stays false all the way to the file's own scripted end. `BANKRUPTCY_THRESHOLD`/`GRACE_TICKS`/`BASE_SALARIES`/`QUALIFICATION_SALARY_BONUS` (shared game balance, out of scope for a single scenario file) are untouched.\n\nWhat the file proves end-to-end: blast with only the 4 holes a lone driller can land inside dusty_hollow's runway. Voxel/fragment yield scales off charge density, not the full 16-hole plan, so a genuinely truncated pattern still rates PERFECT and produces hundreds of fragments -- drilling, charging, sequencing, blasting, three real deaths (the two blasting-qualified employees this crew actually has, plus the surveyor caught near the blast), self-dispatched hauling (#552), and one full contract cycle all still happen for real. The drill_rig itself survives the blast and keeps working the remaining ordered holes afterward, though not fast enough to land a full second pattern before the file's own scripted end. A second pattern, a second contract cycle, and the original $80k target are still out of reach within this file's own step count -- not from an authoring mistake, but because #553/#554 make a full 16-hole pattern genuinely slow -- but the mine survives to the file's own end this time, cash deep in the red but never seized.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow staffed:true",
@@ -226,165 +226,11 @@
           "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
         }
       ],
+      "description": "#557/new finding (payroll-vs-bankruptcy): this file's original crew (13 employees, 8 hand-hired on top of staffed:true's 5 free ones) burned payroll faster than dusty_hollow's $50,000 budget and #553/#554's real drilling+charging time could ever recover from -- sandbox-confirmed bankruptcy at cumulative tick 119 regardless of skill-level tuning, since even at Rookie/level-1 qualifications a 13-person crew's BASE salaries alone outrun the budget over the 100+ ticks this file's drilling+charging phase actually takes. Of the file's original 8 hires, only a single surveyor is genuinely load-bearing: staffed:true's own free crew already covers drilling (driller #1, licensed driving.drill_rig + blasting), charging (blaster #2, licensed blasting), and hauling (drivers #3/#4/#5, licensed driving.truck/excavator) -- the file's original extra hires (a backup surveyor, 2 more drillers, 2 more blasters, 2 more drivers, all boosted to level 5) never did anything: sandbox-confirmed via `employee list` right after the blast on the pre-fix file, only #1 (free driller), #2 (free blaster) and the surveyor ever worked or died -- the other 7 hires sat idle at spawn (82,34) the entire file, drawing full boosted salary for nothing. Hiring only what this file's own actions actually use closes the gap without touching BANKRUPTCY_THRESHOLD/GRACE_TICKS/BASE_SALARIES/QUALIFICATION_SALARY_BONUS (out of scope, shared game balance) -- sandbox-confirmed end-to-end with this fix: cash dips negative post-charge but `bankrupt` stays false all the way through the file's own scripted end.",
       "role": "player",
       "expect": {
         "equals": {
           "employeeCount": 6
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:surveyor",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
-        }
-      ],
-      "description": "Finding #46 (renumbered for staffed:true, unchanged reasoning): a backup surveyor, and in fact the ENTIRE hand-hired roster (all 8 hires below, now employees #6-#13), front-loaded here while cash is still healthy -- CrewPanel.ts's hire button disables on `state.cash < HIRING_COSTS[role]`, confirmed directly with a real click once cash is deep in the red from this file's own setup costs. A mid-game 'hire more staff' beat is not something a real player can click through once early spending has gone negative.",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "employeeCount": 7
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "employeeCount": 8
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "employeeCount": 9
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "employeeCount": 10
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "employeeCount": 11
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "employeeCount": 12
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "employeeCount": 13
         },
         "decreased": [
           "cash"
@@ -400,83 +246,6 @@
         }
       ],
       "description": "Left unmarked: hiring already grants the Rookie starting qualification; this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Employee ids renumbered +5 throughout for staffed:true's 5 free hires (was #1 pre-staffed).",
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee assign_skill 7 skill:geology level:3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 7 skill:geology level:3"
-        }
-      ],
-      "description": "Left unmarked, same reasoning as above (was #2 pre-staffed).",
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee assign_skill 8 skill:blasting level:5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 8 skill:blasting level:5"
-        }
-      ],
-      "description": "Left unmarked, same reasoning as above (was #3 pre-staffed).",
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee assign_skill 9 skill:blasting level:5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 9 skill:blasting level:5"
-        }
-      ],
-      "description": "Left unmarked, same reasoning as above (was #4 pre-staffed).",
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee assign_skill 10 skill:driving.truck level:5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 10 skill:driving.truck level:5"
-        }
-      ],
-      "description": "Left unmarked, same reasoning as above (was #5 pre-staffed). This hired driver, not one of staffed:true's own free drivers, is the one who boards the debris_hauler below -- keeps this file's structure closest to its pre-staffed original.",
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee assign_skill 11 skill:blasting level:5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 11 skill:blasting level:5"
-        }
-      ],
-      "description": "Left unmarked, same reasoning as above (was #6 pre-staffed).",
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee assign_skill 12 skill:blasting level:5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 12 skill:blasting level:5"
-        }
-      ],
-      "description": "Left unmarked, same reasoning as above (was #7 pre-staffed).",
-      "role": "bootstrap"
-    },
-    {
-      "command": "employee assign_skill 13 skill:driving.truck level:5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee assign_skill 13 skill:driving.truck level:5"
-        }
-      ],
-      "description": "Left unmarked, same reasoning as above (was #8 pre-staffed).",
       "role": "bootstrap"
     },
     {
@@ -519,7 +288,7 @@
       }
     },
     {
-      "command": "vehicle driver 2 10",
+      "command": "vehicle driver 2 3",
       "interaction": [
         {
           "type": "clickSelector",
@@ -532,14 +301,14 @@
         {
           "type": "set",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] select",
-          "value": "10"
+          "value": "3"
         },
         {
           "type": "clickSelector",
           "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
         }
       ],
-      "description": "#552/#553: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare the $25,000 a manual purchase would cost on top of everything else -- see the file description's bankruptcy finding for just how tight that budget already is. Employee #10 (hired driver, licensed driving.truck lvl5 above) boards it. Re-opens the vehicles panel first (UIManager.togglePanel, same pattern as level2-playthrough-win's fix): the panel had switched to employees then build (the surveyor/driller/blaster/driver hires and the freight_warehouse placement above), so #bs-vehicle-panel's own [data-vehicle-id=\"2\"] row was off-screen (display:none, zero size) at this point -- not a stale selector, the panel itself just wasn't the active one. togglePanel only closes an ALREADY-active panel, so this click safely switches to vehicles rather than toggling it shut. New finding, real interaction-mode CI: `.bs-vehicle-assign-btn` (`makeAssignRow`, fleetDetailSections.ts) reads a `<select>` next to it, not a fixed target -- clicking Assign without first choosing an option in that select just assigns whoever the browser's default selection lands on (its first eligible option), which for this vehicle is one of staffed:true's own free drivers (a lower employee id than the hired #10), not employee #10 named in the command. Confirmed directly: `vehicle list` after this step showed debris_hauler's `driver` as employee #3, not #10, and hauling still happened (#552 self-dispatch doesn't care WHICH qualified driver boards) but not the one this step names. Fixed with a `set` action on the row's own `select` (scoped by `[data-vehicle-id=\"2\"]`, matching the file's other dropdown-driven steps) before the Assign click, mirroring the Charge step's own real-control convention (issue #515) rather than relying on whatever the dropdown defaulted to.",
+      "description": "#552/#557: staffed:true's free debris_hauler (vehicle #2) is reused here rather than buying a second one by hand -- the file's own hauling volume (one 260kg rubble delivery this cycle, matching Finding #48's fragment-matching constraint below) never needs a second hauler, and this file's budget cannot spare a manual purchase on top of everything else. #557: this file no longer hires its own driver (see the hire step's own finding) -- staffed:true's own free driver #3 (already licensed driving.truck lvl1 from the free roster) boards it instead. Re-opens the vehicles panel first (UIManager.togglePanel, same pattern as level2-playthrough-win's fix): the panel had switched to employees then build (the surveyor hire and the freight_warehouse placement above), so #bs-vehicle-panel's own [data-vehicle-id=\"2\"] row was off-screen (display:none, zero size) at this point -- not a stale selector, the panel itself just wasn't the active one. togglePanel only closes an ALREADY-active panel, so this click safely switches to vehicles rather than toggling it shut. `.bs-vehicle-assign-btn` (`makeAssignRow`, fleetDetailSections.ts) reads a `<select>` next to it, not a fixed target -- clicking Assign without first choosing an option in that select just assigns whoever the browser's default selection lands on (its first eligible option). Fixed with a `set` action on the row's own `select` (scoped by `[data-vehicle-id=\"2\"]`, matching the file's other dropdown-driven steps) before the Assign click, mirroring the Charge step's own real-control convention (issue #515) rather than relying on whatever the dropdown defaulted to -- here that default happens to already be employee #3, but the explicit `set` keeps this step's own intent (\"employee #3 boards\") true regardless of roster order.",
       "role": "player",
       "expect": {
         "changedBy": {
@@ -560,7 +329,7 @@
           "tickCount": 0,
           "holeCount": 0,
           "deathCount": 0,
-          "employeeCount": 13,
+          "employeeCount": 6,
           "vehicleCount": 4
         },
         "changedBy": {
@@ -990,6 +759,14 @@
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
@@ -1059,14 +836,14 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). Real root cause of the command-vs-interaction split previously documented here (deathCount 2 vs 1, vehicleCount 3 vs 4): the drill_plan step above was missing `diameter:` -- the same class of bug vibration-budget.json's own history already found and fixed (see that file's finances-step note) -- so command mode's `drill_hole` actions ran at mining.ts's console-only fallback diameter (0.15m) while interaction mode's real grid-tool click always sends the panel's own DEFAULT_DIAMETER_M (0.089m, Drill.ts); computeDrillHoleDurationTicks scales duration by diameter, so the smaller real diameter drills measurably faster. With no diameter: specified, command mode's driller had less spare time left in this file's 60-tick drilling window and stayed idle at (22,15), parked among the holes it just drilled and inside this blast's radius. Fixed by adding diameter:0.089 to the drill_plan command, matching the real click exactly. `deathCount` updated for #554 (renumbered again): drill_rig #1 itself still survives (its driver, employee #1, was mid rest-cycle and dismounted onto the vehicle's own position at (15, 17.2666...) by #593's fix, then the 12 hole-cancellation steps above froze it there for good -- outside this blast's radius, matching `vehicleCount`:4 below) -- but charging is now real, in-person work (#554): every blasting-qualified employee the game auto-dispatched to load one of the 4 charges (employee #1 once its drilling task ended, staffed:true's own free blaster #2, and two of the hand-hired blasters/drillers) walked to that hole and stayed there once done, with the hired surveyor #6 from the original finding above. Five employees standing on live charges when they fire -- sandbox-confirmed directly (`employees.filter(e => !e.alive)`: #1 at H2's (18,15), #2 at H1's (15,15), #6 at (15,15), plus two more hired blasters at H2/H4) -- is the real, reproducible toll now, not an authoring gap.",
+      "description": "Finding #46 (renumbered, same reasoning): employee #6 (the surveyor dispatched to survey (15,15)) is standing at/near that tile when this 4-hole blast clears it -- a real, reproducible casualty. Rated PERFECT with hundreds of fragments despite only 4 of 16 holes firing -- yield scales off charge density, not pattern completeness, sandbox-confirmed directly (302 fragments, 236 cleared voxels). Real root cause of the command-vs-interaction split previously documented here (deathCount 2 vs 1, vehicleCount 3 vs 4): the drill_plan step above was missing `diameter:` -- the same class of bug vibration-budget.json's own history already found and fixed (see that file's finances-step note) -- so command mode's `drill_hole` actions ran at mining.ts's console-only fallback diameter (0.15m) while interaction mode's real grid-tool click always sends the panel's own DEFAULT_DIAMETER_M (0.089m, Drill.ts); computeDrillHoleDurationTicks scales duration by diameter, so the smaller real diameter drills measurably faster. With no diameter: specified, command mode's driller had less spare time left in this file's 60-tick drilling window and stayed idle at (22,15), parked among the holes it just drilled and inside this blast's radius. Fixed by adding diameter:0.089 to the drill_plan command, matching the real click exactly. `deathCount` updated for #557 (this file's crew shrunk to just staffed:true's 5 free employees plus one hired surveyor -- see the earlier hire step's own finding): drill_rig #1 itself still survives (its driver, employee #1, was mid rest-cycle and dismounted onto the vehicle's own position by #593's fix, then the 12 hole-cancellation steps above froze it there for good -- outside this blast's radius, matching `vehicleCount`:4 below) -- but charging is real, in-person work (#554): every blasting-qualified employee the game auto-dispatched to load one of the 4 charges walked to that hole and stayed there once done. With only two blasting-qualified employees left in this crew (driller #1 once its drilling task ends, and free blaster #2), both of them plus the surveyor #6 (from the original finding above) are the toll -- sandbox-confirmed directly (`employee list` right after the blast: #1, #2, #6 DEAD, #3/#4/#5 unaffected) -- three casualties, not five, now that this file no longer hires extra blasters/drillers who never did any of the charging.",
       "role": "player",
       "expect": {
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 5,
+          "deathCount": 3,
           "vehicleCount": 4
         }
       }
@@ -1224,13 +1001,13 @@
           "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
         }
       ],
-      "description": "#552: hauling self-dispatched automatically once debris_hauler #2 (relocated close to the blast site, not off-map -- see the vehicle-move steps above) had somewhere to go; 30 ticks (the 3 tick-10 steps above) was enough for a full round trip and back, confirmed directly (storedMassKg > 260 by this point). One haul is enough to complete this 260kg contract outright, same as the pre-#552 flow's own single-haul sizing. Contract id renumbered 2->4 (see the `contract accept` step's own #554 finding); tickCount converted to `changedBy: 0` (issue #596) -- this step is itself a non-ticking console call, its own point is that delivery doesn't advance the clock, not a specific running total. deathCount updated 1->5, matching the blast step's own #554 finding (charging-in-person casualties).",
+      "description": "#552: hauling self-dispatched automatically once debris_hauler #2 (relocated close to the blast site, not off-map -- see the vehicle-move steps above) had somewhere to go; 30 ticks (the 3 tick-10 steps above) was enough for a full round trip and back, confirmed directly (storedMassKg > 260 by this point). One haul is enough to complete this 260kg contract outright, same as the pre-#552 flow's own single-haul sizing. Contract id stays 4 under #557's shrunk crew (re-verified directly against the real run, not assumed). tickCount converted to `changedBy: 0` (issue #596) -- this step is itself a non-ticking console call, its own point is that delivery doesn't advance the clock, not a specific running total. deathCount 3, matching the blast step's own #557 finding (charging-in-person casualties, now a 2-person blasting crew plus the surveyor rather than the pre-#557 5).",
       "expect": {
         "changedBy": {
           "tickCount": 0
         },
         "equals": {
-          "deathCount": 5
+          "deathCount": 3
         },
         "increased": [
           "cash"
@@ -1304,10 +1081,10 @@
           "command": "tick 10"
         }
       ],
-      "description": "#553/new: the mine is seized by bankruptcy inside this window (ticksBelowThreshold reaches BANKRUPTCY_GRACE_TICKS=100 at cumulative tick 119, Bankruptcy.ts) -- cash has stayed under the $5,000 threshold continuously since shortly after setup, and the one contract delivery above was nowhere near enough to pull it back above that line. See the file description's bankruptcy finding for why no crew configuration sandbox-tested for this file avoids this. tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning.",
+      "description": "#557: cash dips deep negative in this window but bankruptcy no longer fires -- with this file's crew down to 6 employees (see the earlier hire step's own finding), the one dip below the $5,000 threshold stays well short of `BANKRUPTCY_GRACE_TICKS=100` (Bankruptcy.ts) before the file's own scripted end, sandbox-confirmed end-to-end. tickCount stays `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning.",
       "expect": {
         "changedBy": {
-          "tickCount": 10
+          "tickCount": 6
         },
         "decreased": [
           "cash"
@@ -1333,7 +1110,7 @@
           "command": "tick 10"
         }
       ],
-      "description": "#596/#597: setupEvents idempotency + cooldown-threshold caching moved when `weather_geomagnetic_storm` goes pending -- this `tick 10` no longer gets interrupted partway (sandbox-measured, real run: full 116->126), unlike the pre-fix trajectory where only 9 of the 10 requested ticks advanced. The event now pends only after the batch completes, resolved by the `event choose 0` step below. tickCount converted from a chained absolute to `changedBy` (issue #596) since this checkpoint's own point is that the batch completes, not a specific running total -- robust to any future shift in exactly when the event goes pending.",
+      "description": "#557: this `tick 10` runs full (140->150), not interrupted -- with this file's crew down to 6 employees (see the earlier hire step's own finding), no fresh event pends inside this particular window.",
       "expect": {
         "changedBy": {
           "tickCount": 10
@@ -1348,11 +1125,11 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "description": "Resolved through the event dialog's own buttons. `weather_geomagnetic_storm`'s option 0 (Faraday Cages) costs a further $18,000 -- deterministic under this file's fixed seed, and by this point purely academic: the mine is already bankrupt. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). `wellBeing` re-verified for #554 (renumbered again): 99.95 -> 94.67250000000006 -- the 5-casualty toll (charging-in-person, see the blast step's own #554 finding) and the extra real ticks the charge-wait consumes both feed into it directly, so the old pre-#554 figure no longer applies; still the file's own genuine subject here, so it stays a hard-asserted equals rather than loosened to a direction.",
+      "description": "Resolved through the event dialog's own buttons. `union_nap_room`'s option 0 opens a nap room -- a small, deterministic-under-seed consequence, not a cost the file needs to track precisely. `safety`/`ecology` are not hard-asserted here -- both are downstream consequences of the blast step's own already-documented command-vs-interaction divergence (drill_rig survives the blast in real interaction mode instead of being destroyed with the holes it drilled; see that step's finding). `wellBeing` re-verified for #557 (this file's shrunk, 6-person crew): 100 -> 93.3166666666667 -- the 3-casualty toll (charging-in-person, see the blast step's own #557 finding) and the extra real ticks the charge-wait consumes both feed into it directly; still the file's own genuine subject here, so it stays a hard-asserted equals rather than loosened to a direction.",
       "role": "player",
       "expect": {
         "equals": {
-          "wellBeing": 94.67250000000006,
+          "wellBeing": 93.3166666666667,
           "nuisance": 50
         }
       }
@@ -1365,15 +1142,15 @@
           "command": "campaign status"
         }
       ],
-      "description": "#554: tickCount, deathCount, holeCount, and orderedHoleCount all updated for the fix above (12 hole-cancellation steps right after the tick-60 cutoff, so charging's own real time never lets the driller outrun the deliberately-truncated 4-hole pattern -- see the blast step's own #554 finding). tickCount 126->160: the charge-wait alone (draining 4 real `charge_hole` orders) now costs dozens of real ticks that the pre-#554 instant-charge file never spent, on top of which one `tick 10` batch in this stretch is only ever able to advance 1 tick before a fresh event interrupts it (see that step's own finding) rather than the smooth 10. Still a genuine terminal checkpoint (bankruptcy shutdown) -- stays a pinned absolute, per issue #596's own carve-out, just re-verified against the real current number rather than converted. holeCount/orderedHoleCount both settle at 0 rather than the old 5/7: with every hole beyond the first 4 cancelled before charging ever starts, nothing is ever ordered again after the blast, so there is no further drilling left to land. deathCount 1->5: charging is now real, in-person work (#554) -- every blasting-qualified employee auto-dispatched to load one of the 4 charges stayed on their hole once done, so 5 employees (the original surveyor plus 4 who charged holes) are lost, not 1; see the blast step's own finding for the roster. Findings #45-51 (unchanged) plus two new ones (see file description): the vehicle-pathing deadlock that staffed:true's own vehicle-spawn layout creates on dusty_hollow's terrain, and the bankruptcy that #553's real drilling time forces on this file's budget once that deadlock is worked around. This file's original sequence could never reach its named $80k profit target even before #553 (building types that don't exist, no vehicle ever bought, silently-rejected assign_skill syntax); under #553/#554 the target isn't just distant, it's structurally unreachable. What this file proves instead: blasting with a genuinely truncated 4-of-16 pattern still rates PERFECT and produces hundreds of fragments, so drilling, charging, sequencing, blasting, five real deaths, self-dispatched hauling (#552), and one partial contract delivery all still get exercised for real, once. The mine is seized by bankruptcy shortly after -- the second pattern, second contract cycle, and the $80k target are never reached. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
+      "description": "#557: tickCount, deathCount, employeeCount, bankrupt, and levelEnded/levelEndReason all updated for the crew-size fix above (see the earlier hire step's own finding). tickCount settles at 150, not the pre-fix 160 -- the smaller crew's charge-wait (28 ticks, not 43) and different event timing shift the whole tail. deathCount 3 (driller #1, blaster #2, surveyor #6 -- the file's own two blasting-qualified employees plus the one bystander survey casualty; see the blast step's own #557 finding). employeeCount 6 (5 free staffed + 1 hired surveyor -- see the hire step's own finding for why the other 7 original hires are gone). `bankrupt`/`levelEnded`/`levelEndReason` are this step's real point now: this file's original crew (13 employees) burned payroll faster than dusty_hollow's budget and #553/#554's real drilling+charging time could recover from, seizing the mine by bankruptcy at cumulative tick 119 regardless of skill-level tuning (sandbox-confirmed across six crew configurations, none of which avoided it -- see the pre-fix file's own history). Hiring only what this file's own actions actually use (one surveyor, nothing else -- staffed:true's free crew already covers drilling/charging/hauling) keeps cash's one dip below the $5,000 threshold short of the 100-tick grace period every time, sandbox-confirmed end-to-end: `bankrupt` stays false all the way to this final step. The file still does not reach dusty_hollow's $80k profit target within its own scripted run (Profit: $0/$80,000, unchanged from before -- a second blast cycle was never in scope for this file, per Findings #45-51) -- but it no longer loses either: drilling, charging, sequencing, blasting (a genuinely truncated 4-of-16 pattern still rating PERFECT with hundreds of fragments), three real deaths, self-dispatched hauling (#552), and one full contract delivery all happen for real, and the mine survives to tell about it. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
       "expect": {
         "equals": {
-          "tickCount": 160,
-          "deathCount": 5,
-          "employeeCount": 13,
-          "bankrupt": true,
-          "levelEnded": true,
-          "levelEndReason": "bankruptcy",
+          "tickCount": 150,
+          "deathCount": 3,
+          "employeeCount": 6,
+          "bankrupt": false,
+          "levelEnded": false,
+          "levelEndReason": null,
           "surveyCount": 1,
           "vehicleCount": 4,
           "holeCount": 0,

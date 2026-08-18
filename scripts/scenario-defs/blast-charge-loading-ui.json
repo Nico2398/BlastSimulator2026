@@ -247,7 +247,7 @@
     {
       "command": "wait_until field:chargedCount equals:1 max_ticks:3000",
       "timeout": 125,
-      "description": "#554/#590: the blaster claims the nearest of the three ordered holes and finishes loading it — the first entry moves from plannedChargesByHole into chargesByHole. Screenshot taken right here on purpose: exactly one hole shows the loaded charge visuals while the other two (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — this is the shot that proves the two are visually distinct. maxTicks/timeoutMs widened to the implementer's own calibrated per-order wait budget (#554 landed).",
+      "description": "#554/#590: the blaster claims the nearest of the three ordered holes and finishes loading it — the first entry moves from plannedChargesByHole into chargesByHole. Screenshot taken right here on purpose: exactly one hole shows the loaded charge visuals while the other two (still in plannedChargesByHole) render the lightweight ORDERED ghost marker (CHARGE_ORDERED_COLOR/CHARGE_ORDERED_OPACITY, BlastPlanOverlay.ts) — this is the shot that proves the two are visually distinct. maxTicks/timeoutMs widened to the implementer's own calibrated per-order wait budget (#554 landed). (#554 follow-up: NOT run at 8x speed unlike other orderedChargeCount/chargedCount waits elsewhere -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value, and would defeat the one-at-a-time visual pacing this file exists to demonstrate. The already-generous timeoutMs budget (raised earlier for the #554 timeout-mismatch fix) covers real-time draining at normal 1x speed instead.)",
       "interaction": [
         {
           "type": "waitUntil",
@@ -271,7 +271,7 @@
     {
       "command": "wait_until field:chargedCount equals:3 max_ticks:6000",
       "timeout": 245,
-      "description": "#554/#590: drain the remaining two ordered charges (H2, H3) one at a time — a single blaster never loads two holes simultaneously. Budget doubled off the implementer's single-order figure to cover two sequential loads.",
+      "description": "#554/#590: drain the remaining two ordered charges (H2, H3) one at a time — a single blaster never loads two holes simultaneously. Budget doubled off the implementer's single-order figure to cover two sequential loads. (#554 follow-up: NOT run at 8x speed unlike other orderedChargeCount/chargedCount waits elsewhere -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value, and would defeat the one-at-a-time visual pacing this file exists to demonstrate. The already-generous timeoutMs budget (raised earlier for the #554 timeout-mismatch fix) covers real-time draining at normal 1x speed instead.)",
       "interaction": [
         {
           "type": "waitUntil",
@@ -341,7 +341,7 @@
     {
       "command": "wait_until field:chargedCount equals:6 max_ticks:9000",
       "timeout": 305,
-      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (6 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. Budget widened to cover up to 6 sequential loads at the implementer's own per-order figure.",
+      "description": "#554/#590: the bulk Charge All order drains through the same one-at-a-time blaster pipeline. Screenshot taken at the halfway point (6 of 9 loaded) for a second, denser mixed-state shot: several fully loaded holes next to several still-ordered ghosts. Budget widened to cover up to 6 sequential loads at the implementer's own per-order figure. (#554 follow-up: NOT run at 8x speed unlike other orderedChargeCount/chargedCount waits elsewhere -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value, and would defeat the one-at-a-time visual pacing this file exists to demonstrate. The already-generous timeoutMs budget (raised earlier for the #554 timeout-mismatch fix) covers real-time draining at normal 1x speed instead.)",
       "interaction": [
         {
           "type": "waitUntil",
@@ -365,7 +365,7 @@
     {
       "command": "wait_until field:chargedCount equals:9 max_ticks:9000",
       "timeout": 305,
-      "description": "#554/#590: drain the rest of the Charge All order — every hole is now loaded.",
+      "description": "#554/#590: drain the rest of the Charge All order — every hole is now loaded. (#554 follow-up: NOT run at 8x speed unlike other orderedChargeCount/chargedCount waits elsewhere -- this step deliberately checkpoints a specific mid-load count for a screenshot; speed-8x would overshoot past it before the 200ms poll catches the exact value, and would defeat the one-at-a-time visual pacing this file exists to demonstrate. The already-generous timeoutMs budget (raised earlier for the #554 timeout-mismatch fix) covers real-time draining at normal 1x speed instead.)",
       "interaction": [
         {
           "type": "waitUntil",
@@ -460,6 +460,14 @@
       "timeout": 125,
       "description": "#554/#590: drain H5's re-order before the scenario ends, leaving the site in a fully-landed state rather than one hole still mid-load.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",

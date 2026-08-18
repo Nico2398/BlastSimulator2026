@@ -210,6 +210,14 @@
       "description": "#553/#554 follow-up (real interaction-mode CI finding, \"orderedHoleCount should be 0 but is 1\"): a flat tick 50 pad occasionally lands one hole short under interaction mode real time -- same class of flake scenario-defs.md itself warns hand-measured tick N pads carry (\"a budget that merely happens to be long enough today\"). Switched to waitUntil (#590) the same way other orderedHoleCount waits already do, so a stall fails loudly by name instead of silently.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedHoleCount",
           "equals": 0,
@@ -256,6 +264,14 @@
       "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",

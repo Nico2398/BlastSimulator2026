@@ -1631,6 +1631,14 @@
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
@@ -1656,6 +1664,10 @@
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
         },
@@ -1678,7 +1690,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "description": " #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically — e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame."
     },
     {
       "command": "blast",

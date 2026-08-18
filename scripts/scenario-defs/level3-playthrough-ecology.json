@@ -1599,6 +1599,14 @@
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. Finding (this pass): charging 20 holes for real now costs 76 more ticks (360 -> 436) on top of #553's already-queued drilling, and payroll for all 12 employees keeps accruing the whole time -- BANKRUPTCY_GRACE_TICKS runs out and levelEndReason flips to 'bankruptcy' during this very wait, before pattern 1's blast ever fires. tickCount itself is no longer pinned here (it is an artifact of how long charging took, not this step's subject); orderedChargeCount:0 and chargedCount:20 are.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
@@ -1620,6 +1628,10 @@
     {
       "command": "sequence auto delay_step:10",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
@@ -1645,7 +1657,7 @@
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
       ],
-      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts). 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
+      "description": "Sequence's delay-step stepper carries data-field=\"delay-step\" (Sequence.ts). 3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts). #554 follow-up (real interaction-mode CI finding): a transient overlay briefly covers #bs-blast-panel right as this click fires (same class of race as several untouched files already show identically — e.g. survey-then-blast/rock-fragmenter-breaking's auto-sequence/employees-panel clicks). awaitUsable polls past it instead of failing on the first covered frame.",
       "role": "player",
       "expect": {
         "equals": {

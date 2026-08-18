@@ -181,6 +181,14 @@
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
@@ -421,6 +429,14 @@
       "description": "#554: was a flat `tick 50` -- tickCommand itself stops early and auto-pauses the instant any event fires mid-window (\"Pending event! Resolve it first\"), and the earlier charge-order wait for the first drill/blast cycle above shifts tickCount enough that a spontaneous event now sometimes lands inside this window (observed: a Burial Ground event at tick 135 cut a `tick 50` here off at 39 real ticks, one hole short). `waitUntil` (#590) resolves any pending event itself each tick it advances (command-runner.ts's own runWaitUntil, #554 finding) instead of needing a paired `event choose 0` step to still be reachable before this step's own assertion runs.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedHoleCount",
           "equals": 0,
@@ -470,6 +486,14 @@
       "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -837,6 +861,14 @@
       "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -1630,6 +1662,14 @@
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
@@ -1956,6 +1996,14 @@
       "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
