@@ -1985,6 +1985,10 @@
       "interaction": [
         {
           "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"2\"]"
         },
         {
@@ -2053,7 +2057,7 @@
         }
       ],
       "role": "player",
-      "description": "Max krackle (10kg, the level's strongest available explosive) at minimum stemming (1.0m) -- catastrophic overcharge, exactly the file's own point.",
+      "description": "Blast panel was last closed by the employee-hiring loop above (last opened #bs-toolbar [data-panel=\"employees\"] at step 71) -- clicking #bs-blast-panel [data-step=\"2\"] directly on a hidden panel (display:none on the whole panel root, BlastWorkshop.ts) hits a zero-size element, confirmed by real interaction-mode CI. Reopen the Blast panel via its toolbar tab first, same as step 23 above.",
       "expect": {
         "increased": [
           "orderedChargeCount"
@@ -2062,6 +2066,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {

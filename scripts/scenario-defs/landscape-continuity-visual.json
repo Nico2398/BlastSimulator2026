@@ -1,6 +1,6 @@
 {
   "name": "landscape-continuity-visual",
-  "description": "Visual regression for the landscape/playable mesh junction (#491): frames a ridge, a slope, the close and far pit edges, and a material/biome transition on relief terrain, then drills, charges, sequences and blasts right at the pit edge and re-frames it post-blast \u2014 the landscape and the crater must read as one continuous, gap-free, non-overlapping surface throughout, with no hard-edged material snap across the boundary. Confirmed directly (not just via state assertions) by inspecting step-07's pre-blast and step-10's post-blast screenshots: the fresh crater blends into the surrounding terrain with no visible gaps, floating chunks, or hard material seam. See Finding #64. #560: adds the 'crater-no-floor-cap' shot below \u2014 a close, low-grazing-angle framing of the fresh crater's exposed cut face, the closest angle the camera rig's own polar clamp (POLAR_MAX in CameraController.ts, camera never goes below the target height) allows toward 'underground' \u2014 proving TerrainMesh no longer seals the bottom of the site into a box: there is no horizontal floor plane visible jutting out beneath the exposed rock, only the boundary/skirt wall closing the sides.",
+  "description": "Visual regression for the landscape/playable mesh junction (#491): frames a ridge, a slope, the close and far pit edges, and a material/biome transition on relief terrain, then drills, charges, sequences and blasts right at the pit edge and re-frames it post-blast — the landscape and the crater must read as one continuous, gap-free, non-overlapping surface throughout, with no hard-edged material snap across the boundary. Confirmed directly (not just via state assertions) by inspecting step-07's pre-blast and step-10's post-blast screenshots: the fresh crater blends into the surrounding terrain with no visible gaps, floating chunks, or hard material seam. See Finding #64. #560: adds the 'crater-no-floor-cap' shot below — a close, low-grazing-angle framing of the fresh crater's exposed cut face, the closest angle the camera rig's own polar clamp (POLAR_MAX in CameraController.ts, camera never goes below the target height) allows toward 'underground' — proving TerrainMesh no longer seals the bottom of the site into a box: there is no horizontal floor plane visible jutting out beneath the exposed rock, only the boundary/skirt wall closing the sides.",
   "shots": [
     {
       "name": "overview",
@@ -116,7 +116,10 @@
       "name": "crater-no-floor-cap",
       "yaw": 0,
       "pitch": -30,
-      "target": [4, 24],
+      "target": [
+        4,
+        24
+      ],
       "distance": 8
     }
   ],
@@ -373,6 +376,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {

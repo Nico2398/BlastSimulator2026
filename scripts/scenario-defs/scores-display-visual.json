@@ -206,12 +206,15 @@
       }
     },
     {
-      "command": "tick 50",
-      "description": "#553: drain the ordered plan — the driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing within the first 50-tick chunk).",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "description": "#553/#554 follow-up (real interaction-mode CI finding, \"orderedHoleCount should be 0 but is 1\"): a flat tick 50 pad occasionally lands one hole short under interaction mode real time -- same class of flake scenario-defs.md itself warns hand-measured tick N pads carry (\"a budget that merely happens to be long enough today\"). Switched to waitUntil (#590) the same way other orderedHoleCount waits already do, so a stall fails loudly by name instead of silently.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 60000
         }
       ],
       "role": "setup",
@@ -220,7 +223,8 @@
           "orderedHoleCount": 0,
           "holeCount": 4
         }
-      }
+      },
+      "timeout": 65
     },
     {
       "command": "event choose 0",
@@ -249,6 +253,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
         {

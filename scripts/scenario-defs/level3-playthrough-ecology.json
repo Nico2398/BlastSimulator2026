@@ -1595,6 +1595,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. Finding (this pass): charging 20 holes for real now costs 76 more ticks (360 -> 436) on top of #553's already-queued drilling, and payroll for all 12 employees keeps accruing the whole time -- BANKRUPTCY_GRACE_TICKS runs out and levelEndReason flips to 'bankruptcy' during this very wait, before pattern 1's blast ever fires. tickCount itself is no longer pinned here (it is an artifact of how long charging took, not this step's subject); orderedChargeCount:0 and chargedCount:20 are.",
       "interaction": [
         {
