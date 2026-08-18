@@ -535,21 +535,122 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 245,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #554-followup (issue #586 CI): widened from 120000ms to 240000ms -- same converging-but-too-slow class as tutorial-interactive.json's sibling step.",
+      "command": "tick 25",
+      "description": "#554-followup round 3 (issue #586 CI): a real-time waitUntil here (widened to 240000ms) still stalled at 13 -- CI's browser-driven real-time throughput is frame-cost-bound (#475), not budget-size-bound. Sandbox-measured: charging 16 holes converges 215 ticks after this wait starts (tick 465 -> 680) in command mode's own deterministic trace. Switched to the same deterministic tick-N/event-choose-0 chunked pattern proven for this class of issue elsewhere this session -- 9 rounds of tick 25 (225 ticks) replay the identical trajectory in both modes. `time speed:8` dropped -- it only sped up real-time-driven ticking, which this step no longer does.",
       "interaction": [
-        {
-          "type": "command",
-          "command": "time speed:8"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 240000
-        }
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        { "type": "command", "command": "tick 25" }
       ],
       "role": "setup",
       "expect": {
@@ -558,6 +659,13 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",

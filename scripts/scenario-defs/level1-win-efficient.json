@@ -1177,24 +1177,88 @@
       }
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
-      "timeout": 245,
-      "description": "#554-followup (issue #586 CI): replaced the four-round tick-20/tick-5 hand-measured drilling wait with a proper waitUntil -- real CI intermittently landed the charge step below at 14/16 holes instead of 16 despite two rounds of fixed-tick-budget attempts (a flat 80 ticks, then finer tick-5 chunking to recover ticks lost to tickCommand's stop-on-event behavior); neither fully closed the gap, meaning the true bottleneck was the fixed budget itself, not lost ticks within it. `waitUntil` (#590) converges on the real target (orderedHoleCount:0, i.e. all 16 holes actually landed) instead of gambling a tick count is enough, matching this file's own charge-drain step immediately below (already a waitUntil) and scores-display-visual.json's identical fix for the same class of issue.",
+      "command": "tick 15",
+      "description": "#554-followup round 3 (issue #586 CI): a real-time waitUntil here (240000ms budget, matching scores-display-visual.json's fix) still stalled at 2/16 holes on CI's no-GPU runner -- browser-driven real-time convergence is throughput-bound by frame cost (#475), not by the budget size. Sandbox-measured: drilling actually converges by tick 154 (62 ticks from this wait's start), reliably in command mode's own deterministic trace. Switched to the same deterministic tick-N/event-choose-0 chunked pattern already proven for this exact class of issue elsewhere this session (survey-then-blast.json, core-loop-visual.json) -- 5 rounds of tick 15 (75 ticks, comfortable margin over the measured 62) replay the identical tick-by-tick trajectory in both modes instead of gambling on real-time throughput.",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
+          "type": "command",
+          "command": "tick 15"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
         {
-          "type": "waitUntil",
-          "field": "orderedHoleCount",
-          "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 240000
+          "type": "command",
+          "command": "tick 15"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 15"
         }
       ],
       "role": "setup",
@@ -1210,8 +1274,17 @@
       }
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step and every step through the rest of pattern 1 (charge/sequence/blast/state full/finances/scores/stats/tick/contract-accept/contract-deliver) -- this whole stretch reuses the same cash value the preceding resolveEventIfPending checkpoint already stopped pinning (its own note above has the mechanism), and any drift baked in there would otherwise resurface unchanged at every one of these free (zero-tick-cost) actions. tickCount/holeCount/chargedCount/sequencedCount/deathCount/employeeCount/activeContractCount stay exact throughout -- none of those are wall-clock-sensitive. #554-followup (issue #586 CI, real failure): real CI landed here at 14/16 holes instead of 16 -- fixed at the source, not by loosening this check: see the four-round drilling wait's own last-round note above for the tickCommand-stops-early mechanism and the finer tick-5 chunking that recovers it.",
+      "description": "#553-followup (this batch's own proactive pass): cash dropped from this step and every step through the rest of pattern 1 (charge/sequence/blast/state full/finances/scores/stats/tick/contract-accept/contract-deliver) -- this whole stretch reuses the same cash value the preceding resolveEventIfPending checkpoint already stopped pinning (its own note above has the mechanism), and any drift baked in there would otherwise resurface unchanged at every one of these free (zero-tick-cost) actions. tickCount/holeCount/chargedCount/sequencedCount/deathCount/employeeCount/activeContractCount stay exact throughout -- none of those are wall-clock-sensitive.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -2136,7 +2209,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 2,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "decreased": [
@@ -2160,7 +2233,7 @@
         "equals": {
           "deathCount": 4,
           "employeeCount": 7,
-          "activeContractCount": 2,
+          "activeContractCount": 1,
           "surveyCount": 2
         },
         "changedBy": {

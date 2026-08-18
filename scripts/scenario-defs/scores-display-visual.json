@@ -206,24 +206,66 @@
       }
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
-      "description": "#553/#554 follow-up (real interaction-mode CI finding, \"orderedHoleCount should be 0 but is 1\"): a flat tick 50 pad occasionally lands one hole short under interaction mode real time -- same class of flake scenario-defs.md itself warns hand-measured tick N pads carry (\"a budget that merely happens to be long enough today\"). Switched to waitUntil (#590) the same way other orderedHoleCount waits already do, so a stall fails loudly by name instead of silently.",
+      "command": "tick 10",
+      "description": "#553/#554 follow-up (real interaction-mode CI finding, \"orderedHoleCount should be 0 but is 1\"): a flat tick 50 pad occasionally lands one hole short under interaction mode real time. A real-time waitUntil (240000ms budget) was tried next but still stalled at 1/4 -- CI's browser-driven real-time throughput is frame-cost-bound (#475), not budget-size-bound. Sandbox-measured: drilling converges by tick 47 in command mode's own deterministic trace. Switched to the same deterministic tick-N/event-choose-0 chunked pattern proven for this class of issue elsewhere this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json) -- 5 rounds of tick 10 (50 ticks, comfortable margin over the measured 47) replay the identical trajectory in both modes.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedHoleCount",
-          "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 240000
-        }
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
       ],
       "role": "setup",
       "expect": {
@@ -231,8 +273,14 @@
           "orderedHoleCount": 0,
           "holeCount": 4
         }
-      },
-      "timeout": 245
+      }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
     },
     {
       "command": "event choose 0",

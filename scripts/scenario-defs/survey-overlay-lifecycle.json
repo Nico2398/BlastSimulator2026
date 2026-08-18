@@ -749,25 +749,38 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 15",
+      "description": "#554-followup (issue #586 CI): a real-time waitUntil here let real interaction-mode CI reach a genuine worker_revolt before the sequence step below (the level-end screen covered the whole panel) even though command mode's own deterministic trace never revolts -- same real-time-vs-deterministic-convergence mismatch already found and fixed this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json, scores-display-visual.json). Sandbox-measured: charging converges 43 ticks after this wait starts (tick 250 -> 293). Switched to the same deterministic tick-N/event-choose-0 chunked pattern -- 3 rounds of tick 15 (45 ticks) replay the identical trajectory in both modes instead of gambling on real-time throughput.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
-        }
+        { "type": "command", "command": "tick 15" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        { "type": "command", "command": "tick 15" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 15",
+      "interaction": [
+        { "type": "command", "command": "tick 15" }
       ],
       "role": "setup",
       "expect": {
@@ -776,6 +789,13 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",

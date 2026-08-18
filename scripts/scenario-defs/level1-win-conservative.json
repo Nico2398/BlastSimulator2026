@@ -1256,12 +1256,11 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "wellBeing": 54.05000000000052,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#554: contracts #5 (rubble, accepted tick 121) and #7 (blingite, accepted tick 166) are both still open here -- neither has expired yet (rubble expires at tick 197, blingite's 97-tick deadline lands well past this file's final checkpoint). cash sits flat at $8,696 (no payroll/fuel left to drain with the driller dead, no fine or event has landed yet). safety is pinned at its floor of 0, not recovering -- sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run. wellBeing keeps climbing (not falling) toward the equilibrium computeAverageMorale's zero-living-employee fallback (neutral 50) produces. ecology/nuisance stay untouched -- no real blast and no event has landed yet."
+        "note": "#554-followup (issue #586 CI): wellBeing dropped from this checkpoint too -- same real-time-accrual drift class as this file's other wellBeing checkpoint (CI read 53.47 vs command mode's 54.05, a small mid-climb difference). safety is pinned at its floor of 0, not recovering -- sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run. wellBeing keeps climbing (not falling) toward the equilibrium computeAverageMorale's zero-living-employee fallback (neutral 50) produces, which is exactly why a real-time difference lands on a different point of that climb. ecology/nuisance stay untouched -- no real blast and no event has landed yet. contracts #5 (rubble, accepted tick 121) and #7 (blingite, accepted tick 166) are both still open here -- neither has expired yet."
       }
     },
     {

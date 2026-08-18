@@ -757,25 +757,80 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 10",
+      "description": "#554-followup (issue #586 CI): this file's own worker-revolt margin is thin by design (see the tick-5 buffer step's own note above: holes land at tick ~300 against a ~333 revolt deadline) -- a real-time waitUntil here (the usual charge-drain pattern) lets interaction mode's own wall-clock convergence land on a different point of the wellBeing-at-zero streak than command mode's exact tick trace, occasionally tipping a scenario that survives in command mode into a real worker_revolt in interaction mode (CI: the level-end screen covers the whole page by the sequence step below). Chunked into the same deterministic tick-N/event-choose-0 pattern command mode's own trace already proves safe (sandbox-measured: charging 9 holes lands at tick 353, so 6 rounds of tick 10 -- 60 ticks -- comfortably covers it) instead of a real-time wait, so interaction mode replays the identical tick-by-tick trajectory rather than approximating it.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
-        }
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
       ],
       "role": "setup",
       "expect": {
@@ -784,6 +839,13 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
