@@ -117,10 +117,15 @@ describe('en.json / fr.json — key-set parity', () => {
     // ui.blast_workshop.preflight.warn_charge_loading (the Preflight modal's
     // warning when a targeted hole's charge is still loading), both locales
     // translated.
+    // Baseline is now 3268 (up from 3266): #555 (ramp excavation is real
+    // work) added ui.build.ramp_ordered (the ordering confirmation message
+    // for a queued ramp) and ui.crew.action_dig_ramp_segment (the crew
+    // panel's action label while an employee excavates a ramp segment),
+    // both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3266);
+    expect(Object.keys(en).length).toBe(3268);
   });
 });
 

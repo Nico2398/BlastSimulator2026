@@ -405,11 +405,19 @@ describe('NavMesh and pathfinding', () => {
     const fullyDugSurfaceY = NavGrid.computeSurfaceY(gridFull, lastCell.x, lastCell.z);
     const connectionsFull = findRampConnections(navFull);
     expect(connectionsFull.length).toBeGreaterThan(0);
-    const fullConn = connectionsFull[0]!;
-    expect(fullConn.upperLevel).not.toBe(fullConn.lowerLevel);
+    // connectionsFull[0] is merely the first 'ramp' cell found in row-major
+    // scan order — for a ramp whose bench levels quantize coarsely
+    // (computeBenchLevel/NAV_BENCH_HEIGHT), that is typically a shallow
+    // entrance-area transition already present long before the ramp
+    // finishes, not the connector this test cares about. The connector tied
+    // specifically to the last (deepest) segment's own column is the one
+    // anchored at rampZ === lastCell.z.
+    const fullConn = connectionsFull.find(c => c.rampZ === lastCell.z);
+    expect(fullConn).toBeDefined();
+    expect(fullConn!.upperLevel).not.toBe(fullConn!.lowerLevel);
     const fullPath = findPath(navFull, {
-      agentId: 1, fromX: fullConn.upperX, fromZ: fullConn.upperZ,
-      toX: fullConn.lowerX, toZ: fullConn.lowerZ, avoidVehicles: false,
+      agentId: 1, fromX: fullConn!.upperX, fromZ: fullConn!.upperZ,
+      toX: fullConn!.lowerX, toZ: fullConn!.lowerZ, avoidVehicles: false,
     });
     expect(fullPath.found).toBe(true);
 
@@ -431,7 +439,7 @@ describe('NavMesh and pathfinding', () => {
     // yet present while the last segment remains undug.
     const connectionsPrefix = findRampConnections(navPrefix);
     const hasFullConnector = connectionsPrefix.some(
-      c => c.lowerX === fullConn.lowerX && c.lowerZ === fullConn.lowerZ && c.lowerLevel === fullConn.lowerLevel,
+      c => c.lowerX === fullConn!.lowerX && c.lowerZ === fullConn!.lowerZ && c.lowerLevel === fullConn!.lowerLevel,
     );
     expect(hasFullConnector).toBe(false);
   });

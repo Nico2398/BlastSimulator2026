@@ -1339,15 +1339,24 @@ describe('dig_ramp_segment actions — vehicle-gated dispatch and driving.excava
     return employee;
   }
 
-  function queueDigRampSegmentAction(state: GameState, targetX: number, targetZ: number, durationTicks = 3): number {
+  // dig_ramp_segment's own work-duration is derived from payload.cells.length
+  // (voxelCount) and the reserved vehicle's tier via
+  // computeRampSegmentDurationTicks (ActionSelection.ts) — unlike drill_hole/
+  // charge_hole, it ignores a flat payload.durationTicks entirely. voxelCount
+  // defaults to enough cells (3 ticks' worth at tier 1's
+  // RAMP_DIG_VOXELS_PER_TICK_TIER1 = 8/tick) that a single tickTaskProgress
+  // call mid-task can be observed decrementing rather than immediately
+  // completing the segment.
+  function queueDigRampSegmentAction(state: GameState, targetX: number, targetZ: number, voxelCount = 24): number {
     const id = state.nextPendingActionId++;
+    const cells = Array.from({ length: voxelCount }, (_, i) => ({ x: targetX, y: -i, z: targetZ }));
     dispatchPendingAction(state, {
       id,
       type: 'dig_ramp_segment',
       requiredSkill: 'driving.excavator',
       requiredVehicleRole: 'rock_digger',
       targetX, targetZ, targetY: 0,
-      payload: { durationTicks },
+      payload: { rampId: 1, segmentIndex: 0, cells, region: null },
       targetEmployeeId: null,
     }, { skipQualificationCheck: true });
     return id;

@@ -1072,7 +1072,7 @@ describe('buildRampCommand', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.output).toContain('Ramp built');
+    expect(result.output).toContain('Ramp ordered');
     expect(ctx.state!.cash).toBe(cashBefore - 5 * RAMP_COST_PER_METER);
   });
 
