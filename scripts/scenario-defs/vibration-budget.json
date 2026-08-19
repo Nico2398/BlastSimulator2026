@@ -408,6 +408,16 @@
       }
     },
     {
+      "command": "event choose 0",
+      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending. Root cause of this file's real CI failure (employeeCount 2 instead of 1, several steps below): the next step's own click chain uses clickIfPresent throughout (deliberately, for the genuinely-nondeterministic 'driller may already be dead' case) -- but clickIfPresent silently no-ops rather than erroring if the target is blocked for ANY reason, including a pending event's own overlay covering the panel at that exact moment. A blocked fire sequence produces no visible failure at all; the fired employee simply stays alive, and the mismatch only surfaces much later when employeeCount is finally checked. Resolving any pending event here, before that click chain runs, removes the silent-skip risk.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "employee fire 1",
       "description": "#553: a surviving driller left idle after their blast (rumblox at this overcharge routinely kills them anyway, but not always) drags the roster's average wellbeing down for the rest of the file with no job left to do — fired so cycle 2's fresh driller starts from a clean roster, not because this file is about employee management. #599-followup: the toggle/dismiss/confirm chain was `clickSelector` (hard-fail if absent), which read as a DOM re-render race (\"element vanished from the DOM between the wait and the click\") on a genuine interaction-mode CI failure -- real investigation (live DOM instrumentation, a MutationObserver on #bs-employee-panel across the whole click sequence) found no re-render race at all: the file's own \"not always\" is not a caveat, it is what actually happened in that run -- rumblox killed the driller in the blast this file's own charge/amount is deliberately tuned to routinely trigger, `employee list` confirmed the roster empty, and `.bs-detail-toggle` was never going to exist for a dead crew. `clickSelector` cannot express \"maybe nothing to click\" and fails loudly exactly as designed when the control never appears; `clickIfPresent` is the primitive built for precisely this genuinely-nondeterministic beat (scenario-defs.md's own doc comment) -- polls the same usability gate and no-ops if the driller never shows up alive, still hard-fails through the toolbar click below if the panel itself is unreachable.",
       "interaction": [
