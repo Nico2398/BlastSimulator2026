@@ -1177,113 +1177,15 @@
       }
     },
     {
-      "command": "tick 15",
-      "description": "#554-followup round 4 (issue #586 CI): round 3's 5x tick 15 (75 ticks, sandbox-measured comfortable margin over a 62-tick convergence) still left CI's real runner short at 14/16 holes -- real machine-to-machine variance in interaction-mode drilling throughput exceeds sandbox measurement, the same class this session's other files (tutorial-interactive.json, level2-playthrough-win.json) hit and fixed by widening rather than re-measuring. The final round below is widened from tick 15 to tick 75 (total budget 75 -> 135, well past double the sandbox-measured convergence point) rather than nudging again -- this spot has already needed 3 rounds of incremental increases. The extra 60 ticks shift every absolute tickCount checkpoint after this block by the same +60 (471 -> 531 at this file's final worker-revolt checkpoint, mechanically re-derived, not re-measured -- deterministic chunked-tick totals add exactly, in both modes).",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "description": "#601-followup: replaces #554-followup round 4's hand-tuned +45 unconditional margin (4x tick-15/resolve rounds, 60 ticks regardless of whether an interruption ever happened) with a real `waitUntil`. That margin existed only to survive a pending-event interruption mid-block without knowing in advance whether one would actually occur -- #601 fixed `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time, exactly like command mode's own `runWaitUntil`) so this no longer needs guessing: command mode's own deterministic trace already completes this block in exactly 15 ticks with no interruption ever (confirmed by direct probe), so `waitUntil` costs command mode nothing -- it still resolves after exactly 15 ticks, identical to the original bare `tick 15`. Removing the unconditional block outright (rather than leaving it in place ahead of this step, which an earlier round of this fix mistakenly did) matters here: the old block always burned its full 60 ticks regardless of actual drilling progress, silently absorbing a real per-run UI-vs-console drilling-throughput asymmetry (documented at the ecology `waitUntil` step later in this file) that this step's own `waitUntil` would otherwise expose as a several-tick, run-dependent difference in exactly how long this block itself takes -- harmless here since nothing downstream of *this* checkpoint pins an absolute tickCount, but wasteful and misleading to leave sitting unused ahead of a step that has already made it redundant.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 15"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 15"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 15"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 15"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "description": "#554-followup round 4 (issue #586 CI): round 3's 5x tick 15 (75 ticks total) still left CI's real interaction-mode runner short at 14/16 holes. Root cause: a pending event mid-block halts interaction mode's own tick command early (events.ts's tickCommand loop checks isPaused at the end of each iteration and breaks) -- this round's own tick 15 got cut short, losing whatever ticks the interruption ate, by an amount that varies with exactly when the event fires. Two prior sub-attempts this round: +40 (175 total across all 5 rounds) pushed wellBeing's REVOLT_TICKS=120 streak to complete during pattern 1 itself, days before pattern 2 even starts (confirmed live via screenshot -- the level-end 'THE CREW HAS WALKED OUT' overlay was already up several beats later, which is why a later toolbar click reported 'covered by div'); +15 alone was still short (14/16 again). Settled on +45 (3 resolve/tick-15 pairs) as the middle ground between those two confirmed data points. Command mode never hits the interruption at all (confirmed: its own deterministic trace completes this whole block with the original, unwidened budget and no pending event at this point), so the top-level `command` stays exactly `tick 15` -- untouched, keeping every downstream absolute checkpoint in this large file exactly as already calibrated.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 15"
-        },
-        {
-          "type": "resolveEventIfPending"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 60000
         }
       ],
       "role": "setup",
@@ -2623,6 +2525,31 @@
           "surveyCount": 2,
           "levelEnded": true,
           "levelEndReason": "worker_revolt"
+        }
+      }
+    },
+    {
+      "command": "wait_until field:ecology equals:50 max_ticks:200",
+      "description": "#601-followup (real CI, this file's own regression from #601's harness fix): ScoreManager.ts's ecology decays linearly toward baseline 50 at SCORE_DECAY_RATE=0.05/tick and clamps there exactly (`applyDecay`'s `Math.max(50, value - rate)`) -- it does not stop moving just because `levelEnded` is true, and this file issues no further `tick` of any kind after the block above, so whatever ecology reads at that instant is whatever it is permanently. Direct trace: command mode's own path happens to already sit at the exact 50 floor by that point (0 remaining decay debt), while interaction mode's path -- diverging from command's from as early as tick 92 by a few hundredths of a wellBeing point (ordinary UI-click-vs-console-command tick-boundary noise, the same class this file already documents for cash), amplified once that tiny float difference crossed an employee fatigue-collapse threshold a couple of ticks apart -- ends up with materially more employees mid-collapse during pattern 2's drilling stretch, more total active-drilling ticks to land the same 25 holes, and therefore a bigger cumulative ecology hit still owed at the moment ticking stops (51.17, not 50 -- a real ~24-tick decay debt at 0.05/tick). This was invisible before #601: the block above used to run a fixed, generous real-time-driven wait that happened to always burn enough extra wall-clock ticks to fully pay off this debt regardless of its size; #601 removed that slack along with the nondeterminism it was hiding. `waitUntil` is the correct tool for the actual asymmetry (an unknown, path-dependent number of ticks still owed) rather than another fixed pad: it costs command mode exactly 1 tick (already at floor, first check matches) and leaves every field this file already treats as `equals` here unaffected -- ecology's own linear, clamped decay guarantees both paths land on the exact same 50.0, not merely close to it, however many ticks each one needed to get there.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "ecology",
+          "equals": 50,
+          "maxTicks": 200,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "deathCount": 4,
+          "employeeCount": 7,
+          "activeContractCount": 0,
+          "surveyCount": 2,
+          "levelEnded": true,
+          "levelEndReason": "worker_revolt",
+          "ecology": 50
         }
       }
     },
