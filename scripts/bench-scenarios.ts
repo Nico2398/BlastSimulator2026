@@ -125,10 +125,15 @@ function instrumentPage(page: Page): Page {
  */
 let lastState: unknown = null;
 
-async function runStepActions(page: Page, step: ScenarioStepDef): Promise<void> {
+async function runStepActions(
+  page: Page,
+  step: ScenarioStepDef,
+  onProgress?: (detail: string) => void,
+): Promise<void> {
   for (const action of step.interaction ?? []) {
     if (action.type === 'screenshot') continue;
-    await timed(ops, `action.${action.type}`, () => executeActionOnPage(page, action, step));
+    onProgress?.(`action ${action.type}`);
+    await timed(ops, `action.${action.type}`, () => executeActionOnPage(page, action, step, onProgress));
     if (SETTLE_AFTER.has(action.type)) {
       await timed(ops, 'settle.sleep', () => new Promise<void>(r => setTimeout(r, INTERACTION_SETTLE_MS)));
     }
@@ -172,13 +177,16 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
       for (let s = 0; s < steps.length; s++) {
         const step = steps[s]!;
         const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
+        // See scenario-interaction-runner.ts's own copy of this comment
+        // (PR #616 review round, item 5).
+        let lastProgress = 'no interaction action has started yet';
         try {
           await Promise.race([
             (async () => {
               const before = step.expect
                 ? await timed(ops, 'state.before', () => gameState(page))
                 : {};
-              await runStepActions(page, step);
+              await runStepActions(page, step, (detail) => { lastProgress = detail; });
               if (step.expect) {
                 await timed(ops, 'expect.checkGoal', () =>
                   checkGoal(page, step.expect!, before, (lastState as Record<string, unknown> | null) ?? undefined));
@@ -193,7 +201,10 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
               });
             })(),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error(`step ${s} timed out after ${stepTimeout}ms`)), stepTimeout)),
+              setTimeout(
+                () => reject(new Error(`step ${s} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`)),
+                stepTimeout,
+              )),
           ]);
         } catch (err: unknown) {
           failedAt = s;

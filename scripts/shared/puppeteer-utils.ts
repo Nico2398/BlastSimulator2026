@@ -115,6 +115,12 @@ export interface InteractionStepResult {
  * @param outDir - Output directory for screenshots.
  * @param paddedIdx - Zero-padded step index for filenames.
  * @param cmdSlug - Command slug for filenames.
+ * @param onProgress - Optional sink for a human-readable "where this step
+ *   currently stands" string, updated before each action and (for
+ *   waitUntil/waitForTutorialStep) on every tick within one. The runners
+ *   read the last value through it to name what was actually in flight when
+ *   a step's own outer timeout fires, instead of a bare
+ *   "Step N timed out after Xms" (PR #616 review round, item 5).
  * @returns Interaction step result with state and screenshots.
  */
 export async function executeInteractionActions(
@@ -124,6 +130,7 @@ export async function executeInteractionActions(
   outDir: string,
   paddedIdx: string,
   cmdSlug: string,
+  onProgress?: (detail: string) => void,
 ): Promise<InteractionStepResult> {
   const screenshotPaths: string[] = [];
   let screenshotIndex = 0;
@@ -134,7 +141,8 @@ export async function executeInteractionActions(
   }
 
   // Execute interaction actions
-  for (const action of step.interaction) {
+  for (let i = 0; i < step.interaction.length; i++) {
+    const action = step.interaction[i]!;
     if (action.type === 'screenshot' && enableScreenshots) {
       const ssPath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}-ss${screenshotIndex}.png`);
       await captureFrame(page, ssPath);
@@ -142,7 +150,8 @@ export async function executeInteractionActions(
       console.log(`  Screenshot [${screenshotIndex}]: ${ssPath}`);
       screenshotIndex++;
     } else if (action.type !== 'screenshot') {
-      await executeActionOnPage(page, action, step);
+      onProgress?.(`action ${i + 1}/${step.interaction.length} (${action.type})`);
+      await executeActionOnPage(page, action, step, onProgress);
       // A click that mutates the DOM — opening a panel, then clicking a control
       // inside it — needs the panel's next-frame `uiManager.update` to run
       // before the following action reads or clicks that control. The

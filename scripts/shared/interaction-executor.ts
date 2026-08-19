@@ -416,11 +416,19 @@ export function checkStepActionAllowed(
  * @param action - The interaction action to execute.
  * @param step - The step `action` belongs to, so a `command` action can be
  *   checked against the step's role (issue #479).
+ * @param onProgress - Optional sink for a human-readable "where this action
+ *   currently stands" string. `waitUntil`/`waitForTutorialStep` call it on
+ *   every tick with their own field/value/tick-count detail; the runners
+ *   (scenario-interaction-runner.ts and friends) read the last value through
+ *   it to name what was actually in flight when a step's outer timeout
+ *   fires, instead of a bare "Step N timed out after Xms" (issue: PR #616
+ *   review round, item 5 — richer timeout diagnostics).
  */
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
   step: ScenarioStepDef,
+  onProgress?: (detail: string) => void,
 ): Promise<void> {
   switch (action.type) {
     case 'click': {
@@ -664,6 +672,10 @@ export async function executeActionOnPage(
           return fn === undefined ? null : fn();
         });
         ticksUsed++;
+        onProgress?.(
+          `waitForTutorialStep on "${st?.stepId ?? 'none'}", live control ${st?.stageTarget ?? 'none'}, `
+          + `want ${wanted.map(s => `"${s}"`).join(' or ')}, tick ${ticksUsed}/${maxTicks}`,
+        );
         // Tutorial gone (finished or never started) — nothing left to wait on.
         if (st === null || !st.active) break;
         if (st.stepId !== null && wanted.includes(st.stepId)) break;
@@ -791,6 +803,10 @@ export async function executeActionOnPage(
         }, action.field);
         ticksUsed++;
         lastValue = state;
+        onProgress?.(
+          `waitUntil "${action.field}" = ${JSON.stringify(lastValue)} `
+          + `(want ${JSON.stringify(action.equals)}), tick ${ticksUsed}/${action.maxTicks}`,
+        );
         if (lastValue === action.equals) break;
         if (ticksUsed >= action.maxTicks || Date.now() > deadline) {
           throw new Error(
