@@ -608,6 +608,7 @@
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
+      "description": "#601-followup: the 10 amount-increment / 5 stemming-decrement clicks grid 1's own charge step needed are gone here -- ChargeStep's `amountKg`/`stemmingM` (Charge.ts) are plain instance fields with no reset path between grid cycles, so grid 1's own clicks already left the panel sitting at exactly this step's own declared 15kg/1m, and re-applying the same relative clicks on top of that carried-over value pushed it to 25kg (clamped to rumblox's own 20kg ceiling) and -1m (clamped to the 0.5m floor) instead -- confirmed via direct state-dump probe (`chargesByHole` read 20kg/0.5m, not 15kg/1m). `computeChargeHoleDurationTicks` (ChargePlan.ts) scales duration by `amountKg`, so the wrong 20kg made this charge-drain wait genuinely take longer (140 ticks, not command mode's own 97) -- a real, deterministic miscalibration, not a timing artifact; it had been masked until now by `waitUntil`'s own former real-time drift (#601) making run-to-run tick counts too noisy to notice a fixed gap. Selecting the rumblox card again is still correct (a real player would still click their explosive) and confirmed harmless: `selectExplosive` only reclamps `amountKg` to the new product's own [min,max], which the already-15kg value already satisfies.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -616,66 +617,6 @@
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-explosive=\"rumblox\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "clickSelector",
@@ -979,6 +920,7 @@
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
+      "description": "#601-followup: the 10 amount-increment / 5 stemming-decrement clicks grid 1's own charge step needed are gone here -- ChargeStep's `amountKg`/`stemmingM` (Charge.ts) are plain instance fields with no reset path between grid cycles, so grid 1's own clicks already left the panel sitting at exactly this step's own declared 15kg/1m, and re-applying the same relative clicks on top of that carried-over value pushed it to 25kg (clamped to rumblox's own 20kg ceiling) and -1m (clamped to the 0.5m floor) instead -- confirmed via direct state-dump probe (`chargesByHole` read 20kg/0.5m, not 15kg/1m). `computeChargeHoleDurationTicks` (ChargePlan.ts) scales duration by `amountKg`, so the wrong 20kg made this charge-drain wait genuinely take longer (140 ticks, not command mode's own 97) -- a real, deterministic miscalibration, not a timing artifact; it had been masked until now by `waitUntil`'s own former real-time drift (#601) making run-to-run tick counts too noisy to notice a fixed gap. Selecting the rumblox card again is still correct (a real player would still click their explosive) and confirmed harmless: `selectExplosive` only reclamps `amountKg` to the new product's own [min,max], which the already-15kg value already satisfies.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -987,66 +929,6 @@
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-explosive=\"rumblox\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-btn:first-child"
         },
         {
           "type": "clickSelector",

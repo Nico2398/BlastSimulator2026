@@ -437,43 +437,15 @@
       }
     },
     {
-      "command": "tick 56",
-      "description": "#554-followup round 3 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command -- command mode's own deterministic trace shows this charge order drains in exactly 56 ticks. Kept exact (no margin): this file's crew (3 drillers, no living quarters -- see the crew-walkout fix note on the hire steps far above) already runs wellBeing on razor-thin margin by design, and round 2's own extra padding (a wider primary tick plus a larger unconditional resume tick, which runs regardless of whether the primary tick was actually interrupted) was real extra decay that tipped this exact file into a premature WORKER REVOLT -- confirmed live: a downstream 'covered by div' failure was the full-screen game-over overlay, not a random event, matching this file's own already-documented revolt-margin fragility.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#601-followup: reverted from #554-followup round 3's hand-measured `tick 56` (+ a round-4 chunked-margin chase for whatever an interruption cost) back to a real `waitUntil`. That detour existed only because interaction mode's own `waitUntil` used to drive the page's real rAF clock, whose overshoot on a loaded runner (not this file's own margin) was what caused round 3's premature WORKER REVOLT -- #601 fixed `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time, exactly like command mode's `runWaitUntil` already did) rather than working around it here. A real `waitUntil` now drains in exactly the ticks needed and no more -- no hand-measured count to keep in sync, no margin to guess, no risk of the unconditional resume ticks round 3/4 needed spending extra decay this file's already-thin crew margin can't afford.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 56"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "description": "#554-followup round 4: resolve, then chase down whatever ticks the primary block above lost to an interruption in several small rounds rather than one larger one -- real CI runs showed inconsistent shortfalls (11/12, sometimes with 20 extra ticks, sometimes with 9) that a single fixed resume size can't reliably cover, since how many ticks are actually lost varies run to run with exactly when the interruption lands. Chunked resolve/tick-5 pairs, each independently resolving before the next runs, cost the same total ticks as one larger block but don't waste an entire round if a second interruption lands partway through it. The hard chargedCount/orderedChargeCount check lives here, after every resolve point.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 5"
-        },
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 5"
-        },
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 5"
-        },
-        {
-          "type": "resolveEventIfPending"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
@@ -556,29 +528,15 @@
       }
     },
     {
-      "command": "tick 12",
-      "description": "#554-followup round 3 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command -- command mode's own deterministic trace shows this charge order drains in exactly 12 ticks. Kept exact (no margin), and the resume tick below trimmed to the minimum useful size: this file's crew (3 drillers, no living quarters -- see the crew-walkout fix note on the hire steps far above) already runs wellBeing on razor-thin margin by design, and round 2's own extra padding (a wider primary tick plus a larger unconditional resume tick, which runs regardless of whether the primary tick was actually interrupted) was real extra decay that tipped this exact file into a premature WORKER REVOLT -- confirmed live: the 'covered by div' failure downstream was the full-screen game-over overlay, not a random event, matching this file's own already-documented revolt-margin fragility. `resolveEventIfPending` is still cheap/idempotent, so kept as a real defensive measure against a genuinely pending event; the tick sizes are now tight.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#601-followup: reverted from #554-followup round 3's hand-measured `tick 12` (+ a resume-tick chase for whatever an interruption cost) back to a real `waitUntil` -- see the file's own first charge-drain step's note for why: #601 fixed interaction mode's `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time) instead of working around its old real-time overshoot here.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 12"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "description": "#554-followup round 3: resolve whatever pending event exists, resume with a minimal tick to finish draining if the primary tick above was interrupted, then resolve again. The hard chargedCount/orderedChargeCount check lives here, after both resolve points, not on the tick step above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 5"
-        },
-        {
-          "type": "resolveEventIfPending"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
@@ -678,29 +636,15 @@
       }
     },
     {
-      "command": "tick 5",
-      "description": "#554-followup round 2 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command -- command mode's own deterministic trace shows this charge order drains in exactly 5 ticks. The real-time version let the game's own rAF-driven clock run for up to 2 real minutes, long enough for random events to fire and their own unresolved .bs-confirm-overlay backdrop to block later clicks (a fired-and-unresolved event blocked the H1 per-hole amount stepper in real CI). Interaction mode's own interaction array below widens to 15 ticks for margin and chains resolve/resume in case a pending event still interrupts the synchronous loop mid-block (events.ts's tickCommand checks isPaused each iteration) -- command mode's top-level `command` stays the exact 5, untouched.",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#601-followup: reverted from #554-followup round 2's hand-measured `tick 5` (+ a widened-and-chained resume chase for whatever an interruption cost) back to a real `waitUntil` -- see the file's own first charge-drain step's note for why: #601 fixed interaction mode's `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time) instead of working around its old real-time overshoot here.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 5"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "description": "#554-followup round 2: resolve whatever event interrupted the tick above, resume with a small tick to finish draining, then resolve again -- mirrors level1-win-efficient.json's own fix for the identical interruption class. The hard chargedCount/orderedChargeCount check lives here, after both resolve points, not on the tick step above. role:setup since this step's own interaction bundles command actions (the resume tick) alongside the resolves -- checkStepActionAllowed rejects command actions on a player-marked step.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        },
-        {
-          "type": "command",
-          "command": "tick 5"
-        },
-        {
-          "type": "resolveEventIfPending"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
