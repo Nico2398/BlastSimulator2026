@@ -160,6 +160,43 @@ describe('executeActionOnPage — waitUntil (issue #590, #601)', () => {
   });
 });
 
+describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () => {
+  it('resolves once the tutorial reaches the named step, looping the console\'s own deterministic tick 1', async () => {
+    // #601: same tick-1-loop rewrite as waitUntil, but deliberately does NOT
+    // auto-resolve a pending event (a scenario can wait for the tutorial's
+    // own "an event just fired" checkpoint by stepId, with a dedicated later
+    // player step clicking the real dialog).
+    const evaluate = vi.fn().mockResolvedValueOnce({ active: true, stepId: 'drill-plan', stageTarget: 'grid-tool' });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 400, timeout: 30000 };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves without throwing once the tutorial ends (goes inactive) before the named step is ever reached', async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce({ active: false, stepId: null, stageTarget: null });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 400, timeout: 30000 };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+  });
+
+  it('exhausts its tick budget and throws naming the wanted step, the tutorial\'s current step, and the live control', async () => {
+    const evaluate = vi.fn().mockResolvedValue({ active: true, stepId: 'grid-select', stageTarget: 'grid-tool' });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 1, timeout: 30000 };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      /tutorial never reached "drill-plan" — it is on "grid-select", live control grid-tool, after 1 tick\(s\)/,
+    );
+  });
+});
+
 describe('describeStepFailure', () => {
   it('prefixes a player step\'s error with its label', () => {
     const step: ScenarioStepDef = { command: 'blast', description: 'fire the blast', role: 'player' };

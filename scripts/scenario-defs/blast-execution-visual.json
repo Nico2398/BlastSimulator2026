@@ -1911,7 +1911,7 @@
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
       "timeout": 125,
-      "description": "#601-followup (issue #631): replaces the old 13x tick-10/event-choose-0 chunked pad. That pad was calibrated against the file's own worker-revolt truncation ending the level nearby, so it was never actually exercised charging this cycle's real 64-hole count to completion -- disabling revolt for this file (cheat disable_revolt, issue #631) let the run get far enough to show it: only 62/64 charged when the pad ran out, Fire still disabled, blast failing with 'element is disabled'. #601's own harness fix already makes waitUntil resolve a mid-wait event in both modes (loops the console's own tick 1, auto-resolving a pending event after each tick, exactly like command mode's own runWaitUntil) -- the mid-wait-event concern the old chunked pad worked around predates that fix and no longer applies.",
+      "description": "#601-followup (issue #631): replaces the old 13x tick-10/event-choose-0 chunked pad. That pad was calibrated against the file's own worker-revolt truncation ending the level nearby, so it was never actually exercised charging this cycle's real 64-hole count to completion -- disabling revolt for this file (cheat disable_revolt, issue #631) let the run get far enough to show it: only 62/64 charged when the pad ran out, Fire still disabled, blast failing with 'element is disabled'. #601's own harness fix already makes waitUntil resolve a mid-wait event in both modes (loops the console's own tick 1, auto-resolving a pending event after each tick, exactly like command mode's own runWaitUntil) -- the mid-wait-event concern the old chunked pad worked around predates that fix and no longer applies. Quality-review followup: restored the increased:[chargedCount] check this step's own waitUntil replacement had dropped -- equals:{orderedChargeCount:0} alone is tautological (the waitUntil action itself already blocks until that field hits 0, so the trailing expect could never fail), where the original chunked-tick block also independently proved charging actually progressed.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -1925,7 +1925,10 @@
       "expect": {
         "equals": {
           "orderedChargeCount": 0
-        }
+        },
+        "increased": [
+          "chargedCount"
+        ]
       }
     },
     {

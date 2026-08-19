@@ -536,16 +536,16 @@ export async function executeActionOnPage(
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
     case 'resolveEventIfPending': {
-      // Ask the game, not the DOM. `event status` is read-only
-      // (isObservationCommand admits it) and this is the harness deciding
-      // whether to wait — the resolution itself is a real click below.
+      // Ask the game, not the DOM: read the typed `pendingEvent` mirror off
+      // __gameState() (main.ts) rather than regex-matching `event status`'s
+      // text output — this is the harness deciding whether to wait, the
+      // resolution itself is a real click below.
       const pending = await page.evaluate(() => {
-        const run = (window as unknown as {
-          __gameConsole?: (c: string) => { output?: unknown };
-        }).__gameConsole;
-        if (run === undefined) return false;
-        const out = String(run('event status').output ?? '');
-        return !/no pending event/i.test(out);
+        const getState = (window as unknown as {
+          __gameState?: () => Record<string, unknown> | null;
+        }).__gameState;
+        const st = getState === undefined ? null : getState();
+        return st ? Boolean(st.pendingEvent) : false;
       });
       if (!pending) break;
 
@@ -780,12 +780,13 @@ export async function executeActionOnPage(
             __gameConsole?: (c: string) => { output?: unknown };
           }).__gameConsole;
           run?.('tick 1');
-          const status = run ? String(run('event status').output ?? '') : '';
-          if (!/no pending event/i.test(status)) run?.('event choose 0');
           const getState = (window as unknown as {
             __gameState?: () => Record<string, unknown> | null;
           }).__gameState;
           const st = getState === undefined ? null : getState();
+          // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
+          // regex-matching `event status`'s text output.
+          if (st?.pendingEvent) run?.('event choose 0');
           return st ? st[field] : undefined;
         }, action.field);
         ticksUsed++;

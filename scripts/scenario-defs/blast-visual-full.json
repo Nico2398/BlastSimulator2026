@@ -465,7 +465,8 @@
           "chargedCount": 12,
           "orderedChargeCount": 0
         }
-      }
+      },
+      "timeout": 120
     },
     {
       "command": "event choose 0",
@@ -529,10 +530,10 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) \u2014 the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session \u2014 asserted before each commit rather than assumed.",
       "role": "player",
       "expect": {
-        "note": "count is unchanged — every hole was already charged by Charge All; this step overrides H1 alone",
+        "note": "count is unchanged \u2014 every hole was already charged by Charge All; this step overrides H1 alone",
         "increased": [
           "orderedChargeCount"
         ]
@@ -556,7 +557,8 @@
           "chargedCount": 12,
           "orderedChargeCount": 0
         }
-      }
+      },
+      "timeout": 120
     },
     {
       "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
@@ -664,7 +666,8 @@
           "chargedCount": 12,
           "orderedChargeCount": 0
         }
-      }
+      },
+      "timeout": 120
     },
     {
       "command": "sequence auto delay_step:25",
@@ -726,7 +729,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H6\"] [data-action=\"delay-dec\"]"
         }
       ],
-      "description": "Auto Sequence already put H6 on exactly this step's declared 100ms (traced: step-08-sequence.json), so the arithmetic here is a net zero — one increment and one decrement (100 -> 125 -> 100) is the honest click expression of it, and it still exercises both stepper directions on a row other than H1. Command mode's version of this step was likewise a no-op: the step-08 and step-09 dumps are byte-identical.",
+      "description": "Auto Sequence already put H6 on exactly this step's declared 100ms (traced: step-08-sequence.json), so the arithmetic here is a net zero \u2014 one increment and one decrement (100 -> 125 -> 100) is the honest click expression of it, and it still exercises both stepper directions on a row other than H1. Command mode's version of this step was likewise a no-op: the step-08 and step-09 dumps are byte-identical.",
       "role": "player",
       "expect": {
         "equals": {
