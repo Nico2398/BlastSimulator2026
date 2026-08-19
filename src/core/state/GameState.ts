@@ -57,6 +57,7 @@ import type { LevelStats } from '../campaign/SuccessTracker.js';
 import { createLevelStats } from '../campaign/SuccessTracker.js';
 import type { SitePolicy } from '../entities/SitePolicy.js';
 import { createSitePolicy } from '../entities/SitePolicy.js';
+import type { RampDef } from '../mining/Ramp.js';
 
 /** Save format version — increment when GameState shape changes. */
 // v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
@@ -72,13 +73,33 @@ import { createSitePolicy } from '../entities/SitePolicy.js';
 // PlannedCharge>` (#554 charging becomes work — a charge order queues one
 // `charge_hole` action per hole instead of writing charges into state
 // instantly). See SaveLoad.ts's migrateV11ToV12 stub.
-export const SAVE_VERSION = 12;
+// v12 -> v13: GameState gained `plannedRamps: PlannedRamp[]` and
+// `nextPlannedRampId: number` (#555 ramp excavation becomes work — a ramp
+// order queues one `dig_ramp_segment` action per segment instead of carving
+// voxels into the grid instantly). See SaveLoad.ts's migrateV12ToV13 stub.
+export const SAVE_VERSION = 13;
 
 export interface GameConfig {
   seed: number;
   mineType?: string;
   startingCash?: number;
   eventFreqMultiplier?: number;
+  /**
+   * Per-tick pull toward the neutral (50) midpoint for all four scores
+   * (ScoreManager's `updateScores`). Defaults to the global `SCORE_DECAY_RATE`
+   * when omitted. Every `LevelDef` already declares its own `scoreDecayRate`
+   * (tutorial_pit's 0.01 is documented "player-proof") but nothing read it
+   * before this field existed — every level shared one hardcoded constant
+   * regardless (#555 tutorial worker-revolt fix).
+   */
+  scoreDecayRate?: number;
+  /**
+   * When true, a permanent worker revolt (WorkerRevolt.ts) can never end this
+   * level, however long well-being sits at 0. Sourced from the level's own
+   * `LevelDef.revoltImmune` — true only for tutorial_pit (#555 tutorial
+   * worker-revolt fix).
+   */
+  revoltImmune?: boolean;
   /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
   staffed?: boolean;
 }
@@ -87,6 +108,7 @@ export interface GameConfig {
 export type ActionType =
   | 'drill_hole'
   | 'charge_hole'
+  | 'dig_ramp_segment'
   | 'set_sequence'
   | 'place_building'
   | 'demolish_building'
@@ -134,6 +156,23 @@ export interface PendingAction {
   status: PendingActionStatus;
   /** Employee currently holding (assigned to/working) this action, or null while 'queued' (#547). Distinct from targetEmployeeId, which restricts eligibility rather than recording who claimed it. */
   holderId: number | null;
+}
+
+/** Tracks one ordered ramp's per-segment excavation progress (#555). */
+export interface RampSegmentTracker {
+  index: number;
+  actionId: number;
+  cells: { x: number; y: number; z: number }[];
+  region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
+  done: boolean;
+}
+
+/** A ramp order in flight — its footprint is claimed and segments queue `dig_ramp_segment` actions as they're worked (#555). */
+export interface PlannedRamp {
+  id: number;
+  def: RampDef;
+  footprint: { minX: number; maxX: number; minZ: number; maxZ: number };
+  segments: RampSegmentTracker[];
 }
 
 /**
@@ -265,6 +304,10 @@ export interface GameState {
   lastBlastPreview: BlastPreviewSummary | null;
   /** Tubing inventory and installed-hole set, for waterproofing charges against rain. */
   tubingState: TubingState;
+  /** Ramps ordered but not yet fully dug — each queues one `dig_ramp_segment` action per segment (#555). */
+  plannedRamps: PlannedRamp[];
+  /** Next ID to assign to a newly created PlannedRamp. */
+  nextPlannedRampId: number;
 }
 
 export interface WorldState {
@@ -345,7 +388,7 @@ export function createGame(config: GameConfig): GameState {
     buildings: createBuildingState(),
     vehicles: createVehicleState(),
     employees: createEmployeeState(),
-    scores: createScoreState(),
+    scores: createScoreState(config.scoreDecayRate),
     damage: createDamageState(),
     zone: createZoneState(),
     events: createEventSystemState(config.eventFreqMultiplier ?? 1),
@@ -355,7 +398,7 @@ export function createGame(config: GameConfig): GameState {
     bankruptcy: createBankruptcyState(),
     arrest: createArrestState(),
     ecological: createEcologicalState(),
-    revolt: createRevoltState(),
+    revolt: createRevoltState(config.revoltImmune ?? false),
     revoltDisabled: false,
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
@@ -369,6 +412,8 @@ export function createGame(config: GameConfig): GameState {
     softwareTier: 0,
     lastBlastPreview: null,
     tubingState: createTubingState(),
+    plannedRamps: [],
+    nextPlannedRampId: 1,
   };
 
   if (config.staffed) {

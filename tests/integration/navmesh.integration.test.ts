@@ -7,7 +7,7 @@ import { findPath, findRampConnections, octileHeuristic } from '../../src/core/n
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
 import { generateTerrain } from '../../src/core/world/TerrainGen.js';
-import { buildRamp } from '../../src/core/mining/Ramp.js';
+import { buildRamp, defineRampSegments, carveRampSegment, type RampDef } from '../../src/core/mining/Ramp.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -320,6 +320,128 @@ describe('NavMesh and pathfinding', () => {
       agentId: 1, fromX: 10, fromZ: 5, toX: 10, toZ: 25, avoidVehicles: false,
     });
     expect(result.found).toBe(false);
+  });
+
+  // ── #555: progressive ramp excavation lands one NavGrid patch per segment ──
+  // A ramp order queues one dig_ramp_segment PendingAction per
+  // defineRampSegments entry; each segment's own completion carves it
+  // (carveRampSegment) and patches only that segment's region into the
+  // NavGrid — mirroring how buildRamp's single patch call is expected to
+  // become N incremental ones. These tests are Red today only because
+  // defineRampSegments/carveRampSegment are stubs (Ramp.ts).
+
+  function buildElevatedPlateau(): VoxelGrid {
+    const grid = new VoxelGrid(20, 30, 30);
+    fillSolid(grid, 22); // flat plateau, surface Y=22
+    return grid;
+  }
+
+  const PROGRESSIVE_RAMP: RampDef = {
+    originX: 10, originZ: 5, direction: 'south', length: 12, targetDepth: 10,
+  };
+
+  it('after each segment lands, the NavGrid has no blocked/void cell inside that segment\'s own carved region', () => {
+    const grid = buildElevatedPlateau();
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    const segments = defineRampSegments(grid, PROGRESSIVE_RAMP);
+    expect(segments.length).toBeGreaterThan(0);
+
+    for (const segment of segments) {
+      carveRampSegment(grid, segment);
+      expect(segment.region).not.toBeNull();
+      const region = segment.region!;
+      NavGrid.patchNavGrid(nav, grid, [], [], region);
+
+      for (let z = region.minZ; z <= region.maxZ; z++) {
+        for (let x = region.minX; x <= region.maxX; x++) {
+          const cell = nav.cellAt(x, z);
+          expect(cell).toBeDefined();
+          expect(cell!.type).not.toBe('blocked');
+          expect(cell!.type).not.toBe('void');
+        }
+      }
+    }
+  });
+
+  it('a path requiring only the dug prefix of the ramp succeeds once those segments land, before the whole ramp completes', () => {
+    const grid = buildElevatedPlateau();
+    const nav = NavGrid.buildNavGrid(grid, [], []);
+
+    const segments = defineRampSegments(grid, PROGRESSIVE_RAMP);
+    expect(segments.length).toBeGreaterThan(1);
+
+    // Land only the first half of the segments (entrance-first — index 0 is
+    // the ramp's own entrance).
+    const half = Math.ceil(segments.length / 2);
+    const prefix = segments.slice(0, half);
+    for (const segment of prefix) {
+      carveRampSegment(grid, segment);
+      if (segment.region) NavGrid.patchNavGrid(nav, grid, [], [], segment.region);
+    }
+
+    const lastLandedCell = prefix[prefix.length - 1]!.cells[0]!;
+    const result = findPath(nav, {
+      agentId: 1,
+      fromX: PROGRESSIVE_RAMP.originX, fromZ: PROGRESSIVE_RAMP.originZ,
+      toX: lastLandedCell.x, toZ: lastLandedCell.z,
+      avoidVehicles: false,
+    });
+    expect(result.found).toBe(true);
+  });
+
+  it('the ramp\'s deepest column only reaches its fully-excavated depth once every segment has landed — the last segment landing is what completes full multi-level routing', () => {
+    // Reference: every segment carved and patched in order — the target depth
+    // the fully-dug ramp reaches at its deepest (last) segment.
+    const gridFull = buildElevatedPlateau();
+    const navFull = NavGrid.buildNavGrid(gridFull, [], []);
+    const segmentsFull = defineRampSegments(gridFull, PROGRESSIVE_RAMP);
+    expect(segmentsFull.length).toBeGreaterThan(1);
+    for (const segment of segmentsFull) {
+      carveRampSegment(gridFull, segment);
+      if (segment.region) NavGrid.patchNavGrid(navFull, gridFull, [], [], segment.region);
+    }
+    const lastCell = segmentsFull[segmentsFull.length - 1]!.cells[0]!;
+    const fullyDugSurfaceY = NavGrid.computeSurfaceY(gridFull, lastCell.x, lastCell.z);
+    const connectionsFull = findRampConnections(navFull);
+    expect(connectionsFull.length).toBeGreaterThan(0);
+    // connectionsFull[0] is merely the first 'ramp' cell found in row-major
+    // scan order — for a ramp whose bench levels quantize coarsely
+    // (computeBenchLevel/NAV_BENCH_HEIGHT), that is typically a shallow
+    // entrance-area transition already present long before the ramp
+    // finishes, not the connector this test cares about. The connector tied
+    // specifically to the last (deepest) segment's own column is the one
+    // anchored at rampZ === lastCell.z.
+    const fullConn = connectionsFull.find(c => c.rampZ === lastCell.z);
+    expect(fullConn).toBeDefined();
+    expect(fullConn!.upperLevel).not.toBe(fullConn!.lowerLevel);
+    const fullPath = findPath(navFull, {
+      agentId: 1, fromX: fullConn!.upperX, fromZ: fullConn!.upperZ,
+      toX: fullConn!.lowerX, toZ: fullConn!.lowerZ, avoidVehicles: false,
+    });
+    expect(fullPath.found).toBe(true);
+
+    // Every segment except the very last one — the ramp is not fully dug yet.
+    const gridPrefix = buildElevatedPlateau();
+    const navPrefix = NavGrid.buildNavGrid(gridPrefix, [], []);
+    const segmentsPrefix = defineRampSegments(gridPrefix, PROGRESSIVE_RAMP);
+    for (const segment of segmentsPrefix.slice(0, -1)) {
+      carveRampSegment(gridPrefix, segment);
+      if (segment.region) NavGrid.patchNavGrid(navPrefix, gridPrefix, [], [], segment.region);
+    }
+
+    // The deepest column has not yet reached the fully-dug depth — its last
+    // segment never landed.
+    const prefixSurfaceY = NavGrid.computeSurfaceY(gridPrefix, lastCell.x, lastCell.z);
+    expect(prefixSurfaceY).toBeGreaterThan(fullyDugSurfaceY);
+
+    // The full-depth connector discovered once the ramp is complete is not
+    // yet present while the last segment remains undug.
+    const connectionsPrefix = findRampConnections(navPrefix);
+    const hasFullConnector = connectionsPrefix.some(
+      c => c.lowerX === fullConn!.lowerX && c.lowerZ === fullConn!.lowerZ && c.lowerLevel === fullConn!.lowerLevel,
+    );
+    expect(hasFullConnector).toBe(false);
   });
 
 });

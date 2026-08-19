@@ -391,7 +391,7 @@
         ],
         "equals": {
           "tickCount": 5,
-          "wellBeing": 50.95000000000002
+          "wellBeing": 51.05
         }
       }
     },
@@ -420,7 +420,7 @@
         ],
         "equals": {
           "tickCount": 10,
-          "wellBeing": 52.400000000000034
+          "wellBeing": 52.599999999999994
         }
       }
     },
@@ -448,7 +448,7 @@
           "tickCount": 10,
           "ecology": 50,
           "safety": 50,
-          "wellBeing": 52.400000000000034,
+          "wellBeing": 52.599999999999994,
           "nuisance": 50
         }
       }

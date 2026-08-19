@@ -75,6 +75,8 @@ export function sandboxCommand(
     mineType: config.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
+    scoreDecayRate: level.scoreDecayRate,
+    revoltImmune: level.revoltImmune,
     ...(staffedFlag.staffed ? { staffed: true } : {}),
   });
   ctx.state.world = createWorldState(level.gridX, level.gridY, level.gridZ, true);

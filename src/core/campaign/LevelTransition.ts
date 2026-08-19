@@ -91,6 +91,8 @@ export function createGameForLevel(
     mineType: level.biome,
     startingCash: level.startingCash,
     eventFreqMultiplier: level.eventFreqMultiplier,
+    scoreDecayRate: level.scoreDecayRate,
+    revoltImmune: level.revoltImmune,
     ...(staffed ? { staffed: true } : {}),
   };
 

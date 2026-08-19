@@ -154,19 +154,21 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
       length: '10',
     });
 
-    // Assert: ramp built successfully
+    // Assert: ramp order accepted at this position (#555 — ramp excavation is
+    // progressive: ordering queues dig_ramp_segment work, it no longer
+    // carves the corridor synchronously).
     expect(result.success).toBe(true);
-    expect(result.output).toContain('Ramp built');
-    expect(result.output).toContain('voxels cleared');
+    expect(result.output).toContain('Ramp ordered');
+    expect(result.output).toContain('segments queued');
 
-    // Extract the number of voxels cleared — should be a positive integer
-    const voxelMatch = result.output.match(/voxels cleared:?\s*(\d+)/i);
-    if (voxelMatch) {
-      const voxelsCleared = parseInt(voxelMatch[1]!, 10);
-      expect(voxelsCleared).toBeGreaterThan(0);
+    // Extract the number of segments queued — should be a positive integer
+    const segmentMatch = result.output.match(/(\d+)\s*segments queued/i);
+    if (segmentMatch) {
+      const segmentsQueued = parseInt(segmentMatch[1]!, 10);
+      expect(segmentsQueued).toBeGreaterThan(0);
     }
 
-    // Ramp construction should have deducted cost
+    // Ramp construction should have deducted cost at order time
     expect(ctx.state!.cash).toBeLessThan(TUTORIAL_START_CASH);
   });
 

@@ -6,6 +6,8 @@ import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { updateScores } from '../../../src/core/scores/ScoreManager.js';
+import { SCORE_DECAY_RATE } from '../../../src/core/config/balance.js';
 
 const TEST_SAVE_DIR = path.join(process.cwd(), 'tmp-test-saves');
 
@@ -376,6 +378,96 @@ describe('deserialize — v11→v12 migration for GameState.plannedChargesByHole
     const restored = deserialize(json);
 
     expect(restored.plannedChargesByHole).toEqual({});
+  });
+});
+
+// ── v12→v13 migration for ScoreState.decayRate / RevoltState.immune (#555) ──
+// SAVE_VERSION bumped 12→13 for GameState.plannedRamps/nextPlannedRampId, but
+// the same #555 branch also added ScoreState.decayRate and
+// RevoltState.immune, persisted verbatim with no dedicated version bump. A
+// pre-v13 save has neither field — decayRate must default to the global
+// SCORE_DECAY_RATE constant (matching createScoreState's own default) and
+// immune to false (matching createRevoltState's own default), or a later
+// tick's applyDecay computes `value +/- undefined` and pins the score at NaN
+// forever.
+
+describe('deserialize — v12→v13 migration for ScoreState.decayRate / RevoltState.immune (#555)', () => {
+  it('a v12 save missing scores.decayRate and revolt.immune migrates to the createGame defaults', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 12;
+    const scoresRaw = parsed['scores'] as Record<string, unknown>;
+    const revoltRaw = parsed['revolt'] as Record<string, unknown>;
+    delete scoresRaw['decayRate'];
+    delete revoltRaw['immune'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.scores.decayRate).toBe(SCORE_DECAY_RATE);
+    expect(restored.revolt.immune).toBe(false);
+  });
+
+  it('a tick after migration never drives a score to NaN', () => {
+    const state = createGame({ seed: 42 });
+    // Push a score off neutral so applyDecay's undefined-rate branch would
+    // actually fire (decay is a no-op exactly at 50).
+    state.scores.wellBeing = 40;
+    state.scores.safety = 60;
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 12;
+    const scoresRaw = parsed['scores'] as Record<string, unknown>;
+    const revoltRaw = parsed['revolt'] as Record<string, unknown>;
+    delete scoresRaw['decayRate'];
+    delete revoltRaw['immune'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+    updateScores(restored.scores, {
+      buildings: { buildings: [] },
+      avgMorale: 50,
+      recentAccidents: 0,
+      hasSafetyEquipment: false,
+      maxRecentVibration: 0,
+      employeeCount: 0,
+    });
+
+    expect(Number.isNaN(restored.scores.wellBeing)).toBe(false);
+    expect(Number.isNaN(restored.scores.safety)).toBe(false);
+    expect(Number.isNaN(restored.scores.ecology)).toBe(false);
+    expect(Number.isNaN(restored.scores.nuisance)).toBe(false);
+  });
+
+  it('a pre-v12 save (never had decayRate/immune at all) migrates cleanly through the full chain', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 10;
+    delete parsed['plannedDrillHoles'];
+    delete parsed['plannedChargesByHole'];
+    delete parsed['plannedRamps'];
+    delete parsed['nextPlannedRampId'];
+    const scoresRaw = parsed['scores'] as Record<string, unknown>;
+    const revoltRaw = parsed['revolt'] as Record<string, unknown>;
+    delete scoresRaw['decayRate'];
+    delete revoltRaw['immune'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.scores.decayRate).toBe(SCORE_DECAY_RATE);
+    expect(restored.revolt.immune).toBe(false);
+  });
+
+  it('a v13+ save with decayRate/immune already set is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    state.scores.decayRate = 0.01;
+    state.revolt.immune = true;
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.scores.decayRate).toBe(0.01);
+    expect(restored.revolt.immune).toBe(true);
   });
 });
 

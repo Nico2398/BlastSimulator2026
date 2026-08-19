@@ -17,6 +17,7 @@ import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { MIN_STEMMING_M } from '../../core/config/balance.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 import { addExpense } from '../../core/economy/Finance.js';
+import { formatMoney } from '../../core/economy/formatMoney.js';
 import { processProjections } from '../../core/entities/Damage.js';
 import { killEmployee } from '../../core/entities/Employee.js';
 import { destroyVehicle } from '../../core/entities/Vehicle.js';
@@ -30,7 +31,12 @@ import {
   previewVibrations,
   purchaseSoftware,
 } from '../../core/mining/Software.js';
-import { buildRamp, RAMP_WIDTH, type RampDirection } from '../../core/mining/Ramp.js';
+import {
+  RAMP_WIDTH, RAMP_COST_PER_METER, validateRampOrder, defineRampSegments,
+  computeColumnSurfaceY, rampStepColumn,
+  type RampDirection, type RampDef,
+} from '../../core/mining/Ramp.js';
+import type { PlannedRamp } from '../../core/state/GameState.js';
 import {
   createWeatherCycle,
   forceAdvance,
@@ -86,6 +92,15 @@ export interface ChargeHoleActionPayload {
   amountKg: number;
   stemmingM: number;
   durationTicks: number;
+}
+
+/** Payload carried by a queued `dig_ramp_segment` PendingAction (#555). */
+export interface RampSegmentActionPayload {
+  rampId: number;
+  segmentIndex: number;
+  cells: { x: number; y: number; z: number }[];
+  region: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } | null;
+  segmentCost: number;
 }
 
 /**
@@ -150,6 +165,27 @@ function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
  * for a cancelled drill order too.
  */
 export function releasePlannedHoleForCancelledAction(state: GameState, action: PendingAction): void {
+  // #555: a cancelled dig_ramp_segment keyed off rampId/segmentIndex, not
+  // holeId — handled separately, same generic-cancel-path gap as
+  // drill_hole/charge_hole above (the Operations panel's Work Queue cancel
+  // button reaches only this hook, not buildRampCommand's own cancel path).
+  if (action.type === 'dig_ramp_segment') {
+    const rampId = action.payload['rampId'];
+    if (typeof rampId !== 'number') return;
+    const ramp = state.plannedRamps.find(r => r.id === rampId);
+    if (!ramp) return;
+
+    const segmentIndex = action.payload['segmentIndex'];
+    const idx = ramp.segments.findIndex(s => s.index === segmentIndex);
+    if (idx !== -1) ramp.segments.splice(idx, 1);
+
+    if (!ramp.segments.some(s => !s.done)) {
+      const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);
+      if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
+    }
+    return;
+  }
+
   const holeId = action.payload['holeId'];
   if (typeof holeId !== 'string') return;
 
@@ -825,11 +861,17 @@ export function buySoftwareCommand(
 
 export function buildRampCommand(
   ctx: MiningContext,
-  _args: string[],
+  args: string[],
   named: Record<string, string>,
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
+
+  if (args[0] === 'cancel') {
+    const rampId = parseInt(args[1] ?? named['id'] ?? '', 10);
+    if (isNaN(rampId)) return { success: false, output: 'Usage: build_ramp cancel id:<ramp-id>' };
+    return cancelRampCommand(ctx, rampId);
+  }
 
   let originX: number;
   let originZ: number;
@@ -863,21 +905,83 @@ export function buildRampCommand(
   const rampClaim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp');
   if (!rampClaim.ok) return { success: false, output: rampClaim.output! };
 
-  const result = buildRamp(ctx.grid!, {
-    originX, originZ,
-    direction, length, targetDepth: depth,
-  }, ctx.state!.cash, ctx.emitter);
+  const rampDef: RampDef = { originX, originZ, direction, length, targetDepth: depth };
+  const validation = validateRampOrder(rampDef, ctx.state!.cash);
+  if (!validation.success) return { success: false, output: validation.message };
 
-  if (!result.success) return { success: false, output: result.message };
-  ctx.state!.cash -= result.cost;
-  addExpense(ctx.state!.finances, result.cost, 'construction', 'Build ramp', ctx.state!.tickCount);
+  const segments = defineRampSegments(ctx.grid!, rampDef);
 
-  // Patch NavGrid to reflect ramp terrain changes
-  if (ctx.state!.navGrid && ctx.grid) {
-    NavGrid.patchNavGrid(ctx.state!.navGrid, ctx.grid, ctx.state!.buildings.buildings, ctx.state!.drillHoles, footprint);
+  // Cost is charged in full at order time — unspent remainder (unworked
+  // segments' share) is refunded on cancel via actionOrderCost/cancelAction
+  // (#555, mirrors #553/#554's order-then-work pattern).
+  ctx.state!.cash -= validation.cost;
+  addExpense(ctx.state!.finances, validation.cost, 'construction', 'Build ramp', ctx.state!.tickCount);
+
+  const rampId = ctx.state!.nextPlannedRampId++;
+  const plannedRamp: PlannedRamp = { id: rampId, def: rampDef, footprint, segments: [] };
+
+  for (const segment of segments) {
+    const { x: cx, z: cz } = rampStepColumn(rampDef, segment.index);
+    const surfaceY = computeColumnSurfaceY(ctx.grid!, cx, cz);
+    const actionId = ctx.state!.nextPendingActionId++;
+
+    // skipQualificationCheck (#555, mirrors drill_hole/charge_hole's #553/
+    // #554 dispatch): a ramp order must queue silently even when nobody on
+    // the roster currently holds driving.excavator or a rock_digger yet.
+    dispatchPendingAction(ctx.state!, {
+      id: actionId,
+      type: 'dig_ramp_segment',
+      requiredSkill: 'driving.excavator',
+      requiredVehicleRole: 'rock_digger',
+      targetX: cx,
+      targetZ: cz,
+      targetY: surfaceY,
+      payload: {
+        rampId, segmentIndex: segment.index, cells: segment.cells, region: segment.region,
+        segmentCost: RAMP_COST_PER_METER,
+      } satisfies RampSegmentActionPayload,
+      targetEmployeeId: null,
+    }, { skipQualificationCheck: true });
+
+    plannedRamp.segments.push({
+      index: segment.index, actionId, cells: segment.cells, region: segment.region, done: false,
+    });
   }
 
-  return { success: true, output: result.message };
+  ctx.state!.plannedRamps.push(plannedRamp);
+
+  return {
+    success: true,
+    output: `Ramp ordered: ${length}m ${direction}, ${segments.length} segments queued for excavation`,
+  };
+}
+
+/**
+ * Cancel an ordered ramp still excavating (#555, mirrors `cancelAction`'s use
+ * for drill/charge orders) — releases any in-flight `dig_ramp_segment`
+ * actions (refunding each segment's unspent order-time cost via
+ * `cancelAction`/`actionOrderCost`) and removes the `PlannedRamp` entirely.
+ * Already-carved terrain is kept; only undug segments' cost is refunded.
+ */
+export function cancelRampCommand(ctx: MiningContext, rampId: number): { success: boolean; output: string } {
+  const state = ctx.state!;
+  const ramp = state.plannedRamps.find(r => r.id === rampId);
+  if (!ramp) return { success: false, output: `Ramp #${rampId} not found` };
+
+  let refunded = 0;
+  for (const segment of ramp.segments) {
+    if (segment.done) continue;
+    const result = cancelAction(state, segment.actionId);
+    if (result.success) refunded += result.refunded ?? 0;
+  }
+
+  const idx = state.plannedRamps.findIndex(r => r.id === rampId);
+  if (idx !== -1) state.plannedRamps.splice(idx, 1);
+
+  return {
+    success: true,
+    output: `Ramp #${rampId} cancelled.${refunded > 0 ? ` $${formatMoney(refunded)} refunded.` : ''}`,
+  };
 }
 
 /** The cells a ramp of `length` cuts through, running `direction` from (originX, originZ). Max inclusive. */

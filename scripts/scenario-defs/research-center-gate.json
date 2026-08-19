@@ -10,7 +10,7 @@
         { "type": "command", "command": "campaign start level:tutorial_pit" }
       ],
       "expect": {
-        "equals": { "cash": 80000, "buildingCount": 0 }
+        "equals": { "cash": 290000, "buildingCount": 0 }
       }
     },
     {

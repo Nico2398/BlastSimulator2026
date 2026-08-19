@@ -4,6 +4,7 @@
 
 import type { ScoreId } from '../entities/Building.js';
 import { getBuildingScoreEffects, type BuildingState } from '../entities/Building.js';
+import { SCORE_DECAY_RATE } from '../config/balance.js';
 
 // ── Score state ──
 
@@ -12,11 +13,20 @@ export interface ScoreState {
   safety: number;
   ecology: number;
   nuisance: number;
+  /**
+   * Per-tick pull toward the neutral (50) midpoint, applied by `applyDecay`
+   * below. Carried on the state (rather than read from a single module-level
+   * constant) so each level's own `LevelDef.scoreDecayRate` — tutorial_pit's
+   * 0.01, documented "player-proof" — actually reaches `updateScores` instead
+   * of every level sharing the same hardcoded rate regardless of what its own
+   * definition declared (#555 tutorial worker-revolt fix).
+   */
+  decayRate: number;
 }
 
-/** Starting scores — neutral. */
-export function createScoreState(): ScoreState {
-  return { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50 };
+/** Starting scores — neutral. `decayRate` defaults to the global constant when the caller has no level-specific override. */
+export function createScoreState(decayRate: number = SCORE_DECAY_RATE): ScoreState {
+  return { wellBeing: 50, safety: 50, ecology: 50, nuisance: 50, decayRate };
 }
 
 // ── Score inputs ──
@@ -37,11 +47,6 @@ export interface ScoreInputs {
 }
 
 // ── Update logic ──
-
-import { SCORE_DECAY_RATE } from '../config/balance.js';
-
-/** Decay rate: scores drift towards 50 by this much per tick. */
-const DECAY_RATE = SCORE_DECAY_RATE;
 
 /**
  * Update scores based on current inputs. Mutates state.
@@ -75,11 +80,11 @@ export function updateScores(state: ScoreState, inputs: ScoreInputs): void {
   nuDelta -= inputs.maxRecentVibration * 0.02; // Vibrations increase nuisance
   state.nuisance = clampScore(state.nuisance + nuDelta);
 
-  // Apply decay towards neutral (50)
-  state.wellBeing = applyDecay(state.wellBeing, DECAY_RATE);
-  state.safety = applyDecay(state.safety, DECAY_RATE);
-  state.ecology = applyDecay(state.ecology, DECAY_RATE);
-  state.nuisance = applyDecay(state.nuisance, DECAY_RATE);
+  // Apply decay towards neutral (50), at this state's own per-level rate.
+  state.wellBeing = applyDecay(state.wellBeing, state.decayRate);
+  state.safety = applyDecay(state.safety, state.decayRate);
+  state.ecology = applyDecay(state.ecology, state.decayRate);
+  state.nuisance = applyDecay(state.nuisance, state.decayRate);
 }
 
 /** Record an accident — immediate safety score hit. */
@@ -120,6 +125,22 @@ function clampScore(value: number): number {
 }
 
 function applyDecay(value: number, rate: number): number {
+  // `value > 0` is deliberate, not a gap: a score driven all the way to
+  // exactly 0 (or 100) by a strongly negative/positive delta stays there
+  // instead of drifting back toward neutral on its own — the mechanic
+  // WorkerRevolt.ts's and EcologicalDisaster's own sustained-zero-tick
+  // counters depend on to ever fire at all (see
+  // level1-lose-revolt/level1-lose-ecology.integration.test.ts, which force a
+  // score to exactly 0 and require it to *stay* there). Reverted from a
+  // version of this fix that made 0 recoverable — investigated for #555's
+  // tutorial worker-revolt regression, but it silently broke every other
+  // level's own revolt/ecology lose condition, which relies on precisely
+  // this pinning. The actual #555 fix is `ScoreState.decayRate` (this file)
+  // sourced from the level's own `LevelDef.scoreDecayRate` instead of one
+  // hardcoded global rate — it keeps the tutorial's own well-being buffer
+  // (built up before the long box-cut/drill-plan stretch) draining slowly
+  // enough that the crisis never actually reaches this floor in the first
+  // place, rather than changing what happens once something does.
   if (value > 50) return Math.max(50, value - rate);
   if (value > 0 && value < 50) return Math.min(50, value + rate);
   return value;

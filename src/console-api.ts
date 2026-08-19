@@ -39,6 +39,8 @@ export interface SerializableGameState {
   orderedHoleCount: number;
   /** Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length) — proves a charge order queues work instead of writing charges into state instantly (#554). */
   orderedChargeCount: number;
+  /** Remaining not-yet-`done` segments across every in-flight `state.plannedRamps` entry — proves a ramp order queues progressive excavation work instead of carving the whole corridor instantly (#555). A ramp is spliced out of `plannedRamps` entirely once its last segment lands, so this reaches 0 exactly when every ordered ramp has finished, not merely when the field would otherwise read 0 on an empty ramp. */
+  orderedRampSegmentCount: number;
   chargedCount: number;
   sequencedCount: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
@@ -106,6 +108,9 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     holeCount: s.drillHoles.length,
     orderedHoleCount: s.plannedDrillHoles.length,
     orderedChargeCount: Object.keys(s.plannedChargesByHole).length,
+    orderedRampSegmentCount: s.plannedRamps.reduce(
+      (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
+    ),
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
     surveyCount: s.surveyResults.length,

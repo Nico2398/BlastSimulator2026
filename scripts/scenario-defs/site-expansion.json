@@ -215,6 +215,26 @@
       "role": "player"
     },
     {
+      "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:200",
+      "description": "#555: ramp excavation is queued work, not an instant carve -- an idle driving.excavator-qualified employee from the staffed roster auto-dispatches to the rock_digger and drives it to each segment (#549's cost-based auto-claim, same mechanism drill_hole/charge_hole use; no explicit `vehicle driver` assignment needed for this, unlike building-ramp-visual's player-driven click-through). Draining it here -- before the building/charge/blast/save steps below also consume ticks -- keeps every downstream cash checkpoint (the save/load round-trip) settled against a finished ramp instead of racing this still-ticking background dig (#590/#596 convention).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedRampSegmentCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 60000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedRampSegmentCount": 0
+        },
+        "note": "The ramp's 8 segments have all landed -- fuel/wage costs from the auto-dispatched dig are fully accrued before anything downstream reads cash."
+      }
+    },
+    {
       "command": "build management_office at:34,4",
       "description": "Was left as a bare command (role bootstrap) for the same raycast-past-the-edge reason as the steps above; converted now that #558 lets the picker raycast the landscape past the site.",
       "timeout": 150,
@@ -387,7 +407,7 @@
     },
     {
       "command": "save slot:expanded",
-      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. Runs after the far-bridging claim above, so the saved state (and the load below) includes the bridged ground at chunk (8,0), not just the original blast. #554-followup (issue #586 CI): dropped the exact `cash: 453554` -- a real CI run read 453466 ($88 off), the same real-time-accrual drift class already diagnosed and fixed for level1-playthrough-revolt.json's own cash checkpoints (see that file's notes): this step follows the `wait_until field:orderedChargeCount` charge-drain wait above, whose real per-hole charging (#554) accrues a different number of real ticks (and therefore payroll/upkeep) in interaction mode's own wall-clock pacing than in command mode's fixed tick-command trajectory. `changedBy: {cash: 0}` replaces it -- a real, load-bearing check that `save` itself doesn't spend or credit cash, provable in both modes regardless of which absolute value cash happens to be at this point.",
+      "description": "Left unmarked: save/load UI is out of scope for this batch -- see save-load-visual.json (Batch 6) for the real control. Runs after the far-bridging claim above, so the saved state (and the load below) includes the bridged ground at chunk (8,0), not just the original blast. #554-followup (issue #586 CI): dropped the exact `cash: 453554` -- a real CI run read 453466 ($88 off), the same real-time-accrual drift class already diagnosed and fixed for level1-playthrough-revolt.json's own cash checkpoints (see that file's notes): this step follows the `wait_until field:orderedChargeCount` charge-drain wait above, whose real per-hole charging (#554) accrues a different number of real ticks (and therefore payroll/upkeep) in interaction mode's own wall-clock pacing than in command mode's fixed tick-command trajectory -- #555's own ramp order/dig above adds a second, independent source of the same real-time-accrual drift. `changedBy: {cash: 0}` replaces it -- a real, load-bearing check that `save` itself doesn't spend or credit cash, provable in both modes regardless of which absolute value cash happens to be at this point.",
       "timeout": 150,
       "interaction": [
         {

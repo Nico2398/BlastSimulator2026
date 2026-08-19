@@ -614,6 +614,9 @@ export const VEHICLE_BASE_STATS = {
  */
 export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 
+/** Base excavation voxels/tick for a tier-1 rock digger (#555 ramp excavation — matches VEHICLE_BASE_STATS.rock_digger.workRate). */
+export const RAMP_DIG_VOXELS_PER_TICK_TIER1 = 8;
+
 /** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',
