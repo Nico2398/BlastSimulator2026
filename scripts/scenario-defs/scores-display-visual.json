@@ -94,6 +94,109 @@
       "role": "bootstrap"
     },
     {
+      "command": "employee hire role:driller",
+      "description": "#601-followup: a solo driller has too little fatigue margin for this file's 4-hole grid to reliably finish both drilling (vehicle-driven) and charging (on foot, no vehicle gate, so slower and more fatiguing per hole) back to back -- direct sandbox trace: even from the closest living_quarters placement that stays clear of every hole tile (`at:17,21` below, replacing the old `at:22,21` which silently overlapped one hole -- see that step's own note), command mode's own deterministic charge phase still stalled at 2/4 charged after 3000 ticks. A second driller with an independent rig halves each employee's share of the same workload, restoring the margin distance alone can no longer buy once living_quarters can no longer sit on top of a hole to shortcut the trip.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "vehicle buy drill_rig",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"drill_rig\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "vehicle driver 1 1",
+      "description": "#601-followup: `makeAssignRow` (fleetDetailSections.ts) renders a `<select>` of every not-yet-`driverId`-bound qualified employee, defaulting to whichever sorts first, with `.bs-vehicle-assign-btn` submitting whatever the select currently holds -- an explicit `set` on the select (rather than relying on the picker's own default option) is what actually pins the driver, since `driverId` isn't set until the walk-to-board completes, so a second click issued before the first driver has physically boarded still sees the first driller as an eligible, first-sorted default (sandbox-confirmed: without the `set` below, vehicle #2's assign click silently reassigned driller #1 again -- \"Employee already walking to board a vehicle\" -- leaving vehicle #2 permanently driverless). Does NOT re-click the vehicles toolbar tab: the panel is already open, left there by the preceding `vehicle buy drill_rig` purchase -- the `employee assign_skill` bootstrap step in between uses `command` type, not a click, so panel state is unchanged.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] select",
+          "value": "1"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"1\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "vehicle driver 2 2",
+      "description": "Crews drill_rig #2 with driller #2, same reasoning as the step above.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] select",
+          "value": "2"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"2\"] .bs-vehicle-assign-btn"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "build management_office at:5,5",
       "interaction": [
         {
@@ -132,8 +235,8 @@
       }
     },
     {
-      "command": "build living_quarters at:22,21",
-      "description": "#554: relocated from (12,5) to (22,21), inside the drill/charge grid at (20,20)-(24,24) below (clear of every hole cell, roughly equidistant from all four) — charging is real work now (on foot, no vehicle gate, unlike drilling), and the solo driller's needs gauges crossing threshold mid-walk from a distant living_quarters repeatedly left them oscillating between the two forever, never actually landing every charge_hole action (observed: still 1-4 ordered, not landed, after 6000 ticks even from a nearer (17,17)). A living_quarters this close keeps every rest trip short enough to actually make forward progress on all four holes.",
+      "command": "build living_quarters at:17,21",
+      "description": "#601-followup: relocated again, from (22,21) to (17,21) -- (22,21) was never actually clear of every hole cell as #554's own description claimed. living_quarters' footprint (`rect(3,3)`, BuildingDefs.ts) is anchored at its own top-left corner (`building.x + dx`, Building.ts), not centered, so `at:22,21` occupies x:[22,24] z:[21,23] -- which contains (23,23), one of this file's own 4 drill holes (the 2x2 grid at spacing 4 from (20,20) lands corners at (20,20)/(23,20)/(20,23)/(23,23)). A drill_rig can never actually reach a hole a building is standing on: #554's own diagnostic (still 1-4 ordered after 6000 ticks) was this exact bug already, misread as a fatigue/travel-distance problem and \"fixed\" by moving closer -- which happened to leave 3 of 4 holes clear by coincidence, not by the equidistant-from-every-corner reasoning the old description claimed. Confirmed directly: `wait_until field:orderedHoleCount equals:0` (the deterministic replacement for the old real-time-driven wait, see below) stalls at exactly 1 forever regardless of maxTicks (still stuck after 5000 ticks, sandbox-measured) with EITHER one driller or two drillers with independent rigs -- decisive against a fatigue-margin theory, since two independent crews sharing the same 4 holes would have trivially finished a merely-slow job. (17,21) sits entirely outside the (20,20)-(23,23) hole bounding box (its own footprint is x:[17,19] z:[21,23], nearest-tile distance to any hole at most ~4.1) -- clear of every hole like (22,21) was meant to be, but close enough that the charge phase below (on foot, no vehicle gate) keeps the same short rest trips #554's original relocation was actually chasing.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -145,7 +248,7 @@
         },
         {
           "type": "pickTile",
-          "x": 22,
+          "x": 17,
           "z": 21
         },
         {
@@ -206,66 +309,16 @@
       }
     },
     {
-      "command": "tick 10",
-      "description": "#553/#554 follow-up (real interaction-mode CI finding, \"orderedHoleCount should be 0 but is 1\"): a flat tick 50 pad occasionally lands one hole short under interaction mode real time. A real-time waitUntil (240000ms budget) was tried next but still stalled at 1/4 -- CI's browser-driven real-time throughput is frame-cost-bound (#475), not budget-size-bound. Sandbox-measured: drilling converges by tick 47 in command mode's own deterministic trace. Switched to the same deterministic tick-N/event-choose-0 chunked pattern proven for this class of issue elsewhere this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json) -- 5 rounds of tick 10 (50 ticks, comfortable margin over the measured 47) replay the identical trajectory in both modes.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "description": "#601-followup: replaces #553/#554's own hand-tuned 5x tick-10/event-choose-0 chunked pad (50 ticks, a \"comfortable margin\" over a sandbox-measured 47-tick convergence that still occasionally landed one hole short in real CI, \"orderedHoleCount should be 0 but is 1\") with a real `waitUntil`. That margin was guessing at a number that didn't need guessing: #601 fixed `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time, exactly like command mode's own `runWaitUntil`), so this converges on the exact tick each mode's own drilling actually finishes instead of hoping a fixed pad was wide enough.",
       "interaction": [
-        { "type": "command", "command": "tick 10" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        { "type": "command", "command": "tick 10" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        { "type": "command", "command": "tick 10" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        { "type": "command", "command": "tick 10" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        { "type": "command", "command": "tick 10" }
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 60000
+        }
       ],
       "role": "setup",
       "expect": {
