@@ -437,24 +437,43 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 56",
+      "description": "#554-followup round 3 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command -- command mode's own deterministic trace shows this charge order drains in exactly 56 ticks. Kept exact (no margin): this file's crew (3 drillers, no living quarters -- see the crew-walkout fix note on the hire steps far above) already runs wellBeing on razor-thin margin by design, and round 2's own extra padding (a wider primary tick plus a larger unconditional resume tick, which runs regardless of whether the primary tick was actually interrupted) was real extra decay that tipped this exact file into a premature WORKER REVOLT -- confirmed live: a downstream 'covered by div' failure was the full-screen game-over overlay, not a random event, matching this file's own already-documented revolt-margin fragility.",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 56"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554-followup round 4: resolve, then chase down whatever ticks the primary block above lost to an interruption in several small rounds rather than one larger one -- real CI runs showed inconsistent shortfalls (11/12, sometimes with 20 extra ticks, sometimes with 9) that a single fixed resume size can't reliably cover, since how many ticks are actually lost varies run to run with exactly when the interruption lands. Chunked resolve/tick-5 pairs, each independently resolving before the next runs, cost the same total ticks as one larger block but don't waste an entire round if a second interruption lands partway through it. The hard chargedCount/orderedChargeCount check lives here, after every resolve point.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 5"
         },
         {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "command",
+          "command": "tick 5"
+        },
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "command",
+          "command": "tick 5"
+        },
+        {
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "setup",
@@ -467,7 +486,7 @@
     },
     {
       "command": "event choose 0",
-      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks the next click -- real CI reported exactly that on the H1 per-hole amount stepper (`#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child failed: element is covered by div`), matching this file's own already-established idempotent-resolve pattern used after every tick block above.",
+      "description": "#554-followup round 3 (issue #586 CI): idempotent -- a no-op when nothing is pending. This file's wellBeing crashes low enough to keep unlocking low-wellbeing-gated union events past the charge-drain block fixed above -- a live run reported the very next click (the H1 per-hole amount stepper) covered by a leftover event's .bs-confirm-overlay backdrop, even with the resolve/resume chain on the charge-drain step immediately above having already reported nothing pending. One more defensive resolve directly before the click.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -537,24 +556,29 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 12",
+      "description": "#554-followup round 3 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command -- command mode's own deterministic trace shows this charge order drains in exactly 12 ticks. Kept exact (no margin), and the resume tick below trimmed to the minimum useful size: this file's crew (3 drillers, no living quarters -- see the crew-walkout fix note on the hire steps far above) already runs wellBeing on razor-thin margin by design, and round 2's own extra padding (a wider primary tick plus a larger unconditional resume tick, which runs regardless of whether the primary tick was actually interrupted) was real extra decay that tipped this exact file into a premature WORKER REVOLT -- confirmed live: the 'covered by div' failure downstream was the full-screen game-over overlay, not a random event, matching this file's own already-documented revolt-margin fragility. `resolveEventIfPending` is still cheap/idempotent, so kept as a real defensive measure against a genuinely pending event; the tick sizes are now tight.",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 12"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554-followup round 3: resolve whatever pending event exists, resume with a minimal tick to finish draining if the primary tick above was interrupted, then resolve again. The hard chargedCount/orderedChargeCount check lives here, after both resolve points, not on the tick step above.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 5"
         },
         {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "setup",
@@ -564,16 +588,6 @@
           "orderedChargeCount": 0
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks the next click -- real CI reported exactly that on the H1 per-hole amount stepper (`#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child failed: element is covered by div`), matching this file's own already-established idempotent-resolve pattern used after every tick block above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
     },
     {
       "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
@@ -664,24 +678,29 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 5",
+      "description": "#554-followup round 2 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command -- command mode's own deterministic trace shows this charge order drains in exactly 5 ticks. The real-time version let the game's own rAF-driven clock run for up to 2 real minutes, long enough for random events to fire and their own unresolved .bs-confirm-overlay backdrop to block later clicks (a fired-and-unresolved event blocked the H1 per-hole amount stepper in real CI). Interaction mode's own interaction array below widens to 15 ticks for margin and chains resolve/resume in case a pending event still interrupts the synchronous loop mid-block (events.ts's tickCommand checks isPaused each iteration) -- command mode's top-level `command` stays the exact 5, untouched.",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554-followup round 2: resolve whatever event interrupted the tick above, resume with a small tick to finish draining, then resolve again -- mirrors level1-win-efficient.json's own fix for the identical interruption class. The hard chargedCount/orderedChargeCount check lives here, after both resolve points, not on the tick step above. role:setup since this step's own interaction bundles command actions (the resume tick) alongside the resolves -- checkStepActionAllowed rejects command actions on a player-marked step.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 5"
         },
         {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "setup",
@@ -691,16 +710,6 @@
           "orderedChargeCount": 0
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks the next click -- real CI reported exactly that on the H1 per-hole amount stepper (`#bs-blast-panel [data-field=\"amount\"] .bsx-stepper-btn:last-child failed: element is covered by div`), matching this file's own already-established idempotent-resolve pattern used after every tick block above.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
