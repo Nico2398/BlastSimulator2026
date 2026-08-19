@@ -397,9 +397,9 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:5 depth:6 start:20,20",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20",
       "timeout": 60,
-      "description": "drill-plan, click half: grid tool dragged over the exact 20,20-30,30 rectangle the card asks for (spacing 5 makes 3x3 holes), confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below.",
+      "description": "drill-plan, click half: grid tool dragged over the exact 20,20-26,26 rectangle the card asks for, confirmed. #553: this only orders the 9 holes -- drill_hole became a queued, vehicle-gated action, so holeCount stays 0 until the driller (equipped above) actually drives the drill_rig to each one. The wait is its own step right below. #554-followup (issue #586 CI, rounds 4-5): round 4 corrected the command from rows:3 cols:3 spacing:5 (9 holes) to rows:4 cols:4 spacing:3 (16 holes), reasoning the spacing stepper is unreachable this early in the rail (confirmed live, still true) so the declared spacing:5 could never be real. That was half right: spacing really is stuck at the tool's own DEFAULT_SPACING_M=3, but the drag rectangle producing 16 holes at that spacing was itself a latent bug in the region the tutorial rail snaps this drag to (REGION.drill, tutorialStages.ts), sized for a spacing of 5 that Drill.ts has never actually used since #479 -- nothing caught it because charging was instant until #553/#554, so the extra holes never cost real time. Round 5 fixes REGION.drill directly (20-30 -> 20-26), restoring the tutorial's originally-intended 3x3/9-hole workload for a lone early-tutorial employee with no living quarters yet; a 16-hole grid drove that same employee into a full worker revolt partway through charging (see the charging step's own note below). Command and drag corrected back in step to match the fixed region.",
       "role": "player",
       "interaction": [
         {
@@ -418,8 +418,8 @@
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
-          "x2": 30,
-          "z2": 30
+          "x2": 26,
+          "z2": 26
         },
         {
           "type": "screenshot"
@@ -436,22 +436,24 @@
       }
     },
     {
-      "command": "tick 300",
+      "command": "wait_until field:holeCount equals:9 max_ticks:400",
       "timeout": 90,
-      "description": "#553: drill-plan complete: the driller drives the drill_rig to all 9 ordered holes and drills them (sandbox-measured: a single driller/drill_rig lands a 3x3 spacing:5 grid on tutorial_pit in ~300 ticks door-to-door). waitForTutorialStep drives the real clock in interaction mode; command mode needs the explicit tick since it has no implicit clock between steps.",
+      "description": "#553: drill-plan complete: the driller drives the drill_rig to all 9 ordered holes and drills them (sandbox-measured: a single driller/drill_rig lands a 3x3 spacing:3 grid on tutorial_pit comfortably inside 400 ticks door-to-door). #554-followup round 6 (issue #586 CI): previously used waitForTutorialStep(stepId:'charge'), which resolves the instant the FIRST hole lands (createComparisonStep's isComplete fires on the first increase past its snapshot -- 'drill-plan' advances to 'charge' after hole 1 of 9, not all 9). The very next step's `charge hole:*` order then only covered whatever was drilled AT THAT MOMENT -- usually just the one hole -- leaving the other 8 permanently uncharged (no later step re-issues the order), which is what left 'Auto Sequence' unreachable further down: charging never actually finished. Switched to waitUntil on holeCount itself so this step keeps waiting until every hole is actually down, in both modes, rather than stopping the moment the tutorial card first flips.",
       "role": "player",
       "interaction": [
         {
-          "type": "waitForTutorialStep",
-          "stepId": "charge",
-          "timeout": 90000
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 400,
+          "timeoutMs": 180000
         }
       ],
       "expect": {
         "tutorialStep": "charge",
-        "increased": [
-          "holeCount"
-        ]
+        "equals": {
+          "holeCount": 9
+        }
       }
     },
     {
@@ -482,87 +484,23 @@
       }
     },
     {
-      "command": "tick 15",
-      "description": "#554-followup round 3 (issue #586 CI): a real-time waitUntil here (widened to 240000ms) still stalled at 1 -- CI's browser-driven real-time throughput is frame-cost-bound (#475), not budget-size-bound, so no amount of widening closes it reliably. Sandbox-measured: charging converges 81 ticks after this wait starts (tick 325 -> 406) in command mode's own deterministic trace. Switched to the same deterministic tick-N/event-choose-0 chunked pattern proven for this class of issue elsewhere this session -- 6 rounds of tick 15 (90 ticks) replay the identical trajectory in both modes. `time speed:8` dropped -- it only sped up real-time-driven ticking, which this step no longer does.",
+      "command": "wait_until field:chargedCount equals:9 max_ticks:500",
+      "description": "#554-followup round 6 (issue #586 CI): earlier rounds waited only for the FIRST charge to land (tutorialStep flips to 'sequence' the instant chargedCount first increases -- createComparisonStep's isComplete, same premature-advance behaviour as drill-plan above) and moved on with 8 of 9 holes still uncharged. That left 'Auto Sequence' unreachable further down the file: the sequence panel's own auto-sequence control only ever became reachable once every ordered charge had actually landed, so a scenario that stopped at chargedCount:1 could never proceed no matter how the following steps were reshuffled. Waiting for full completion here (chargedCount:9) is the real fix -- the drill-plan step above now also waits for all 9 holes before charging is ordered (round 6), so this order only ever targets the full 9 in the first place, unlike the partial orders earlier rounds were chasing. A 16-hole grid at this same lone-employee, no-living-quarters stage drove a full WORKER REVOLT at cumulative tick 318 (WorkerRevolt.ts's REVOLT_TICKS=120 sticky-zero window); REGION.drill (tutorialStages.ts) was fixed at the source to restore the tutorial's originally-intended 3x3/9-hole workload, which comfortably finishes charging well short of that threshold.",
       "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        { "type": "resolveEventIfPending" }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 15",
-      "interaction": [
-        { "type": "command", "command": "tick 15" }
+        {
+          "type": "waitUntil",
+          "field": "chargedCount",
+          "equals": 9,
+          "maxTicks": 500,
+          "timeoutMs": 180000
+        }
       ],
       "role": "setup",
       "expect": {
-        "increased": [
-          "chargedCount"
-        ],
-        "tutorialStep": "sequence"
+        "tutorialStep": "sequence",
+        "equals": {
+          "chargedCount": 9
+        }
       }
     },
     {

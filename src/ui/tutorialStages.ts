@@ -98,10 +98,21 @@ const REGION = {
   // suggestion area, so nothing downstream of the survey moves.
   survey: { x1: 23, z1: 23, x2: 23, z2: 23, exact: true },
   // Sized to the grid it produces: the tool derives
-  // cols = round((x2 - x1) / spacing) + 1, so at the default spacing of 5 a
-  // 20→30 span is exactly three holes at 20, 25 and 30. An outline the
-  // resulting holes spilled out of would be telling the player the wrong thing.
-  drill: { x1: 20, z1: 20, x2: 30, z2: 30, exact: true },
+  // cols = round((x2 - x1) / spacing) + 1. This region predates Drill.ts's
+  // own DEFAULT_SPACING_M (3, not the 5 this region was originally sized
+  // for) -- the mismatch went unnoticed because the spacing stepper is
+  // unreachable this early in the rail (no path to it, confirmed live), so
+  // nothing here ever adjusts spacing away from the tool's own default, and
+  // charging used to be instant (pre-#553/#554) so the doubled 4×4=16-hole
+  // grid a 20→30 span actually produces at spacing 3 never had time to cost
+  // anything. Once charging became real, queued work, 16 holes was enough
+  // for a lone early-tutorial employee (no living quarters built yet) to
+  // collapse repeatedly and trigger a full worker revolt before finishing
+  // (issue #586 CI, tutorial-interactive.json). 20→26 at spacing 3 is
+  // round(6/3)+1=3 holes/side, 3×3=9 -- restoring the region to the
+  // originally-intended 3×3 grid for the spacing this tool actually opens
+  // at, not the 4×4 the stale 20→30/spacing-5 sizing silently grew it to.
+  drill: { x1: 20, z1: 20, x2: 26, z2: 26, exact: true },
   // One tile: the warehouse is placed by its origin corner, and the footprint
   // ghost shows the rest. In the level's clear north-west quarter, but pulled
   // off the map's own corner: at (4,4) the camera ray through that tile's

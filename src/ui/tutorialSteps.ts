@@ -181,7 +181,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 5: drill-plan ──
-  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20'], TOOLBAR_TARGET.blast),
+  // #554-followup: drilling is real, queued work (was instant pre-#553) --
+  // same waitsOnWork gap as 'charge'/'sequence' below, just on the drilling
+  // stage: isComplete fires after the FIRST ordered hole lands, not all of
+  // them, so without waitsOnWork the rail holds the clock (tutorialGuide.ts's
+  // decideClock) well before a multi-hole grid finishes drilling -- and once
+  // held, every subsequent scenario `tick N` is capped to exactly 1 real tick
+  // per call (events.ts's tickCommand checks isPaused only at the end of each
+  // iteration), so no tick budget, however large, ever recovers from it.
+  createComparisonStep('drill-plan', 'tutorial.step5.title', 'tutorial.step5', (s) => (s.drillHoles ?? []).length, ['drill_plan grid rows:3 cols:3 spacing:5 depth:8 start:20,20'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
   // ── Step 5: charge ──
   // #554: charging is real, queued work now (was instant) -- without
