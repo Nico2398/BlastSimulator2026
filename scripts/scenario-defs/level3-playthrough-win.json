@@ -1686,16 +1686,8 @@
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
       "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #601-followup: dropped the speed-button click that used to precede this wait -- it was only ever needed to make the OLD real-time-driven `waitUntil` (auto-tick loop, real wall-clock) advance faster; #601's harness fix replaced that with a loop of the console's own synchronous `tick 1`, which never reads `state.timeScale` at all, so the click has done nothing since #601 landed. It became actively harmful here rather than merely dead: the charge step just above is itself a `role: guard` proving `state.bankrupt` already flipped level-end (see its own note), and `LevelEndScreen`'s full-screen overlay covers the whole page including the HUD the instant that happens -- so `awaitUsable` on the speed button could only ever time out once the level-end timing (already accepted as real and covered, upstream) lands before this step instead of after it.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",

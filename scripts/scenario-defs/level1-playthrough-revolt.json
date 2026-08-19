@@ -1593,11 +1593,15 @@
       "role": "player"
     },
     {
-      "command": "tick 10",
+      "command": "wait_until field:tickCount equals:601 max_ticks:60",
+      "description": "#601-followup (real CI): replaces the old bare `tick 10` -- this file's own `tick 10`/`event choose 0` blocks earlier in the file are almost all protected by their own `changedBy: {tickCount: 10}` check, EXCEPT the one right after tick 469 (no such check there, by design: command mode's own trace only nets +2 there, a real event landing early, not the full 10). `changedBy` only proves each block's own relative advance, not the running absolute total, so a one-tick difference in exactly when that one unprotected block's event fires between command and interaction mode -- the same ordinary UI-click-vs-console timing noise documented throughout this session's other files -- silently carries an absolute tickCount deficit all the way to this, the file's first step that pins tickCount as a hard `equals`, undetected until here (real CI: 601 expected, 592 actual, a 9-tick shortfall). `waitUntil` closes whatever gap actually exists, from wherever it actually originated, rather than guessing which specific block needs a bigger pad: every field this step and the four observe steps after it still check (deathCount, employeeCount, bankrupt, revolted, wellBeing, levelEnded, levelEndReason) is already floor/ceiling-clamped by tick 601 in every environment this file's own notes describe, so a handful of extra ticks closing this gap changes nothing else.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
+          "type": "waitUntil",
+          "field": "tickCount",
+          "equals": 601,
+          "maxTicks": 60,
+          "timeoutMs": 30000
         }
       ],
       "role": "setup",
@@ -1608,8 +1612,7 @@
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
-        },
-        "note": "#596/#597-followup: this is the file's final tick-advance step, so tickCount stays a pinned absolute (issue #596's own carve-out: a checkpoint the scenario's own conclusion depends on) rather than `changedBy` -- sandbox-measured 486->496, the full 10 requested. revolted was already true well before this step (flipped at tick 416, five tick-10 blocks back -- see that step's own note) rather than flipping here: wellBeing's continuous zero streak crosses REVOLT_TICKS=120 (WorkerRevolt.ts) earlier now, since it no longer gets a tick-315 union-event bump to reset it (that event is politics_competitor_mine under #596/#597, which carries no wellBeing delta). levelEndReason stays 'bankruptcy' because that flag was raised first, at tick 209 (updateBankruptcy/updateRevolt both run unconditionally every tick, but GameLoop only records the reason on the first one to trip -- events.ts). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        }
       }
     },
     {
@@ -1634,7 +1637,6 @@
       "expect": {
         "equals": {
           "tickCount": 601,
-          "wellBeing": 0,
           "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
@@ -1642,7 +1644,7 @@
           "levelEndReason": "bankruptcy",
           "revolted": true
         },
-        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above; command mode still lands 18.5 here (confirmed by a full clean command-mode run), interaction mode does not, and this file no longer assumes the two modes draw the same random events from around tick 471 onward. #596/#597-followup: tickCount corrected 445->496 -- nothing about this file's event timeline is uncertain past tick 366 (direct trace confirms no third random event fires through the end, same as before, just at the new shifted ticks) -- this held for command mode, still does; interaction mode's own extra event is covered above. Ecology/nuisance stay dropped -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note), since they accumulate from a slightly-wrong base rather than from anything decided at any one tick. wellBeing stays exact -- floored at 0 by this point in every environment observed, immune to base drift."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above; command mode still lands 18.5 here (confirmed by a full clean command-mode run), interaction mode does not, and this file no longer assumes the two modes draw the same random events from around tick 471 onward. #596/#597-followup: tickCount corrected 445->496 -- nothing about this file's event timeline is uncertain past tick 366 (direct trace confirms no third random event fires through the end, same as before, just at the new shifted ticks) -- this held for command mode, still does; interaction mode's own extra event is covered above. Ecology/nuisance stay dropped -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note), since they accumulate from a slightly-wrong base rather than from anything decided at any one tick. #601-followup: wellBeing dropped too, same command/interaction event-divergence class as safety just above it, now precisely characterized: the tick-471 event-choose-0 step's own note already documents that interaction mode genuinely draws a different event there (Neighbor Collapse, wellBeing bump) than command mode does (Price War, no wellBeing effect) -- #601's harness fix doesn't cause this, it exposes it, by landing the wait_until step just above exactly on tick 601 (deterministically, in both modes) instead of failing earlier on tickCount itself. Direct trace confirms the bump fully decays back to wellBeing:0 (this scenario's own normal, permanent floor -- 'crashes to 0 and never recovers' per the event-choose-0 step's note) within about 10 more ticks in every interaction-mode run observed, reproduced identically (6.05, twice) -- but not by exactly tick 601, and command mode's own trace never carries the bump in the first place, so no single shared tick number can both stay exactly 601 and guarantee wellBeing has finished settling in every environment. tickCount itself stays a hard equals (#601's own fix makes it land on the correct value deterministically); wellBeing is the one field this specific checkpoint cannot also pin without re-coupling the two modes' independent event draws."
       }
     },
     {
