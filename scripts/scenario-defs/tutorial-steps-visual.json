@@ -178,13 +178,7 @@
         }
       ],
       "role": "setup",
-      "description": "#553-followup (issue #586 CI): relaxed `cash: 197804` to `decreased` -- a real interaction-mode run (2/6 local reps) read 196164 instead, inheriting real-time payroll drift from the survey step's own player clicks/waits above (same real-time-accrual class documented throughout this PR), which this purely tick-driven step can't undo.",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "note": "seismic survey completes mid-tick (tick 9 of this 10-tick block)"
-      }
+      "description": "#553-followup (issue #586 CI): relaxed `cash: 197804` to `decreased` -- a real interaction-mode run (2/6 local reps) read 196164 instead, inheriting real-time payroll drift from the survey step's own player clicks/waits above (same real-time-accrual class documented throughout this PR), which this purely tick-driven step can't undo. #555 (this merge)-followup (real CI): dropped `decreased` entirely -- the survey's own $3,000 is already charged at order time (the survey step's own `changedBy` above), there is no continuous per-tick payroll/upkeep drain anywhere in this codebase (only discrete costs: hires, training, purchases, event fines, rest deductions), and the surveyor's task needs no vehicle, so a real run can land this 10-tick block with nothing left to spend and cash genuinely flat -- exactly what a real CI run read (293516 -> 293516). `decreased` was never a mode-invariant claim here."
     },
     {
       "command": "tick 10",
@@ -218,12 +212,7 @@
         }
       ],
       "role": "setup",
-      "description": "#553-followup (issue #586 CI): relaxed `cash: 195344` to `decreased` -- same real-time-accrual drift as the tick-10 checkpoint above, inherited from the survey step's own real clicks.",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
+      "description": "#553-followup (issue #586 CI): relaxed `cash: 195344` to `decreased` -- same real-time-accrual drift as the tick-10 checkpoint above, inherited from the survey step's own real clicks. #555 (this merge)-followup (real CI): dropped `decreased` entirely -- same reasoning as the tick-10 checkpoint two steps above: no continuous per-tick cash drain exists in this codebase, so a real run can land this block with cash genuinely unchanged."
     },
     {
       "command": "employee hire role:driller",

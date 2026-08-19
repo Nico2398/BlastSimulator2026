@@ -2529,15 +2529,16 @@
       }
     },
     {
-      "command": "wait_until field:ecology equals:50 max_ticks:200",
-      "description": "#601-followup (real CI, this file's own regression from #601's harness fix): ScoreManager.ts's ecology decays linearly toward baseline 50 at SCORE_DECAY_RATE=0.05/tick and clamps there exactly (`applyDecay`'s `Math.max(50, value - rate)`) -- it does not stop moving just because `levelEnded` is true, and this file issues no further `tick` of any kind after the block above, so whatever ecology reads at that instant is whatever it is permanently. Direct trace: command mode's own path happens to already sit at the exact 50 floor by that point (0 remaining decay debt), while interaction mode's path -- diverging from command's from as early as tick 92 by a few hundredths of a wellBeing point (ordinary UI-click-vs-console-command tick-boundary noise, the same class this file already documents for cash), amplified once that tiny float difference crossed an employee fatigue-collapse threshold a couple of ticks apart -- ends up with materially more employees mid-collapse during pattern 2's drilling stretch, more total active-drilling ticks to land the same 25 holes, and therefore a bigger cumulative ecology hit still owed at the moment ticking stops (51.17, not 50 -- a real ~24-tick decay debt at 0.05/tick). This was invisible before #601: the block above used to run a fixed, generous real-time-driven wait that happened to always burn enough extra wall-clock ticks to fully pay off this debt regardless of its size; #601 removed that slack along with the nondeterminism it was hiding. `waitUntil` is the correct tool for the actual asymmetry (an unknown, path-dependent number of ticks still owed) rather than another fixed pad: it costs command mode exactly 1 tick (already at floor, first check matches) and leaves every field this file already treats as `equals` here unaffected -- ecology's own linear, clamped decay guarantees both paths land on the exact same 50.0, not merely close to it, however many ticks each one needed to get there.",
+      "command": "wait_until field:ecology equals:50 max_ticks:800",
+      "timeout": 155,
+      "description": "#601-followup (real CI, this file's own regression from #601's harness fix): ScoreManager.ts's ecology decays linearly toward baseline 50 at SCORE_DECAY_RATE=0.05/tick and clamps there exactly (`applyDecay`'s `Math.max(50, value - rate)`) -- it does not stop moving just because `levelEnded` is true, and this file issues no further `tick` of any kind after the block above, so whatever ecology reads at that instant is whatever it is permanently. Direct trace: command mode's own path happens to already sit at the exact 50 floor by that point (0 remaining decay debt), while interaction mode's path -- diverging from command's from as early as tick 92 by a few hundredths of a wellBeing point (ordinary UI-click-vs-console-command tick-boundary noise, the same class this file already documents for cash), amplified once that tiny float difference crossed an employee fatigue-collapse threshold a couple of ticks apart -- ends up with materially more employees mid-collapse during pattern 2's drilling stretch, more total active-drilling ticks to land the same 25 holes, and therefore a bigger cumulative ecology hit still owed at the moment ticking stops (51.17, not 50 -- a real ~24-tick decay debt at 0.05/tick). This was invisible before #601: the block above used to run a fixed, generous real-time-driven wait that happened to always burn enough extra wall-clock ticks to fully pay off this debt regardless of its size; #601 removed that slack along with the nondeterminism it was hiding. `waitUntil` is the correct tool for the actual asymmetry (an unknown, path-dependent number of ticks still owed) rather than another fixed pad: it costs command mode exactly 1 tick (already at floor, first check matches) and leaves every field this file already treats as `equals` here unaffected -- ecology's own linear, clamped decay guarantees both paths land on the exact same 50.0, not merely close to it, however many ticks each one needed to get there. #555 (this merge)-followup (real CI): `maxTicks` bumped 200 -> 800 and `timeoutMs` 60000 -> 150000 -- level1's own `LevelDef.scoreDecayRate` (0.03) now actually reaches `updateScores` instead of the hardcoded global 0.05 this note's own math assumed, so the same point-debt takes ~1.67x longer to pay off, and real interaction-mode CI read a bigger debt still outstanding (51.59, not 50) after the old 200-tick budget ran out.",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "ecology",
           "equals": 50,
-          "maxTicks": 200,
-          "timeoutMs": 60000
+          "maxTicks": 800,
+          "timeoutMs": 150000
         }
       ],
       "role": "setup",
@@ -2610,7 +2611,7 @@
     },
     {
       "command": "scores",
-      "description": "#554: ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the queued-charge migration's own ~60-tick uniform shift (see the tickCount-551 note on the earlier tick-20/worker_revolt checkpoint) pushes this observation 60 ticks further into ecology's own decay/recovery curve than before, past the point where the #592 living-quarters-overcapacity dip had already recovered back to baseline. `nuisance` reads 49.98000000000037 -- #555 (this merge)'s `LevelDef.scoreDecayRate` wiring fix means level1's own declared 0.03 (not the previously hardcoded global 0.05) now drives nuisance's decay back toward baseline, landing it just short of a full recovery at this checkpoint rather than exactly at 50. tickCount/deathCount/employeeCount stay 551/4/7. wellBeing/safety stay exact -- confirmed unaffected by direct trace.",
+      "description": "#554: ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the queued-charge migration's own ~60-tick uniform shift (see the tickCount-551 note on the earlier tick-20/worker_revolt checkpoint) pushes this observation 60 ticks further into ecology's own decay/recovery curve than before, past the point where the #592 living-quarters-overcapacity dip had already recovered back to baseline. `nuisance` dropped from `equals` (#555, this merge, real CI): level1's own `LevelDef.scoreDecayRate` (0.03, not the previously hardcoded global 0.05) now genuinely drives nuisance's decay, and the ecology `waitUntil` step above -- needed precisely because that same slower rate makes ecology's own debt take longer to pay off -- consumes a real-time-dependent number of extra ticks that also decays nuisance further: command mode's own path needs 0 extra ticks (ecology already at floor) and reads nuisance at 49.98000000000037, while a real interaction-mode run needed enough extra ticks to close a real ecology debt and read nuisance already clamped at its own floor of 50. Not mode-invariant, same class as wellBeing/safety just below. tickCount/deathCount/employeeCount stay 551/4/7. wellBeing/safety stay exact -- confirmed unaffected by direct trace.",
       "interaction": [
         {
           "type": "command",
@@ -2626,8 +2627,7 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 50,
-          "nuisance": 49.98000000000037
+          "ecology": 50
         }
       }
     },
@@ -2649,8 +2649,7 @@
           "surveyCount": 2,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 50,
-          "nuisance": 49.98000000000037
+          "ecology": 50
         }
       }
     },
@@ -2673,7 +2672,6 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 49.98000000000037,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",
