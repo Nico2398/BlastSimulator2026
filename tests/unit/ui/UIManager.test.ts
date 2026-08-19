@@ -565,3 +565,42 @@ describe('UIManager — Fleet panel vehicle-select delegation (#512)', () => {
     expect(cb).toHaveBeenCalledWith(2);
   });
 });
+
+// blastActiveStep (PR #616 review round, item 7): the scenario harness's
+// __uiState() bridge (main.ts) reads this to drive the new ensureStep
+// interaction action, which asserts-or-clicks a Blast Workshop step tab
+// instead of a scenario assuming what a preceding step left active.
+describe('UIManager — blastActiveStep (#616 review round, item 7)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('defaults to the Drill step (1)', () => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+    expect(uiManager.blastActiveStep).toBe(1);
+  });
+
+  it('tracks a real tab click inside the Blast Workshop panel', () => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    uiManager = new UIManager(container);
+    uiManager.showPanel('blast');
+
+    const chargeTab = Array.from(container.querySelectorAll('#bs-blast-panel button'))
+      .find(b => b.textContent?.includes('Charge')) as HTMLButtonElement;
+    expect(chargeTab).not.toBeUndefined();
+    chargeTab.click();
+
+    expect(uiManager.blastActiveStep).toBe(2);
+  });
+});

@@ -817,6 +817,53 @@ export async function executeActionOnPage(
       }
       break;
     }
+    case 'ensurePanel': {
+      // #bs-toolbar's own `data-panel` -> the panel element __uiState()
+      // reports visibility for (main.ts's `panels` map). `settings` opens a
+      // modal, not a toggle panel, and is deliberately absent here.
+      const PANEL_ELEMENT_ID: Record<string, string> = {
+        blast: 'bs-blast-panel',
+        contracts: 'bs-contract-panel',
+        ops: 'bs-operations-panel',
+        build: 'bs-build-panel',
+        vehicles: 'bs-vehicle-panel',
+        employees: 'bs-employee-panel',
+        survey: 'bs-survey-panel',
+      };
+      const panelId = PANEL_ELEMENT_ID[action.panel];
+      if (panelId === undefined) {
+        throw new Error(`ensurePanel: unknown panel "${action.panel}" (not a toggle panel, or misspelled)`);
+      }
+
+      const alreadyOpen = await page.evaluate((id: string) => {
+        const getUiState = (window as unknown as {
+          __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
+        }).__uiState;
+        const st = getUiState === undefined ? null : getUiState();
+        return st?.panels[id]?.visible ?? false;
+      }, panelId);
+
+      onProgress?.(`ensurePanel "${action.panel}" ${alreadyOpen ? 'already open' : 'opening'}`);
+      if (!alreadyOpen) {
+        await waitUsableAndClick(page, `#bs-toolbar [data-panel="${action.panel}"]`, action.timeout ?? 10000);
+      }
+      break;
+    }
+    case 'ensureStep': {
+      const active = await page.evaluate(() => {
+        const getUiState = (window as unknown as {
+          __uiState?: () => { activeBlastStep: number } | null;
+        }).__uiState;
+        const st = getUiState === undefined ? null : getUiState();
+        return st?.activeBlastStep ?? null;
+      });
+
+      onProgress?.(`ensureStep ${action.step} (currently ${active ?? 'unknown'})`);
+      if (active !== action.step) {
+        await waitUsableAndClick(page, `#bs-blast-panel [data-step="${action.step}"]`, action.timeout ?? 10000);
+      }
+      break;
+    }
     default: {
       // Exhaustiveness check
       const _exhaustive: never = action;

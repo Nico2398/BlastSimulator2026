@@ -237,6 +237,73 @@ describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () =>
   });
 });
 
+describe('executeActionOnPage — ensurePanel (PR #616 review round, item 7)', () => {
+  it('does not click when __uiState() already reports the panel visible', async () => {
+    // The mocked evaluate stands in for the whole page.evaluate(callback)
+    // round trip — it returns what the real browser-side callback would
+    // have computed (here, the extracted `visible` boolean), not the raw
+    // __uiState() object the callback reads from inside the page.
+    const evaluate = vi.fn().mockResolvedValueOnce(true);
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'employee hire role:driller', role: 'setup' };
+    const action = { type: 'ensurePanel' as const, panel: 'employees' };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(page.click).not.toHaveBeenCalled();
+  });
+
+  it('clicks the toolbar tab when __uiState() reports the panel not visible', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(null); // waitUsableAndClick's own probe: usable now
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'employee hire role:driller', role: 'setup' };
+    const action = { type: 'ensurePanel' as const, panel: 'employees' };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(page.click).toHaveBeenCalledWith('#bs-toolbar [data-panel="employees"]');
+  });
+
+  it('rejects an unknown/non-toggle panel name without touching the page', async () => {
+    const page = fakePage();
+    const step: ScenarioStepDef = { command: 'noop', role: 'setup' };
+    const action = { type: 'ensurePanel' as const, panel: 'settings' };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(/unknown panel "settings"/);
+    expect(page.evaluate).not.toHaveBeenCalled();
+  });
+});
+
+describe('executeActionOnPage — ensureStep (PR #616 review round, item 7)', () => {
+  it('does not click when __uiState().activeBlastStep already matches', async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce(2);
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'charge hole:H1 explosive:boomite amount:5kg stemming:2m', role: 'setup' };
+    const action = { type: 'ensureStep' as const, step: 2 as const };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(page.click).not.toHaveBeenCalled();
+  });
+
+  it('clicks the step tab when __uiState().activeBlastStep does not match', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(null); // waitUsableAndClick's own probe: usable now
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'charge hole:H1 explosive:boomite amount:5kg stemming:2m', role: 'setup' };
+    const action = { type: 'ensureStep' as const, step: 2 as const };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(page.click).toHaveBeenCalledWith('#bs-blast-panel [data-step="2"]');
+  });
+});
+
 describe('describeStepFailure', () => {
   it('prefixes a player step\'s error with its label', () => {
     const step: ScenarioStepDef = { command: 'blast', description: 'fire the blast', role: 'player' };

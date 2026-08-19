@@ -33,6 +33,10 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   // bounded by maxTicks/timeoutMs so a stall fails loudly (issue #590). See
   // InteractionStepAction.
   'waitUntil',
+  // Idempotent panel/step-tab selection: click only if not already open/
+  // active, instead of a step assuming what a preceding one left in place
+  // (PR #616 review round, item 7). See InteractionStepAction.
+  'ensurePanel', 'ensureStep',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [

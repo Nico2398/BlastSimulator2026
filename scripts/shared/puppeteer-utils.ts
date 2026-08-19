@@ -29,6 +29,10 @@ export const SCREENSHOT_DIR = resolve(import.meta.dirname ?? process.cwd(), '..'
  */
 const SETTLE_AFTER = new Set([
   'click', 'clickSelector', 'pickTile', 'dragTiles', 'mousedown', 'mouseup', 'type',
+  // Both may perform a real click (only when not already open/active) that
+  // opens a panel or switches a step tab — a following action in the same
+  // step reading or clicking inside it needs that frame settled first.
+  'ensurePanel', 'ensureStep',
 ]);
 
 /**

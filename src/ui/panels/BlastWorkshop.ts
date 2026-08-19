@@ -25,7 +25,7 @@ import { FireStep } from './blastSteps/Fire.js';
 
 export type GameConsoleFn = (cmd: string) => CommandResult;
 
-type StepId = 1 | 2 | 3 | 4 | 5;
+export type StepId = 1 | 2 | 3 | 4 | 5;
 const STEP_KEYS: Record<StepId, string> = {
   1: 'ui.blast_workshop.step.drill',
   2: 'ui.blast_workshop.step.charge',
@@ -156,6 +156,17 @@ export class BlastWorkshop {
   hide(): void { this.el.style.display = 'none'; }
 
   get visible(): boolean { return this.el.style.display !== 'none'; }
+
+  /**
+   * Which step tab is currently showing — exposed for the scenario harness's
+   * `ensureStep` interaction action (`interaction-executor.ts`), so a step
+   * can assert-or-click a tab instead of assuming it, the same "ask the
+   * game, not the DOM" reasoning already applied to `pendingEvent`. This
+   * panel's own `autoAdvance` (`suggestStep`, above) moves the active tab
+   * out from under a scenario mid-sequence, which is what made a scenario's
+   * own hardcoded `[data-step="N"]` click land on the wrong tab in PR #616.
+   */
+  get currentStep(): StepId { return this.activeStep; }
 
   update(state: GameState, weather?: WeatherState): void {
     if (this.autoAdvance) {
