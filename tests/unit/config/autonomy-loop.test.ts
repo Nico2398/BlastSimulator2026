@@ -655,6 +655,27 @@ describe('the sweep that runs when the checks come in', () => {
   });
 });
 
+// PR #615 merged with its `full-ci` interaction-mode job silently skipped:
+// the label was applied via a separate API call after `pull_request: opened`
+// had already fired, and default `pull_request` types are
+// [opened, synchronize, reopened] -- not `labeled`. Both `shard-config` and
+// `scenario-interaction` evaluated their `if: contains(...'full-ci')` guard
+// against a PR that had no labels yet, reported `skipped` rather than
+// `failure`, and the run still concluded `success`. PR #616 only got its
+// shards from 30 unrelated follow-up pushes after the label landed --
+// `synchronize` was already in the list, `labeled` was not. Mirrors the same
+// fix already proven for `auto-assign-next.yml`'s READY TO MERGE marker
+// above.
+describe('ci.yml re-evaluates full-ci/build-check when the label lands', () => {
+  it('includes labeled and ready_for_review alongside the defaults', () => {
+    const ci = workflow('ci.yml');
+    const types = /pull_request:[\s\S]*?types:\s*\[([^\]]+)\]/.exec(ci)?.[1] ?? '';
+    for (const type of ['opened', 'synchronize', 'reopened', 'labeled', 'ready_for_review']) {
+      expect(types, `ci.yml's pull_request trigger is missing \`${type}\``).toContain(type);
+    }
+  });
+});
+
 // The third ending nothing owned: the PR opened, marked, and its CI came back
 // red. `agentic-auto-merge.yml` declines a failed CI run, no merge fires so
 // `auto-assign-next.yml` never chains, the watchdog skips any issue with a
