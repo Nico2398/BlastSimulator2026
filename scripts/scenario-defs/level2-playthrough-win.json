@@ -2408,7 +2408,7 @@
           "tickCount": 0
         }
       },
-      "description": "#554: switched from a numeric id to a type: selector (ContractSelector, Contract.ts), same reasoning as pattern 1's own accept step above -- the queued-charging/queued-drilling delays this file now waits through rotate the offer pool (REFRESH_INTERVAL=20 ticks) far past any id this file could hardcode. `type:ore_sale` resolves to whichever ore-sale offer is first in the live pool at this point (#70, Deliver rustite ore, this run's own seed), deterministically. Same bankruptcy-overlay finding as every step past blast 1 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
+      "description": "#554: switched from a numeric id to a type: selector (ContractSelector, Contract.ts), same reasoning as pattern 1's own accept step above -- the queued-charging/queued-drilling delays this file now waits through rotate the offer pool (REFRESH_INTERVAL=20 ticks) far past any id this file could hardcode. `type:ore_sale` resolves to whichever ore-sale offer is first in the live pool at this point (#71, Deliver absurdium ore, this run's own seed, re-derived after #601's harness fix -- see the deliver guard's own note just below), deterministically. Same bankruptcy-overlay finding as every step past blast 1 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
     },
     {
       "command": "contract deliver type:ore_sale amount:100",
@@ -2418,9 +2418,9 @@
           "command": "contract deliver type:ore_sale amount:100"
         }
       ],
-      "description": "#554: selector-based, same reasoning as the accept step above. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "#554: selector-based, same reasoning as the accept step above. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. #601-followup: id corrected 70 -> 71 -- #601's deterministic `waitUntil` harness fix shifts this file's exact tick counts, and the id this step's own selector needs to match is whatever `type:ore_sale` actually resolved to at the accept step just above at those new tick counts, not the literal id number the original #554 round happened to observe (a live, rotating pool, not a fixed catalog). Re-derived via a direct command-mode probe of this exact step (`contract accept type:ore_sale` -> \"Accepted contract #71: Deliver absurdium ore\"), not guessed.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"70\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"71\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -2982,7 +2982,7 @@
           "tickCount": 0
         }
       },
-      "description": "#554: switched from a numeric id to a type: selector (ContractSelector, Contract.ts), same reasoning as the earlier accept steps -- the queued-charging/queued-drilling delays this file now waits through rotate the offer pool (REFRESH_INTERVAL=20 ticks) far past any id this file could hardcode. `type:ore_sale` resolves to whichever ore-sale offer is first in the live pool at this point (#100, Deliver sparkium ore, this run's own seed), deterministically. Same bankruptcy-overlay finding as every step past blast 1 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
+      "description": "#554: switched from a numeric id to a type: selector (ContractSelector, Contract.ts), same reasoning as the earlier accept steps -- the queued-charging/queued-drilling delays this file now waits through rotate the offer pool (REFRESH_INTERVAL=20 ticks) far past any id this file could hardcode. `type:ore_sale` resolves to whichever ore-sale offer is first in the live pool at this point (#101, Deliver sparkium ore, this run's own seed, re-derived after #601's harness fix -- see the deliver guard's own note just below), deterministically. Same bankruptcy-overlay finding as every step past blast 1 -- accept is covered, `expect.blocked` proves it, and the command runs directly."
     },
     {
       "command": "contract deliver type:ore_sale amount:300",
@@ -2992,9 +2992,9 @@
           "command": "contract deliver type:ore_sale amount:300"
         }
       ],
-      "description": "#554: selector-based, same reasoning as the accept step above. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "#554: selector-based, same reasoning as the accept step above. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. #601-followup: id corrected 100 -> 101, same mechanism and re-derivation method as this file's earlier #71 guard (a direct command-mode probe of this exact step: `contract accept type:ore_sale` -> \"Accepted contract #101: Deliver sparkium ore\").",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"100\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"101\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -3717,7 +3717,7 @@
           "tickCount": 0
         }
       },
-      "description": "#553/#597/#593: contract id #114 is stale again -- by tick 2320 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past it, and #593's own trajectory shift moved the tick this step lands on besides. Switched to the stable `type:ore_sale` selector (#597, `findContract`/`ContractSelector` in Contract.ts) instead of hand-renumbering a third time -- it resolves to whichever ore_sale contract the pool is actually offering (id 115 in this run) without needing to track the exact id. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly. #553-followup (issue #586 CI): same toolbar-button guard target as contract 20's own accept step above -- the row-specific accept selector vanishes once this step's own `command` action accepts it (matching level3-playthrough-win.json's own fix)."
+      "description": "#553/#597/#593: contract id #114 is stale again -- by tick 2320 the pool has refreshed (REFRESH_INTERVAL=20 ticks, Contract.ts) far past it, and #593's own trajectory shift moved the tick this step lands on besides. Switched to the stable `type:ore_sale` selector (#597, `findContract`/`ContractSelector` in Contract.ts) instead of hand-renumbering a third time -- it resolves to whichever ore_sale contract the pool is actually offering (id 139 in this run, re-derived after #601's harness fix -- see the deliver guard's own note just below) without needing to track the exact id. Interaction-mode finding: same bankruptcy full-screen overlay as every step past tick 132 -- accept is covered, `expect.blocked` proves it, and the command runs directly. #553-followup (issue #586 CI): same toolbar-button guard target as contract 20's own accept step above -- the row-specific accept selector vanishes once this step's own `command` action accepts it (matching level3-playthrough-win.json's own fix)."
     },
     {
       "command": "contract deliver type:ore_sale amount:350",
@@ -3727,9 +3727,9 @@
           "command": "contract deliver type:ore_sale amount:350"
         }
       ],
-      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else.",
+      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else. #601-followup: id corrected 115 -> 139, same mechanism and re-derivation method as this file's earlier #71/#101 guards (a direct command-mode probe of this exact step: `contract accept type:ore_sale` -> \"Accepted contract #139: Deliver blingite ore\").",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"115\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-id=\"139\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
