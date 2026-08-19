@@ -105,15 +105,19 @@ export class BlastReportModal {
 
   /**
    * Discard any in-flight deferred report and close the modal (#545).
-   * `currentReport` is accepted so a caller replacing ctx.state (#571) can
-   * pass the new state's lastBlastReport — TODO: implement wiring it into
-   * lastShownReport so re-arming after a state swap is suppressed.
+   * `currentReport` is the replacing state's lastBlastReport, e.g. from a
+   * caller swapping ctx.state wholesale (#571, `load`): stamping it into
+   * lastShownReport means a later update() tick that sees that same-identity
+   * report treats it as already-shown and does not re-arm the delay timer,
+   * even though the new state object's reference differs from whatever was
+   * shown before the swap. Defaults to null, matching a fresh level's
+   * lastBlastReport (new_game, campaign transition).
    */
   reset(currentReport: BlastReport | null = null): void {
-    void currentReport;
     this.pendingReport = null;
     this.pendingDeadlineMs = null;
     this.hide();
+    this.lastShownReport = currentReport;
   }
 
   update(state: GameState): void {
