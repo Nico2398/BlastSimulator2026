@@ -337,6 +337,16 @@
       }
     },
     {
+      "command": "event choose 0",
+      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks the next click -- real CI reported exactly that (the following `employee fire 1` step's own toolbar-open click never landed, leaving employeeCount at 2 instead of 1 by the checkpoint several steps later).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
@@ -717,6 +727,16 @@
       }
     },
     {
+      "command": "event choose 0",
+      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks the next click -- real CI reported exactly that (the following `employee fire 1` step's own toolbar-open click never landed, leaving employeeCount at 2 instead of 1 by the checkpoint several steps later).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
@@ -1069,6 +1089,16 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks the next click -- real CI reported exactly that (the following `employee fire 1` step's own toolbar-open click never landed, leaving employeeCount at 2 instead of 1 by the checkpoint several steps later).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",

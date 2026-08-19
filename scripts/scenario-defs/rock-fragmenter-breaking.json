@@ -205,6 +205,16 @@
       }
     },
     {
+      "command": "event choose 0",
+      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks every later click -- this file's 'Employee #3... crewed onto the rock_fragmenter' hire step reported exactly that (`#bs-toolbar [data-panel=\"employees\"] failed: element is covered by div.bs-confirm-overlay`) in real CI, matching this same idempotent-resolve pattern already used elsewhere in this file (see the tick-30-padding step's own note below).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
