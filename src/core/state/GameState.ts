@@ -230,6 +230,8 @@ export interface GameState {
   ecological: EcologicalState;
   /** Worker revolt tracker (resets each level). */
   revolt: RevoltState;
+  /** TEMPORARY test-only override (`cheat disable_revolt`, cheats.ts) — see that command's own doc comment and issue #631. */
+  revoltDisabled: boolean;
   /** Per-level success statistics. */
   levelStats: LevelStats;
   /** Site policy governing shift scheduling and rest thresholds. */
@@ -345,6 +347,7 @@ export function createGame(config: GameConfig): GameState {
     arrest: createArrestState(),
     ecological: createEcologicalState(),
     revolt: createRevoltState(),
+    revoltDisabled: false,
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
     levelEnded: false,

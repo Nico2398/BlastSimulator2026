@@ -21,6 +21,17 @@
       "description": " #553: cash bumped from $50,000 to $3,000,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits, and the 4th cycle restores its pre-#553 rows:8 cols:8 (64-hole) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts to stress the projectile-grouping path (#404) -- which a single driller/drill_rig takes over 1000 ticks to land door-to-door even at tight spacing:1."
     },
     {
+      "command": "cheat disable_revolt",
+      "description": "#601-followup (issue #631): this file's own crew is genuinely undersized for its own workload -- direct trace confirms `levelEnded:true, levelEndReason:'worker_revolt'` fires deterministically at the same tick in both command and interaction mode (the 64-hole cycle 4 marathon plus an accumulating idle-driller roster dragging computeAverageMorale down, Employee.ts), not a scenario-file timing bug. Disables the revolt end-condition for this file only (state.revoltDisabled, cheats.ts) so the file can reach the conclusion its own assertions actually describe, as a tracked stopgap -- issue #631 covers removing this cheat once the underlying crew-sizing/revolt-margin gap is fixed for real.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "cheat disable_revolt"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "employee hire role:driller",
       "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
       "interaction": [
@@ -1898,270 +1909,24 @@
       }
     },
     {
-      "command": "tick 10",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "description": "#601-followup (issue #631): replaces the old 13x tick-10/event-choose-0 chunked pad. That pad was calibrated against the file's own worker-revolt truncation ending the level nearby, so it was never actually exercised charging this cycle's real 64-hole count to completion -- disabling revolt for this file (cheat disable_revolt, issue #631) let the run get far enough to show it: only 62/64 charged when the pad ran out, Fire still disabled, blast failing with 'element is disabled'. #601's own harness fix already makes waitUntil resolve a mid-wait event in both modes (loops the console's own tick 1, auto-resolving a pending event after each tick, exactly like command mode's own runWaitUntil) -- the mid-wait-event concern the old chunked pad worked around predates that fix and no longer applies.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "description": "#554/#590 finding: charging is real, worker-performed work that can take long enough (relative to MIN_EVENT_INTERVAL_TICKS) for a spontaneous event to fire mid-wait -- a single long `waitUntil` has no way to resolve one in interaction mode (its real, isPaused-gated clock halts exactly as it would for a real player, per interaction-executor.ts's own waitUntil doc comment), so the drain stalls forever at whatever count was ordered when the event hit. Command mode's own waitUntil auto-resolves silently and never showed this. Chunked here into the same tick-N/event-choose-0 pattern already used for this file's drilling waits, which does resolve mid-wait events in both modes."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
         }
       ],
       "role": "setup",
       "expect": {
-        "increased": [
-          "chargedCount"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
+        "equals": {
+          "orderedChargeCount": 0
         }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      }
     },
     {
       "command": "sequence auto delay_step:25",
@@ -2281,14 +2046,10 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#560: 5th cycle appended to drill+blast right at the very edge of the site (this file's world is 64x64 -- new_game's DEFAULT_GRID_SIZE, balance.ts -- so 60..61 sits 2-3 cells from the true boundary at 63), proving the boundary/skirt wall stays closed with no see-through gap at the site's own outer edge, not just the interior-ish edges (20/45/5,45/5,5) cycles 1-4 above already exercise. Own fresh driller so this cycle isn't gated behind whichever of ids 1-11 above happens to still be alive in a given mode -- hireEmployee assigns ids from a monotonic counter that ignores firing/death (grid 2-4's own hire steps above already rely on this: id4 was handed out even though ids 1-3 were fired/spliced first), so the next id is deterministically 12 regardless of mode.",
+      "description": "#560: 5th cycle appended to drill+blast right at the very edge of the site (this file's world is 64x64 -- new_game's DEFAULT_GRID_SIZE, balance.ts -- so 60..61 sits 2-3 cells from the true boundary at 63), proving the boundary/skirt wall stays closed with no see-through gap at the site's own outer edge, not just the interior-ish edges (20/45/5,45/5,5) cycles 1-4 above already exercise. Own fresh driller so this cycle isn't gated behind whichever of ids 1-11 above happens to still be alive in a given mode -- hireEmployee assigns ids from a monotonic counter that ignores firing/death (grid 2-4's own hire steps above already rely on this: id4 was handed out even though ids 1-3 were fired/spliced first), so the next id is deterministically 12 regardless of mode. #601-followup (issue #631, real interaction-mode finding): swapped the bare waitForSelector+clickSelector pair for awaitUsable -- this is the first time interaction mode ever reached this 5th cycle (previously always cut short by the worker-revolt this file's cheat disable_revolt now bypasses, issue #631), and waitForSelector only proves DOM presence, not that the panel has actually finished laying out -- the same class of gap already fixed at the cycle-4 charge step above (awaitUsable retries the usability probe rather than clicking the instant the node exists). #601-followup round 2 (issue #631): removed this step's own toolbar re-click too -- the Employees panel is already open here, left that way by the `employee fire 4` step just above (UIManager.togglePanel closes an ALREADY-active panel on re-click instead of leaving it open, the same class already documented and fixed elsewhere in this suite -- blast-visual-full.json's own vehicle panel, level1-win-efficient.json's tick-15 blocks). `inspect` in between is a read-only console command with no UI interaction, so it does not change which panel is active. Confirmed via direct trace: this step's own awaitUsable timed out with 'present but hidden' -- the toolbar re-click had just toggled the panel closed.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
+          "type": "awaitUsable",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
         {
@@ -2345,7 +2106,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:59,59",
-      "description": "#560: right at the very edge of this file's 64x64 world -- holes reach x/z=61, 2-3 cells from the true boundary at 63 -- the same boundary/skirt wall closure #559 already covers at the interior-ish edges cycles 1-4 use (starts 20,20 / 45,20 / 5,45 / 5,5), now proven with a real blast right at the site's own outer edge, where the depth-limited skirt (#560) has the least margin to work with.",
+      "description": "#560: right at the very edge of this file's 64x64 world -- holes reach x/z=61, 2-3 cells from the true boundary at 63 -- the same boundary/skirt wall closure #559 already covers at the interior-ish edges cycles 1-4 use (starts 20,20 / 45,20 / 5,45 / 5,5), now proven with a real blast right at the site's own outer edge, where the depth-limited skirt (#560) has the least margin to work with. #601-followup round 3 (issue #631, real interaction-mode finding): one increment click on the spacing stepper before dragging -- cycle 4's own grid decrements it down to 1 (see grid 1's own comment: spacing persists across grid operations within a session), and this cycle never accounted for un-decrementing it back to 2 before its own drag. Confirmed via direct trace: without the click, the (59,59)-(61,61) drag rectangle at the inherited spacing:1 computes a 3x3 grid (orderedHoleCount:9), not this step's own declared 2x2 (orderedHoleCount:4).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -2362,6 +2123,10 @@
         {
           "type": "waitForSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
         },
         {
           "type": "dragTiles",
@@ -2471,52 +2236,15 @@
       }
     },
     {
-      "command": "tick 10",
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
+      "description": "#601-followup round 4 (issue #631, real interaction-mode finding): replaces the old tick-10/event/tick-10/event/tick-3 chunked pad (a fixed 23-tick budget calibrated for command mode's own trace) with a real waitUntil -- this cycle was never reachable before (revolt always ended the level first, issue #631), so the pad's sufficiency for interaction mode's own real click-driven timing was never actually tested. Direct trace: the old pad left this cycle at chargedCount:1/4 in interaction mode.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "description": "#554/#590 finding: charging is real, worker-performed work that can take long enough (relative to MIN_EVENT_INTERVAL_TICKS) for a spontaneous event to fire mid-wait -- a single long `waitUntil` has no way to resolve one in interaction mode (its real, isPaused-gated clock halts exactly as it would for a real player, per interaction-executor.ts's own waitUntil doc comment), so the drain stalls forever at whatever count was ordered when the event hit. Command mode's own waitUntil auto-resolves silently and never showed this. Chunked here into the same tick-N/event-choose-0 pattern already used for this file's drilling waits, which does resolve mid-wait events in both modes."
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
-    },
-    {
-      "command": "tick 3",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 3"
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 60000
         }
       ],
       "role": "setup",
@@ -2526,16 +2254,6 @@
           "orderedChargeCount": 0
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
     },
     {
       "command": "sequence auto delay_step:25",

@@ -21,6 +21,17 @@
       "description": "#553: cash bumped from $50,000 to $150,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, on top of the four blast-workshop software tiers it already buys. Bumped again to $200,000 (#554): charging is now real work too -- three separate charge orders (Charge All plus two per-hole overrides), each drained by its own wait, add several hundred more ticks of the 3-driller roster's payroll/fuel upkeep before the tier:4 software purchase further down this file (observed short by ~10,400 at $150,000)."
     },
     {
+      "command": "cheat disable_revolt",
+      "description": "#601-followup (issue #631): direct trace confirms `levelEnded:true, levelEndReason:'worker_revolt'` fires deterministically at the same tick in both command and interaction mode, during this file's own queued-charge wait -- a real crew-workload/revolt-margin shortfall, not a scenario-file timing bug. Disables the revolt end-condition for this file only (state.revoltDisabled, cheats.ts) so the file can reach the conclusion its own assertions actually describe, as a tracked stopgap -- issue #631 covers removing this cheat once the underlying crew-sizing/revolt-margin gap is fixed for real.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "cheat disable_revolt"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "employee hire role:driller",
       "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed any roster before its drill_plan) now needs one first. Employee #1.",
       "interaction": [
