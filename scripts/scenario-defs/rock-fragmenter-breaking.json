@@ -176,24 +176,43 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 21",
+      "description": "#554-followup round 3 (issue #586 CI): switched from the real-time waitUntil (8x speed, up to 120 real seconds) to a synchronous tick command -- command mode's own deterministic trace shows charging 4 holes takes exactly 21 ticks (tickCount 80 -> 101). The real-time version let the game's own rAF-driven clock run for up to 2 real minutes, long enough for wellBeing to crash well below command mode's own trace and unlock a whole class of low-wellbeing-gated union events (union_strike_threat: `canFire: wellBeing < 35`, plus its own scripted follow-up) that kept firing faster than a fixed number of resolveEventIfPending calls could drain (round 2's attempt, chaining 4 resolves after the fact, was still not enough -- confirmed live). Round 3's own first attempt (a bare synchronous tick 21, hard-checked right here) still came up short live (chargedCount 2/4) -- a pending event mid-block halts events.ts's own tickCommand loop early (checks isPaused at the end of each iteration), the exact same interruption class level1-win-efficient.json hit and fixed the same way: the hard check moved off this step entirely (see the resolve/resume step below), command mode's own top-level `command` staying exactly `tick 21` so its already-correct deterministic trace is untouched.",
       "interaction": [
         {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 21"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554-followup round 3: resolve whatever event interrupted the tick above, resume with a small tick to finish draining, then resolve again, repeated -- mirrors level1-win-efficient.json's own final fix for the identical interruption class, chained multiple times since a live run at 1 round still came up short (3/4, having improved from 2/4 with none). The hard chargedCount/orderedChargeCount check lives here now, after every resolve point, not on the tick step above. role:setup (not player) since this step's own interaction bundles command actions (the resume ticks) alongside the resolves -- checkStepActionAllowed rejects any command action on a player-marked step.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
         },
         {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+          "type": "command",
+          "command": "tick 15"
         },
         {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "command",
+          "command": "tick 15"
+        },
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "command",
+          "command": "tick 15"
+        },
+        {
+          "type": "resolveEventIfPending"
         }
       ],
       "role": "setup",
@@ -203,16 +222,6 @@
           "orderedChargeCount": 0
         }
       }
-    },
-    {
-      "command": "event choose 0",
-      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending, resolves one when a timer fired during the charge-drain wait above (up to 3000 ticks at 8x speed is real time long enough for a random event to land). Without this, a fired-and-unresolved event's own .bs-confirm-overlay backdrop blocks every later click -- this file's 'Employee #3... crewed onto the rock_fragmenter' hire step reported exactly that (`#bs-toolbar [data-panel=\"employees\"] failed: element is covered by div.bs-confirm-overlay`) in real CI, matching this same idempotent-resolve pattern already used elsewhere in this file (see the tick-30-padding step's own note below).",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -417,6 +426,16 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554-followup round 4 (issue #586 CI): idempotent -- a no-op when nothing is pending. This file's wellBeing crashes low enough (real CI: WELL 2) to keep unlocking low-wellbeing-gated union events well past the charging block fixed above -- a live run reported this exact hire step's own toolbar click covered by a leftover event's `.bs-confirm-overlay` backdrop. Defensive resolve immediately before the click, matching the same idempotent pattern already used elsewhere in this file.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "employee hire role:driver",
