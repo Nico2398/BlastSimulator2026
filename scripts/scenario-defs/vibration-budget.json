@@ -348,7 +348,11 @@
     },
     {
       "command": "sequence auto delay_step:25",
+      "description": "#601-followup: leading `resolveEventIfPending` added -- the preceding `event choose 0` step's own resolve and this step's first click are two separate real-time steps with a gap between them (each interaction-mode step incurs its own CDP round-trips); a timer event landing in that gap leaves its `.bs-confirm-overlay` backdrop covering the blast panel, failing this step's own `[data-step=\"3\"]` click with \"element is covered by div\" -- confirmed via direct CI-reproducing run. Re-checking for a pending event as this step's own first action, immediately before the click that needs the panel clear, closes that race instead of relying on the earlier step's now-stale resolve.",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
@@ -368,6 +372,9 @@
     {
       "command": "blast",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"5\"]"
@@ -408,44 +415,19 @@
       }
     },
     {
-      "command": "event choose 0",
-      "description": "#554-followup (issue #586 CI): idempotent -- a no-op when nothing is pending. Root cause of this file's real CI failure (employeeCount 2 instead of 1, several steps below): the next step's own click chain uses clickIfPresent throughout (deliberately, for the genuinely-nondeterministic 'driller may already be dead' case) -- but clickIfPresent silently no-ops rather than erroring if the target is blocked for ANY reason, including a pending event's own overlay covering the panel at that exact moment. A blocked fire sequence produces no visible failure at all; the fired employee simply stays alive, and the mismatch only surfaces much later when employeeCount is finally checked. Resolving any pending event here, before that click chain runs, removes the silent-skip risk.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "employee fire 1",
-      "description": "#553: a surviving driller left idle after their blast (rumblox at this overcharge routinely kills them anyway, but not always) drags the roster's average wellbeing down for the rest of the file with no job left to do — fired so cycle 2's fresh driller starts from a clean roster, not because this file is about employee management. #599-followup: the toggle/dismiss/confirm chain was `clickSelector` (hard-fail if absent), which read as a DOM re-render race (\"element vanished from the DOM between the wait and the click\") on a genuine interaction-mode CI failure -- real investigation (live DOM instrumentation, a MutationObserver on #bs-employee-panel across the whole click sequence) found no re-render race at all: the file's own \"not always\" is not a caveat, it is what actually happened in that run -- rumblox killed the driller in the blast this file's own charge/amount is deliberately tuned to routinely trigger, `employee list` confirmed the roster empty, and `.bs-detail-toggle` was never going to exist for a dead crew. `clickSelector` cannot express \"maybe nothing to click\" and fails loudly exactly as designed when the control never appears; `clickIfPresent` is the primitive built for precisely this genuinely-nondeterministic beat (scenario-defs.md's own doc comment) -- polls the same usability gate and no-ops if the driller never shows up alive, still hard-fails through the toolbar click below if the panel itself is unreachable.",
+      "command": "time resume",
+      "description": "#601-followup: was `event choose 0` (resolveEventIfPending) then `employee fire 1`. Direct probe (deathCount right after the blast step above, both modes, run 3x each) shows grid 1's driller now dies deterministically in BOTH modes -- the file's old \"not always\" is stale, same staleness #601 already found and fixed for grid 2's own analogous transition (see that step's own note, several hundred lines below). A dead employee has no row in #bs-employee-panel (`CrewPanel.render` filters to `e.alive`) -- `.bs-detail-toggle` was never going to exist, so the old toggle/dismiss/confirm `clickIfPresent` chain always no-op'd in interaction mode. But `fireEmployee` (Employee.ts) splices by id with no `alive` check, so the OLD command-mode script (a bare `employee fire 1`) still spliced the corpse for real -- a real player has no click for that, since the row doesn't exist to click. That command-vs-interaction action-count asymmetry is what #601 traced for grid 2 (`runCommand`'s action-count gate charges `employee fire` whether it fires a live employee or a corpse, but interaction mode's genuine no-op charges nothing), and it applies here identically. Fixed the same way #601 fixed grid 2: `time resume` is idempotent this deep into an already-resumed run and, as a META_COMMAND, exempt from the action-count gate in both modes, so neither mode's replay of this step nudges the cooldown gate. The one remaining click -- opening the employees panel, so the hire step below still finds it open -- stays, modeling a player checking on their dead crew and finding nobody left to dismiss.",
       "interaction": [
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-employee-panel .bs-detail-toggle",
-          "timeoutMs": 5000
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-employee-panel .bs-crew-dismiss button",
-          "timeoutMs": 5000
-        },
-        {
-          "type": "clickIfPresent",
-          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
-          "timeoutMs": 5000
         }
       ],
       "role": "player"
     },
     {
       "command": "finances",
-      "description": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. #596: cash dropped from this checkpoint's own equals (was a hand-derived 207286) — the same incidental-running-total class this file's own cycle-2/cycle-3 finances checkpoints already treat this way (see their own notes): a read-only `finances` query doesn't move cash itself (before==after for the step), so neither an exact changedBy nor a directional decreased/increased belongs here — the spend already happened in the hire/purchase/tick steps above, which is where a cash assertion belongs.",
+      "description": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. #596: cash dropped from this checkpoint's own equals (was a hand-derived 207286) — the same incidental-running-total class this file's own cycle-2/cycle-3 finances checkpoints already treat this way (see their own notes): a read-only `finances` query doesn't move cash itself (before==after for the step), so neither an exact changedBy nor a directional decreased/increased belongs here — the spend already happened in the hire/purchase/tick steps above, which is where a cash assertion belongs. #601-followup: the preceding step is now `time resume`, not `employee fire 1` (see its own note) — it still opens the employees panel for real in interaction mode, so the panel is still open here too.",
       "interaction": [
         {
           "type": "command",
@@ -456,7 +438,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 2/3 — see grid 1's own hire step for why (a new one each cycle, fired after each blast). #553-followup: no toolbar click here -- the preceding `employee fire 1` step already opened the employees panel (it clicks `#bs-toolbar [data-panel=\"employees\"]` itself to reach the dismiss button) and the `finances` step between it and this one is a command-only observe step that never touches panel state, so the panel is still open. ToolRail's click handler is a togglePanel toggle (UIManager.ts:450) -- re-clicking here closed the panel outright, leaving the driller row zero-size for the click that followed.",
+      "description": "#553: a fresh driller for grid 2/3 — see grid 1's own hire step for why (a new one each cycle, fired after each blast). #553-followup: no toolbar click here -- the preceding `time resume` step already opened the employees panel (it clicks `#bs-toolbar [data-panel=\"employees\"]` itself, see its own #601-followup note) and the `finances` step between it and this one is a command-only observe step that never touches panel state, so the panel is still open. ToolRail's click handler is a togglePanel toggle (UIManager.ts:450) -- re-clicking here closed the panel outright, leaving the driller row zero-size for the click that followed. #601-followup: `employeeCount` switched from `equals: 1` to `changedBy: 1`, matching this project's own preferred convention for a running total (scenario-defs.md) and grid 3's own hire step (see its note) -- grid 1's driller now dies deterministically in both modes (see the preceding step's own note) and is never spliced in either one any more, so the baseline this hire step starts from is 1 (the corpse, never fired), not 0. `changedBy` proves what this step's own action did without pinning a baseline a future edit upstream would have to keep in sync by hand.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -472,7 +454,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
+        "changedBy": {
           "employeeCount": 1
         }
       }
@@ -748,7 +730,11 @@
     },
     {
       "command": "sequence auto delay_step:25",
+      "description": "#601-followup: leading `resolveEventIfPending` added -- same race grid 1's own sequence step found and fixed (see its own note): the preceding `event choose 0` step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\".",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
@@ -769,6 +755,9 @@
       "command": "blast",
       "description": "Blast 2/3.",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"5\"]"
@@ -832,9 +821,9 @@
       "expect": {
         "equals": {
           "vehicleCount": 0,
-          "employeeCount": 1
+          "employeeCount": 2
         },
-        "note": "#601: `employeeCount: 1` restored to this equals block. The prior note here (dropping it, #599-followup) was chasing a real but stale mode split from an earlier build (\"command mode fires the survivor down to 0, interaction mode's corpse stays at 1\") -- the step it blamed (`employee fire 2`) no longer runs a fire at all (see that step's own #601 note: it replays `time resume` in command mode and only opens the employees panel for real in interaction mode), so grid 2's driller -- dead in both modes, deterministically, confirmed by direct probe -- is never fired in either one. `employeeCount` reads 1 (the one corpse, never spliced) in both modes now, genuinely, not incidentally. `vehicleCount` stays 0 regardless (the drill_rig is destroyed in the blast either way, driver dead or fired)."
+        "note": "#601: `employeeCount: 1` restored to this equals block. The prior note here (dropping it, #599-followup) was chasing a real but stale mode split from an earlier build (\"command mode fires the survivor down to 0, interaction mode's corpse stays at 1\") -- the step it blamed (`employee fire 2`) no longer runs a fire at all (see that step's own #601 note: it replays `time resume` in command mode and only opens the employees panel for real in interaction mode), so grid 2's driller -- dead in both modes, deterministically, confirmed by direct probe -- is never fired in either one. `employeeCount` reads 1 (the one corpse, never spliced) in both modes now, genuinely, not incidentally. #601-followup: corrected again, 1 -> 2 -- grid 1's own driller transition (see that step's own #601-followup note) is now fixed the identical way, so grid 1's corpse is never spliced either any more; this checkpoint sees both grid 1's and grid 2's corpses, never grid 1's alone. `vehicleCount` stays 0 regardless (the drill_rig is destroyed in the blast either way, driver dead or fired)."
       }
     },
     {
@@ -1112,7 +1101,11 @@
     },
     {
       "command": "sequence auto delay_step:25",
+      "description": "#601-followup: leading `resolveEventIfPending` added -- same race grid 1's own sequence step found and fixed (see its own note): the preceding step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\".",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
@@ -1133,6 +1126,9 @@
       "command": "blast",
       "description": "Blast 3/3 — the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"5\"]"
@@ -1183,13 +1179,13 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "employeeCount": 2,
+          "employeeCount": 3,
           "vehicleCount": 0,
           "buildingCount": 0,
           "holeCount": 0,
           "tickCount": 595
         },
-        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #601: employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
+        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #601: employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. #601-followup: employeeCount corrected again, 2 -> 3 -- grid 1's own driller transition is now fixed the identical way (see that step's own #601-followup note), so grid 1's corpse is never spliced either any more; this checkpoint sees grid 1's corpse, grid 2's corpse, and grid 3's own live driller. tickCount is unaffected -- the action-count-gate asymmetry #601 traced was specific to the real command `employee fire N` executing in command mode with no interaction-mode equivalent, and grid 1's transition never spent that action in interaction mode either way (its old click chain no-op'd against a dead crew), so removing the command-mode-only splice does not change either mode's action count or tick trace. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
       }
     },
     {
