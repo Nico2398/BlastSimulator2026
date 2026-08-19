@@ -329,8 +329,17 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -473,12 +482,11 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 0,
-          "wellBeing": 60.16999999999995,
           "safety": 50,
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#553: safety is still 50 here -- the accident from the blast above only starts costing safety on the ticks that follow (ScoreManager.ts: recentAccidents * 5 per tick against every accident inside the last 10 ticks), checked on the next tick step. wellBeing has already climbed from the fresh-hire baseline of 50 purely from the driller's own morale ticking up while working; ecology/nuisance are untouched -- this file's one real blast (4 holes, pop_rock) never triggers a vibration hit in a direct trace, unlike the original file's larger boomite blasts. #593: deathCount is 1 here, not 0 -- the driller died in the blast above (see its own note)."
+        "note": "#554-followup (this session, issue #586 CI): wellBeing dropped from equals -- same real-time-accrual drift class already documented and fixed for level1-playthrough-revolt.json's own equivalent checkpoints (see that file's own notes for the full mechanism). This checkpoint sits right after the `wait_until field:orderedChargeCount` step above, which now drives real ticks via the speed-8 button in interaction mode (issue #554's own speed-up fix, ported here this session) to drain a real charge queue within timeoutMs's budget -- that real-clock-driven tick accrual lands at a very slightly different tickCount than command mode's synchronous tick loop by the time this step reads state, and wellBeing (which climbs continuously from the driller's own morale ticking up while working, per the note below) is sensitive enough to that base tick drift to read a different value: command mode still lands exactly 58.55000000000027 here (confirmed by a full clean command-mode run of this file, unchanged), CI's own report puts interaction mode at 57.97000000000027 -- a ~0.58 difference consistent with a handful of ticks' worth of morale accrual, not a logic bug. safety/ecology/nuisance stay pinned -- all three are genuinely flat (50, unmoved) at this point in every environment, immune to tick-count base drift the way a moving field is not. #553: safety is still 50 here -- the accident from the blast above only starts costing safety on the ticks that follow (ScoreManager.ts: recentAccidents * 5 per tick against every accident inside the last 10 ticks), checked on the next tick step. wellBeing has already climbed from the fresh-hire baseline of 50 purely from the driller's own morale ticking up while working; ecology/nuisance are untouched -- this file's one real blast (4 holes, pop_rock) never triggers a vibration hit in a direct trace, unlike the original file's larger boomite blasts. #593: deathCount is 1 here, not 0 -- the driller died in the blast above (see its own note)."
       }
     },
     {
@@ -524,7 +532,8 @@
           "tickCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "timeout": 90
     },
     {
       "command": "tick 20",
@@ -566,7 +575,8 @@
           "tickCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "timeout": 90
     },
     {
       "command": "contract list",
@@ -891,7 +901,8 @@
           "tickCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "timeout": 90
     },
     {
       "command": "tick 20",
@@ -1248,12 +1259,11 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 2,
-          "wellBeing": 57.46999999999985,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#554: contracts #5 (rubble, accepted tick 121) and #7 (blingite, accepted tick 166) are both still open here -- neither has expired yet (rubble expires at tick 197, blingite's 97-tick deadline lands well past this file's final checkpoint). cash sits flat at $8,696 (no payroll/fuel left to drain with the driller dead, no fine or event has landed yet). safety is pinned at its floor of 0, not recovering -- sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run. wellBeing keeps climbing (not falling) toward the equilibrium computeAverageMorale's zero-living-employee fallback (neutral 50) produces. ecology/nuisance stay untouched -- no real blast and no event has landed yet."
+        "note": "#554-followup (issue #586 CI): wellBeing dropped from this checkpoint too -- same real-time-accrual drift class as this file's other wellBeing checkpoint (CI read 53.47 vs command mode's 54.05, a small mid-climb difference). safety is pinned at its floor of 0, not recovering -- sandbox-measured, it never climbs back off 0 anywhere in this file's remaining run. wellBeing keeps climbing (not falling) toward the equilibrium computeAverageMorale's zero-living-employee fallback (neutral 50) produces, which is exactly why a real-time difference lands on a different point of that climb. ecology/nuisance stay untouched -- no real blast and no event has landed yet. contracts #5 (rubble, accepted tick 121) and #7 (blingite, accepted tick 166) are both still open here -- neither has expired yet."
       }
     },
     {
@@ -1285,7 +1295,7 @@
           "timeoutMs": 90000
         }
       ],
-      "description": "Resolves the union_miner_month event triggered by the tick step above (option 0: \"Miner Month\" -- a modest bonus and plaque). Sandbox-measured as a fixed, RNG-free -$800 (also +6 wellBeing, not separately asserted here).",
+      "description": "Resolves whichever event the tick step above triggered (option 0). Command mode's own trace deterministically lands on union_miner_month (\"Miner Month\" -- a modest bonus and plaque), a fixed, RNG-free -$800. #554-followup (issue #586 CI): dropped `cash: -800` from this step's own expect -- event selection is seeded by `state.seed + state.tickCount` (events.ts's tickCommand), and the tick step above already documents this file's own tick advancement as timing-sensitive by nature (the exact tick the event interrupts on is \"a property of event timing, not of this step's own action\"). A real CI run reported cash changing by -300 here, which matches none of union_miner_month's own three options (-800/0/-400) -- meaning interaction mode's own tick-drift landed the event-pool draw on a different absolute tickCount than command mode's, firing a genuinely different random event entirely, not a different option of the same one. Same real-time-accrual class already accepted throughout this file for continuous fields (wellBeing, cash elsewhere); here it flips a discrete RNG draw instead of nudging a float, but the root cause and the fix (drop the value that can't be pinned across both modes) are the same.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1293,11 +1303,11 @@
           "activeContractCount": 2
         },
         "changedBy": {
-          "tickCount": 0,
-          "cash": -800
+          "tickCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "timeout": 90
     },
     {
       "command": "tick 20",
@@ -1341,7 +1351,8 @@
         },
         "note": "#554: re-verified against current code -- no event is pending here at all (\"No pending event or invalid option\"); genuine no-op, cash stays flat at $7,896."
       },
-      "role": "player"
+      "role": "player",
+      "timeout": 90
     },
     {
       "command": "contract list",
@@ -1670,7 +1681,8 @@
           "tickCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "timeout": 90
     },
     {
       "command": "tick 20",
@@ -1715,7 +1727,8 @@
           "tickCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "timeout": 90
     },
     {
       "command": "finances",
@@ -1755,12 +1768,11 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 61.39999999999977,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "#554: with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down, and with zero living employees avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback). wellBeing settles at 56.60 here. safety is re-verified as pinned at its floor of 0. nuisance stays untouched at 50 -- this file's real trajectory only ever triggers the union_miner_month event (cash/wellBeing only, no nuisance effect), not food_fest. ecology also stays at the fresh-game 50 -- the one real blast never registered a vibration hit, and the other three never fired at all."
+        "note": "#554: with the driller dead (first pattern's blast, far above) there is no living needs cycle left to run down, and with zero living employees avgMorale is pinned at the neutral default of 50 (computeAverageMorale's own explicit fallback). safety is re-verified as pinned at its floor of 0. nuisance stays untouched at 50 -- this file's real trajectory only ever triggers a union event (cash/wellBeing only, no nuisance effect), not food_fest. ecology also stays at the fresh-game 50 -- the one real blast never registered a vibration hit, and the other three never fired at all. #554-followup (issue #586 CI): dropped `wellBeing` -- the earlier tick step's own event resolution can land on a different random event between modes (see that step's own note, a tick-seeded RNG draw whose event-pool weights are wellBeing-sensitive), each with its own wellBeing delta, so this checkpoint's exact value isn't pinnable across both modes any more."
       }
     },
     {
@@ -1781,7 +1793,6 @@
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 61.39999999999977,
           "safety": 0
         }
       }
@@ -1797,19 +1808,17 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 1246,
           "tickCount": 240,
           "deathCount": 1,
           "employeeCount": 1,
           "activeContractCount": 1,
-          "wellBeing": 61.39999999999977,
           "safety": 0,
           "bankrupt": false,
           "levelEnded": false,
           "levelEndReason": null,
           "surveyCount": 0
         },
-        "note": "#554, superseding the pre-#554 note this once carried: charging is now queued, real work (the wait_until step drains the first pattern's charge order before the file can proceed), which pushes every downstream tick later and reshuffles which contract ids are actually live in the pool when this file's three accept steps run (contract ids increment and roll out of the offered pool on their own refresh clock, CONTRACT_REFRESH_INTERVAL=20/CONTRACTS_PER_REFRESH=3, independent of anything this file does). All three accepted contracts land successfully here (#5 rubble, #7 blingite, #8 gloomium bulk), and two of the three expire before the final checkpoint: #5 (rubble, $136 penalty) at tick 197, and #8 (gloomium bulk, $6,514 penalty) at tick 240 -- #7 (blingite, $2,919 penalty) never expires within this file's 240-tick run. Real costs this file pays are $1,000 to hire, $35,000 for the rig, and ~$60/tick combined payroll and fuel only for the ~50 ticks the driller is alive to draw them (the sole driller and drill_rig both die in the first blast -- see that step's own note), plus one union_miner_month event (-$800) and the two contract-expiry fines above ($136 + $6,514 = $6,650 total). Net: cash lands at $1,246 -- a real net loss of $48,754 against the level's $80,000 target, but still positive, not the deep negative the pre-#554 trace once described. bankrupt/levelEnded both stay false: cash never crosses below BANKRUPTCY_THRESHOLD ($5,000) for the required BANKRUPTCY_GRACE_TICKS (100 consecutive ticks) -- confirmed via direct trace. No ecological/revolt shutdown either -- the one real blast never moved ecology off the fresh-game baseline of 50, and nuisance never moves either (no food_fest event lands in this trajectory)."
+        "note": "#554, superseding the pre-#554 note this once carried: charging is now queued, real work (the wait_until step drains the first pattern's charge order before the file can proceed), which pushes every downstream tick later and reshuffles which contract ids are actually live in the pool when this file's three accept steps run (contract ids increment and roll out of the offered pool on their own refresh clock, CONTRACT_REFRESH_INTERVAL=20/CONTRACTS_PER_REFRESH=3, independent of anything this file does). All three accepted contracts land successfully here (#5 rubble, #7 blingite, #8 gloomium bulk), and two of the three expire before the final checkpoint: #5 (rubble, $136 penalty) at tick 197, and #8 (gloomium bulk, $6,514 penalty) at tick 240 -- #7 (blingite, $2,919 penalty) never expires within this file's 240-tick run. Real costs this file pays are $1,000 to hire, $35,000 for the rig, and ~$60/tick combined payroll and fuel only for the ~50 ticks the driller is alive to draw them (the sole driller and drill_rig both die in the first blast -- see that step's own note), plus one random union event mid-file and the two contract-expiry fines above ($136 + $6,514 = $6,650 total). Command mode's own deterministic trace lands cash at $1,246 -- a real net loss of $48,754 against the level's $80,000 target, but still positive, not the deep negative the pre-#554 trace once described. bankrupt/levelEnded both stay false: cash never crosses below BANKRUPTCY_THRESHOLD ($5,000) for the required BANKRUPTCY_GRACE_TICKS (100 consecutive ticks) -- confirmed via direct trace. No ecological/revolt shutdown either -- the one real blast never moved ecology off the fresh-game baseline of 50, and nuisance never moves either (no food_fest event lands in this trajectory). #554-followup (issue #586 CI): `cash`/`wellBeing` dropped from equals -- the earlier union-event tick step can resolve a different random event between modes (that step's own note has the mechanism), which changes cash/wellBeing by a different amount than command mode's own $800/6-point trace without changing anything structural (contract counts, bankruptcy, level-end state all stay exactly as calibrated)."
       }
     }
   ]

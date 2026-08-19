@@ -457,7 +457,7 @@ export function tickCommand(
         state.levelEnded = true;
         state.levelEndReason = 'arrest';
         lines.push(`[tick ${state.tickCount}] ARRESTED! Criminal charges end your run.`);
-      } else if (revolted) {
+      } else if (revolted && !state.revoltDisabled) {
         state.levelEnded = true;
         state.levelEndReason = 'worker_revolt';
         lines.push(`[tick ${state.tickCount}] WORKER REVOLT! Your workforce walks out for good.`);

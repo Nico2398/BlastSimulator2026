@@ -602,6 +602,13 @@ window.__gameState = () => {
     deathCount: s.damage.deathCount,
     levelEnded: s.levelEnded,
     levelEndReason: s.levelEndReason,
+    // Typed mirror of `ctx.state.events.pendingEvent !== null` (EventSystem.ts)
+    // for the scenario harness — `resolveEventIfPending`/`waitUntil`
+    // (interaction-executor.ts) used to infer this by regex-matching
+    // `event status`'s text output, the same "ask the game, not the DOM"
+    // principle those actions already apply to clicks, just not yet to this
+    // one console command's own copy.
+    pendingEvent: s.events.pendingEvent !== null,
     // ── Game-over detection fields ──
     bankrupt: s.bankruptcy.bankrupt,
     revolted: s.revolt.revolted,

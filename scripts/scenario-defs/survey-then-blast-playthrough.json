@@ -741,8 +741,17 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -868,7 +877,7 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 14",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "clickSelector",
@@ -876,28 +885,28 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         }
       ],
       "role": "player",
-      "description": "#581: the command said `contract accept 1`, and contract #1 is not on offer at this point in EITHER mode -- both dump the available pool as ids 4-11, so the command was silently accepting nothing (`activeContractCount` stayed 0 right through it) and the `contract deliver` guard below was operating on a contract nothing had accepted. Interaction mode was the half that worked: the unscoped click landed on the first offered card, which IS the pool's leading id, which is why that guard finds it and correctly reports its DELIVER disabled. So the click was right and the command text was wrong; the command names whatever the pool's leading id actually is and the click is scoped to it. #553 follow-up: id drifted again from #4 to #14 -- the crew-walkout fix earlier in this file (a second driller/tier-2 rig, to keep drilling inside the well-being margin) adds real ticks before this point, and `generateContracts`' CONTRACT_REFRESH_INTERVAL cycling carries the pool further along with them (re-confirmed directly: `contract list` at this exact point now offers [14..21], not [4..11]). Nothing downstream is re-baselined -- the three steps after the guard are `observe` and assert nothing."
+      "description": "#581: the command said `contract accept 1`, and contract #1 is not on offer at this point in EITHER mode -- both dump the available pool as ids 4-11, so the command was silently accepting nothing (`activeContractCount` stayed 0 right through it) and the `contract deliver` guard below was operating on a contract nothing had accepted. Interaction mode was the half that worked: the unscoped click landed on the first offered card, which IS the pool's leading id, which is why that guard finds it and correctly reports its DELIVER disabled. So the click was right and the command text was wrong; the command names whatever the pool's leading id actually is and the click is scoped to it. #553 follow-up: id drifted again from #4 to #14 -- the crew-walkout fix earlier in this file (a second driller/tier-2 rig, to keep drilling inside the well-being margin) adds real ticks before this point, and `generateContracts`' CONTRACT_REFRESH_INTERVAL cycling carries the pool further along with them (re-confirmed directly: `contract list` at this exact point now offers [14..21], not [4..11]). Nothing downstream is re-baselined -- the three steps after the guard are `observe` and assert nothing. #554 follow-up (real interaction-mode CI finding): id drifted again, past 14 this time (this run's own `contract list` at this point offers [17..24], not [14..21]) -- #554's own charging-time budget adds more real ticks earlier in this file the same way #553's drilling-time budget already did twice before. Switched from the numeric id to `type:rubble_disposal` (#597's own fix for exactly this recurring drift, already applied to the console command text in level3-playthrough-win.json) for both the command and the click selector (data-contract-type, ContractsPanel.ts), instead of renumbering the id a third time."
     },
     {
-      "command": "contract deliver 14 amount:500",
+      "command": "contract deliver type:rubble_disposal amount:100",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 14 amount:500"
+          "command": "contract deliver type:rubble_disposal amount:100"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: nothing is in storage at this point, so ContractsPanel disables the amount box, MAX and DELIVER together (maxDeliverable = min(remaining, stored) is 0). The console command is no better -- it returns success:false and command mode only fails a step on a thrown exception, so this step is a silent no-op in both modes. Two modes genuinely disagree on WHY, and that is worth knowing: in command mode `contract accept 1` above fails outright (\"Contract #1 not found or already completed\") -- by this point in the campaign, `generateContracts`' CONTRACT_REFRESH_INTERVAL cycling has already carried ids past 1, confirmed directly (`contract list` at this exact point now offers [14..21], not 1) -- leaving activeContractCount at 0 and no card at all, while the interaction-mode click on `.bs-contract-accept` accepts whichever contract is really on offer (the array's first entry, id 14, matching render()'s insertion order). So no `equals` is asserted here -- only `expect.blocked`, which is interaction-mode-only and therefore checks the mode where a card actually exists, scoped to id 14 to match what actually gets accepted rather than the stale id this file has already drifted past twice (1 -> 4 -> 14, each time the drilling wait earlier in the file grew).",
+      "description": "BLOCKED, and deliberately not converted to a click: nothing is in storage at this point, so ContractsPanel disables the amount box, MAX and DELIVER together (maxDeliverable = min(remaining, stored) is 0). The console command is no better -- it returns success:false and command mode only fails a step on a thrown exception, so this step is a silent no-op in both modes. Two modes genuinely disagree on WHY, and that is worth knowing: in command mode `contract accept 1` above fails outright (\"Contract #1 not found or already completed\") -- by this point in the campaign, `generateContracts`' CONTRACT_REFRESH_INTERVAL cycling has already carried ids past 1, confirmed directly (`contract list` at this exact point now offers [14..21], not 1) -- leaving activeContractCount at 0 and no card at all, while the interaction-mode click on `.bs-contract-accept` accepts whichever contract is really on offer (the array's first entry, id 14, matching render()'s insertion order). So no `equals` is asserted here -- only `expect.blocked`, which is interaction-mode-only and therefore checks the mode where a card actually exists, scoped to id 14 to match what actually gets accepted rather than the stale id this file has already drifted past twice (1 -> 4 -> 14, each time the drilling wait earlier in the file grew). #554 follow-up: same id-drift fix as the accept step above -- switched to data-contract-type and type:rubble_disposal, amount matched to the pool's current first rubble_disposal offer (18, 100kg) instead of the stale 500kg figure from whichever offer used to be id 14.",
       "expect": {
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"14\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
       },
       "role": "guard"
     },

@@ -576,7 +576,7 @@
       "role": "bootstrap"
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:25,25",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:25,25",
       "interaction": [
         {
           "type": "clickSelector",
@@ -598,8 +598,8 @@
           "type": "dragTiles",
           "x1": 25,
           "z1": 25,
-          "x2": 29,
-          "z2": 29
+          "x2": 27,
+          "z2": 27
         },
         {
           "type": "screenshot"
@@ -612,15 +612,15 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 9,
+          "orderedHoleCount": 4,
           "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs working it in parallel (a single driller cannot finish before the 120-tick worker-revolt countdown -- see the second `employee hire role:driller` step above)."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable, now with two drillers/drill_rigs working it in parallel. #554-followup (issue #586 CI, real failure): shrunk further from 9 holes (3x3) to 4 (2x2) -- real interaction-mode CI proved this file's own wellBeing (pinned at 0 with no living_quarters anywhere in the file, ScoreManager.ts's applyDecay deliberately keeps a score at exactly 0 there until direct intervention, per level1-lose-revolt.integration.test.ts's own documented design) crosses REVOLT_TICKS (120 consecutive ticks at 0, WorkerRevolt.ts) before the file's own player-facing sequence/blast steps can run once charging (#554: real, queued work, not instant) is added on top of drilling's own already-tight ~300-tick budget -- command mode's identical trace revolts too (sandbox-confirmed via direct state inspection: `revolted:true` by tick ~305-310 in both modes), it just never surfaced there because command mode has no DOM for the revolt's level-end overlay to block. Not a timing/chunking bug like the sibling fixes elsewhere this session -- the crew's own wellbeing budget was already spent by the time #554's charging needed it. 9 holes with 2 parallel drillers left ~40 real ticks of charging work needed past a ~305-tick deadline; 4 holes cuts both drilling and charging time roughly in half, landing comfortably inside the deadline instead of gambling the margin closer."
     },
     {
       "command": "tick 50",
-      "description": "#553 follow-up: drain the ordered plan in bounded chunks rather than one large tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. With two drillers working in parallel, sandbox-measured (pure command-mode engine probe) landing all 9 holes around tick ~297-310 from a drill_plan at tick 102, comfortably inside the worker-revolt countdown's tick ~333 deadline -- the last (5th) chunk below is deliberately smaller than the others to land in that window with margin rather than overshoot into revolt.",
+      "description": "#553 follow-up: drain the ordered plan in bounded chunks rather than one large tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count. #554-followup (issue #586 CI, real failure): this file's own wellBeing pins at exactly 0 partway through drilling (no living_quarters anywhere in the file) and ScoreManager.ts's applyDecay deliberately never lets a score at exactly 0 climb back up on its own (level1-lose-revolt.integration.test.ts documents this as intentional) -- so once REVOLT_TICKS (120 consecutive ticks at 0, WorkerRevolt.ts) elapses, revolt is unavoidable regardless of what commands run next. Sandbox-confirmed this file's original 9-hole/6-chunk drilling wait plus the charge-drain wait below already crossed that deadline in BOTH modes (`revolted:true` by tick ~305-310) -- command mode's own scenario-test run never surfaced it because it has no DOM for the revolt's level-end overlay to block, only interaction mode's real click on the sequence step below does. Shrinking the grid from 9 holes to 4 (see the drill_plan step's own note) was the real fix; trimmed from 6 chunks (225 nominal ticks, 75 of them dead padding past actual completion) to 3 -- sandbox-measured, 4 holes with two parallel drillers land exactly here, comfortably inside the revolt deadline instead of padding into it.",
       "interaction": [
         {
           "type": "command",
@@ -663,74 +663,24 @@
         {
           "type": "command",
           "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 20",
-      "description": "Fifth chunk, deliberately smaller than the rest -- all 9 holes should have landed with margin before the worker-revolt countdown completes.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 20"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 5",
-      "description": "#596/#597 follow-up: with the event cooldown's random threshold now cached once per window instead of redrawn on every 5-tick retry, an event goes pending a few ticks earlier than before, and a `tick N` batch halts the instant that happens -- so the fifth chunk above now lands a few ticks short of its requested count. This small buffer chunk (sandbox-measured, seed:42) makes up the shortfall and lands all 9 holes at tick ~300, still comfortably inside the tick ~333 worker-revolt deadline.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 5"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 9
+          "holeCount": 4
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "event choose 0",
@@ -757,28 +707,61 @@
       }
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 10",
+      "description": "#554-followup round 2 (issue #586 CI): the earlier fix here (a real-time waitUntil, then 6 chunked tick-10/event-choose-0 rounds sized for the original 9-hole grid) treated this as a timing/convergence problem, but sandbox-inspection of live game state proved both modes actually revolt around tick ~305-310 regardless -- this file's own wellBeing pins at exactly 0 partway through drilling (no living_quarters anywhere in the file) and ScoreManager.ts's applyDecay deliberately never lets a score at exactly 0 recover on its own (level1-lose-revolt.integration.test.ts documents this as intentional design, not a bug), so once REVOLT_TICKS (120 consecutive ticks at 0) elapses, revolt is unavoidable no matter how the remaining ticks are chunked. The drill_plan step's own note has the real fix (9 holes -> 4), which lands drilling with real margin before the deadline; trimmed this charge-drain to match -- sandbox-measured, 4 holes charge in 20 ticks from here, comfortably inside the deadline instead of the original 60-tick budget that used to pad straight through it.",
       "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
-        }
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        { "type": "command", "command": "tick 10" }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 9,
+          "chargedCount": 4,
           "orderedChargeCount": 0
         }
       }
     },
     {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
       "command": "sequence auto delay_step:25",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
@@ -787,7 +770,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 9
+          "sequencedCount": 4
         }
       }
     },

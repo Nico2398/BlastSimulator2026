@@ -40,14 +40,26 @@ export type InteractionStepAction =
   | { type: 'wheel'; deltaX: number; deltaY: number }
   | { type: 'wait'; durationMs: number }
   | { type: 'waitForSelector'; selector: string; timeout?: number }
-  // Waits until the tutorial reaches one of the named steps (or ends), driving
-  // the game's real auto-tick clock for the duration of the wait — the same
-  // bracketing interaction-driver.ts's own awaitTutorialStep uses — so queued
-  // work the step depends on (a surveyor walking out, a driver boarding) can
-  // actually finish. Fixed
+  // Waits until the tutorial reaches one of the named steps (or ends).
   // `wait` durations cannot express "the tutorial noticed", which is why
-  // tutorial-driven scenarios desynced from the rails (#481). `timeout` is ms.
-  | { type: 'waitForTutorialStep'; stepId: string | string[]; timeout?: number }
+  // tutorial-driven scenarios desynced from the rails (#481).
+  //
+  // #601: loops the console's own `tick 1` (`__gameConsole('tick 1')`, the
+  // same call the real auto-tick loop itself makes) up to `maxTicks` times
+  // instead of driving the page's real rAF clock — real-world elapsed time
+  // no longer has any bearing on how many game ticks pass while this waits,
+  // so a scenario using it produces the identical trace on a fast sandbox
+  // and a loaded CI runner alike. Deliberately does NOT auto-resolve a
+  // pending event (unlike `waitUntil`): a scenario can wait for the
+  // tutorial's own "an event just fired" checkpoint by `stepId`, with a
+  // dedicated later player step clicking the real dialog, so resolving it
+  // here would consume the same event the wait was asked to stop at.
+  // `tickCommand` itself refuses to advance while an event is pending, so
+  // an unrelated event genuinely pauses this wait, same as a real player's
+  // game — matching this action's original real-time behavior. `timeout`
+  // (ms) remains as an outer wall-clock safety net against a genuine hang,
+  // separate from and much larger than the tick budget itself.
+  | { type: 'waitForTutorialStep'; stepId: string | string[]; timeout?: number; maxTicks?: number }
   | { type: 'type'; selector: string; text: string; delay?: number }
   | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
   | { type: 'viewport'; width: number; height: number }
@@ -130,13 +142,17 @@ export type InteractionStepAction =
    * Command mode loops the console's own `tick 1` (reusing `tickCommand`
    * exactly as it stands, `runCommand(engine, 'tick 1')` — see
    * `command-runner.ts`'s `runWaitUntil`) up to `maxTicks` times, checking
-   * the state dump after each. Interaction mode drives the page's real
-   * running clock (`__setAutoTick`, the same mechanism
-   * `waitForTutorialStep` already uses) and polls `window.__gameState()`,
-   * bounded by `timeoutMs` real milliseconds — the two harnesses do not
-   * advance ticks at the same real-world rate, so the tick budget and the
-   * wall-clock budget are two separate, explicitly author-supplied numbers
-   * rather than one converted from the other.
+   * the state dump after each. #601: interaction mode now loops the exact
+   * same `tick 1` call through the console (`__gameConsole('tick 1')`, the
+   * same function the real auto-tick loop itself calls) instead of driving
+   * the page's real rAF clock — real-world elapsed time no longer affects
+   * how many ticks pass, so both harnesses advance identically regardless
+   * of host machine speed or render cost, closing a class of CI-only
+   * flakiness (a slow frame let more ticks fire than the equivalent
+   * command-mode wait, overshooting a fragile score threshold into an
+   * outcome — e.g. a worker_revolt — command mode's own trace never
+   * reached). `timeoutMs` remains as an outer wall-clock safety net against
+   * a genuine hang, no longer the loop's own pacing budget.
    *
    * `equals` matches with `===` — for a numeric field that settles exactly
    * (a count, a boolean, an id), not a score that merely trends. A step

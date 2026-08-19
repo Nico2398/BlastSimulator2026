@@ -133,37 +133,66 @@ describe('a player step whose click cannot complete fails and names the selector
   });
 });
 
-describe('executeActionOnPage — waitUntil (issue #590)', () => {
-  it('resolves once the polled field reaches the target, toggling auto-tick on then off', async () => {
-    const evaluate = vi.fn()
-      // setAutoTick(true)
-      .mockResolvedValueOnce(undefined)
-      // __gameState() poll — field already at target
-      .mockResolvedValueOnce({ holeCount: 25 })
-      // setAutoTick(false)
-      .mockResolvedValueOnce(undefined);
+describe('executeActionOnPage — waitUntil (issue #590, #601)', () => {
+  it('resolves once the polled field reaches the target, looping the console\'s own deterministic tick 1', async () => {
+    // #601: one page.evaluate call per tick (tick 1 + event-status check +
+    // conditional resolve + field read, all inside the same browser-side
+    // callback) — no real-time auto-tick toggling any more.
+    const evaluate = vi.fn().mockResolvedValueOnce(25);
     const page = fakePage({ evaluate });
     const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:400', role: 'setup' };
     const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 400, timeoutMs: 30000 };
 
     await executeActionOnPage(page, action, step);
 
-    expect(evaluate).toHaveBeenCalledTimes(3);
+    expect(evaluate).toHaveBeenCalledTimes(1);
   });
 
-  it('exhausts its wall-clock budget and throws naming the field, its last value, and the budget', async () => {
-    const evaluate = vi.fn().mockImplementation(async (fn: (...a: unknown[]) => unknown) => {
-      // Distinguish the setAutoTick calls (which pass an `enabled` arg) from
-      // the parameterless __gameState() poll by arity of the page.evaluate
-      // call signature used at each site.
-      return fn.length === 0 ? { holeCount: 3 } : undefined;
-    });
+  it('exhausts its tick budget and throws naming the field, its last value, and the tick count', async () => {
+    const evaluate = vi.fn().mockResolvedValue(3);
     const page = fakePage({ evaluate });
     const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:1', role: 'setup' };
-    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 1, timeoutMs: 250 };
+    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 1, timeoutMs: 30000 };
 
     await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
-      /"holeCount" never reached 25 — stalled at 3 after 250ms/,
+      /"holeCount" never reached 25 — stalled at 3 after 1 tick\(s\)/,
+    );
+  });
+});
+
+describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () => {
+  it('resolves once the tutorial reaches the named step, looping the console\'s own deterministic tick 1', async () => {
+    // #601: same tick-1-loop rewrite as waitUntil, but deliberately does NOT
+    // auto-resolve a pending event (a scenario can wait for the tutorial's
+    // own "an event just fired" checkpoint by stepId, with a dedicated later
+    // player step clicking the real dialog).
+    const evaluate = vi.fn().mockResolvedValueOnce({ active: true, stepId: 'drill-plan', stageTarget: 'grid-tool' });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 400, timeout: 30000 };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(evaluate).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves without throwing once the tutorial ends (goes inactive) before the named step is ever reached', async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce({ active: false, stepId: null, stageTarget: null });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 400, timeout: 30000 };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+  });
+
+  it('exhausts its tick budget and throws naming the wanted step, the tutorial\'s current step, and the live control', async () => {
+    const evaluate = vi.fn().mockResolvedValue({ active: true, stepId: 'grid-select', stageTarget: 'grid-tool' });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 1, timeout: 30000 };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      /tutorial never reached "drill-plan" — it is on "grid-select", live control grid-tool, after 1 tick\(s\)/,
     );
   });
 });

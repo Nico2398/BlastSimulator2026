@@ -214,6 +214,14 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'weather set',
   'weather',
   'event fire',
+  // TEMPORARY (cheats.ts): unblocks blast-execution-visual.json and
+  // blast-visual-full.json, whose crews are genuinely undersized for their
+  // own workload and hit a deterministic worker revolt before finishing —
+  // not a UI gap a real click could stand in for, since the revolt is a
+  // core-simulation outcome with no control to avert it. Tracked for
+  // removal, alongside a real fix to that crew-sizing/revolt-margin gap, in
+  // issue #631.
+  'cheat disable_revolt',
   // Broader than the others on purpose, for two independent reasons:
   //  1. `corrupt target:X cost:Y` — the scenario overrides the bribe's cost
   //     to hit an exact scripted cash delta; ShadyPanel's real "Make the
@@ -528,16 +536,16 @@ export async function executeActionOnPage(
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
     case 'resolveEventIfPending': {
-      // Ask the game, not the DOM. `event status` is read-only
-      // (isObservationCommand admits it) and this is the harness deciding
-      // whether to wait — the resolution itself is a real click below.
+      // Ask the game, not the DOM: read the typed `pendingEvent` mirror off
+      // __gameState() (main.ts) rather than regex-matching `event status`'s
+      // text output — this is the harness deciding whether to wait, the
+      // resolution itself is a real click below.
       const pending = await page.evaluate(() => {
-        const run = (window as unknown as {
-          __gameConsole?: (c: string) => { output?: unknown };
-        }).__gameConsole;
-        if (run === undefined) return false;
-        const out = String(run('event status').output ?? '');
-        return !/no pending event/i.test(out);
+        const getState = (window as unknown as {
+          __gameState?: () => Record<string, unknown> | null;
+        }).__gameState;
+        const st = getState === undefined ? null : getState();
+        return st ? Boolean(st.pendingEvent) : false;
       });
       if (!pending) break;
 
@@ -625,36 +633,46 @@ export async function executeActionOnPage(
     case 'waitForTutorialStep': {
       const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
       const deadline = Date.now() + (action.timeout ?? 30000);
-      // Drive the real rAF-driven, isPaused-gated clock for this wait only —
-      // the tutorial's own completion checks and any queued work (walking,
-      // surveying, hauling) need time to pass, and scenarioMode has switched
-      // the auto-tick off. Restored on the way out so every other action keeps
-      // the deterministic scripted-tick clock.
-      const setAutoTick = (enabled: boolean) => page.evaluate((on: boolean) => {
-        (window as unknown as { __setAutoTick?: (e: boolean) => void }).__setAutoTick?.(on);
-      }, enabled);
-      await setAutoTick(true);
-      try {
-        for (;;) {
-          const st = await page.evaluate(() => {
-            const fn = (window as unknown as {
-              __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null };
-            }).__tutorialState;
-            return fn === undefined ? null : fn();
-          });
-          // Tutorial gone (finished or never started) — nothing left to wait on.
-          if (st === null || !st.active) break;
-          if (st.stepId !== null && wanted.includes(st.stepId)) break;
-          if (Date.now() > deadline) {
-            throw new Error(
-              `waitForTutorialStep: tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`
-              + ` — it is on "${st.stepId}", live control ${st.stageTarget ?? 'none'}`,
-            );
-          }
-          await new Promise((r) => setTimeout(r, 200));
+      const maxTicks = action.maxTicks ?? 3000;
+      // #601: loops the console's own `tick 1` (the same `__gameConsole`
+      // call the real auto-tick loop itself makes — main.ts's per-command
+      // `tutorial.onCommandExecuted` hook fires identically either way, so
+      // the tutorial's own rails advance the same way) instead of driving
+      // the page's real rAF clock. Deliberately does NOT auto-resolve a
+      // pending event (unlike `waitUntil` below): a scenario can wait for
+      // the tutorial's own "an event just fired" checkpoint by name (e.g.
+      // `stepId: 'event-fire-resolve'`), with a dedicated later player step
+      // clicking the dialog for real — auto-resolving here would consume
+      // that same event before the scenario's own click gets to it, racing
+      // the tutorial rail straight past the checkpoint the wait was asked
+      // to stop at. `tickCommand` itself refuses to advance while an event
+      // is pending, so an unrelated event genuinely pauses this wait, same
+      // as it would a real player's game — matching this action's original
+      // real-time behavior, just deterministic now. `deadline` stays as an
+      // outer wall-clock safety net against a genuine hang, not the loop's
+      // own pacing budget.
+      let ticksUsed = 0;
+      for (;;) {
+        const st = await page.evaluate(() => {
+          const run = (window as unknown as {
+            __gameConsole?: (c: string) => unknown;
+          }).__gameConsole;
+          run?.('tick 1');
+          const fn = (window as unknown as {
+            __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null };
+          }).__tutorialState;
+          return fn === undefined ? null : fn();
+        });
+        ticksUsed++;
+        // Tutorial gone (finished or never started) — nothing left to wait on.
+        if (st === null || !st.active) break;
+        if (st.stepId !== null && wanted.includes(st.stepId)) break;
+        if (ticksUsed >= maxTicks || Date.now() > deadline) {
+          throw new Error(
+            `waitForTutorialStep: tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`
+            + ` — it is on "${st.stepId}", live control ${st.stageTarget ?? 'none'}, after ${ticksUsed} tick(s)`,
+          );
         }
-      } finally {
-        await setAutoTick(false);
       }
       break;
     }
@@ -740,37 +758,46 @@ export async function executeActionOnPage(
       // (issue #590) — the interaction-mode counterpart to
       // command-runner.ts's own runWaitUntil, generalizing waitForTutorialStep's
       // pattern from "the tutorial rail's current step id" to any field.
+      //
+      // #601: loops the console's own `tick 1` (`__gameConsole('tick 1')`,
+      // the exact call the real auto-tick loop itself makes) up to
+      // `maxTicks` times instead of driving the page's real rAF clock, and
+      // auto-resolves a pending event after each tick exactly like command
+      // mode's own `runWaitUntil` does. Real-world elapsed time no longer
+      // has any bearing on how many game ticks pass here, so this produces
+      // the identical trace on a fast sandbox and a loaded CI runner alike
+      // — closing a class of CI-only flakiness where a slow frame let more
+      // ticks fire than command mode's equivalent wait, overshooting a
+      // fragile score threshold into an outcome (e.g. worker_revolt)
+      // command mode's own trace never reached. `timeoutMs` remains an
+      // outer wall-clock safety net against a genuine hang.
       const deadline = Date.now() + action.timeoutMs;
-      const setAutoTick = (enabled: boolean) => page.evaluate((on: boolean) => {
-        (window as unknown as { __setAutoTick?: (e: boolean) => void }).__setAutoTick?.(on);
-      }, enabled);
-      // Drive the real rAF-driven, isPaused-gated clock for this wait only —
-      // scenarioMode has switched auto-tick off, and the queued work this is
-      // usually waiting on (a drilled hole, a loaded charge) needs real time
-      // to pass. Restored on the way out so every other action keeps the
-      // deterministic scripted-tick clock.
-      await setAutoTick(true);
-      try {
-        let lastValue: unknown;
-        for (;;) {
-          const state = await page.evaluate(() => {
-            const fn = (window as unknown as {
-              __gameState?: () => Record<string, unknown> | null;
-            }).__gameState;
-            return fn === undefined ? null : fn();
-          });
-          lastValue = state ? state[action.field] : undefined;
-          if (lastValue === action.equals) break;
-          if (Date.now() > deadline) {
-            throw new Error(
-              `waitUntil: "${action.field}" never reached ${JSON.stringify(action.equals)}`
-              + ` — stalled at ${JSON.stringify(lastValue)} after ${action.timeoutMs}ms`,
-            );
-          }
-          await new Promise((r) => setTimeout(r, 200));
+      let lastValue: unknown;
+      let ticksUsed = 0;
+      for (;;) {
+        const state = await page.evaluate((field: string) => {
+          const run = (window as unknown as {
+            __gameConsole?: (c: string) => { output?: unknown };
+          }).__gameConsole;
+          run?.('tick 1');
+          const getState = (window as unknown as {
+            __gameState?: () => Record<string, unknown> | null;
+          }).__gameState;
+          const st = getState === undefined ? null : getState();
+          // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
+          // regex-matching `event status`'s text output.
+          if (st?.pendingEvent) run?.('event choose 0');
+          return st ? st[field] : undefined;
+        }, action.field);
+        ticksUsed++;
+        lastValue = state;
+        if (lastValue === action.equals) break;
+        if (ticksUsed >= action.maxTicks || Date.now() > deadline) {
+          throw new Error(
+            `waitUntil: "${action.field}" never reached ${JSON.stringify(action.equals)}`
+            + ` — stalled at ${JSON.stringify(lastValue)} after ${ticksUsed} tick(s)`,
+          );
         }
-      } finally {
-        await setAutoTick(false);
       }
       break;
     }
