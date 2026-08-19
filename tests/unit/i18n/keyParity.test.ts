@@ -129,10 +129,15 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial.step_buyrockdigger[.title]) plus three tutorial rail hint keys
     // (tutorial.stage.expand_digger, tutorial.stage.train_excavator,
     // tutorial.stage.vehicle_buy_rock_digger), both locales translated.
+    // Baseline is now 3274 (down from 3275): removed the orphaned
+    // ui.build.ramp_built key (#637 review) -- buildRampCommand switched to
+    // ui.build.ramp_ordered when ordering a ramp became queued excavation
+    // work instead of an instant carve, and nothing ever came to reference
+    // ramp_built's "Ramp carved." text afterward.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3275);
+    expect(Object.keys(en).length).toBe(3274);
   });
 });
 

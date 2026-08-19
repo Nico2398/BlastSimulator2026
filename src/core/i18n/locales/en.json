@@ -2627,7 +2627,6 @@
   "ui.build.ramp_section": "Terrain",
   "ui.build.ramp": "Build Ramp",
   "ui.build.ramp_depth": "Depth",
-  "ui.build.ramp_built": "Ramp carved.",
   "ui.build.ramp_ordered": "Ramp ordered — excavation underway.",
   "ui.policy.title": "Site Policy",
   "ui.policy.shift_mode": "Shift schedule",

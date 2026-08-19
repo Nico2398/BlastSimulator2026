@@ -2627,7 +2627,6 @@
   "ui.build.ramp_section": "Terrain",
   "ui.build.ramp": "Creuser une rampe",
   "ui.build.ramp_depth": "Profondeur",
-  "ui.build.ramp_built": "Rampe creusée.",
   "ui.build.ramp_ordered": "Rampe commandée — excavation en cours.",
   "ui.policy.title": "Politique du site",
   "ui.policy.shift_mode": "Horaires de poste",
