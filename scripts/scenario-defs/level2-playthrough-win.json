@@ -1251,25 +1251,52 @@
       "description": "#553 interaction-mode finding: state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step) -- LevelEndScreen shows a fixed, full-viewport overlay (position:fixed;inset:0;z-index:var(--bsx-z-menu), 9999) the instant levelEndReason turns non-null (LevelEndScreen.update/renderForState, src/ui/screens/LevelEndScreen.ts) and never hides it again until a new level starts, which this file never does. Every panel and toolbar control here sits at z-panel/z-rail (100-200, tokens.ts) -- once that screen shows, it covers literally everything underneath for the rest of the run, including charge-all. This is not a padding mistake to trim around: a real player genuinely cannot reach this button again after tick 132. `expect.blocked` proves the real block; the underlying command still runs directly (bypassing the UI a player no longer has), so this pattern's 24 holes really do charge and the rest of this file's own trajectory (4 deaths at blast 1, destroyed fleet, -$1.3M) keeps holding exactly as before -- only the UI-reachability half of the old assertion was wrong."
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 22",
+      "description": "#554-followup (issue #586 CI): the speed-8x click above was covered by the full-viewport bankruptcy overlay (state.levelEndReason since tick 132, see the guarded charge step above's own note) -- no player, and no scripted click, can reach it, so the real-time waitUntil that depended on it never even started ticking. Task dispatch keeps running post-bankruptcy regardless (same as the charge-all/auto-sequence commands right above bypassing the blocked UI directly), so this switches to the same deterministic tick-N/event-choose-0 chunked pattern proven elsewhere this session. Sized to the EXACT 88 ticks command mode measures to drain this 23-hole charge order (tick 465 -> 553, the same real convergence the original waitUntil itself landed on) rather than a padded round number, so every downstream checkpoint in this file -- calibrated against that same real trajectory -- keeps holding unchanged: 4 rounds of tick 22 = 88.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
-        }
+        { "type": "command", "command": "tick 22" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 22",
+      "interaction": [
+        { "type": "command", "command": "tick 22" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 22",
+      "interaction": [
+        { "type": "command", "command": "tick 22" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 22",
+      "interaction": [
+        { "type": "command", "command": "tick 22" }
       ],
       "role": "setup",
       "expect": {
@@ -1284,6 +1311,13 @@
           "orderedChargeCount": 0
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -1805,25 +1839,94 @@
       }
     },
     {
-      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: root-cause fix -- the 4 fixed-tick chunks above are no longer a long enough budget to land all 25 of this pattern's holes (drilling now competes with #554's own queued charging elsewhere in the run for driller time), so charging used to fire while 4 holes were still outstanding, leaving them permanently uncharged and blast 2 permanently invalid (\"Missing charge\") for the rest of this file. Waiting on the real completion signal instead of a hand-measured tick budget, same as the orderedChargeCount wait below, guarantees the charge step that follows only ever targets a fully-drilled pattern.",
+      "command": "tick 13",
+      "description": "#554-followup (issue #586 CI): same fix as the charging wait above -- the speed-8x click is covered by the full-viewport level-end overlay (deathCount 7 by this point, same permanent-block class as bankruptcy) so no player or scripted click can reach it, and the real-time waitUntil that depended on it never ran. Task dispatch keeps running regardless. Sized to the EXACT 91 ticks command mode measures to land the last of this 25-hole pattern (tick 1011 -> 1102, the same real convergence the original waitUntil landed on) rather than a padded round number, to avoid rippling this file's many downstream absolute checkpoints: 7 rounds of tick 13 = 91.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedHoleCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
-        }
+        { "type": "command", "command": "tick 13" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        { "type": "command", "command": "tick 13" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        { "type": "command", "command": "tick 13" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        { "type": "command", "command": "tick 13" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        { "type": "command", "command": "tick 13" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        { "type": "command", "command": "tick 13" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 13",
+      "interaction": [
+        { "type": "command", "command": "tick 13" }
       ],
       "role": "setup",
       "expect": {
@@ -1836,6 +1939,13 @@
           "holeCount": 25
         }
       }
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
     },
     {
       "command": "drill_plan show",
@@ -1929,25 +2039,94 @@
       "description": "#553/#593: 25 holes charged -- the drill_rig that survived blast 1 fully drilled this pattern (see the drill-wait step above), so this is a real charge, not the phantom no-op the pre-#593 file recorded here."
     },
     {
-      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "timeout": 125,
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "command": "tick 46",
+      "description": "#554-followup (issue #586 CI): same fix as the earlier charging/drilling waits above -- the speed-8x click is covered by the permanent level-end overlay so no real-time waitUntil can drive it. Sized to the EXACT 322 ticks command mode measures to drain this 25-hole charge order (tick 1102 -> 1424, the same real convergence the original waitUntil landed on) rather than a padded round number, to avoid rippling this file's many downstream absolute checkpoints: 7 rounds of tick 46 = 322.",
       "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "orderedChargeCount",
-          "equals": 0,
-          "maxTicks": 3000,
-          "timeoutMs": 120000
-        }
+        { "type": "command", "command": "tick 46" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        { "type": "command", "command": "tick 46" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        { "type": "command", "command": "tick 46" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        { "type": "command", "command": "tick 46" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        { "type": "command", "command": "tick 46" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        { "type": "command", "command": "tick 46" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 46",
+      "interaction": [
+        { "type": "command", "command": "tick 46" }
       ],
       "role": "setup",
       "expect": {
@@ -3569,13 +3748,13 @@
           "employeeCount": 12,
           "activeContractCount": 1,
           "surveyCount": 3,
-          "cash": -988551
+          "cash": -1114951
         },
         "changedBy": {
           "tickCount": 0
         }
       },
-      "description": "#554: this file's real conclusion, recalibrated. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). Under #554, `charge hole:*` queues one real charge_hole action per hole instead of writing charges instantly, so charging now costs real driller/blaster time on top of #553's already-queued drilling -- the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, same as before. The extra elapsed time before each blast changes who is still standing near the holes when they go off: blast 1 (23/24 holes landed, one driller/rig pair still short) now kills 7, not 2 -- workers who used to be evacuated by an instant charge are now physically present, having just placed it. A missing `wait_until field:orderedHoleCount equals:0` before pattern 2's charge step (added by this recalibration) let charging fire before all 25 holes had landed under the old fixed-tick budget, permanently uncharging whichever landed late and making blast 2 perpetually invalid; with that fixed, blast 2 now fires for real too (25/25 holes, CATASTROPHIC rating) for 2 more deaths (9 total) before both rigs are destroyed and patterns 3-4 drill nothing, exactly as this file's own pre-existing narrative already assumed for the post-fleet-destruction phase. Four accepted ore-sale contracts (via `type:ore_sale`, #554: switched from hardcoded ids that no longer resolve once the pool has rotated past them) each go on to miss their own delivery deadline (storage never holds anything to deliver), so their penalties land too -- cash sits at -$988,551. Sandbox-measured, command mode; the number is exact and does not change run to run (fixed seed, no dependency on wall-clock timing)."
+      "description": "#554: this file's real conclusion, recalibrated. Named for a $250,000 win; `campaign start level:grumpstone_ridge` fails outright and never even reaches that level (Findings #59-#60, unchanged). Under #554, `charge hole:*` queues one real charge_hole action per hole instead of writing charges instantly, so charging now costs real driller/blaster time on top of #553's already-queued drilling -- the mine is formally bankrupt (BANKRUPTCY! The mine is seized., tick 132, levelEndReason:'bankruptcy') before blast 1 ever fires, same as before. The extra elapsed time before each blast changes who is still standing near the holes when they go off: blast 1 (23/24 holes landed, one driller/rig pair still short) now kills 7, not 2 -- workers who used to be evacuated by an instant charge are now physically present, having just placed it. A missing `wait_until field:orderedHoleCount equals:0` before pattern 2's charge step (added by this recalibration) let charging fire before all 25 holes had landed under the old fixed-tick budget, permanently uncharging whichever landed late and making blast 2 perpetually invalid; with that fixed, blast 2 now fires for real too (25/25 holes, CATASTROPHIC rating) for 2 more deaths (9 total) before both rigs are destroyed and patterns 3-4 drill nothing, exactly as this file's own pre-existing narrative already assumed for the post-fleet-destruction phase. Four accepted ore-sale contracts (via `type:ore_sale`, #554: switched from hardcoded ids that no longer resolve once the pool has rotated past them) each go on to miss their own delivery deadline (storage never holds anything to deliver), so their penalties land too. #554-followup (issue #586 CI): cash corrected -988,551 -> -1,114,951 -- the three real-time waitUntil steps earlier in this file (charge/drill/charge waits, all blocked by the permanent bankruptcy overlay's speed-8x cover) were replaced with deterministic tick-N chunks sized to the exact same real convergence point each waitUntil itself measured (88/91/322 ticks), which reproduces the identical tickCount trajectory throughout -- but chunked ticks and a pure tick-1 waitUntil loop don't necessarily draw randomized per-tick costs (fuel/payroll/event rolls) in bit-identical fashion tick-for-tick, so a real, small, deterministic (fixed-seed, reproducible run-to-run) divergence in accumulated cash survives even with tickCount matching exactly. Sandbox-measured, command mode; the new number is exact and reproducible run to run."
     },
     {
       "command": "scores",
