@@ -583,6 +583,108 @@ describe("reading #499's head the way the action now reads it", () => {
   });
 });
 
+// PR #615's actual failure mode: a workflow run's own `conclusion` is
+// `success` the instant every job in it either passed or was skipped, so
+// `checkState`/`mergeVerdict` alone cannot tell a genuinely green `full-ci`
+// PR from one whose interaction shards silently never ran. This is the
+// third, independent line of defence (alongside ci.yml's `labeled` trigger
+// type and open-pr setting the label at creation) — it asks the CI run's
+// own jobs directly.
+describe("asking the CI run's own jobs before trusting its conclusion", () => {
+  const source = readFileSync(
+    join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+  );
+  const start = source.indexOf('const LABEL_GATED_JOBS');
+  const end = source.indexOf('const method = ');
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+
+  const buildMissingGatedJobs = (jobsByRunId) =>
+    new Function(
+      'github',
+      'owner',
+      'repo',
+      `${source.slice(start, end)} return missingGatedJobs;`
+    )(
+      {
+        paginate: async (_fn, { run_id }) => jobsByRunId[run_id] ?? [],
+        rest: { actions: { listJobsForWorkflowRun: () => {} } },
+      },
+      'Nico2398',
+      'BlastSimulator2026'
+    ) as (labels: { name: string }[], runs: unknown[]) => Promise<string[]>;
+
+  const CI_RUN = { id: 555, path: '.github/workflows/ci.yml' };
+  const interactionJob = (n, conclusion) => ({ name: `Scenarios (interaction mode) — shard ${n}/4`, conclusion });
+  const buildJob = (conclusion) => ({ name: 'Production build', conclusion });
+
+  it('is a no-op when the PR carries no gated label', async () => {
+    const missingGatedJobs = buildMissingGatedJobs({});
+    await expect(missingGatedJobs([], [CI_RUN])).resolves.toEqual([]);
+  });
+
+  it('clears full-ci once every interaction shard reports success', async () => {
+    const missingGatedJobs = buildMissingGatedJobs({
+      [CI_RUN.id]: [1, 2, 3, 4].map((n) => interactionJob(n, 'success')),
+    });
+    await expect(
+      missingGatedJobs([{ name: 'full-ci' }], [CI_RUN])
+    ).resolves.toEqual([]);
+  });
+
+  // The exact #615 shape: the run reports `success`, but the label's job
+  // never appears in its own job list at all.
+  it('flags full-ci when the interaction job never ran', async () => {
+    const missingGatedJobs = buildMissingGatedJobs({ [CI_RUN.id]: [] });
+    await expect(
+      missingGatedJobs([{ name: 'full-ci' }], [CI_RUN])
+    ).resolves.toEqual(['full-ci']);
+  });
+
+  it('flags full-ci when a shard is present but did not succeed', async () => {
+    const missingGatedJobs = buildMissingGatedJobs({
+      [CI_RUN.id]: [interactionJob(1, 'success'), interactionJob(2, 'failure')],
+    });
+    await expect(
+      missingGatedJobs([{ name: 'full-ci' }], [CI_RUN])
+    ).resolves.toEqual(['full-ci']);
+  });
+
+  it('checks build-check against the Production build job independently of full-ci', async () => {
+    const missingGatedJobs = buildMissingGatedJobs({ [CI_RUN.id]: [buildJob('success')] });
+    await expect(
+      missingGatedJobs([{ name: 'build-check' }], [CI_RUN])
+    ).resolves.toEqual([]);
+    const missingGatedJobs2 = buildMissingGatedJobs({ [CI_RUN.id]: [] });
+    await expect(
+      missingGatedJobs2([{ name: 'build-check' }], [CI_RUN])
+    ).resolves.toEqual(['build-check']);
+  });
+
+  it('looks up the CI run by path, not by display name', async () => {
+    const missingGatedJobs = buildMissingGatedJobs({
+      [CI_RUN.id]: [1, 2].map((n) => interactionJob(n, 'success')),
+    });
+    const renamedButSamePath = { id: CI_RUN.id, path: CI_RUN.path };
+    await expect(
+      missingGatedJobs([{ name: 'full-ci' }], [renamedButSamePath])
+    ).resolves.toEqual([]);
+  });
+
+  it('reads the newest CI run on the head when more than one is present', async () => {
+    const missingGatedJobs = buildMissingGatedJobs({
+      [CI_RUN.id]: [],
+      [CI_RUN.id + 1]: [1, 2].map((n) => interactionJob(n, 'success')),
+    });
+    await expect(
+      missingGatedJobs(
+        [{ name: 'full-ci' }],
+        [CI_RUN, { ...CI_RUN, id: CI_RUN.id + 1 }]
+      )
+    ).resolves.toEqual([]);
+  });
+});
+
 // Every wait in this action was a guess at something an event already reports.
 // A sleeping runner is also the one state that cannot say what it is waiting
 // for, which is how #499's ten minutes of identical log lines ended in a wrong

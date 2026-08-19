@@ -36,9 +36,12 @@
  *   npm run ci:await -- --pr 581 --timeout-minutes 20   # opt-in, for a human
  *
  * Exit codes — the whole point of the script, since the caller branches on them:
- *   0  GREEN    every workflow run on the head reported success (or the PR merged)
- *   1  RED      at least one reported failure. The failing jobs are printed with
- *               their log URLs, which is the input a fix needs
+ *   0  GREEN    every workflow run on the head reported success (or the PR merged),
+ *               and — for a `full-ci`/`build-check` PR — the job(s) those labels
+ *               gate actually ran and succeeded, not merely skipped without failing
+ *   1  RED      at least one reported failure, or a full-ci/build-check PR whose
+ *               gated job never ran despite the label (#615). The failing jobs are
+ *               printed with their log URLs, which is the input a fix needs
  *   2  TIMEOUT  only reachable with an explicit `--timeout-minutes`. Not a verdict
  *   3  GONE     the PR is closed unmerged, or no PR exists for that head
  *   4  USAGE    bad arguments, or `gh` could not answer
@@ -62,6 +65,39 @@ export interface WorkflowRun {
 }
 
 export type Verdict = 'green' | 'red' | 'pending';
+
+/** A job on a workflow run, reduced to what a label-gate check depends on. */
+export interface WorkflowJob {
+  name: string;
+  conclusion: string | null;
+}
+
+/**
+ * A label that gates a job (`full-ci` -> the interaction-mode shards,
+ * `build-check` -> the production build) makes a CI run's own `success`
+ * conclusion insufficient evidence on its own: the run reports `success` the
+ * moment every job in it either passed or was skipped, and a job skipped
+ * because its `if:` guard was evaluated before the label existed is
+ * indistinguishable from that at the run level. PR #615 merged exactly that
+ * way. Kept in step with the same-named check in
+ * `.github/actions/agentic-auto-merge/action.yml` — the two decide whether a
+ * PR may end a run and whether it may merge, and must not disagree about it.
+ */
+const LABEL_GATED_JOBS: { label: string; jobNamePrefix: string }[] = [
+  { label: 'full-ci', jobNamePrefix: 'Scenarios (interaction mode)' },
+  { label: 'build-check', jobNamePrefix: 'Production build' },
+];
+
+/** Gated labels whose job did not fully report `success` among `jobs`. */
+export function missingGatedJobs(labels: string[], jobs: WorkflowJob[]): string[] {
+  const wanted = LABEL_GATED_JOBS.filter((g) => labels.includes(g.label));
+  return wanted
+    .filter((g) => {
+      const matches = jobs.filter((j) => j.name.startsWith(g.jobNamePrefix));
+      return matches.length === 0 || !matches.every((j) => j.conclusion === 'success');
+    })
+    .map((g) => g.label);
+}
 
 /**
  * Conclusions that mean nothing is going to repeat this run. `cancelled` and
@@ -174,6 +210,7 @@ interface PullRequest {
   merged_at: string | null;
   draft: boolean;
   head: { ref: string; sha: string };
+  labels: { name: string }[];
 }
 
 function resolvePr(options: Options): PullRequest | undefined {
@@ -194,6 +231,14 @@ function runsOnHead(sha: string): WorkflowRun[] {
     `repos/{owner}/{repo}/actions/runs?head_sha=${sha}&per_page=100`,
   ]);
   return page.workflow_runs ?? [];
+}
+
+function jobsForRun(runId: number): WorkflowJob[] {
+  const page = gh<{ jobs: WorkflowJob[] }>([
+    'api',
+    `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100&filter=latest`,
+  ]);
+  return page.jobs ?? [];
 }
 
 /** Failing jobs, so the caller reads what to fix rather than that something broke. */
@@ -274,6 +319,27 @@ async function main(): Promise<number> {
       return 1;
     }
     if (verdict === 'green') {
+      const ciRun = latest.find((run) => run.path === '.github/workflows/ci.yml');
+      const labels = (pr.labels ?? []).map((l) => l.name);
+      const missing = ciRun ? missingGatedJobs(labels, jobsForRun(ciRun.id)) : [];
+
+      if (ciRun && missing.length > 0) {
+        // Every workflow run on the head reported success -- but a run
+        // reports `success` the moment every job in it either passed or was
+        // skipped, and a job a label gates can be skipped for the same
+        // reason it never ran at all: the label did not exist yet when its
+        // `if:` guard was evaluated. #615 merged on the run-level fact alone
+        // with its interaction shards silently absent; this is what reads
+        // that gap instead of reporting green on an absence of evidence.
+        console.log(
+          `CI RED — pull request #${pr.number}: every workflow run reported success, `
+          + `but the job(s) gated behind ${missing.join(', ')} did not fully run.`
+        );
+        console.log(`  ${ciRun.html_url}`);
+        console.log('Re-push (or re-run the CI workflow) so the label is evaluated against a live run.');
+        return 1;
+      }
+
       console.log(`CI GREEN — pull request #${pr.number}: ${latest.length} workflow run(s) reported success.`);
       return 0;
     }
