@@ -291,6 +291,94 @@ describe('BlastReportModal', () => {
     expect(modal.visible).toBe(false);
   });
 
+  // ── reset(currentReport) threads state.lastBlastReport through so a
+  // save/load round trip doesn't re-arm the modal (#571) ─────────────────
+  //
+  // Bug: reset() never stamped lastShownReport, so closeStaleLevelOverlays()
+  // (called whenever ctx.state is replaced — including after `load`, whose
+  // deserialized state carries a reference-distinct but structurally
+  // identical lastBlastReport) left the modal thinking it had never shown
+  // that report, and the very next update() tick re-armed it.
+
+  it('reset(currentReport) stamps lastShownReport so a subsequent update() call with that same-identity report does not re-arm (#571)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    const original = makeReport({ tick: 100 });
+    state.lastBlastReport = original;
+    openReport(modal, state, setNow);
+    (modal.root.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
+    expect(modal.visible).toBe(false);
+
+    // Simulate closeStaleLevelOverlays(newState) passing the freshly
+    // deserialized state's lastBlastReport — a reference-distinct but
+    // structurally identical report, mirroring a save/load round trip.
+    const reloaded = makeReport({ tick: 100 });
+    modal.reset(reloaded);
+
+    expect(modal.pending).toBe(false);
+    expect(modal.visible).toBe(false);
+
+    const newState = makeState();
+    newState.lastBlastReport = reloaded; // same reference just passed to reset()
+    modal.update(newState);
+
+    expect(modal.pending).toBe(false);
+    expect(modal.visible).toBe(false);
+
+    // Stays closed even once the report's would-be open delay fully elapses.
+    setNow(BLAST_REPORT_DELAY_MS * 20);
+    modal.update(newState);
+
+    expect(modal.pending).toBe(false);
+    expect(modal.visible).toBe(false);
+  });
+
+  it('reset() with no argument leaves lastShownReport at null, same as before — a later new report still arms and opens normally (#571)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    state.lastBlastReport = makeReport({ tick: 100 });
+    modal.update(state); // arms it (pending)
+
+    modal.reset(); // no argument — the pre-#571 call shape
+
+    expect(modal.pending).toBe(false);
+    expect(modal.visible).toBe(false);
+
+    const freshState = makeState();
+    freshState.lastBlastReport = makeReport({ tick: 999 }); // genuinely new report
+    modal.update(freshState);
+    expect(modal.pending).toBe(true); // arms normally — nothing was wrongly suppressed
+
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(freshState);
+    expect(modal.visible).toBe(true);
+  });
+
+  it('reset(currentReport) discards an actively pending report outright — it does not resurrect once discarded, even when currentReport is that exact pending report (#571)', () => {
+    const { modal, setNow } = makeModal();
+    const state = makeState();
+    const pending = makeReport({ tick: 50 });
+    state.lastBlastReport = pending;
+    modal.update(state); // arms `pending`, still waiting out its delay
+    expect(modal.pending).toBe(true);
+
+    // A level transition / save-load lands mid-delay: currentReport here is
+    // that exact same pending report reference (e.g. an immediate reload
+    // before the report ever had a chance to open) — it must never surface.
+    modal.reset(pending);
+
+    expect(modal.pending).toBe(false);
+    expect(modal.visible).toBe(false);
+
+    // Even once its original deadline would have elapsed, on the same state
+    // object with the same report reference, it stays suppressed.
+    setNow(BLAST_REPORT_DELAY_MS);
+    modal.update(state);
+
+    expect(modal.pending).toBe(false);
+    expect(modal.visible).toBe(false);
+  });
+
   it('refreshLocale() does not throw', () => {
     const { modal } = makeModal();
     expect(() => modal.refreshLocale()).not.toThrow();

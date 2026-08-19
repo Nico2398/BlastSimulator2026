@@ -17,7 +17,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { t, setLocale, getLocale } from '../../../src/core/i18n/I18n.js';
 import type { BlastReport } from '../../../src/core/mining/BlastExecution.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
-import { BLAST_REPORT_DELAY_MS } from '../../../src/ui/panels/BlastReportModal.js';
+import { BlastReportModal, BLAST_REPORT_DELAY_MS } from '../../../src/ui/panels/BlastReportModal.js';
 import { setupEvents } from '../../../src/core/events/index.js';
 
 setupEvents();
@@ -405,7 +405,10 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     uiManager.update(state); // delay elapsed — report opens
     expect(uiManager.blastReportModalVisible).toBe(true);
 
-    uiManager.closeStaleLevelOverlays();
+    // A second site's freshly-entered state — mirrors main.ts's
+    // enteredNewLevel guard, which always passes the newly-swapped-in
+    // ctx.state, never the stale one that was just replaced.
+    uiManager.closeStaleLevelOverlays(createGame({ seed: 2, mineType: 'desert' }));
 
     expect(uiManager.blastReportModalVisible).toBe(false);
   });
@@ -414,7 +417,7 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     uiManager = new UIManager(container);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
-    expect(() => uiManager.closeStaleLevelOverlays()).not.toThrow();
+    expect(() => uiManager.closeStaleLevelOverlays(createGame({ seed: 1, mineType: 'desert' }))).not.toThrow();
 
     expect(uiManager.blastReportModalVisible).toBe(false);
   });
@@ -429,19 +432,123 @@ describe('UIManager — closeStaleLevelOverlays (#504)', () => {
     expect(uiManager.blastReportModalPending).toBe(true);
     expect(uiManager.blastReportModalVisible).toBe(false);
 
-    uiManager.closeStaleLevelOverlays();
-
-    expect(uiManager.blastReportModalPending).toBe(false);
-
     // Level-transition semantics: a genuinely fresh GameState, whose
     // lastBlastReport starts null (mirrors the real enteredNewLevel guard) —
     // not a reuse of the same stale state object.
     const freshState = createGame({ seed: 1, mineType: 'desert' });
+    uiManager.closeStaleLevelOverlays(freshState);
+
+    expect(uiManager.blastReportModalPending).toBe(false);
+
     nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
     uiManager.update(freshState);
 
     expect(uiManager.blastReportModalPending).toBe(false);
     expect(uiManager.blastReportModalVisible).toBe(false);
+  });
+});
+
+// ── closeStaleLevelOverlays threads state.lastBlastReport into
+// BlastReportModal.reset so a save/load round trip doesn't re-arm the
+// modal (#571) ───────────────────────────────────────────────────────────
+//
+// loadCommand (src/console/commands/saveload.ts) deserializes into a fresh
+// GameState object whose lastBlastReport is structurally identical to, but a
+// different reference than, the one that was already dismissed. main.ts's
+// enteredNewLevel guard fires on any ctx.state identity change — including
+// `load` — and calls closeStaleLevelOverlays(ctx.state). Before the fix,
+// reset() ignored the report it was handed, so the very next update() tick
+// saw a "new" report (by reference) and re-armed the modal.
+
+describe('UIManager — closeStaleLevelOverlays threads state.lastBlastReport into reset (#571)', () => {
+  let container: HTMLDivElement;
+  let uiManager: UIManager;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    uiManager?.dispose();
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('forwards state.lastBlastReport to BlastReportModal.reset()', () => {
+    const resetSpy = vi.spyOn(BlastReportModal.prototype, 'reset');
+    uiManager = new UIManager(container);
+    const state = makeStateWithReport(10);
+
+    uiManager.closeStaleLevelOverlays(state);
+
+    expect(resetSpy).toHaveBeenCalledWith(state.lastBlastReport);
+  });
+
+  it('forwards null when the freshly-entered state has no blast report yet (new_game/campaign/sandbox entry)', () => {
+    const resetSpy = vi.spyOn(BlastReportModal.prototype, 'reset');
+    uiManager = new UIManager(container);
+    const freshState = createGame({ seed: 1, mineType: 'desert' });
+
+    uiManager.closeStaleLevelOverlays(freshState);
+
+    expect(resetSpy).toHaveBeenCalledWith(null);
+  });
+
+  it('a same-identity report re-observed after closeStaleLevelOverlays(state) does not re-arm the modal — the save/load bug, reproduced at UIManager level', () => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    uiManager = new UIManager(container);
+    const state = makeStateWithReport(10);
+    uiManager.update(state); // arms
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
+    uiManager.update(state); // opens
+    expect(uiManager.blastReportModalVisible).toBe(true);
+
+    (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
+    expect(uiManager.blastReportModalVisible).toBe(false);
+
+    // Simulate a save/load round trip: a fresh GameState whose
+    // lastBlastReport is structurally identical to, but a different
+    // reference than, the one just dismissed.
+    const reloadedState = createGame({ seed: 1, mineType: 'desert' });
+    reloadedState.lastBlastReport = makeBlastReport(10);
+
+    uiManager.closeStaleLevelOverlays(reloadedState);
+
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
+    uiManager.update(reloadedState);
+
+    expect(uiManager.blastReportModalPending).toBe(false);
+    expect(uiManager.blastReportModalVisible).toBe(false);
+  });
+
+  it('a genuinely NEW blast report on the same reloaded state still arms and opens on its normal delay', () => {
+    vi.spyOn(MiniMap.prototype, 'update').mockImplementation(() => {});
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    uiManager = new UIManager(container);
+    const state = makeStateWithReport(10);
+    uiManager.update(state);
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS);
+    uiManager.update(state);
+    (container.querySelector('[data-action="report-close"]') as HTMLButtonElement).click();
+
+    const reloadedState = createGame({ seed: 1, mineType: 'desert' });
+    reloadedState.lastBlastReport = makeBlastReport(10);
+    uiManager.closeStaleLevelOverlays(reloadedState);
+
+    // A brand-new blast fires on the reloaded state — a fresh object, never
+    // shown before.
+    reloadedState.lastBlastReport = makeBlastReport(20);
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10);
+    uiManager.update(reloadedState); // arms the new report
+    expect(uiManager.blastReportModalVisible).toBe(false);
+    expect(uiManager.blastReportModalPending).toBe(true);
+
+    nowSpy.mockReturnValue(BLAST_REPORT_DELAY_MS * 10 + BLAST_REPORT_DELAY_MS);
+    uiManager.update(reloadedState);
+
+    expect(uiManager.blastReportModalVisible).toBe(true);
   });
 });
 
