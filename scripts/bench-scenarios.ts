@@ -33,7 +33,7 @@ import { runCommand } from '../src/console/createRunner.js';
 import { serializeGameState } from '../src/console-api.js';
 import { checkGoalAgainstState } from './shared/scenario-goal.js';
 import {
-  loadScenarioDef, scenarioFiles, formatStepIndex, formatCommandSlug, SCENARIO_DIR,
+  loadScenarioDef, scenarioFiles, formatStepIndex, formatCommandSlug, effectiveStepTimeoutMs, SCENARIO_DIR,
 } from './shared/scenario-utils.js';
 import type { ScenarioStepDef } from './shared/scenario-types.js';
 
@@ -171,7 +171,7 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
 
       for (let s = 0; s < steps.length; s++) {
         const step = steps[s]!;
-        const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
+        const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
         try {
           await Promise.race([
             (async () => {

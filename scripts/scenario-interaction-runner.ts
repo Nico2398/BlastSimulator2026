@@ -11,6 +11,7 @@ import {
   formatStepIndex,
   formatCommandSlug,
   buildScenarioReport,
+  effectiveStepTimeoutMs,
   type ReportableStep,
 } from './shared/scenario-utils.js';
 import {
@@ -97,7 +98,7 @@ export async function runScenarioInteraction(
       const cmdSlug = formatCommandSlug(step.command);
       console.log(`\n--- Step ${i}: ${step.command} ---`);
       let timedOut = false;
-      const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
+      const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
       const timeoutPromise = new Promise<void>((_, reject) =>
         setTimeout(() => { timedOut = true; reject(new Error(`Step ${i} timed out after ${stepTimeout}ms`)); }, stepTimeout)
       );

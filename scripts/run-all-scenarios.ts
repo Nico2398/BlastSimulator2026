@@ -25,6 +25,7 @@ import {
   formatCommandSlug,
   loadScenarioDef,
   buildScenarioReport,
+  effectiveStepTimeoutMs,
   SCENARIO_DIR,
   type ReportableStep,
 } from './shared/scenario-utils.js';
@@ -154,7 +155,7 @@ async function runBatchInteraction(
           const step = steps[s]!;
           const paddedIdx = formatStepIndex(s);
           const cmdSlug = formatCommandSlug(step.command);
-          const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
+          const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
 
           try {
             await Promise.race([
