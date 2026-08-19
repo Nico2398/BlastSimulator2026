@@ -103,8 +103,14 @@ export class BlastReportModal {
   /** Whether a report has arrived but is still waiting out its open delay (#545). */
   get pending(): boolean { return this.pendingReport !== null; }
 
-  /** Discard any in-flight deferred report and close the modal (#545). */
-  reset(): void {
+  /**
+   * Discard any in-flight deferred report and close the modal (#545).
+   * `currentReport` is accepted so a caller replacing ctx.state (#571) can
+   * pass the new state's lastBlastReport — TODO: implement wiring it into
+   * lastShownReport so re-arming after a state swap is suppressed.
+   */
+  reset(currentReport: BlastReport | null = null): void {
+    void currentReport;
     this.pendingReport = null;
     this.pendingDeadlineMs = null;
     this.hide();

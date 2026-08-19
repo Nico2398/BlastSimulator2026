@@ -322,8 +322,14 @@ export class UIManager {
    * so a level transition mid-dialog is not this bug's shape. LevelEndScreen
    * is excluded too — its update() already closes itself the instant
    * state.levelEndReason reads null, which a fresh level's state always is.
+   *
+   * `state` is the freshly-swapped-in GameState (#571) — TODO: implement
+   * threading state.lastBlastReport through to BlastReportModal.reset so a
+   * later save/load that structurally re-creates the same report doesn't
+   * re-arm the modal.
    */
-  closeStaleLevelOverlays(): void {
+  closeStaleLevelOverlays(state: GameState): void {
+    void state;
     this.blastReportModal.reset();
   }
 

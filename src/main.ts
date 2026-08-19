@@ -473,9 +473,9 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // state (e.g. BlastReportModal left open from an earlier site's last
   // blast) — a second `sandbox start` otherwise left that site's "Rating:
   // Perfect" dialog covering the new site's terrain (#504).
-  if (enteredNewLevel) {
+  if (enteredNewLevel && ctx.state) {
     mainMenu.hide();
-    uiManager.closeStaleLevelOverlays();
+    uiManager.closeStaleLevelOverlays(ctx.state);
   }
 
   // (Re)seed the weather cycle whenever ctx.state was replaced with a new
