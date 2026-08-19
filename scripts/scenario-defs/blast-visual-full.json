@@ -713,7 +713,11 @@
     },
     {
       "command": "sequence auto delay_step:25",
+      "description": "#601-followup: leading `resolveEventIfPending` added -- the preceding charge-drain wait's own trailing resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\" (same race vibration-budget.json's own analogous sequence step found and fixed, see its note).",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
@@ -939,7 +943,11 @@
       "timeout": 30,
       "frames": 6,
       "interval": 50,
+      "description": "#601-followup: leading `resolveEventIfPending` added -- same real-time-gap race the preceding `sequence auto` step found and fixed (see its own note): a timer event landing between steps leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"5\"]` with \"element is covered by div\".",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"5\"]"
