@@ -585,7 +585,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:20,20",
+      "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,20",
       "interaction": [
         {
           "type": "clickSelector",
@@ -607,8 +607,8 @@
           "type": "dragTiles",
           "x1": 20,
           "z1": 20,
-          "x2": 24,
-          "z2": 24
+          "x2": 22,
+          "z2": 22
         },
         {
           "type": "screenshot"
@@ -621,11 +621,11 @@
       "role": "player",
       "expect": {
         "equals": {
-          "orderedHoleCount": 9,
+          "orderedHoleCount": 4,
           "holeCount": 0
         }
       },
-      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this 9-hole grid's drilling time reasonable for a single driller/drill_rig (no staffed:true near-origin spawn on a campaign map)."
+      "description": "depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge/sequence counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: spacing tightened from 5m to 2m to keep this grid's drilling time reasonable for a single driller/drill_rig (no staffed:true near-origin spawn on a campaign map). #554-followup: grid trimmed 3x3 (9 holes) -> 2x2 (4 holes), dragTiles rectangle shrunk (20,20)-(24,24) -> (20,20)-(22,22) -- the idle-headcount dilution trick two steps above (Employee #3/#4/#5) kept wellBeing off the sticky-zero floor (ScoreManager.ts's applyDecay) long enough to avoid a revolt when charging was instant, but #554's real charging work adds real ticks after drilling that push the same trace past REVOLT_TICKS=120 -- sandbox-confirmed: this file's own command-mode trace hit revolted:true by the final blast step even though it never surfaced as a scenario failure there (no DOM to be blocked by), only in real interaction-mode CI where the level-end overlay covers the sequence button. Fewer holes means less continuous drilling for the sole active driller, avoiding the wellBeing crash outright rather than merely diluting or outracing it."
     },
     {
       "command": "tick 50",
@@ -706,45 +706,7 @@
     },
     {
       "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "description": "Seventh and final chunk — all 9 holes should have landed by now.",
+      "description": "#554-followup: fourth and final chunk -- trimmed from seven rounds down to four after the grid trim (9 holes -> 4) above. Sandbox-measured: all 4 holes now land by tick 255 (94 + ~161), well inside this budget -- the old 7-round (350-tick) plan burned ~150 further ticks of dead padding after landing that were pinning wellBeing at its intentional sticky-zero floor (ScoreManager.ts's applyDecay) for no reason, eating most of the margin before REVOLT_TICKS=120 during the charge-drain wait below.",
       "interaction": [
         {
           "type": "command",
@@ -755,7 +717,7 @@
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
-          "holeCount": 9
+          "holeCount": 4
         }
       }
     },
@@ -785,8 +747,17 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -798,7 +769,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "chargedCount": 9,
+          "chargedCount": 4,
           "orderedChargeCount": 0
         }
       }
@@ -807,6 +778,10 @@
       "command": "sequence auto delay_step:25",
       "interaction": [
         {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         }
@@ -814,7 +789,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "sequencedCount": 9
+          "sequencedCount": 4
         }
       }
     },

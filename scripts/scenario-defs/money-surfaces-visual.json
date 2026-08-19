@@ -121,8 +121,17 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -191,9 +200,19 @@
       }
     },
     {
-      "command": "contract accept id:2",
-      "timeout": 30,
-      "description": "#513 fix landed: offered-contract cards now carry `data-contract-id`, so negotiating contract 1 and accepting contract 2 specifically is a reliable, scoped click instead of only ever reaching \"the first offer\". Converted from three commands to real clicks: open the contracts panel, negotiate on card 1's own `[data-action=\"negotiate\"]`, then accept on card 2's own `.bs-contract-accept`.",
+      "command": "contract list",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "contract list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "contract accept type:ore_sale",
+      "timeout": 75,
+      "description": "#513 fix landed: offered-contract cards now carry `data-contract-id`, so negotiating one contract and accepting a different one specifically is a reliable, scoped click instead of only ever reaching \"the first offer\". Converted from three commands to real clicks: open the contracts panel, negotiate on a rubble_disposal card's own `[data-action=\"negotiate\"]`, then accept a different (ore_sale) card's own `.bs-contract-accept`. #554-followup (issue #586 CI): the fixed ids (`data-contract-id=\"1\"`/`\"2\"`, `contract accept id:2`) drifted out of the offer pool -- CONTRACT_REFRESH_INTERVAL=20 ticks (Contract.ts) keeps rotating ids out from under a fixed reference, and #554's real per-hole charging added a whole extra queue-drain wait (the `wait_until field:orderedChargeCount` step above) worth of additional elapsed ticks before this step ever runs, on top of the drift class already fixed the same way in core-loop-visual.json/economy-full-loop.json/safety-projection-visual.json. Direct trace at the point this step actually runs (tick 79, command mode) shows 8 offers including 2 rubble_disposal (ids 1, 7) and 1 ore_sale/sparkium (id 2, the original hardcoded target) among others -- retargeted by `type:` (ContractSelector, #597) instead: `type:rubble_disposal` for negotiate (any offer of that type; this file never cares which specific rubble contract, only that negotiating one and accepting a different one are two distinct real clicks) and `type:ore_sale` for accept (distinct type from the negotiate target, so the two clicks can never collide on the same card even if the exact id/material drifts). `command` also switched from the stale `id:2` to `type:ore_sale` so command mode and interaction mode target the same kind of contract. Timeouts widened (30s waitForSelector, 75s step budget) for the same real-time-vs-game-tick throughput reason as economy-full-loop.json's own contract-accept fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -201,19 +220,21 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] [data-action=\"negotiate\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] [data-action=\"negotiate\"]",
+          "timeout": 30000
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] [data-action=\"negotiate\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] [data-action=\"negotiate\"]"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept",
+          "timeout": 30000
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-accept"
         }
       ],
       "role": "player"

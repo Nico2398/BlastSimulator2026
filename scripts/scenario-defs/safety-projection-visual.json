@@ -194,7 +194,7 @@
     },
     {
       "command": "tick 50",
-      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). Sandbox-measured landing at tick 400 (8 chunks) for this 16-hole grid with the staffed roster's single driller.",
+      "description": "#553: drain the ordered plan in bounded 50-tick chunks -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts). Sandbox-measured landing at tick 300 (6 chunks) for this 16-hole grid with the staffed roster's single driller (#554-followup, issue #586 CI: the file previously ran 8 chunks/400 ticks -- a direct trace showed the extra 2 chunks were dead padding past the point all 16 holes had already landed, trimmed below).",
       "interaction": [
         {
           "type": "command",
@@ -290,45 +290,7 @@
     },
     {
       "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player"
-    },
-    {
-      "command": "tick 50",
-      "description": "Eighth and final chunk — all 16 holes should have landed by now.",
+      "description": "Sixth and final chunk — all 16 holes should have landed by now. Two further chunks (300->400 ticks) were dropped here (#554-followup, issue #586 CI): a direct trace showed all 16 holes already landed by tick 300 (end of this chunk) with orderedHoleCount already 0, so the extra 100 ticks the file used to spend past that point were pure padding -- and exactly that padding pushed wellBeing's already-zero streak (pinned at 0 since ~tick 300, REVOLT_TICKS=120, WorkerRevolt.ts) past the revolt threshold during the charge-order wait_until step below, ending the level via worker_revolt before the auto-sequence click ever got a chance to run as real, clickable UI -- the interaction-mode `[data-step=\"3\"]` click that surfaced the real CI failure needs the sequence panel to still be reachable, which a worker_revolt's full-viewport LevelEndScreen overlay permanently prevents. Trimming the dead padding keeps the level alive long enough for charge/sequence/blast to run as genuine player interaction, same fix and same reasoning as core-loop-visual.json's identical dead-padding-before-revolt finding.",
       "interaction": [
         {
           "type": "command",
@@ -410,8 +372,17 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",

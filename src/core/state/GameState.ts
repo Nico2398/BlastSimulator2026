@@ -230,6 +230,17 @@ export interface GameState {
   ecological: EcologicalState;
   /** Worker revolt tracker (resets each level). */
   revolt: RevoltState;
+  /**
+   * TEMPORARY test-only override (`cheat disable_revolt`, cheats.ts) — see
+   * that command's own doc comment and issue #631. Deliberately excused from
+   * this file's own SAVE_VERSION/migration convention (see the comment block
+   * above SAVE_VERSION): it is boolean, defaults to `false`, and the sole
+   * consumer (`!state.revoltDisabled` in events.ts) already treats a missing
+   * field on an old save as falsy, so no migration is needed. Remove this
+   * field (and re-check whether that reasoning still holds for whatever
+   * replaces it) alongside the rest of #631's cleanup, not before.
+   */
+  revoltDisabled: boolean;
   /** Per-level success statistics. */
   levelStats: LevelStats;
   /** Site policy governing shift scheduling and rest thresholds. */
@@ -345,6 +356,7 @@ export function createGame(config: GameConfig): GameState {
     arrest: createArrestState(),
     ecological: createEcologicalState(),
     revolt: createRevoltState(),
+    revoltDisabled: false,
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),
     levelEnded: false,

@@ -178,7 +178,7 @@ const KNOWN_COMMANDS = [
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'preview', 'blast_preview', 'install_tubing',
   'build_ramp', 'set_policy', 'terrain_info', 'help',
-  'blast_plan', 'needs', 'save', 'load',
+  'blast_plan', 'needs', 'save', 'load', 'cheat',
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */
@@ -608,6 +608,33 @@ describe('Dual-play scenario steps — data-driven validation', () => {
             expect(action.maxTicks).toBeGreaterThan(0);
             expect(Number.isInteger(action.timeoutMs)).toBe(true);
             expect(action.timeoutMs).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+
+    it(`${name} — outer step timeout covers every inner waitUntil/resolveEventIfPending timeoutMs`, () => {
+      // Regression for PR #616's headline bug: interaction-executor.ts and
+      // the step runner race a step's own outer `timeout` (seconds,
+      // defaults to 60s) against an inner action's `timeoutMs` (ms)
+      // independently. When the outer fires first it produces a generic
+      // "Step N timed out after 60000ms" instead of the action's own,
+      // more useful error — 12 steps across 3 files shipped with this
+      // mismatch undetected. `resolveEventIfPending.timeoutMs` defaults to
+      // 30000 (interaction-executor.ts) when absent, same default used here.
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        if (!stepObj.interaction) continue;
+        const outerMs = (stepObj.timeout ?? 60) * 1000;
+        for (const action of stepObj.interaction) {
+          if (action.type === 'waitUntil') {
+            expect(action.timeoutMs).toBeLessThanOrEqual(outerMs);
+          } else if (action.type === 'resolveEventIfPending') {
+            const innerMs = action.timeoutMs ?? 30000;
+            expect(innerMs).toBeLessThanOrEqual(outerMs);
           }
         }
       }

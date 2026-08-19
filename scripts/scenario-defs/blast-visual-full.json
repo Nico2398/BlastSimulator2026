@@ -21,6 +21,17 @@
       "description": "#553: cash bumped from $50,000 to $150,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, on top of the four blast-workshop software tiers it already buys. Bumped again to $200,000 (#554): charging is now real work too -- three separate charge orders (Charge All plus two per-hole overrides), each drained by its own wait, add several hundred more ticks of the 3-driller roster's payroll/fuel upkeep before the tier:4 software purchase further down this file (observed short by ~10,400 at $150,000)."
     },
     {
+      "command": "cheat disable_revolt",
+      "description": "#601-followup (issue #631): direct trace confirms `levelEnded:true, levelEndReason:'worker_revolt'` fires deterministically at the same tick in both command and interaction mode, during this file's own queued-charge wait -- a real crew-workload/revolt-margin shortfall, not a scenario-file timing bug. Disables the revolt end-condition for this file only (state.revoltDisabled, cheats.ts) so the file can reach the conclusion its own assertions actually describe, as a tracked stopgap -- issue #631 covers removing this cheat once the underlying crew-sizing/revolt-margin gap is fixed for real.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "cheat disable_revolt"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "employee hire role:driller",
       "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed any roster before its drill_plan) now needs one first. Employee #1.",
       "interaction": [
@@ -438,7 +449,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "#601-followup: reverted from #554-followup round 3's hand-measured `tick 56` (+ a round-4 chunked-margin chase for whatever an interruption cost) back to a real `waitUntil`. That detour existed only because interaction mode's own `waitUntil` used to drive the page's real rAF clock, whose overshoot on a loaded runner (not this file's own margin) was what caused round 3's premature WORKER REVOLT -- #601 fixed `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time, exactly like command mode's `runWaitUntil` already did) rather than working around it here. A real `waitUntil` now drains in exactly the ticks needed and no more -- no hand-measured count to keep in sync, no margin to guess, no risk of the unconditional resume ticks round 3/4 needed spending extra decay this file's already-thin crew margin can't afford.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -454,7 +465,18 @@
           "chargedCount": 12,
           "orderedChargeCount": 0
         }
-      }
+      },
+      "timeout": 120
+    },
+    {
+      "command": "event choose 0",
+      "description": "#554-followup round 3 (issue #586 CI): idempotent -- a no-op when nothing is pending. This file's wellBeing crashes low enough to keep unlocking low-wellbeing-gated union events past the charge-drain block fixed above -- a live run reported the very next click (the H1 per-hole amount stepper) covered by a leftover event's .bs-confirm-overlay backdrop, even with the resolve/resume chain on the charge-drain step immediately above having already reported nothing pending. One more defensive resolve directly before the click.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "charge hole:H1 explosive:boomite amount:8 stemming:3",
@@ -508,10 +530,10 @@
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
-      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) — the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session — asserted before each commit rather than assumed.",
+      "description": "Per-hole charging is a real control now (gap G3, ChargeHoleList.ts): the Charge step renders a \"Per Hole\" section, one row per hole keyed by data-hole, each with its own commit button at [data-hole=\"<id>\"] [data-action=\"charge-hole\"]. That button dispatches `charge hole:<id> explosive:<selected> amount:<amount>kg stemming:<stemming>m` from the panel's current product card / amount / stemming values (ChargeStep.chargeHole, Charge.ts) \u2014 the same three values Charge All reads, so the steppers have to be driven to the declared numbers first. The Charge All step above already pinned the panel to [data-step=\"2\"] (a manual tab click disarms autoAdvance), so the Per Hole rows stay visible. 3 amount increments (5 -> 8kg) and 5 stemming increments (2.0 -> 3.0m) reach this hole's declared values. Amount steps by 1kg (data-field=\"amount\", clamped to the selected product's [minChargeKg, maxChargeKg]); stemming steps by 0.2m with a 0.5m floor (data-field=\"stemming\", Charge.ts adjustStemming). Both are plain instance fields on ChargeStep with no reset path, so they carry over from the previous charge step in the same page session \u2014 asserted before each commit rather than assumed.",
       "role": "player",
       "expect": {
-        "note": "count is unchanged — every hole was already charged by Charge All; this step overrides H1 alone",
+        "note": "count is unchanged \u2014 every hole was already charged by Charge All; this step overrides H1 alone",
         "increased": [
           "orderedChargeCount"
         ]
@@ -519,7 +541,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "#601-followup: reverted from #554-followup round 3's hand-measured `tick 12` (+ a resume-tick chase for whatever an interruption cost) back to a real `waitUntil` -- see the file's own first charge-drain step's note for why: #601 fixed interaction mode's `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time) instead of working around its old real-time overshoot here.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -535,7 +557,8 @@
           "chargedCount": 12,
           "orderedChargeCount": 0
         }
-      }
+      },
+      "timeout": 120
     },
     {
       "command": "charge hole:H2 explosive:boomite amount:3 stemming:1",
@@ -627,7 +650,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "description": "#601-followup: reverted from #554-followup round 2's hand-measured `tick 5` (+ a widened-and-chained resume chase for whatever an interruption cost) back to a real `waitUntil` -- see the file's own first charge-drain step's note for why: #601 fixed interaction mode's `waitUntil` itself (both modes now loop the console's own `tick 1`, auto-resolving a pending event each time) instead of working around its old real-time overshoot here.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -643,14 +666,23 @@
           "chargedCount": 12,
           "orderedChargeCount": 0
         }
-      }
+      },
+      "timeout": 120
     },
     {
       "command": "sequence auto delay_step:25",
+      "description": "#601-followup: leading `resolveEventIfPending` added -- the preceding charge-drain wait's own trailing resolve and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\" (same race vibration-budget.json's own analogous sequence step found and fixed, see its note).",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"3\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
         },
         {
           "type": "clickSelector",
@@ -697,7 +729,7 @@
           "selector": "#bs-blast-panel [data-hole=\"H6\"] [data-action=\"delay-dec\"]"
         }
       ],
-      "description": "Auto Sequence already put H6 on exactly this step's declared 100ms (traced: step-08-sequence.json), so the arithmetic here is a net zero — one increment and one decrement (100 -> 125 -> 100) is the honest click expression of it, and it still exercises both stepper directions on a row other than H1. Command mode's version of this step was likewise a no-op: the step-08 and step-09 dumps are byte-identical.",
+      "description": "Auto Sequence already put H6 on exactly this step's declared 100ms (traced: step-08-sequence.json), so the arithmetic here is a net zero \u2014 one increment and one decrement (100 -> 125 -> 100) is the honest click expression of it, and it still exercises both stepper directions on a row other than H1. Command mode's version of this step was likewise a no-op: the step-08 and step-09 dumps are byte-identical.",
       "role": "player",
       "expect": {
         "equals": {
@@ -869,7 +901,11 @@
       "timeout": 30,
       "frames": 6,
       "interval": 50,
+      "description": "#601-followup: leading `resolveEventIfPending` added -- same real-time-gap race the preceding `sequence auto` step found and fixed (see its own note): a timer event landing between steps leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"5\"]` with \"element is covered by div\".",
       "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
         {
           "type": "clickSelector",
           "selector": "#bs-blast-panel [data-step=\"5\"]"

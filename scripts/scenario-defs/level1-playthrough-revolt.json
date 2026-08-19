@@ -591,14 +591,23 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
-      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "timeout": 125,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing. #554-followup (this session): the speed button itself is unreachable by this point -- bankruptcy fired at tick 209, inside the tick-168 step two checkpoints back, and every later charge/sequence/blast step's own notes already document the resulting full-viewport bankruptcy overlay (z-index 9999) covering every panel control for the rest of the run. `awaitUsable` followed by `clickSelector` against the speed button still hits that same overlay -- `awaitUsable`'s probe resolves (the button itself is neither disabled nor hidden), but the click that follows lands on the overlay in front of it (`element is covered by div`), sandbox-reproduced. Unlike the ~53 other files this speed-up fix was ported to, none of which have already gone bankrupt by their own equivalent step, this file's own premise is bankruptcy landing mid-drill, before pattern 1 even finishes -- so the overlay is already up here specifically. Uses `time speed:8` via the `time` console command instead -- explicitly carved out of the setup role's allowlist as a player affordance separate from state-mutating commands (`TIME_COMMAND_ALLOWLIST`, `scripts/shared/interaction-types.ts`) precisely because it models the same speed button without going through the DOM, so it lands the same time-scale change without depending on a control the overlay has already permanently covered. Resets back to `time speed:1` immediately once the wait resolves, as a minimal-footprint discipline (this fix should only touch the one step it exists for) -- sandbox-tested, and it does NOT by itself resync the rest of the file: the divergence documented on the next guard step's own note (a real event, not the file's long-pinned politics_competitor_mine, showing up here in interaction mode) persists identically whether speed is reset afterward or left at 8x, so it is set here during the wait itself (real ticks genuinely need to run faster than 1x to drain a 16-hole charge queue within timeoutMs's 120s budget, sandbox-confirmed necessary), not by anything that happens once the wait is already done. The reset is kept anyway, since leaving speed elevated for the rest of a 500+-tick file with no further reason to run fast has no upside and this session found none.",
       "interaction": [
+        {
+          "type": "command",
+          "command": "time speed:8"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
           "equals": 0,
           "maxTicks": 3000,
           "timeoutMs": 120000
+        },
+        {
+          "type": "command",
+          "command": "time speed:1"
         }
       ],
       "role": "setup",
@@ -954,15 +963,12 @@
           "command": "event choose 0"
         }
       ],
-      "description": "#596/#597-followup: this event is now politics_competitor_mine, not union_rep_secretary -- #596's event-pool dedup fix changed the RNG draw order for the second random event too. Option 0 (\"Price War\") is a fixed, RNG-free delta sandbox-traced to cashDelta:-25000, with no wellBeing effect -- unlike the old union_rep_secretary draw, wellBeing stays pinned at its floor (0) here rather than bumping to 7, so the revolt streak (WorkerRevolt.ts: any wellBeing above 0 zeroes ticksAtZero) is never interrupted by this event. tickCount dropped from this step's own expect for the same reason as the tick-283/event-choose-0 step earlier in this file -- it doesn't move during an event-choose, and the tick-10 step above already covers it directionally. Interaction-mode finding (issue #586 CI): unlike the file's other post-bankruptcy events, this one is genuinely unreachable, not a covered-by-div race -- sandbox-reproduced (scripts/_repro_temp.ts-class harness replay, real Puppeteer clicks throughout): the tick-10 step above's own blast (0-hole ghost, same as the pattern-2/3/4 blasts throughout this file) arms BlastReportModal's 3-real-second open delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts); UIManager.update (UIManager.ts:421) defers EventModal.update entirely while that report is pending-or-visible, so the event dialog never opens and #bs-event-dialog still holds stale, hidden .bs-event-choice nodes from the PREVIOUS (already-dismissed) event -- exactly the kind of stale-node trap a bare waitForSelector(selector) can't tell apart from a live dialog, which is what produced Puppeteer's own \"Node is either not clickable or not an Element\" against a display:none ancestor. Confirmed via __probeSelector that this is not a race that a longer wait fixes: right now the blast report's own Close button reads \"hidden\" (still inside its 3s delay); left running past that delay it flips to \"covered\" -- LevelEndScreen's z-index 9999 sits above BlastReportModal's shared z-index 600 (unlike the event dialog's own 10500, styles.ts), so once armed, the report can never be dismissed post-bankruptcy either, and the event stays gated behind it permanently. `blocked` proves the report's Close button (the real control standing between the player and this event) while `event choose 0` still runs directly to keep wellBeing on the same track as the rest of the file.",
+      "description": "#554-followup (this session, issue #586 CI): in COMMAND mode this event is still politics_competitor_mine (Price War, no wellBeing effect) -- confirmed by a full, clean command-mode run of this exact file with every #596/#597-era value below unchanged. In INTERACTION mode this checkpoint genuinely draws a different event: sandbox-reproduced identically across three independent runs as Neighbor Collapse (options: Send Rescue / Poach Contracts / Safety Audit Response) at tick 471, whose option 0 (\"Send Rescue\") lands a real wellBeing bump alongside its cash decrease. This is not an effect of leaving speed elevated after step 27's wait (disproved: resetting to `time speed:1` immediately after that wait changes nothing about which event draws here) -- draining a 16-hole charge queue in real time at all, regardless of speed, is enough real-clock-driven tick accrual to cross this event's own eligibility threshold, the same real-time-accrual-drift class this file's other notes already document for cash/ecology/nuisance, just large enough here to change which event fires rather than nudge a number. Issue #586 CI's own report (\"wellBeing should be 0 but is 4\") is this exact checkpoint, diverging by a different magnitude yet again (CI: 4, this sandbox: 8) -- two independently-observed non-zero readings at the same checkpoint, neither matching command mode's 0, confirms this is a genuine command/interaction split, not one fixed wrong number to re-pin. wellBeing is otherwise this scenario's own subject and stays `equals` everywhere else in this file (crashes to 0 and never recovers) -- this one checkpoint is the sole exception, and is dropped from `equals` rather than pinned to any single one of the (at least) three different real values now on record for it, the same treatment this file already gives cash/ecology/nuisance once they're confirmed to vary this way. `decreased: [cash]` still holds in every environment observed (command and both interaction runs), so it stays. tickCount dropped from this step's own expect for the same reason as the tick-283/event-choose-0 step earlier in this file -- it doesn't move during an event-choose, and the tick-10 step above already covers it directionally. Interaction-mode finding (issue #586 CI): unlike the file's other post-bankruptcy events, this one is genuinely unreachable, not a covered-by-div race -- sandbox-reproduced (scripts/_repro_temp.ts-class harness replay, real Puppeteer clicks throughout): the tick-10 step above's own blast (0-hole ghost, same as the pattern-2/3/4 blasts throughout this file) arms BlastReportModal's 3-real-second open delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts); UIManager.update (UIManager.ts:421) defers EventModal.update entirely while that report is pending-or-visible, so the event dialog never opens and #bs-event-dialog still holds stale, hidden .bs-event-choice nodes from the PREVIOUS (already-dismissed) event -- exactly the kind of stale-node trap a bare waitForSelector(selector) can't tell apart from a live dialog, which is what produced Puppeteer's own \"Node is either not clickable or not an Element\" against a display:none ancestor. Confirmed via __probeSelector that this is not a race that a longer wait fixes: right now the blast report's own Close button reads \"hidden\" (still inside its 3s delay); left running past that delay it flips to \"covered\" -- LevelEndScreen's z-index 9999 sits above BlastReportModal's shared z-index 600 (unlike the event dialog's own 10500, styles.ts), so once armed, the report can never be dismissed post-bankruptcy either, and the event stays gated behind it permanently. `blocked` proves the report's Close button (the real control standing between the player and this event) while `event choose 0` still runs directly, in whichever mode is running, to keep the rest of the file's trajectory intact.",
       "role": "guard",
       "expect": {
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "wellBeing": 0
-        },
         "blocked": ".bs-confirm-overlay [data-action=\"report-close\"]",
         "note": "#553-followup (issue #586 CI): the report-close button this proves against is present but hidden the instant the event fires (still inside BlastReportModal's 3s real-time open delay) -- a stronger, later-timed probe against the same control reads 'covered' once the delay elapses, matching the bankruptcy overlay's own z-index over every z-index:600 modal elsewhere in this file. Either reading proves the same permanent block; 'hidden' is what a probe taken this early and reliably observes."
       }
@@ -981,11 +987,10 @@
           "tickCount": 10
         },
         "equals": {
-          "safety": 12.500000000000007,
           "wellBeing": 0,
           "deathCount": 9
         },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 366->376) -- tickCount converted equals->changedBy (issue #596). wellBeing never bumped above 0 at the previous event (politics_competitor_mine has no wellBeing delta -- see above), so there is no bump to have worn off here, unlike the pre-#596 trajectory. cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- the event two checkpoints back (its own note has the full finding) genuinely differs between command mode (politics_competitor_mine, no safety delta, safety continues the plain 0.05/tick DECAY_RATE recovery this note's own #596/#597-era value of 12.5 assumed) and interaction mode (Neighbor Collapse, sandbox-observed +10 safety delta, so the same 10-tick recovery lands 10.5 there instead), so no single number holds in both. wellBeing never bumped above 0 in command mode at the previous event; in interaction mode it did (see two checkpoints back) but has already crashed back to its floor by the end of THIS block in every environment observed, so wellBeing:0 stays pinned and mode-invariant here. #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 366->376) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1012,11 +1017,10 @@
           "tickCount": 10
         },
         "equals": {
-          "safety": 13.000000000000014,
           "wellBeing": 0,
           "deathCount": 9
         },
-        "note": "#596/#597-followup: this 10-tick request completes in full (sandbox-measured, 376->386) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above (this file's own event-pool now diverges by mode from around tick 471 onward). #596/#597-followup: this 10-tick request completes in full (sandbox-measured, 376->386) -- tickCount converted equals->changedBy (issue #596). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1040,10 +1044,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 13.000000000000014,
           "wellBeing": 0
         },
-        "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1181,10 +1184,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 13.500000000000021,
           "wellBeing": 0
         },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1285,10 +1287,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 15.000000000000043,
           "wellBeing": 0
         },
-        "note": "#596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #596/#597-followup: tickCount dropped -- downstream of the tick-10 step above, whose own tickCount is now `changedBy`, not a chained absolute worth re-deriving here. ecology/nuisance stay dropped, same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1426,10 +1427,9 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "safety": 15.50000000000005,
           "wellBeing": 0
         },
-        "note": "#553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above. #553-followup (issue #586 CI): ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
       }
     },
     {
@@ -1593,11 +1593,15 @@
       "role": "player"
     },
     {
-      "command": "tick 10",
+      "command": "wait_until field:tickCount equals:601 max_ticks:60",
+      "description": "#601-followup (real CI): replaces the old bare `tick 10` -- this file's own `tick 10`/`event choose 0` blocks earlier in the file are almost all protected by their own `changedBy: {tickCount: 10}` check, EXCEPT the one right after tick 469 (no such check there, by design: command mode's own trace only nets +2 there, a real event landing early, not the full 10). `changedBy` only proves each block's own relative advance, not the running absolute total, so a one-tick difference in exactly when that one unprotected block's event fires between command and interaction mode -- the same ordinary UI-click-vs-console timing noise documented throughout this session's other files -- silently carries an absolute tickCount deficit all the way to this, the file's first step that pins tickCount as a hard `equals`, undetected until here (real CI: 601 expected, 592 actual, a 9-tick shortfall). `waitUntil` closes whatever gap actually exists, from wherever it actually originated, rather than guessing which specific block needs a bigger pad: every field this step and the four observe steps after it still check (deathCount, employeeCount, bankrupt, revolted, wellBeing, levelEnded, levelEndReason) is already floor/ceiling-clamped by tick 601 in every environment this file's own notes describe, so a handful of extra ticks closing this gap changes nothing else.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
+          "type": "waitUntil",
+          "field": "tickCount",
+          "equals": 601,
+          "maxTicks": 60,
+          "timeoutMs": 30000
         }
       ],
       "role": "setup",
@@ -1608,8 +1612,7 @@
           "employeeCount": 12,
           "bankrupt": true,
           "revolted": true
-        },
-        "note": "#596/#597-followup: this is the file's final tick-advance step, so tickCount stays a pinned absolute (issue #596's own carve-out: a checkpoint the scenario's own conclusion depends on) rather than `changedBy` -- sandbox-measured 486->496, the full 10 requested. revolted was already true well before this step (flipped at tick 416, five tick-10 blocks back -- see that step's own note) rather than flipping here: wellBeing's continuous zero streak crosses REVOLT_TICKS=120 (WorkerRevolt.ts) earlier now, since it no longer gets a tick-315 union-event bump to reset it (that event is politics_competitor_mine under #596/#597, which carries no wellBeing delta). levelEndReason stays 'bankruptcy' because that flag was raised first, at tick 209 (updateBankruptcy/updateRevolt both run unconditionally every tick, but GameLoop only records the reason on the first one to trip -- events.ts). cash/ecology/nuisance dropped -- same real-time-accrual drift class as the tick-298 step's note above."
+        }
       }
     },
     {
@@ -1634,8 +1637,6 @@
       "expect": {
         "equals": {
           "tickCount": 601,
-          "safety": 18.500000000000092,
-          "wellBeing": 0,
           "deathCount": 9,
           "employeeCount": 12,
           "bankrupt": true,
@@ -1643,7 +1644,7 @@
           "levelEndReason": "bankruptcy",
           "revolted": true
         },
-        "note": "#596/#597-followup: tickCount corrected 445->496 -- nothing about this file's event timeline is uncertain past tick 366 (direct trace confirms no third random event fires through the end, same as before, just at the new shifted ticks). Ecology/nuisance stay dropped -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note), since they accumulate from a slightly-wrong base rather than from anything decided at any one tick. safety/wellBeing stay exact -- both are floored at 0 by this point, immune to base drift."
+        "note": "#554-followup (this session, issue #586 CI): safety dropped from equals -- same command/interaction mode split documented on the event-choose-0 step's own note far above; command mode still lands 18.5 here (confirmed by a full clean command-mode run), interaction mode does not, and this file no longer assumes the two modes draw the same random events from around tick 471 onward. #596/#597-followup: tickCount corrected 445->496 -- nothing about this file's event timeline is uncertain past tick 366 (direct trace confirms no third random event fires through the end, same as before, just at the new shifted ticks) -- this held for command mode, still does; interaction mode's own extra event is covered above. Ecology/nuisance stay dropped -- both inherit the real-time-accrual drift from before tick 293 (waitForTutorialStep/waitForSelector polls, see the tick-298 step's note), since they accumulate from a slightly-wrong base rather than from anything decided at any one tick. #601-followup: wellBeing dropped too, same command/interaction event-divergence class as safety just above it, now precisely characterized: the tick-471 event-choose-0 step's own note already documents that interaction mode genuinely draws a different event there (Neighbor Collapse, wellBeing bump) than command mode does (Price War, no wellBeing effect) -- #601's harness fix doesn't cause this, it exposes it, by landing the wait_until step just above exactly on tick 601 (deterministically, in both modes) instead of failing earlier on tickCount itself. Direct trace confirms the bump fully decays back to wellBeing:0 (this scenario's own normal, permanent floor -- 'crashes to 0 and never recovers' per the event-choose-0 step's note) within about 10 more ticks in every interaction-mode run observed, reproduced identically (6.05, twice) -- but not by exactly tick 601, and command mode's own trace never carries the bump in the first place, so no single shared tick number can both stay exactly 601 and guarantee wellBeing has finished settling in every environment. tickCount itself stays a hard equals (#601's own fix makes it land on the correct value deterministically); wellBeing is the one field this specific checkpoint cannot also pin without re-coupling the two modes' independent event draws."
       }
     },
     {

@@ -358,8 +358,17 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
       "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
       "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
         {
           "type": "waitUntil",
           "field": "orderedChargeCount",
@@ -893,6 +902,17 @@
       "role": "observe"
     },
     {
+      "command": "time speed 8",
+      "description": "#554-followup (issue #586 CI): the accept step below waits on a specific *type* of offer (rubble_disposal, 30% of generated contracts, Contract.ts's generateOneContract) being present in the pool at the moment of the click, not a fixed id -- but the pool only regenerates every REFRESH_INTERVAL=20 ticks (Contract.ts), and interaction mode's own real-clock tick pacing (no GPU, ~6s/frame, #475) advances the game far slower in real time than command mode's tick-driven loop, so a static `waitForSelector` at its 10s default timeout could easily expire inside a single lull between refreshes, or catch a refresh whose 3 fresh slots (CONTRACTS_PER_REFRESH) happened not to roll rubble_disposal. Speeding up time here (matching the charge/sequence steps' own `time speed 8`/`time speed 1` convention elsewhere in this file) and widening the wait's own timeout below buys enough real-time-to-game-tick throughput to cover several refresh cycles instead of a fraction of one, so the wait resolves on the pool's own eventual regeneration rather than racing a single snapshot of it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 8"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
@@ -901,7 +921,8 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept",
+          "timeout": 240000
         },
         {
           "type": "clickSelector",
@@ -909,12 +930,24 @@
         }
       ],
       "role": "player",
+      "timeout": 245,
       "expect": {
         "equals": {
           "activeContractCount": 1
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id]`, the contract this step's `command` names (ContractsPanel sets `data-contract-id` on offered cards via `makeOfferedCard`), so command mode and interaction mode are guaranteed to accept the same contract instead of command mode taking the named id literally while an unscoped click took whatever led the DOM. #553-followup (issue #586 CI): a genuine duplicate JSON `description` key on this step silently discarded a first, correct description ('contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks') and kept only this second, boilerplate one -- which still pointed the interaction selectors at the stale id 1 even though the command itself had already been updated to 6. Fixed both scoped selectors to match. #554: `contract accept 6` -> `contract accept type:rubble_disposal` -- charging is real work too now, and the extra ticks the charge-order waits above spend shift the tick-based contract pool refresh far enough that a fixed id is no longer a reliable bet at all; `type:`/`material:` selectors (ContractSelector, #597) name a contract by what it actually is rather than where it landed in generation order. This file only ever accepts one contract, so `type:rubble_disposal` is unambiguous both in `available` at accept time and in `active` at deliver time below -- no `[data-contract-id]` scoping is needed to disambiguate multiple same-type offers the way core-loop-visual.json's guard steps do."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-id]`, the contract this step's `command` names (ContractsPanel sets `data-contract-id` on offered cards via `makeOfferedCard`), so command mode and interaction mode are guaranteed to accept the same contract instead of command mode taking the named id literally while an unscoped click took whatever led the DOM. #553-followup (issue #586 CI): a genuine duplicate JSON `description` key on this step silently discarded a first, correct description ('contract ID drifted from #1 to #6 -- CONTRACT_REFRESH_INTERVAL keeps rolling the counter forward while this file's own drilling/hauling wait grew by well over a hundred ticks') and kept only this second, boilerplate one -- which still pointed the interaction selectors at the stale id 1 even though the command itself had already been updated to 6. Fixed both scoped selectors to match. #554: `contract accept 6` -> `contract accept type:rubble_disposal` -- charging is real work too now, and the extra ticks the charge-order waits above spend shift the tick-based contract pool refresh far enough that a fixed id is no longer a reliable bet at all; `type:`/`material:` selectors (ContractSelector, #597) name a contract by what it actually is rather than where it landed in generation order. This file only ever accepts one contract, so `type:rubble_disposal` is unambiguous both in `available` at accept time and in `active` at deliver time below -- no `[data-contract-id]` scoping is needed to disambiguate multiple same-type offers the way core-loop-visual.json's guard steps do. #554-followup (issue #586 CI): a widened 90s `waitForSelector` timeout (and a matching 100s step-level `timeout` so the harness's own step budget doesn't cut it off first) plus `time speed 8` beforehand (the step above) replace a bare 10s wait against a single pool snapshot -- see that step's own description for why the type-scoped selector alone wasn't enough. `time speed 1` restored in a separate setup step below -- role:player's own interaction array may never contain a `command` action (`checkStepActionAllowed`), so the restore can't live inside this step."
+    },
+    {
+      "command": "time speed 1",
+      "description": "Restore normal speed after the widened contract-accept wait above.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time speed 1"
+        }
+      ],
+      "role": "setup"
     },
     {
       "command": "contract deliver type:rubble_disposal amount:200",
