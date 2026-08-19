@@ -750,7 +750,21 @@
     },
     {
       "command": "tick 15",
-      "description": "#554-followup (issue #586 CI): a real-time waitUntil here let real interaction-mode CI reach a genuine worker_revolt before the sequence step below (the level-end screen covered the whole panel) even though command mode's own deterministic trace never revolts -- same real-time-vs-deterministic-convergence mismatch already found and fixed this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json, scores-display-visual.json). Sandbox-measured: charging converges 43 ticks after this wait starts (tick 250 -> 293). Switched to the same deterministic tick-N/event-choose-0 chunked pattern -- 3 rounds of tick 15 (45 ticks) replay the identical trajectory in both modes instead of gambling on real-time throughput.",
+      "description": "#554-followup round 2 (issue #586 CI): round 1's fix (3 rounds of tick 15 = 45 ticks, sized from a 43-tick command-mode measurement) still stalled in real interaction-mode CI -- root-caused via local reproduction to a genuine cross-mode divergence, not a timing race: the sole driller here collapses (fatigue hits its floor, tickNeedGauges/tickCollapse) partway through charging in interaction mode's own real trajectory, with no living_quarters anywhere in this file to shorten the recovery (NEED_REST_NO_BUILDING_DURATION_MULTIPLIER doubles it), stalling chargedCount at 1/4 for the remainder of the original 45-tick budget -- command mode's identical tick-for-tick trace does not hit the same collapse within that window. #554-followup round 3: a first attempt at 6 rounds (90 ticks) let all 4 holes charge by round 4 (60 ticks) but then burned 2 more rounds of pure dead padding (nothing left to charge) that pushed this file's already-thin wellBeing margin (no living_quarters anywhere, single driller/drill_rig, same class this file's own drilling-wait note above already trimmed padding to avoid) into a genuine worker_revolt during the trailing rounds -- the resulting level-end overlay then blocked the sequence step below. Trimmed to 4 rounds of tick 15 (60 ticks): comfortable margin over the measured collapse-and-recover-and-finish point, without the extra dead ticks that risked crossing REVOLT_TICKS=120 for no reason.",
+      "interaction": [
+        { "type": "command", "command": "tick 15" }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        { "type": "resolveEventIfPending" }
+      ],
+      "role": "player"
+    },
+    {
+      "command": "tick 15",
       "interaction": [
         { "type": "command", "command": "tick 15" }
       ],
