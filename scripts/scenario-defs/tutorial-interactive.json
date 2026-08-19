@@ -262,11 +262,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.drill_rig\"]"
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]"
         }
       ],
       "expect": {
@@ -352,11 +352,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel .bs-train-btn[data-skill=\"driving.excavator\"]"
+          "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.excavator\"]"
         }
       ],
       "expect": {

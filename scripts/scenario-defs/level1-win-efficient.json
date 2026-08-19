@@ -2610,7 +2610,7 @@
     },
     {
       "command": "scores",
-      "description": "#554: ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the queued-charge migration's own ~60-tick uniform shift (see the tickCount-551 note on the earlier tick-20/worker_revolt checkpoint) pushes this observation 60 ticks further into ecology's own decay/recovery curve than before, past the point where the #592 living-quarters-overcapacity dip had already recovered back to baseline. `nuisance` also corrected, from 50 to 42.41000000000024 -- the same 60-tick shift lands this observation mid-decay on nuisance's own curve instead of at a point where it happened to read baseline. tickCount/deathCount/employeeCount stay 551/4/7. wellBeing/safety stay exact -- confirmed unaffected by direct trace.",
+      "description": "#554: ecology reads 50 here, not the pre-#554 file's 44.99999999999943 -- the queued-charge migration's own ~60-tick uniform shift (see the tickCount-551 note on the earlier tick-20/worker_revolt checkpoint) pushes this observation 60 ticks further into ecology's own decay/recovery curve than before, past the point where the #592 living-quarters-overcapacity dip had already recovered back to baseline. `nuisance` reads 49.98000000000037 -- #555 (this merge)'s `LevelDef.scoreDecayRate` wiring fix means level1's own declared 0.03 (not the previously hardcoded global 0.05) now drives nuisance's decay back toward baseline, landing it just short of a full recovery at this checkpoint rather than exactly at 50. tickCount/deathCount/employeeCount stay 551/4/7. wellBeing/safety stay exact -- confirmed unaffected by direct trace.",
       "interaction": [
         {
           "type": "command",
@@ -2627,7 +2627,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 42.41000000000024
+          "nuisance": 49.98000000000037
         }
       }
     },
@@ -2650,7 +2650,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 42.41000000000024
+          "nuisance": 49.98000000000037
         }
       }
     },
@@ -2673,7 +2673,7 @@
           "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
-          "nuisance": 42.41000000000024,
+          "nuisance": 49.98000000000037,
           "bankrupt": false,
           "levelEnded": true,
           "levelEndReason": "worker_revolt",

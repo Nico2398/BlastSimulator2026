@@ -78,6 +78,7 @@
     },
     {
       "command": "wait_until field:orderedRampSegmentCount equals:3 max_ticks:400",
+      "timeout": 95,
       "description": "Drain half the ordered segments — the crewed rock_digger digs one dig_ramp_segment action at a time, nearest/entrance-first (mirrors #553's drill_hole landing order). This step's own auto-captured screenshot is the mid-dig checkpoint: the corridor is carved partway down, not the whole length.",
       "interaction": [
         {
@@ -98,6 +99,7 @@
     },
     {
       "command": "wait_until field:orderedRampSegmentCount equals:0 max_ticks:800",
+      "timeout": 125,
       "description": "Drain the remaining segments. This step's own auto-captured screenshot is the full-completion checkpoint: every segment carved, the ramp corridor complete end to end.",
       "interaction": [
         {
