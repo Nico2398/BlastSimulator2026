@@ -1,6 +1,6 @@
 {
   "name": "vehicle-driver-assignment-visual",
-  "description": "Visual check: assign qualified driver to vehicle, verify driver info, enforce one driver per vehicle",
+  "description": "Visual check: assign a qualified driver to a vehicle via a real click, and verify the driver info that renders afterward. One-driver-per-vehicle is enforced at the core layer (canAssignDriver, VehicleDriverAssignment.ts) and covered by unit/integration tests (Vehicle.test.ts, VehicleBoarding.test.ts, vehicle-commands.test.ts, vehicles.integration.test.ts) -- not re-proven here, because the Fleet panel never offers a control to attempt a double-assignment in the first place: an occupied vehicle's row swaps the assign picker for a driver-name/unassign row (makeDriverRow, fleetDetailSections.ts) instead of disabling it, so there is no live control left for a guard step to point at.",
   "steps": [
     {
       "command": "campaign start level:dusty_hollow cash:75000",

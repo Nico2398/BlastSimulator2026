@@ -23,7 +23,7 @@
     },
     {
       "command": "state",
-      "description": "Click New Campaign: reveals the world map with 3 level cards. Dusty Hollow (tier 1) is unlocked with a Start button; Grumpstone Ridge and Treranium Depths are locked, showing the lock icon and the profit threshold required on the prior level. No game exists yet, so 'state' is the paired command (it fails gracefully with 'No game loaded' — this step is UI-only, the command exists only to satisfy the command/interaction pairing convention).",
+      "description": "Click New Campaign: reveals the world map with 3 level cards. Dusty Hollow (tier 1) is unlocked with a Start button; Grumpstone Ridge and Treranium Depths are locked, showing the lock icon and the profit threshold required on the prior level. 'state' is the paired command, used here purely to satisfy the command/interaction pairing convention (this step is UI-only) — standalone it fails with 'No game loaded', but this batch's shared command-mode engine (run-all-scenarios.ts) can carry a previous scenario's still-loaded game into this file's first steps depending on run order, so the real outcome is genuinely either (issue #585).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -44,7 +44,7 @@
     },
     {
       "command": "state",
-      "description": "Click Back on the world map: returns to the main menu button list, confirming the round trip does not leave stray DOM behind.",
+      "description": "Click Back on the world map: returns to the main menu button list, confirming the round trip does not leave stray DOM behind. 'state' is again just the paired command for this UI-only step; the same cross-file batch-engine nondeterminism as the New Campaign step above (run-all-scenarios.ts, issue #585) makes the real outcome genuinely either.",
       "interaction": [
         {
           "type": "clickSelector",

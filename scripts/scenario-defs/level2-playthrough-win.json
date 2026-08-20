@@ -878,6 +878,9 @@
           "z": 8
         },
         {
+          "type": "screenshot"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
         }

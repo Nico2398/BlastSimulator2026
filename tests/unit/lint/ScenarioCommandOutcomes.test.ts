@@ -10,21 +10,16 @@
 // This replays every scenario file's command sequence via the same
 // primitives runSteps (scripts/shared/command-runner.ts) itself is built
 // from — createGameEngine + runCommand — rather than through runSteps
-// directly. runSteps's own commandOutcome check is the implementer's wiring,
-// still an unimplemented stub as of the Red phase this file was written in
-// (checkCommandOutcome in scripts/shared/scenario-goal.ts always returns
-// null). Driving runCommand here directly means this lint measures the
-// scenario JSON's real, present behaviour against the live console engine,
-// independent of whether that wiring has landed — which is what lets it be
-// red right now, naming every currently-undeclared refusal, instead of
-// silently passing until someone remembers to re-run it after the wiring
-// merges.
-//
-// EXPECTED TO FAIL HEAVILY at Red phase (~412 known undeclared refusals
-// across ~63 scenario-defs files) — that is correct and intentional. It only
-// goes green once the implementer's triage pass tags every currently-real
-// refusal in scripts/scenario-defs/*.json with the right commandOutcome. Do
-// not weaken this test to make it pass early.
+// directly. runSteps's own commandOutcome check (checkCommandOutcome in
+// scripts/shared/scenario-goal.ts) is fully wired and not a stub — but this
+// lint still bypasses it deliberately, because its job is narrower than
+// runSteps's own per-step check: it needs each step's raw
+// CommandResult.success to isolate an undeclared refusal from every other
+// failure class (a thrown exception, an unrelated `expect` violation), and
+// StepResult only exposes a single folded `error` string that conflates a
+// commandOutcome violation with an expect violation. Driving runCommand
+// here directly keeps this lint's own diagnosis independent of whatever
+// else runSteps also happens to check.
 //
 // Any per-step scratch state this lint captures for diagnosis is written to
 // an os.tmpdir() throwaway directory — never into screenshots/ or any other
@@ -35,35 +30,10 @@ import { mkdtempSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { tmpdir } from 'os';
 import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
-import { createGameEngine, runWaitUntil } from '../../../scripts/shared/command-runner.js';
+import { createGameEngine, runWaitUntil, findWaitUntilAction } from '../../../scripts/shared/command-runner.js';
 import { runCommand } from '../../../src/console/createRunner.js';
 import { serializeGameState } from '../../../src/console-api.js';
-import type { InteractionStepAction, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
-
-/**
- * `waitUntil` (issue #590) is the one interaction action that replaces a
- * step's `command` entirely in the real runner (`runWaitUntil`,
- * command-runner.ts) rather than executing it — the field carries a plain
- * descriptive string by convention (scenario-defs.md), never a real console
- * command. Replaying that string through plain `runCommand`, as this lint
- * otherwise does, always reports "Unknown command" — a false positive.
- *
- * The fix is not to skip the step: `runWaitUntil` is what actually advances
- * the engine (ticking until the named field settles) — every later step in
- * the file depends on that state having genuinely moved (holes drilled,
- * charges loaded). Skipping it silently leaves the engine stalled, which
- * surfaces as *downstream* steps failing against never-completed queued
- * work — a second false positive, just one step removed from the first.
- * Driving the same `runWaitUntil` the real runner uses keeps this lint's
- * replay honest with the live engine, per its own doc comment above.
- */
-function findWaitUntilAction(
-  step: ScenarioStepDef,
-): Extract<InteractionStepAction, { type: 'waitUntil' }> | undefined {
-  return step.interaction?.find(
-    (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
-  );
-}
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 
 const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
 

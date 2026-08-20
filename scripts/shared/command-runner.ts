@@ -68,6 +68,24 @@ export function runWaitUntil(
   );
 }
 
+/**
+ * Locate a step's `waitUntil` interaction entry, if it has one — the one
+ * authoritative field/target/budget spec both command mode (`runWaitUntil`
+ * above) and interaction mode (`interaction-executor.ts`) read to drive the
+ * tick-loop instead of the step's own `command` string, which is descriptive
+ * only and never executed as-is when this is present (issue #590). Exported
+ * so callers that replay scenario steps outside `runSteps` (e.g. the
+ * command-outcome lint) can detect a `waitUntil` step the same way, rather
+ * than re-declaring this predicate.
+ */
+export function findWaitUntilAction(
+  step: ScenarioStepDef,
+): Extract<InteractionStepAction, { type: 'waitUntil' }> | undefined {
+  return step.interaction?.find(
+    (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
+  );
+}
+
 // Re-export canonical types from scenario-types.ts
 export type { StepResult } from './scenario-types.js';
 
@@ -97,13 +115,9 @@ export function runSteps(
     const paddedIdx = formatStepIndex(i);
     const cmdSlug = formatCommandSlug(step.command);
     const before = (serializeGameState(ctx) as Record<string, unknown> | null) ?? {};
-    // `waitUntil` drives command mode too (issue #590) — its `interaction`
-    // entry is the one authoritative field/target/budget spec both modes
-    // read, so a step using it runs the tick-loop instead of its own
-    // `command` string (which is descriptive only, never executed as-is).
-    const waitUntilAction = step.interaction?.find(
-      (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
-    );
+    // `waitUntil` drives command mode too (issue #590) — see
+    // `findWaitUntilAction`'s doc comment above for why.
+    const waitUntilAction = findWaitUntilAction(step);
 
     let error: string | undefined;
     let result: { success: boolean; output: string } = { success: false, output: '' };
