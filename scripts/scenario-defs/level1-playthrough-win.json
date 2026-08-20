@@ -908,7 +908,7 @@
       }
     },
     {
-      "command": "contract accept 4",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "clickSelector",
@@ -916,14 +916,14 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         }
       ],
-      "description": "Finding #48 (unchanged): the Fleet panel's Haul button always sends the vehicle to `findReachableGroundFragment` -- the NEAREST reachable, non-oversized fragment, with no regard for ore content -- and #552 self-dispatches hauling automatically, so a player cannot target a specific fragment by ore at all. The contract must match what the hauler will actually claim, not the reverse: this cycle's nearest reachable fragment carries no named ore, so the rubble-disposal contract (materialId '') is the one it can satisfy, confirmed by replaying this file's own exact command sequence. #554/new: contract id renumbered 2->4 -- the charge-wait above (real, queued `charge_hole` work, dozens of extra ticks) consumes a longer slice of the contract-generation RNG stream than the old instant-charge timing did, so by the time this step runs the generator has moved on to a later id for the same rubble-disposal contract type (`contract list` right before this step confirms it: `[4] Dispose of rubble`). Re-verified directly, not guessed -- an id shift here is exactly the kind of downstream consequence #554's own timing change forces. New finding, real interaction-mode CI: this step used to sit right after `contract list`, before the tick-10/event-choose pair above -- but `lucky_strike` (fired as a side effect of the blast, several steps up) is already pending by then, and unlike command mode, where a pending event is just state until something reads it, a real browser shows its modal (`.bs-confirm-overlay`) the instant it goes pending, sitting over the whole shell and blocking this step's own toolbar click (confirmed directly: `clickSelector` failed with \"covered by div.bs-confirm-overlay\"). Moved to after the tick-10/event-choose pair instead, which the file was already going to run anyway -- `lucky_strike` is resolved for real by the time this step's click reaches the toolbar, in both modes.",
+      "description": "Finding #48 (unchanged): the Fleet panel's Haul button always sends the vehicle to `findReachableGroundFragment` -- the NEAREST reachable, non-oversized fragment, with no regard for ore content -- and #552 self-dispatches hauling automatically, so a player cannot target a specific fragment by ore at all. The contract must match what the hauler will actually claim, not the reverse: this cycle's nearest reachable fragment carries no named ore, so the rubble-disposal contract (materialId '') is the one it can satisfy, confirmed by replaying this file's own exact command sequence. #554: this contract's id has renumbered across runs (the charge-wait's real, queued `charge_hole` work consumes a different slice of the contract-generation RNG stream than instant-charge timing did) -- #635 drops the numeric id entirely in favor of the stable `type:rubble_disposal` selector (materialId '' for this type, so no `material:` clause), which resolves to whichever rubble-disposal contract the generator produced this run without needing to track its id. New finding, real interaction-mode CI: this step used to sit right after `contract list`, before the tick-10/event-choose pair above -- but `lucky_strike` (fired as a side effect of the blast, several steps up) is already pending by then, and unlike command mode, where a pending event is just state until something reads it, a real browser shows its modal (`.bs-confirm-overlay`) the instant it goes pending, sitting over the whole shell and blocking this step's own toolbar click (confirmed directly: `clickSelector` failed with \"covered by div.bs-confirm-overlay\"). Moved to after the tick-10/event-choose pair instead, which the file was already going to run anyway -- `lucky_strike` is resolved for real by the time this step's click reaches the toolbar, in both modes.",
       "role": "player"
     },
     {
@@ -985,23 +985,23 @@
       "role": "player"
     },
     {
-      "command": "contract deliver 4 amount:260",
+      "command": "contract deliver type:rubble_disposal amount:260",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-amount"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount"
         },
         {
           "type": "set",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-amount",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-amount",
           "value": "260"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"4\"] .bs-contract-deliver"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
         }
       ],
-      "description": "#552: hauling self-dispatched automatically once debris_hauler #2 (relocated close to the blast site, not off-map -- see the vehicle-move steps above) had somewhere to go; 30 ticks (the 3 tick-10 steps above) was enough for a full round trip and back, confirmed directly (storedMassKg > 260 by this point). One haul is enough to complete this 260kg contract outright, same as the pre-#552 flow's own single-haul sizing. Contract id stays 4 under #557's shrunk crew (re-verified directly against the real run, not assumed). tickCount converted to `changedBy: 0` (issue #596) -- this step is itself a non-ticking console call, its own point is that delivery doesn't advance the clock, not a specific running total. deathCount 3, matching the blast step's own #557 finding (charging-in-person casualties, now a 2-person blasting crew plus the surveyor rather than the pre-#557 5).",
+      "description": "#552: hauling self-dispatched automatically once debris_hauler #2 (relocated close to the blast site, not off-map -- see the vehicle-move steps above) had somewhere to go; 30 ticks (the 3 tick-10 steps above) was enough for a full round trip and back, confirmed directly (storedMassKg > 260 by this point). One haul is enough to complete this 260kg contract outright, same as the pre-#552 flow's own single-haul sizing. #635: dropped the numeric contract id (it renumbered across runs -- see the accept step's own finding) for the stable `type:rubble_disposal` selector, which resolves to this run's rubble-disposal contract regardless of its id. tickCount converted to `changedBy: 0` (issue #596) -- this step is itself a non-ticking console call, its own point is that delivery doesn't advance the clock, not a specific running total. deathCount 3, matching the blast step's own #557 finding (charging-in-person casualties, now a 2-person blasting crew plus the surveyor rather than the pre-#557 5).",
       "expect": {
         "changedBy": {
           "tickCount": 0
