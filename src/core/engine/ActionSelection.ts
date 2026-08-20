@@ -84,6 +84,16 @@ export function seedTaskTimerFields(state: GameState, employee: Employee, action
 }
 
 /**
+ * Converts a grid-cell distance (from either the octile-heuristic estimate
+ * or a real findPath's totalCost) into ticks, at AGENT_WALK_SPEED cells per
+ * tick. Single source of truth for both estimateTravelTicks (heuristic) and
+ * resolveActionCost (pathfinding) (#614).
+ */
+function cellsToTravelTicks(cells: number): number {
+  return cells / AGENT_WALK_SPEED;
+}
+
+/**
  * Straight-line (octile-heuristic) travel ticks for `employee` to reach
  * `action`'s target — see `octileHeuristic` in `Pathfinding.ts`. Shared by
  * `estimateActionCost` (always uses this direct-line estimate) and
@@ -92,7 +102,7 @@ export function seedTaskTimerFields(state: GameState, employee: Employee, action
  * NavGrid has been built yet.
  */
 function estimateTravelTicks(employee: Employee, action: PendingAction): number {
-  return octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) / AGENT_WALK_SPEED;
+  return cellsToTravelTicks(octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ));
 }
 
 /**
@@ -135,7 +145,7 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
 
   if (!path.found) return null;
 
-  const travelTicks = path.totalCost / AGENT_WALK_SPEED;
+  const travelTicks = cellsToTravelTicks(path.totalCost);
   return { totalTicks: travelTicks + workTicks };
 }
 
