@@ -337,6 +337,9 @@ export class UIManager {
   /** Read-only accessor for tests (#545) — whether a report is waiting out its open delay. */
   get blastReportModalPending(): boolean { return this.blastReportModal.pending; }
 
+  /** Read-only accessor for the scenario harness's `ensureStep` action — which Blast Workshop step tab is active. */
+  get blastActiveStep(): number { return this.blastUI.currentStep; }
+
   /** Re-render all owned panels' locale-dependent text after a language change. */
   refreshLocale(): void {
     this.topBar.refreshLocale();

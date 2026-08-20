@@ -25,6 +25,7 @@ import {
   formatCommandSlug,
   loadScenarioDef,
   buildScenarioReport,
+  effectiveStepTimeoutMs,
   SCENARIO_DIR,
   type ReportableStep,
 } from './shared/scenario-utils.js';
@@ -154,7 +155,11 @@ async function runBatchInteraction(
           const step = steps[s]!;
           const paddedIdx = formatStepIndex(s);
           const cmdSlug = formatCommandSlug(step.command);
-          const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
+          const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
+          // Last "where this step stands" string from whichever action is
+          // currently running — see scenario-interaction-runner.ts's own
+          // copy of this comment (PR #616 review round, item 5).
+          let lastProgress = 'no interaction action has started yet';
 
           try {
             await Promise.race([
@@ -165,6 +170,7 @@ async function runBatchInteraction(
 
                 const interactionResult = await executeInteractionActions(
                   page, step, false, outDir, paddedIdx, cmdSlug,
+                  (detail) => { lastProgress = detail; },
                 );
 
                 if (step.expect) {
@@ -194,7 +200,10 @@ async function runBatchInteraction(
                 });
               })(),
               new Promise((_, reject) =>
-                setTimeout(() => reject(new Error(`Step ${s} timed out after ${stepTimeout}ms`)), stepTimeout)
+                setTimeout(
+                  () => reject(new Error(`Step ${s} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`)),
+                  stepTimeout,
+                )
               ),
             ]);
           } catch (err: unknown) {

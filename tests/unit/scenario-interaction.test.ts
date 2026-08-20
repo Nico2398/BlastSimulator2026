@@ -158,6 +158,29 @@ describe('executeActionOnPage — waitUntil (issue #590, #601)', () => {
       /"holeCount" never reached 25 — stalled at 3 after 1 tick\(s\)/,
     );
   });
+
+  // Item 5 of the PR #616 review round: a step that times out on the outer
+  // deadline (several actions' combined time, none individually stalling)
+  // should still name the field/value/tick-count the runner last observed
+  // through waitUntil, instead of a bare "Step N timed out after Xms".
+  it('reports its field/value/tick-count on every tick via onProgress', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(9)
+      .mockResolvedValueOnce(25);
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_until field:holeCount equals:25 max_ticks:400', role: 'setup' };
+    const action = { type: 'waitUntil' as const, field: 'holeCount', equals: 25, maxTicks: 400, timeoutMs: 30000 };
+    const progress: string[] = [];
+
+    await executeActionOnPage(page, action, step, (detail) => progress.push(detail));
+
+    expect(progress).toEqual([
+      'waitUntil "holeCount" = 3 (want 25), tick 1/400',
+      'waitUntil "holeCount" = 9 (want 25), tick 2/400',
+      'waitUntil "holeCount" = 25 (want 25), tick 3/400',
+    ]);
+  });
 });
 
 describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () => {
@@ -194,6 +217,90 @@ describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () =>
     await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
       /tutorial never reached "drill-plan" — it is on "grid-select", live control grid-tool, after 1 tick\(s\)/,
     );
+  });
+
+  it('reports the tutorial\'s current step and live control on every tick via onProgress', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce({ active: true, stepId: 'grid-select', stageTarget: 'grid-tool' })
+      .mockResolvedValueOnce({ active: true, stepId: 'drill-plan', stageTarget: 'charge-tool' });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 400, timeout: 30000 };
+    const progress: string[] = [];
+
+    await executeActionOnPage(page, action, step, (detail) => progress.push(detail));
+
+    expect(progress).toEqual([
+      'waitForTutorialStep on "grid-select", live control grid-tool, want "drill-plan", tick 1/400',
+      'waitForTutorialStep on "drill-plan", live control charge-tool, want "drill-plan", tick 2/400',
+    ]);
+  });
+});
+
+describe('executeActionOnPage — ensurePanel (PR #616 review round, item 7)', () => {
+  it('does not click when __uiState() already reports the panel visible', async () => {
+    // The mocked evaluate stands in for the whole page.evaluate(callback)
+    // round trip — it returns what the real browser-side callback would
+    // have computed (here, the extracted `visible` boolean), not the raw
+    // __uiState() object the callback reads from inside the page.
+    const evaluate = vi.fn().mockResolvedValueOnce(true);
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'employee hire role:driller', role: 'setup' };
+    const action = { type: 'ensurePanel' as const, panel: 'employees' };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(page.click).not.toHaveBeenCalled();
+  });
+
+  it('clicks the toolbar tab when __uiState() reports the panel not visible', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(null); // waitUsableAndClick's own probe: usable now
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'employee hire role:driller', role: 'setup' };
+    const action = { type: 'ensurePanel' as const, panel: 'employees' };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(page.click).toHaveBeenCalledWith('#bs-toolbar [data-panel="employees"]');
+  });
+
+  it('rejects an unknown/non-toggle panel name without touching the page', async () => {
+    const page = fakePage();
+    const step: ScenarioStepDef = { command: 'noop', role: 'setup' };
+    const action = { type: 'ensurePanel' as const, panel: 'settings' };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(/unknown panel "settings"/);
+    expect(page.evaluate).not.toHaveBeenCalled();
+  });
+});
+
+describe('executeActionOnPage — ensureStep (PR #616 review round, item 7)', () => {
+  it('does not click when __uiState().activeBlastStep already matches', async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce(2);
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'charge hole:H1 explosive:boomite amount:5kg stemming:2m', role: 'setup' };
+    const action = { type: 'ensureStep' as const, step: 2 as const };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(page.click).not.toHaveBeenCalled();
+  });
+
+  it('clicks the step tab when __uiState().activeBlastStep does not match', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(null); // waitUsableAndClick's own probe: usable now
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'charge hole:H1 explosive:boomite amount:5kg stemming:2m', role: 'setup' };
+    const action = { type: 'ensureStep' as const, step: 2 as const };
+
+    await executeActionOnPage(page, action, step);
+
+    expect(page.click).toHaveBeenCalledWith('#bs-blast-panel [data-step="2"]');
   });
 });
 

@@ -159,7 +159,46 @@ export type InteractionStepAction =
    * using this is `role: 'setup'`, the same class as `tick N` and
    * `waitForTutorialStep` — not a player action.
    */
-  | { type: 'waitUntil'; field: string; equals: unknown; maxTicks: number; timeoutMs: number };
+  | { type: 'waitUntil'; field: string; equals: unknown; maxTicks: number; timeoutMs: number }
+  /**
+   * Open a toolbar panel — but only if it is not already open. `#bs-toolbar
+   * [data-panel="X"]` toggles: a step's own bare `clickSelector` on that
+   * control assumes the panel's current state instead of asserting it, and
+   * PR #616 shipped two real bugs from exactly that assumption —
+   * `blast-execution-visual.json` toggled the Employee panel *closed* with a
+   * redundant open click (it was already open from a preceding step), and
+   * `level1-lose-ecology.json` clicked a Blast-panel step tab while the
+   * Employee panel was the one actually open. `ensurePanel` reads
+   * `__uiState().panels['bs-<panel>-panel'].visible` (issue: main.ts's own
+   * "ask the game, not the DOM" bridge, the same principle already applied
+   * to `pendingEvent`) and clicks the toolbar tab only when the panel is not
+   * already showing — idempotent by construction, so a step never has to
+   * know or assume what a preceding step left open.
+   *
+   * `panel` is one of `#bs-toolbar`'s own `data-panel` values (see
+   * `tutorialStepHelpers.ts`'s `TOOLBAR_TARGET`, which `ensurePanel`'s own
+   * implementation reuses for the click selector): `blast`, `contracts`,
+   * `ops`, `build`, `vehicles`, `employees`, `survey`. `settings` is not a
+   * toggle panel (it opens a modal) and is not supported here.
+   */
+  | { type: 'ensurePanel'; panel: string; timeout?: number }
+  /**
+   * Select a Blast Workshop step tab (`#bs-blast-panel [data-step="N"]`,
+   * `N` 1-5 for Drill/Charge/Sequence/Preview/Fire) — but only if it is not
+   * already the active tab. The panel's own `autoAdvance` (`suggestStep`,
+   * `BlastWorkshop.ts`) moves the active tab on its own the instant a
+   * drilled hole goes uncharged or a charged hole goes unsequenced, out from
+   * under a scenario that assumed a step tab a preceding step had left
+   * active was still active — the exact root cause behind two of PR #616's
+   * fixes (`level1-playthrough-win.json`'s 12 remove-hole clicks, and the
+   * `[data-step="2"]` re-clicks documented on `blast-execution-visual.json`'s
+   * per-hole charge steps). `ensureStep` reads
+   * `__uiState().activeBlastStep` (`UIManager.blastActiveStep`, delegating
+   * to `BlastWorkshop.currentStep`) and clicks the tab only when it is not
+   * already active, the same idempotent-by-construction shape as
+   * `ensurePanel`.
+   */
+  | { type: 'ensureStep'; step: 1 | 2 | 3 | 4 | 5; timeout?: number };
 
 /**
  * Whether a step's `interaction` models something the player must do by

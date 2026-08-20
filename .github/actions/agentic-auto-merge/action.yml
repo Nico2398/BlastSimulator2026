@@ -148,6 +148,49 @@ runs:
             return { pending, failed, total: latest.size };
           };
 
+          // A workflow run's own `conclusion` is `success` the moment every job
+          // in it either passed or was skipped -- and a job an `if:` guard
+          // skipped because the label it checks for did not exist yet, at
+          // trigger-evaluation time, is indistinguishable from that at the run
+          // level. PR #615 merged exactly that way: `full-ci`'s interaction
+          // shards never ran, the CI run still concluded `success`, and nothing
+          // above ever asked the run's own jobs whether the one thing the label
+          // was for had actually happened. `ci.yml`'s `pull_request` trigger now
+          // also re-evaluates on `labeled` (closing the gap at its source), and
+          // `open-pr` sets the label on the PR-creation call rather than a
+          // follow-up edit (removing the race entirely) -- this is the third,
+          // independent line of defence: never trust a run-level `success` for a
+          // job a label is supposed to gate without asking that run's own jobs.
+          const LABEL_GATED_JOBS = [
+            { label: 'full-ci', jobNamePrefix: 'Scenarios (interaction mode)' },
+            { label: 'build-check', jobNamePrefix: 'Production build' },
+          ];
+
+          // `runs` is the same head-scoped list `checkState` reads, unfiltered —
+          // this looks up the CI run directly by path rather than by workflow
+          // name, since `.name` is a display string free to change independent
+          // of the file that emits it.
+          const missingGatedJobs = async (prLabels, runs) => {
+            const names = new Set((prLabels || []).map((l) => l.name));
+            const wanted = LABEL_GATED_JOBS.filter((g) => names.has(g.label));
+            if (wanted.length === 0) return [];
+
+            const ciRuns = runs.filter((r) => r.path === '.github/workflows/ci.yml');
+            if (ciRuns.length === 0) return wanted.map((g) => g.label);
+            const ciRun = ciRuns.reduce((a, b) => (b.id > a.id ? b : a));
+
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner, repo, run_id: ciRun.id, per_page: 100
+            });
+
+            return wanted
+              .filter((g) => {
+                const matches = jobs.filter((j) => j.name.startsWith(g.jobNamePrefix));
+                return matches.length === 0 || !matches.every((j) => j.conclusion === 'success');
+              })
+              .map((g) => g.label);
+          };
+
           const method = (process.env.MERGE_METHOD || 'squash').toUpperCase();
           const only = parseInt(process.env.ONLY_PR || '', 10);
           const head = (process.env.ONLY_HEAD || '').trim();
@@ -320,9 +363,25 @@ runs:
                 continue;
               }
 
-              // Every run reported and none failed. Whether GitHub agrees the
-              // PR is mergeable is now its call to make, not something to poll
-              // for: this request either merges or names what stopped it.
+              // Every run reported and none failed -- but that is a run-level
+              // fact, and #615 merged on exactly that fact while its full-ci
+              // job had silently skipped. Ask the CI run's own jobs before
+              // asking GitHub to merge.
+              const missing = await missingGatedJobs(pr.labels, runs);
+              if (missing.length > 0) {
+                core.warning(
+                  `#${n}: every workflow run reported success, but the job(s) gated ` +
+                  `behind ${missing.join(', ')} did not fully run — treating as stuck ` +
+                  'rather than merging on an absence of evidence (#615).'
+                );
+                unarmed.push(n);
+                continue;
+              }
+
+              // Every run reported, none failed, and every label-gated job
+              // actually ran. Whether GitHub agrees the PR is mergeable is now
+              // its call to make, not something to poll for: this request
+              // either merges or names what stopped it.
               try {
                 await github.rest.pulls.merge({
                   owner, repo, pull_number: n, merge_method: method.toLowerCase()

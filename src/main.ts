@@ -719,7 +719,14 @@ window.__uiState = () => {
       });
     });
   }
-  return { panels: panelStates, blastPanelButtons: buttons };
+  return {
+    panels: panelStates,
+    blastPanelButtons: buttons,
+    // Which Blast Workshop step tab is active, for the scenario harness's
+    // `ensureStep` action (interaction-executor.ts) — the panel's own
+    // autoAdvance can move the tab out from under a scenario mid-sequence.
+    activeBlastStep: uiManager.blastActiveStep,
+  };
 };
 
 // What can a player actually click right now? Used by interaction mode so a

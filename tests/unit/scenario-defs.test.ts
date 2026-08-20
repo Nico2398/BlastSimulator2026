@@ -33,6 +33,10 @@ const KNOWN_INTERACTION_ACTION_TYPES = [
   // bounded by maxTicks/timeoutMs so a stall fails loudly (issue #590). See
   // InteractionStepAction.
   'waitUntil',
+  // Idempotent panel/step-tab selection: click only if not already open/
+  // active, instead of a step assuming what a preceding one left in place
+  // (PR #616 review round, item 7). See InteractionStepAction.
+  'ensurePanel', 'ensureStep',
 ] as const;
 
 const PLAYTHROUGH_SCENARIO_NAMES = [
@@ -183,6 +187,21 @@ const KNOWN_COMMANDS = [
 
 /** Commands that inspect state — valid as a final playthrough step */
 const INSPECTION_COMMANDS = ['campaign', 'state', 'scores', 'finances', 'stats', 'inspect'];
+
+// Pre-existing files still on a bare/`id:` numeric contract selector,
+// grandfathered the same way issue #515's role lint grandfathered untagged
+// steps: a documented, individually-tracked exception rather than a silent
+// pass. Tracked for migration in issue #635 — remove a name from here as
+// its file moves to `type:`/`material:`, never add one back.
+const CONTRACT_ID_SELECTOR_EXCEPTIONS = [
+  'contract-negotiation',
+  'contract-panel-visual',
+  'economy-display-visual',
+  'level1-playthrough-win',
+  'level1-win-conservative',
+  'tutorial-interactive',
+  'tutorial-playthrough',
+];
 
 // ──────────────────────────────────────────────
 // 1. File existence & valid JSON
@@ -344,6 +363,47 @@ describe('No steps use unknown commands', () => {
         }
       }
       expect(unknownCommands).toEqual([]);
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
+// 7b. "contract" commands use the type:/material: selector, not a raw
+// numeric id (issue #597). `CONTRACT_REFRESH_INTERVAL` keeps cycling the
+// offer pool, so a bare id or `id:N` names a moving target — the recurring
+// class of flake behind PR #616's own review round (contract offer ids
+// drifted 1->4->14, 19->20 across three separate prior fixes in
+// level3-playthrough-win.json alone) and the review's own explicit
+// suggested check.
+// ──────────────────────────────────────────────
+describe('"contract" commands use type:/material:, not a numeric id (issue #597)', () => {
+  const CONTRACT_SUB = /^contract\s+(accept|decline|deliver|negotiate)\b(.*)$/;
+
+  const usesNumericId = (rest: string): boolean =>
+    !/\btype:/.test(rest) && (/\bid:\d+/.test(rest) || /^\s*\d+/.test(rest));
+
+  for (const name of ALL_SCENARIO_NAMES) {
+    if (CONTRACT_ID_SELECTOR_EXCEPTIONS.includes(name)) continue;
+
+    it(`${name} — no contract command uses a bare/id: numeric selector`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      const offenders: string[] = [];
+
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        const commands = [step.command, ...(step.interaction ?? [])
+          .filter((a): a is Extract<typeof a, { type: 'command' }> => a.type === 'command')
+          .map(a => a.command)];
+
+        for (const cmd of commands) {
+          const match = CONTRACT_SUB.exec(cmd.trim());
+          if (match && usesNumericId(match[2] ?? '')) {
+            offenders.push(`step[${i}]: "${cmd}"`);
+          }
+        }
+      }
+
+      expect(offenders).toEqual([]);
     });
   }
 });

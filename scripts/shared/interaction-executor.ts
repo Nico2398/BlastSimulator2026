@@ -14,6 +14,7 @@ import { awaitPlacementArmed } from './tile-picker.js';
 import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './interaction-types.js';
 import type { PlayerAction } from './interaction-types.js';
 import { runAction, waitForUiUpdate } from './interaction-driver.js';
+import { TOOLBAR_TARGET } from '../../src/ui/tutorialStepHelpers.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -416,11 +417,19 @@ export function checkStepActionAllowed(
  * @param action - The interaction action to execute.
  * @param step - The step `action` belongs to, so a `command` action can be
  *   checked against the step's role (issue #479).
+ * @param onProgress - Optional sink for a human-readable "where this action
+ *   currently stands" string. `waitUntil`/`waitForTutorialStep` call it on
+ *   every tick with their own field/value/tick-count detail; the runners
+ *   (scenario-interaction-runner.ts and friends) read the last value through
+ *   it to name what was actually in flight when a step's outer timeout
+ *   fires, instead of a bare "Step N timed out after Xms" (issue: PR #616
+ *   review round, item 5 — richer timeout diagnostics).
  */
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
   step: ScenarioStepDef,
+  onProgress?: (detail: string) => void,
 ): Promise<void> {
   switch (action.type) {
     case 'click': {
@@ -664,6 +673,10 @@ export async function executeActionOnPage(
           return fn === undefined ? null : fn();
         });
         ticksUsed++;
+        onProgress?.(
+          `waitForTutorialStep on "${st?.stepId ?? 'none'}", live control ${st?.stageTarget ?? 'none'}, `
+          + `want ${wanted.map(s => `"${s}"`).join(' or ')}, tick ${ticksUsed}/${maxTicks}`,
+        );
         // Tutorial gone (finished or never started) — nothing left to wait on.
         if (st === null || !st.active) break;
         if (st.stepId !== null && wanted.includes(st.stepId)) break;
@@ -791,6 +804,10 @@ export async function executeActionOnPage(
         }, action.field);
         ticksUsed++;
         lastValue = state;
+        onProgress?.(
+          `waitUntil "${action.field}" = ${JSON.stringify(lastValue)} `
+          + `(want ${JSON.stringify(action.equals)}), tick ${ticksUsed}/${action.maxTicks}`,
+        );
         if (lastValue === action.equals) break;
         if (ticksUsed >= action.maxTicks || Date.now() > deadline) {
           throw new Error(
@@ -798,6 +815,60 @@ export async function executeActionOnPage(
             + ` — stalled at ${JSON.stringify(lastValue)} after ${ticksUsed} tick(s)`,
           );
         }
+      }
+      break;
+    }
+    case 'ensurePanel': {
+      // #bs-toolbar's own `data-panel` -> the panel element __uiState()
+      // reports visibility for (main.ts's `panels` map). `settings` opens a
+      // modal, not a toggle panel, and is deliberately absent here even
+      // though TOOLBAR_TARGET carries it — that absence, not TOOLBAR_TARGET's
+      // own key set, is what makes "settings" rejected below. The click
+      // selector itself reuses TOOLBAR_TARGET (tutorialStepHelpers.ts, pure
+      // data — the tutorial's own highlight targets) rather than rebuilding
+      // the same `#bs-toolbar [data-panel="..."]` string by hand a second time.
+      const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
+        blast: 'bs-blast-panel',
+        contracts: 'bs-contract-panel',
+        ops: 'bs-operations-panel',
+        build: 'bs-build-panel',
+        vehicles: 'bs-vehicle-panel',
+        employees: 'bs-employee-panel',
+        survey: 'bs-survey-panel',
+      };
+      const panelKey = action.panel as keyof typeof TOOLBAR_TARGET;
+      const panelId = PANEL_ELEMENT_ID[panelKey];
+      const selector = TOOLBAR_TARGET[panelKey];
+      if (panelId === undefined || selector === undefined) {
+        throw new Error(`ensurePanel: unknown panel "${action.panel}" (not a toggle panel, or misspelled)`);
+      }
+
+      const alreadyOpen = await page.evaluate((id: string) => {
+        const getUiState = (window as unknown as {
+          __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
+        }).__uiState;
+        const st = getUiState === undefined ? null : getUiState();
+        return st?.panels[id]?.visible ?? false;
+      }, panelId);
+
+      onProgress?.(`ensurePanel "${action.panel}" ${alreadyOpen ? 'already open' : 'opening'}`);
+      if (!alreadyOpen) {
+        await waitUsableAndClick(page, selector, action.timeout ?? 10000);
+      }
+      break;
+    }
+    case 'ensureStep': {
+      const active = await page.evaluate(() => {
+        const getUiState = (window as unknown as {
+          __uiState?: () => { activeBlastStep: number } | null;
+        }).__uiState;
+        const st = getUiState === undefined ? null : getUiState();
+        return st?.activeBlastStep ?? null;
+      });
+
+      onProgress?.(`ensureStep ${action.step} (currently ${active ?? 'unknown'})`);
+      if (active !== action.step) {
+        await waitUsableAndClick(page, `#bs-blast-panel [data-step="${action.step}"]`, action.timeout ?? 10000);
       }
       break;
     }

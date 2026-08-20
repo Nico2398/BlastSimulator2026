@@ -7,6 +7,19 @@ on:
   pull_request:
     branches:
       - main
+    # Default types are [opened, synchronize, reopened] -- `labeled` is not
+    # among them. `full-ci`/`build-check` are applied via a separate API call
+    # after PR creation (agentic-pipeline-finalization's open-pr step), which
+    # fires no `pull_request` event of its own. Without `labeled` here, the
+    # `if: contains(...labels..., 'full-ci')` guards on shard-config/
+    # scenario-interaction below are evaluated once, at `opened`, before the
+    # label exists -- both jobs report `skipped`, not `failure`, so the
+    # overall run still reports `success` and agentic-auto-merge treats it as
+    # green. PR #615 merged exactly that way; #616 only got its interaction
+    # shards because of 30 unrelated follow-up pushes (each a `synchronize`)
+    # after the label landed. `ready_for_review` closes the same gap for a
+    # draft PR labeled before going ready.
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
   schedule:
     # Weekly full run (Monday 4am UTC) to catch regressions
     - cron: '0 4 * * 1'

@@ -66,6 +66,35 @@ describe('BlastWorkshop', () => {
     expect(chargeAllBtn.closest('div[style*="display: none"]')).not.toBeNull();
   });
 
+  // currentStep (PR #616 review round, item 7): the scenario harness's own
+  // "ask the game, not the DOM" read of which tab is active, so a scenario's
+  // ensureStep action can assert-or-click instead of assuming a tab a
+  // preceding step left active is still active.
+  it('currentStep defaults to Drill (1)', () => {
+    const { workshop } = makeWorkshop();
+    expect(workshop.currentStep).toBe(1);
+  });
+
+  it('currentStep tracks a manual tab click', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    tabButton(workshop.root, 'Charge').click();
+    expect(workshop.currentStep).toBe(2);
+  });
+
+  it('currentStep tracks auto-advance, matching which controls are actually visible', () => {
+    const { workshop } = makeWorkshop();
+    workshop.show();
+    const state = makeState();
+    const hole = addHole(state.drillHoles, 10, 10, 8, 0.15);
+    const chargeResult = createCharge('boomite', 5, 2, hole.depth);
+    if ('charge' in chargeResult) state.chargesByHole[hole.id] = chargeResult.charge;
+
+    workshop.update(state, 'sunny');
+
+    expect(workshop.currentStep).toBe(3);
+  });
+
   it('auto-advances to Charge once holes exist but are not fully charged', () => {
     const { workshop } = makeWorkshop();
     workshop.show();

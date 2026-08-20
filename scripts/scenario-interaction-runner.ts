@@ -11,6 +11,7 @@ import {
   formatStepIndex,
   formatCommandSlug,
   buildScenarioReport,
+  effectiveStepTimeoutMs,
   type ReportableStep,
 } from './shared/scenario-utils.js';
 import {
@@ -97,9 +98,21 @@ export async function runScenarioInteraction(
       const cmdSlug = formatCommandSlug(step.command);
       console.log(`\n--- Step ${i}: ${step.command} ---`);
       let timedOut = false;
-      const stepTimeout = (step.timeout ?? DEFAULT_STEP_TIMEOUT) * 1000;
+      // Last "where this step stands" string reported by whichever action is
+      // currently running — read by the timeout race below so a step that
+      // times out on the outer deadline names what was actually in flight,
+      // instead of a bare "Step N timed out after Xms" (PR #616 review round,
+      // item 5). effectiveStepTimeoutMs already makes a single waitUntil/
+      // waitForTutorialStep's own deadline fire first with its own, more
+      // specific error; this covers the residual case where several actions'
+      // combined time — none individually stalling — exceeds the outer budget.
+      let lastProgress = 'no interaction action has started yet';
+      const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
       const timeoutPromise = new Promise<void>((_, reject) =>
-        setTimeout(() => { timedOut = true; reject(new Error(`Step ${i} timed out after ${stepTimeout}ms`)); }, stepTimeout)
+        setTimeout(() => {
+          timedOut = true;
+          reject(new Error(`Step ${i} timed out after ${stepTimeout}ms (last progress: ${lastProgress})`));
+        }, stepTimeout)
       );
       const stepScreenshotPaths: string[] = [];
 
@@ -112,6 +125,7 @@ export async function runScenarioInteraction(
 
             const interactionResult = await executeInteractionActions(
               page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
+              (detail) => { lastProgress = detail; },
             );
             stepScreenshotPaths.push(...interactionResult.screenshotPaths);
 

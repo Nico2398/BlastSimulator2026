@@ -10,8 +10,11 @@ import { describe, it, expect } from 'vitest';
 import {
   isMachineryWorkflow,
   latestRunPerWorkflow,
+  missingGatedJobs,
   parseArgs,
   verdictOf,
+  wantedGatedLabels,
+  type WorkflowJob,
   type WorkflowRun,
 } from '../../../scripts/await-pr-ci.js';
 
@@ -158,4 +161,76 @@ describe('arguments', () => {
       expect(parseArgs(argv as string[])).toHaveProperty('error');
     }
   );
+});
+
+// #615's actual failure mode: a workflow run's own `conclusion` is `success`
+// the instant every job in it either passed or was skipped, so `verdictOf`
+// alone cannot tell a genuinely green full-ci PR from one whose interaction
+// shards silently never ran. Kept in step with the same-named check in
+// `.github/actions/agentic-auto-merge/action.yml`.
+describe("asking a CI run's own jobs before trusting its conclusion", () => {
+  const job = (over: Partial<WorkflowJob> = {}): WorkflowJob => ({
+    name: 'Scenarios (interaction mode) — shard 1/4',
+    conclusion: 'success',
+    ...over,
+  });
+
+  it('is a no-op when the PR carries no gated label', () => {
+    expect(missingGatedJobs([], [])).toEqual([]);
+    expect(missingGatedJobs([], [job({ conclusion: null })])).toEqual([]);
+  });
+
+  it('clears full-ci once every interaction shard reports success', () => {
+    const jobs = [1, 2, 3, 4].map((n) =>
+      job({ name: `Scenarios (interaction mode) — shard ${n}/4` })
+    );
+    expect(missingGatedJobs(['full-ci'], jobs)).toEqual([]);
+  });
+
+  // The exact #615 shape: the run reports `success`, but the label's job
+  // never appears in its own job list at all.
+  it('flags full-ci when the interaction job never ran', () => {
+    expect(missingGatedJobs(['full-ci'], [])).toEqual(['full-ci']);
+    expect(missingGatedJobs(['full-ci'], [job({ name: 'TypeScript type check' })])).toEqual(['full-ci']);
+  });
+
+  it('flags full-ci when a shard is present but did not succeed', () => {
+    const jobs = [job({ name: 'Scenarios (interaction mode) — shard 1/4', conclusion: 'success' }),
+      job({ name: 'Scenarios (interaction mode) — shard 2/4', conclusion: 'failure' })];
+    expect(missingGatedJobs(['full-ci'], jobs)).toEqual(['full-ci']);
+  });
+
+  it('checks build-check against the Production build job independently of full-ci', () => {
+    expect(missingGatedJobs(['build-check'], [job({ name: 'Production build' })])).toEqual([]);
+    expect(missingGatedJobs(['build-check'], [])).toEqual(['build-check']);
+  });
+
+  it('reports every missing gated label when a PR carries more than one', () => {
+    expect(missingGatedJobs(['full-ci', 'build-check'], [])).toEqual(['full-ci', 'build-check']);
+  });
+
+  it('does not flag a `skipped` job as failing when its label is absent', () => {
+    // Production build reports `skipped` on every PR without build-check —
+    // that is the normal, correct case, not evidence of anything missing.
+    expect(missingGatedJobs([], [job({ name: 'Production build', conclusion: 'skipped' })])).toEqual([]);
+  });
+});
+
+// wantedGatedLabels is the fail-closed answer for when no ci.yml run exists
+// on the head at all -- main() used to fall through to `missing = []` (a
+// pass) in exactly that case, disagreeing with agentic-auto-merge's own
+// `ciRuns.length === 0` branch, which already failed closed. A code-review
+// round on PR #638 found the disagreement independently twice before this
+// test existed.
+describe('wantedGatedLabels — the fail-closed case when no ci.yml run exists at all', () => {
+  it('is empty when the PR carries no gated label', () => {
+    expect(wantedGatedLabels([])).toEqual([]);
+    expect(wantedGatedLabels(['agent-task', 'ready'])).toEqual([]);
+  });
+
+  it('names every gated label the PR carries, with no jobs to consult', () => {
+    expect(wantedGatedLabels(['full-ci'])).toEqual(['full-ci']);
+    expect(wantedGatedLabels(['build-check'])).toEqual(['build-check']);
+    expect(wantedGatedLabels(['full-ci', 'build-check'])).toEqual(['full-ci', 'build-check']);
+  });
 });
