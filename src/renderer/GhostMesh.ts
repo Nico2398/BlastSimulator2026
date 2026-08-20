@@ -27,9 +27,22 @@ const CLAIMED_PULSE_SPEED = 1.1;         // radians / second, claimed
 // camera glow brighter than faces facing it, layered on top of the existing
 // pulse-opacity behaviour above. Same blue as GHOST_COLOR in both ghost
 // states — no second color.
-const RIM_COLOR     = new THREE.Color(GHOST_COLOR); // reuses ghost base color
-const RIM_POWER     = 2.0;               // fresnel exponent
-const RIM_INTENSITY = 1.0;               // additive glow multiplier
+//
+// The rim term is added into totalEmissiveRadiance, which the standard
+// transparent alpha-blend then multiplies by the material's (pulsing,
+// 0.10-0.60) `opacity` uniform before it reaches the screen — exactly where
+// the rim should read strongest (thin grazing-angle sliver), the ghost is
+// also most see-through, diluting it. RIM_OPACITY_FLOOR compensates: the rim
+// contribution is divided by max(opacity, RIM_OPACITY_FLOOR) in-shader so its
+// on-screen brightness stays roughly independent of the opacity pulse
+// (floored rather than divided by raw opacity so it can't blow up as opacity
+// approaches 0). Original tuning (RIM_INTENSITY 1.0, no compensation) pixel-
+// sampled only a ~6-8% grazing-angle brightness delta — imperceptible at
+// normal viewing distance (#613 visual feedback).
+const RIM_COLOR         = new THREE.Color(GHOST_COLOR); // reuses ghost base color
+const RIM_POWER         = 1.5;           // fresnel exponent — widened vs 2.0 so the glow band reads as an edge, not a sliver
+const RIM_INTENSITY     = 2.2;           // additive glow multiplier
+const RIM_OPACITY_FLOOR = 0.25;          // floor for the opacity-compensation divisor (caps compensation at 4x)
 
 /** Builds a ghost mesh material at the given starting opacity — the unclaimed
  *  and claimed materials differ only in that value (#547 review). */
@@ -62,7 +75,8 @@ function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
         '#include <emissivemap_fragment>',
         '#include <emissivemap_fragment>\n' +
           'float rimFresnel = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), rimPower);\n' +
-          'totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel;',
+          `float rimOpacityCompensation = 1.0 / max(opacity, ${RIM_OPACITY_FLOOR.toFixed(2)});\n` +
+          'totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel * rimOpacityCompensation;',
       );
   };
   material.customProgramCacheKey = () => 'ghost-mesh-fresnel-v1';
