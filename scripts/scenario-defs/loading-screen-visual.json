@@ -25,7 +25,6 @@
     },
     {
       "command": "state",
-      "description": "Click New Campaign to reach the world map, where Dusty Hollow offers a Start Level button.",
       "interaction": [
         {
           "type": "command",
@@ -40,7 +39,9 @@
           "selector": "#bs-main-menu"
         }
       ],
-      "role": "observe"
+      "description": "Click New Campaign to reach the world map, where Dusty Hollow offers a Start Level button. `state` fails standalone (no game loaded yet), but this batch's shared command-mode engine (run-all-scenarios.ts) can carry a previous scenario's still-loaded game into this file's first steps depending on run order — genuinely either outcome (issue #585).",
+      "role": "observe",
+      "commandOutcome": "either"
     },
     {
       "command": "new_game seed:1138 size:24",

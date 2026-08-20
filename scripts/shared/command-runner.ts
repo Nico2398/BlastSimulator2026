@@ -14,7 +14,7 @@ import {
   buildScenarioReport,
   type ReportableStep,
 } from './scenario-utils.js';
-import { checkGoalAgainstState } from './scenario-goal.js';
+import { checkGoalAgainstState, checkCommandOutcome } from './scenario-goal.js';
 
 /**
  * Command-mode side of the `waitUntil` action (issue #590): loop the
@@ -105,46 +105,50 @@ export function runSteps(
       (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
     );
 
+    let error: string | undefined;
+    let result: { success: boolean; output: string } = { success: false, output: '' };
+    let gameState: Record<string, unknown> | null = null;
+
     try {
-      const result = waitUntilAction
-        ? runWaitUntil(engine, waitUntilAction)
-        : runCommand(engine, step.command);
-      const gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+      if (waitUntilAction) {
+        const waited = runWaitUntil(engine, waitUntilAction);
+        result = { success: true, output: waited.output };
+        gameState = waited.gameState;
+      } else {
+        result = runCommand(engine, step.command);
+        gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+      }
+
+      const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
+      if (outcomeViolation !== null) throw new Error(outcomeViolation);
 
       if (step.expect) {
         const violation = checkGoalAgainstState(step.expect, before, gameState);
         if (violation !== null) throw new Error(`expect failed: ${violation}`);
       }
-
-      const stateData = {
-        step: i,
-        command: step.command,
-        commandOutput: result.output,
-        gameState,
-        uiState: null,
-        screenshots: undefined,
-      };
-      const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
-      writeFileSync(statePath, JSON.stringify(stateData, null, 2));
-
-      results.push({
-        step: i,
-        command: step.command,
-        commandOutput: result.output,
-        gameState,
-        statePath,
-      });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      results.push({
-        step: i,
-        command: step.command,
-        commandOutput: '',
-        gameState: null,
-        statePath: '',
-        error: errorMsg,
-      });
+      error = err instanceof Error ? err.message : String(err);
     }
+
+    const stateData = {
+      step: i,
+      command: step.command,
+      commandOutput: result.output,
+      gameState,
+      uiState: null,
+      screenshots: undefined,
+    };
+    const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
+    writeFileSync(statePath, JSON.stringify(stateData, null, 2));
+
+    results.push({
+      step: i,
+      command: step.command,
+      commandOutput: result.output,
+      gameState,
+      statePath,
+      ...(error !== undefined ? { error } : {}),
+    });
   }
 
   // Save report using shared builder

@@ -77,7 +77,8 @@
         "blocked": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not researched"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "build vehicle_depot at:25,5 tier:3",
@@ -99,7 +100,8 @@
         "blocked": "#bs-build-panel [data-build-type=\"vehicle_depot\"] .bs-build-buy-btn",
         "note": "rejected: tier 3 not researched"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "build list",

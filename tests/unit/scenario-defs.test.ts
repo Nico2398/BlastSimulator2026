@@ -828,6 +828,30 @@ describe('Step role field is a recognized value when present', () => {
 });
 
 // ──────────────────────────────────────────────
+// 13b. Step commandOutcome, when present, is a recognized value (issue #585)
+// Forward-looking, like the `role` check above: no scenario definition sets
+// `commandOutcome` yet (the implementer's triage pass is what adds them), so
+// today this passes vacuously across all files — it exists to hold the
+// contract once that pass lands, exactly the way the `role` check did for
+// issue #479 before any file was tagged.
+// ──────────────────────────────────────────────
+describe('Step commandOutcome field is a recognized value when present', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — every step's commandOutcome, if set, is "refused" or "either"`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        if (step.commandOutcome === undefined) continue;
+        expect(
+          ['refused', 'either'],
+          `step[${i}] commandOutcome "${step.commandOutcome}" must be "refused" or "either"`,
+        ).toContain(step.commandOutcome);
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
 // 14. Role-marked steps never reach the console for anything but an
 // allowlisted setup command (issue #479). A step with no role tag predates
 // the distinction and is unconstrained — true of every definition here

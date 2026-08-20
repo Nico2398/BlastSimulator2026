@@ -288,6 +288,21 @@ export interface ScenarioStepDef {
   role?: ScenarioStepRole;
   /** See {@link ScenarioStepGoal}. */
   expect?: ScenarioStepGoal;
+  /**
+   * How this step's command result must be judged, beyond "didn't throw".
+   * Absent (the default) means the console must accept the command —
+   * success:false fails the step, naming the command and the console's
+   * own refusal text. Command-mode only; interaction mode is unchanged.
+   *
+   * - 'refused' — refusal is the assertion (a guard/negative-path step):
+   *   the command succeeding is the failure. Independent of `role` — a
+   *   guard-role step still has to say this explicitly.
+   * - 'either' — genuinely nondeterministic (e.g. `event choose 0` after a
+   *   bare `tick`, where an event may or may not be pending): either
+   *   outcome passes. Reserved for beats that are truly nondeterministic,
+   *   never a blanket silencer.
+   */
+  commandOutcome?: 'refused' | 'either';
 }
 
 /**

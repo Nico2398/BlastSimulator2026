@@ -64,46 +64,6 @@
       }
     },
     {
-      "command": "build medical_bay at:5,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build medical_bay at:5,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build office at:8,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build office at:8,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
       "command": "employee hire role:driller",
       "interaction": [
         {

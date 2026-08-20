@@ -8,7 +8,7 @@ paths:
 
 # Scenario Definitions
 
-Scenario JSON drives two verification channels from one file: `scenario` (command mode, pure Node.js) and `visual` (interaction mode, real Puppeteer clicks).
+Scenario JSON drives two verification channels from one file: `scenario` (command mode, pure Node.js) and `visual` (interaction mode, real Puppeteer clicks). In command mode, a step whose command the console refuses (`success: false`) fails the scenario unless the step declares `commandOutcome`.
 
 - Every step carries a `command`. Steps that also carry an `interaction` array run through the UI in interaction mode; steps without one fall back to the command.
 - Both modes must pass. `npm run scenarios` covers command mode; `npm run scenarios:interaction` covers the browser path.
@@ -48,6 +48,16 @@ A step's `command` or clicks prove only that nothing threw, not that the game ac
 A staffed opening is `campaign start level:<id> staffed:true` or `new_game ... staffed:true` — the same opt-in composition (`STARTING_SITE_STAFFED_COMPOSITION`, `src/core/config/balance.ts`, issue #551), free, applied before any assertion. A scenario that only needs an ordinary staffed site should use it rather than hand-rolling hire/license/buy/assign for the same roster. The four vehicles it grants come unmanned — `vehicle driver <vid> <eid>` is still required before anything drives.
 
 A wait for queued work to land (a drilled hole, and by issue #554 onward a loaded charge, a dug ramp segment, a built building) uses the `waitUntil` action (issue #590) — see the interaction-actions table above — rather than a hand-measured `tick N` pad: `field`/`equals` name what the step is actually waiting on, so a stall fails loudly and by name instead of a budget that merely happens to be long enough today. `tutorial-playthrough.json`/`blast-basic.json` predate it and still use hand-measured `tick N` steps; a new wait for queued work should use `waitUntil` instead of copying that pattern.
+
+## Step outcome (`commandOutcome`)
+
+Command mode has a `success: boolean` on every command result, and a step's own claim depends on which way that went — a step recorded as "ran" whether the console accepted or refused its command was silently proving nothing (issue #585 audited 412 such silently-refused commands across 63 files). `commandOutcome` (`ScenarioStepDef`, `scripts/shared/scenario-types.ts`, checked by `checkCommandOutcome` in `scripts/shared/scenario-goal.ts`) states which outcome the step expects, command-mode only:
+
+- Absent (the default) — the command must succeed. `success: false` fails the step, naming the command and the console's own refusal text.
+- `'refused'` — the command must be refused; the step fails if it unexpectedly succeeds (a guard step whose guard stopped guarding). Independent of `role: 'guard'` — a guard-role step still states this explicitly, and it composes with `expect.equals`/`expect.blocked` proving state didn't change.
+- `'either'` — either outcome passes. Reserved for genuinely nondeterministic beats (e.g. `event choose 0` after a bare `tick`, where an event may or may not be pending that beat) — never a blanket silencer for a step whose own claim is actually broken.
+
+A step whose command throws a real exception still fails regardless of `commandOutcome` — only a `success: false` return is a "refusal" this field can declare expected.
 
 ## Interaction actions
 
