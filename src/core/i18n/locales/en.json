@@ -2622,7 +2622,6 @@
   "ui.survey.confidence_pct": "{pct}% confidence",
   "ui.survey.overlay_toggle_tip": "Toggle confidence overlay — O",
   "ui.confirm.cancel": "Cancel",
-  "ui.vehicles.break": "Break",
   "ui.contracts.deliver": "Deliver",
   "ui.build.ramp_section": "Terrain",
   "ui.build.ramp": "Build Ramp",

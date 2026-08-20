@@ -134,10 +134,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // ui.build.ramp_ordered when ordering a ramp became queued excavation
     // work instead of an instant carve, and nothing ever came to reference
     // ramp_built's "Ramp carved." text afterward.
+    // Baseline is now 3273 (down from 3274): #618 retired the Fleet panel's
+    // manual Break button (fragment_debris/boulder-breaking is self-dispatching
+    // since #552, same as hauling) and removed its now-dead ui.vehicles.break
+    // key from both locales.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3274);
+    expect(Object.keys(en).length).toBe(3273);
   });
 });
 
