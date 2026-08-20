@@ -94,7 +94,7 @@ export class BlastFooter {
     const margin = estValue - planCost;
     const reason = !hasHoles
       ? t('ui.blast_workshop.footer.fire_reason_no_holes')
-      : (errors[0] ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: errors[0].issue }) : null);
+      : (errors[0] ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) }) : null);
 
     const signature = JSON.stringify({ planCost, estValue, margin, fireOk, reason });
     if (signature === this.lastSignature) return;

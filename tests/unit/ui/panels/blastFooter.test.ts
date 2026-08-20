@@ -4,6 +4,7 @@ import { BlastFooter } from '../../../../src/ui/panels/blastFooter.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole, resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
+import { setLocale } from '../../../../src/core/i18n/I18n.js';
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -29,6 +30,7 @@ function chargeAndSequence(state: ReturnType<typeof makeState>) {
 beforeEach(() => {
   resetHoleIds();
   document.body.innerHTML = '';
+  setLocale('en');
 });
 
 describe('BlastFooter', () => {
@@ -54,7 +56,7 @@ describe('BlastFooter', () => {
     expect(footer.root.textContent).toContain('$60');
   });
 
-  it('FIRE stays disabled with a reason when holes are drilled but not fully charged', () => {
+  it('FIRE stays disabled with a reason when holes are drilled but not fully charged (default en locale)', () => {
     const { footer } = makeFooter();
     const state = makeState();
     addHole(state.drillHoles, 10, 10, 8, 0.15);
@@ -65,6 +67,24 @@ describe('BlastFooter', () => {
     const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
     expect(fireBtn.disabled).toBe(true);
     expect(footer.root.textContent).toContain('Missing charge');
+  });
+
+  // #633: BlastPlan.ts's ValidationError.issue must be a translation key, and
+  // blastFooter must resolve it through t() at display time — not bake English
+  // prose into the fire-blocked reason line regardless of active locale.
+  it('FIRE-blocked reason line is translated under the fr locale, not left in English', () => {
+    setLocale('fr');
+    const { footer } = makeFooter();
+    const state = makeState();
+    addHole(state.drillHoles, 10, 10, 8, 0.15);
+    addHole(state.drillHoles, 13, 10, 8, 0.15);
+
+    footer.update(state);
+
+    const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
+    expect(fireBtn.disabled).toBe(true);
+    expect(footer.root.textContent).toContain('Charge manquante');
+    expect(footer.root.textContent).not.toContain('Missing charge');
   });
 
   it('FIRE enables once every hole is charged and sequenced', () => {

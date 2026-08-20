@@ -4,6 +4,7 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import type { GameState, PendingAction } from '../../core/state/GameState.js';
+import { t } from '../../core/i18n/I18n.js';
 import {
   createGridPlan, addHole, removeHole, resetHoleIds,
   computeDrillHoleDurationTicks,
@@ -503,7 +504,7 @@ export function blastCommand(
   const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
   const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
   if (errors.length > 0) {
-    return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
+    return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}` };
   }
 
   // ctx.weatherCycle may not exist yet (created lazily by the `weather`
@@ -676,7 +677,7 @@ export function blastPlanCommand(
     const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
     const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
     if (errors.length === 0) return { success: true, output: 'Plan is valid and ready to blast.' };
-    return { success: false, output: `Validation issues:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
+    return { success: false, output: `Validation issues:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}` };
   }
 
   if (sub === 'list') {
@@ -746,7 +747,7 @@ export function blastPreviewCommand(
   const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
   const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
   if (errors.length > 0) {
-    return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${e.issue}`).join('\n')}` };
+    return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}` };
   }
 
   const tier = ctx.state!.softwareTier;
