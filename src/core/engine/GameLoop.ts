@@ -1135,15 +1135,18 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
   emp.taskTicksRemaining -= 1;
 
   const action = state.pendingActions.find(a => a.id === emp.activeActionId);
-  const awards = action ? computeTaskXpAwards(emp, action) : [];
+  const xpAwards = action ? computeTaskXpAwards(emp, action) : [];
 
   let skill: SkillCategory | null = null;
   let leveledUp = false;
   let levelUpLevels: { oldLevel: 1 | 2 | 3 | 4 | 5; newLevel: 1 | 2 | 3 | 4 | 5 } | null = null;
 
-  for (const award of awards) {
-    skill = award.category;
-    const xpResult = gainXp(state.employees, emp.id, award.category, award.amount, emitter);
+  // computeTaskXpAwards returns 0 or 1 awards today (0 when the action carries
+  // no skill); looping keeps this call site correct if it ever grants XP in
+  // more than one category for the same tick.
+  for (const xpAward of xpAwards) {
+    skill = xpAward.category;
+    const xpResult = gainXp(state.employees, emp.id, xpAward.category, xpAward.amount, emitter);
     if (xpResult) {
       leveledUp = xpResult.leveledUp;
       if (xpResult.leveledUp) {
