@@ -27,7 +27,7 @@ import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/N
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
+import { ACTION_SELECTION_MAX_PATH_ATTEMPTS, AGENT_WALK_SPEED, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, LIVING_QUARTERS_WELLBEING_MULTIPLIERS } from '../../../src/core/config/balance.js';
 
 // ── NavGrid helpers (mirrors tests/unit/nav/Pathfinding.test.ts) ───────────
 
@@ -167,6 +167,62 @@ describe('resolveActionCost', () => {
     const result = resolveActionCost(state, emp, action);
 
     expect(result).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// cells -> ticks conversion consistency (#614)
+//
+// distance / AGENT_WALK_SPEED is computed twice in this file today: once
+// inside estimateTravelTicks (octileHeuristic-based) and once inline inside
+// resolveActionCost (path.totalCost-based). Both are meant to route through
+// the same cellsToTravelTicks(cells) helper so a future change to the
+// conversion cannot drift between the two call sites unnoticed. These tests
+// isolate each branch's travel component (total cost minus
+// computeActionWorkTicks, which is identical and already directly tested
+// above) and pin it to distance / AGENT_WALK_SPEED, and to each other.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('cells -> ticks conversion consistency (#614)', () => {
+  it('heuristic-based (estimateActionCost) and pathfinding-based (resolveActionCost) travel components agree with each other and with distance / AGENT_WALK_SPEED (happy path)', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 0, 0);
+    // Straight line along x on a flat, fully-walkable grid: octileHeuristic
+    // and a real findPath's totalCost both reduce to the raw cell distance
+    // (no diagonal component, every cell's moveCost is 1.0), so both branches
+    // must agree on a single known distance.
+    const distance = 10;
+    const action = makeAction({ id: 1, targetX: distance, targetZ: 0 });
+    const expectedTravelTicks = distance / AGENT_WALK_SPEED;
+
+    const workTicks = computeActionWorkTicks(state, emp, action);
+
+    const heuristicTravelTicks = estimateActionCost(state, emp, action) - workTicks;
+
+    const resolved = resolveActionCost(state, emp, action);
+    expect(resolved).not.toBeNull();
+    const pathTravelTicks = resolved!.totalTicks - workTicks;
+
+    expect(heuristicTravelTicks).toBeCloseTo(expectedTravelTicks, 10);
+    expect(pathTravelTicks).toBeCloseTo(expectedTravelTicks, 10);
+    expect(heuristicTravelTicks).toBeCloseTo(pathTravelTicks, 10);
+  });
+
+  it('employee already standing on the target — travel component is exactly zero for both branches (boundary: zero distance)', () => {
+    const state = makeState();
+    const emp = makeEmployee(state, 5, 5);
+    const action = makeAction({ id: 1, targetX: 5, targetZ: 5 });
+
+    const workTicks = computeActionWorkTicks(state, emp, action);
+
+    const heuristicTravelTicks = estimateActionCost(state, emp, action) - workTicks;
+
+    const resolved = resolveActionCost(state, emp, action);
+    expect(resolved).not.toBeNull();
+    const pathTravelTicks = resolved!.totalTicks - workTicks;
+
+    expect(heuristicTravelTicks).toBe(0);
+    expect(pathTravelTicks).toBe(0);
   });
 });
 
