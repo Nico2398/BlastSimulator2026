@@ -16,6 +16,7 @@ import {
   TRAINING_BASE_FEE,
   TRAINING_LEVEL_COST_MULTIPLIER,
   TRAINING_RELOCATION_OFFSET,
+  XP_THRESHOLDS,
 } from '../config/balance.js';
 
 export type ProficiencyLevel = 1 | 2 | 3 | 4 | 5;
@@ -231,6 +232,7 @@ export function tickTraining(
       isNew = false;
       level = Math.min(MAX_PROFICIENCY, existing.proficiencyLevel + 1) as ProficiencyLevel;
       existing.proficiencyLevel = level;
+      existing.xp = Math.max(existing.xp, XP_THRESHOLDS[level]);
     }
     // A better-qualified employee demands more pay.
     emp.salary = calculateSalary(emp);

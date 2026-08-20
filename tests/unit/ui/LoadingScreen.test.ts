@@ -144,6 +144,74 @@ describe('LoadingScreen', () => {
     });
   });
 
+  // ── Weighted phases (#474) ──
+
+  describe('runPhases — weighted phases', () => {
+    it('advances the bar in proportion to weight, not position in the list', async () => {
+      const seen: number[] = [];
+      await screen.runPhases([
+        { weight: 3, run: () => { seen.push(screen.progress); } },
+        { weight: 1, run: () => { seen.push(screen.progress); } },
+      ]);
+      // total weight 4, +1 reserved for the "ready" bump => denominator 5
+      expect(seen[0]).toBeCloseTo(3 / 5, 5);
+      expect(seen[1]).toBeCloseTo(4 / 5, 5);
+    });
+
+    it('a heavier phase moves the bar further than a lighter one', async () => {
+      const seen: number[] = [];
+      await screen.runPhases([
+        { weight: 1, run: () => { seen.push(screen.progress); } },
+        { weight: 5, run: () => { seen.push(screen.progress); } },
+      ]);
+      const firstJump = seen[0]!;
+      const secondJump = seen[1]! - seen[0]!;
+      expect(secondJump).toBeGreaterThan(firstJump);
+    });
+
+    it('an unset weight behaves as weight 1, unchanged from the pre-#474 equal split', async () => {
+      const seen: number[] = [];
+      await screen.runPhases([
+        { run: () => { seen.push(screen.progress); } },
+        { run: () => { seen.push(screen.progress); } },
+      ]);
+      // setPhase() rounds to a whole percent, so 1/3 and 2/3 land on the
+      // nearest percent (33%, 67%) rather than the exact fraction.
+      expect(seen[0]).toBeCloseTo(1 / 3, 2);
+      expect(seen[1]).toBeCloseTo(2 / 3, 2);
+    });
+
+    it('a zero or negative weight also falls back to 1, rather than producing a nonsense fraction', async () => {
+      const seen: number[] = [];
+      await screen.runPhases([
+        { weight: 0, run: () => { seen.push(screen.progress); } },
+        { weight: -4, run: () => { seen.push(screen.progress); } },
+      ]);
+      expect(seen[0]).toBeCloseTo(1 / 3, 2);
+      expect(seen[1]).toBeCloseTo(2 / 3, 2);
+    });
+
+    it('segment marks land at the same weighted fractions as the bar', async () => {
+      await screen.runPhases([
+        { weight: 3, run: () => {} },
+        { weight: 1, run: () => {} },
+      ]);
+      const marks = Array.from(container.querySelectorAll<HTMLElement>('.bsx-loading-mark'));
+      expect(marks).toHaveLength(2);
+      expect(marks[0]!.style.left).toBe(`${(3 / 5) * 100}%`);
+      expect(marks[1]!.style.left).toBe(`${(4 / 5) * 100}%`);
+    });
+
+    it('still reaches full progress before hiding regardless of weight', async () => {
+      let atEnd = -1;
+      await screen.runPhases([
+        { weight: 10, run: () => {} },
+        { weight: 1, run: () => {} },
+      ]).then(() => { atEnd = screen.progress; });
+      expect(atEnd).toBe(1);
+    });
+  });
+
   it('dispose removes it from the document', () => {
     screen.dispose();
     expect(document.getElementById('bs-loading-screen')).toBeNull();

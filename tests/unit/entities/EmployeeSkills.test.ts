@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
+import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import {
   createEmployeeState,
   hireEmployee,
@@ -308,13 +309,25 @@ describe('tickTraining', () => {
     expect(emp().salary).toBe(calculateSalary(emp()));
   });
 
-  it('granted qualification has xp initialised to 0', () => {
+  it('promoted qualification has xp floored at the new level\'s threshold', () => {
+    // blasting is a promotion (the employee already holds it), not a fresh
+    // grant — training it must not leave xp at 0, which would under-credit a
+    // trained employee relative to one who reached the same level via work.
     startTraining(state, empId, 1, 'blasting' as SkillCategory, 1, 100);
     tickTraining(state);
 
     const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
     const blasting = quals.find((q: SkillQualification) => q.category === 'blasting')!;
-    expect(blasting.xp).toBe(0);
+    expect(blasting.xp).toBe(XP_THRESHOLDS[blasting.proficiencyLevel as 1 | 2 | 3 | 4 | 5]);
+  });
+
+  it('freshly granted qualification has xp initialised to 0', () => {
+    startTraining(state, empId, 1, 'geology' as SkillCategory, 1, 100);
+    tickTraining(state);
+
+    const quals: SkillQualification[] = (state.employees.find(e => e.id === empId) as any).qualifications;
+    const geology = quals.find((q: SkillQualification) => q.category === 'geology')!;
+    expect(geology.xp).toBe(0);
   });
 
   it('does not complete training early — qualification is absent while ticksRemaining > 0', () => {

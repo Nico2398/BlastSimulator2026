@@ -46,6 +46,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import {
   hireEmployee, assignSkill, checkCollapse, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
+import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js';
 import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction, PlannedRamp, RampSegmentTracker } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
@@ -1724,6 +1725,169 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
     tickTaskProgress(state, employee);
 
     expect(qual().xp).toBe(3); // level 5 -> XP_PER_TICK_BASE + floor(5 * 0.5) = 3
+  });
+});
+
+// ── tickTaskProgress via computeTaskXpAwards (issue #621) ────────────────────
+//
+// tickTaskProgress is expected to stop reading emp.activeTaskSkill directly
+// and instead look up the PendingAction via
+// state.pendingActions.find(a => a.id === emp.activeActionId) and call
+// computeTaskXpAwards(emp, action), looping over the returned awards. These
+// tests exercise that path's observable behaviour end-to-end through
+// tickTaskProgress — they do not call computeTaskXpAwards directly (see
+// EmployeeXpRules.test.ts for that).
+describe('tickTaskProgress — XP awards via computeTaskXpAwards rule function (issue #621)', () => {
+  const SEED = 42;
+
+  /** Dispatch a task of `type`/`requiredSkill` to `employeeId` and let tickEmployees claim + seed it. */
+  function dispatchAndClaimTyped(
+    state: GameState,
+    employeeId: number,
+    actionId: number,
+    type: PendingAction['type'],
+    requiredSkill: PendingAction['requiredSkill'],
+  ): void {
+    state.pendingActions.push({
+      id: actionId, type, requiredSkill, requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: employeeId,
+      status: 'queued', holderId: null,
+    });
+    tickEmployees(state);
+    resolveArrival(state);
+  }
+
+  it('a drill_hole task grants blasting XP equal to computeXpPerTick at the employee\'s current level', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng); // 'blasting' level 1
+    dispatchAndClaimTyped(state, employee.id, 1, 'drill_hole', 'blasting');
+
+    const qual = () => employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual().xp).toBe(0);
+
+    const progress = tickTaskProgress(state, employee);
+
+    expect(qual().xp).toBe(computeXpPerTick(1));
+    expect(progress?.skill).toBe('blasting');
+  });
+
+  it('a drill_hole task at a higher proficiency level grants the scaled amount', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 4);
+    dispatchAndClaimTyped(state, employee.id, 1, 'drill_hole', 'blasting');
+
+    const qual = () => employee.qualifications.find(q => q.category === 'blasting')!;
+
+    tickTaskProgress(state, employee);
+
+    expect(qual().xp).toBe(computeXpPerTick(4));
+  });
+
+  it('a survey task grants geology XP equal to computeXpPerTick at the employee\'s current level', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng); // 'geology' level 1
+    dispatchAndClaimTyped(state, employee.id, 2, 'survey', 'geology');
+
+    const qual = () => employee.qualifications.find(q => q.category === 'geology')!;
+    expect(qual().xp).toBe(0);
+
+    const progress = tickTaskProgress(state, employee);
+
+    expect(qual().xp).toBe(computeXpPerTick(1));
+    expect(progress?.skill).toBe('geology');
+  });
+
+  it('a survey task at a higher proficiency level grants the scaled amount', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng);
+    assignSkill(state.employees, employee.id, 'geology', 3);
+    dispatchAndClaimTyped(state, employee.id, 2, 'survey', 'geology');
+
+    const qual = () => employee.qualifications.find(q => q.category === 'geology')!;
+
+    tickTaskProgress(state, employee);
+
+    expect(qual().xp).toBe(computeXpPerTick(3));
+  });
+
+  it('a drill_hole tick crossing the level-2 threshold returns leveledUp:true with correct oldLevel/newLevel', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    // Position XP just short of the level-2 threshold so this single tick's
+    // award (computeXpPerTick(1) = 1) crosses it.
+    employee.qualifications.find(q => q.category === 'blasting')!.xp = XP_THRESHOLDS[2] - 1;
+    dispatchAndClaimTyped(state, employee.id, 1, 'drill_hole', 'blasting');
+
+    const progress = tickTaskProgress(state, employee);
+
+    expect(progress?.leveledUp).toBe(true);
+    expect(progress?.oldLevel).toBe(1);
+    expect(progress?.newLevel).toBe(2);
+  });
+
+  it('a survey tick crossing the level-2 threshold returns leveledUp:true with correct oldLevel/newLevel', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng);
+    employee.qualifications.find(q => q.category === 'geology')!.xp = XP_THRESHOLDS[2] - 1;
+    dispatchAndClaimTyped(state, employee.id, 2, 'survey', 'geology');
+
+    const progress = tickTaskProgress(state, employee);
+
+    expect(progress?.leveledUp).toBe(true);
+    expect(progress?.oldLevel).toBe(1);
+    expect(progress?.newLevel).toBe(2);
+  });
+
+  it('a tick that does not cross a threshold returns leveledUp:false with no oldLevel/newLevel keys', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng); // fresh, xp 0, far from threshold
+    dispatchAndClaimTyped(state, employee.id, 1, 'drill_hole', 'blasting');
+
+    const progress = tickTaskProgress(state, employee);
+
+    expect(progress?.leveledUp).toBe(false);
+    expect(progress).not.toHaveProperty('oldLevel');
+    expect(progress).not.toHaveProperty('newLevel');
+  });
+
+  // Real haul_debris/fragment_debris actions (HaulDispatch.ts:24-32) set
+  // requiredSkill: null the same way, but they're claimed through a
+  // haul/fragment-specific eligibility check (isHaulOrFragmentActionClaimable)
+  // this synthetic fixture doesn't satisfy — 'general_work' is the same
+  // null-skill shape (matches the tickEmployees describe block's own
+  // makeAction default above) without that extra machinery.
+  it("the result's skill field is null for a task whose action has requiredSkill: null, and grants no XP to any qualification", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    const qualsBefore = JSON.parse(JSON.stringify(employee.qualifications));
+
+    dispatchAndClaimTyped(state, employee.id, 1, 'general_work', null);
+    const progress = tickTaskProgress(state, employee);
+
+    expect(progress?.skill).toBeNull();
+    expect(employee.qualifications).toEqual(qualsBefore);
+  });
+
+  it('a second requiredSkill: null task also grants no XP and reports skill:null (not a one-off)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'surveyor', rng);
+    const qualsBefore = JSON.parse(JSON.stringify(employee.qualifications));
+
+    dispatchAndClaimTyped(state, employee.id, 1, 'general_work', null);
+    const progress = tickTaskProgress(state, employee);
+
+    expect(progress?.skill).toBeNull();
+    expect(employee.qualifications).toEqual(qualsBefore);
   });
 });
 

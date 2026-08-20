@@ -17,6 +17,7 @@ jobs:
     # owner's PAT, so they carry the same author login as hand-written PRs.
     # The head branch prefix is the only reliable distinguisher.
     if: >-
+      vars.CLAUDE_REVIEW_ENABLED != 'false' &&
       !startsWith(github.head_ref, 'pipeline/') &&
       !startsWith(github.head_ref, 'claude/') &&
       !startsWith(github.head_ref, 'opencode/') &&

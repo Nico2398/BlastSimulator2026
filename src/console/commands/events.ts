@@ -371,8 +371,12 @@ export function tickCommand(
           }
         }
       }
-      if (progress.leveledUp) {
-        lines.push(`[tick ${state.tickCount}] LEVELUP: ${emp.name} reached level ${progress.newLevel} in ${progress.skill}.`);
+      // Report every award that leveled up this tick (#622) — a vehicle-gated
+      // action can grant XP in two categories in the same tick and both can
+      // cross a level threshold; progress.leveledUp/skill/newLevel alone only
+      // carry the first one.
+      for (const levelUp of progress.levelUps) {
+        lines.push(`[tick ${state.tickCount}] LEVELUP: ${emp.name} reached level ${levelUp.newLevel} in ${levelUp.skill}.`);
       }
     }
 
