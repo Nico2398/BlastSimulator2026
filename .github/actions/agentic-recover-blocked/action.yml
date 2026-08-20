@@ -64,8 +64,16 @@ runs:
           // session is simply waiting its turn. Only silence behind this run,
           // with an issue still `in-progress` and nothing to show for it, is
           // suspicious.
+          //
+          // #614: a run concurrency-blocked behind this one's own slot can be
+          // reported by the Actions API as `pending`, not `queued` — this step
+          // ran with #614's real run sitting in exactly that state, found
+          // nothing under the narrower two-status check, and blocked a run
+          // that went on to open its PR 19 minutes later. `agentic-ci-failure.yml`
+          // already covered the full set for the same reason; mirrored here.
+          const LIVE = ['queued', 'in_progress', 'waiting', 'requested', 'pending'];
           for (const workflow_id of RUNNERS) {
-            for (const status of ['queued', 'in_progress']) {
+            for (const status of LIVE) {
               const { data } = await github.rest.actions.listWorkflowRuns({
                 owner, repo, workflow_id, status, per_page: 10,
               });

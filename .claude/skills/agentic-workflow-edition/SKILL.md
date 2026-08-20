@@ -108,7 +108,7 @@ The Actions layer has no runtime you can drive locally, so its channel is `logic
 
 1. Add or update the assertions in `tests/unit/config/autonomy-loop.test.ts`. Pin the trigger, the token, and every guard — each of them fails silently in production.
 2. Read the **shipped source**, never a copy of it. The existing tests lift `agentic-auto-merge`'s inline script out of its `action.yml` and evaluate the real function; a re-typed duplicate drifts and then passes forever.
-3. Where a predicate is deliberately inlined in more than one place — the deliverable-PR check exists in three, because two of its sites run without a checkout — pin every copy so they cannot disagree.
+3. Where a predicate is deliberately inlined in more than one place — the deliverable-PR check exists in three because two of its sites run without a checkout, and the "is a runner session live" check exists in two (`agentic-recover-blocked`, `agentic-ci-failure.yml`) for the same reason — pin every copy so they cannot disagree. Pinning each copy's own content is not enough: #614 happened because both liveness copies were individually pinned and still drifted, one polling the full set of non-terminal Actions run statuses and the other only two of them, with nothing ever comparing them. Assert the copies equal each other, not only that each contains what it should.
 4. `npm run test` and `npm run typecheck`. A YAML parse check (`python3 -c "import yaml; yaml.safe_load(open(...))"`) catches an indentation error before a push does.
 5. State in the PR body which mechanism changed and which run it was lost to. Nothing about this layer is self-evident three months later.
 
