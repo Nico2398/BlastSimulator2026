@@ -681,6 +681,14 @@ export const STARTING_SITE_STAFFED_COMPOSITION: {
 // ─── Employee Skills ───────────────────────────────────────────────────────────
 
 /**
+ * Per-tick XP award formula: XP_PER_TICK_BASE + floor(proficiencyLevel * XP_PER_TICK_LEVEL_SCALE).
+ * Read by computeXpPerTick() in src/core/entities/EmployeeXpRules.ts.
+ * Level 1 → 1 XP/tick, Level 5 → 3 XP/tick, at current values.
+ */
+export const XP_PER_TICK_BASE = 1;
+export const XP_PER_TICK_LEVEL_SCALE = 0.5;
+
+/**
  * Task-duration multipliers by proficiency level (1–5).
  * Applied as: ticksRequired = ceil(baseDuration * PROFICIENCY_MULTIPLIERS[level] / productivityMultiplier).
  * Lower value = shorter task duration. Rookie (1) is the baseline (×1.00);
