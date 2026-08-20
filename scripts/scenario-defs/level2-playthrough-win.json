@@ -1768,8 +1768,8 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "orderedHoleCount": 6,
-          "holeCount": 19
+          "orderedHoleCount": 0,
+          "holeCount": 25
         },
         "increased": [
           "tickCount"
@@ -2246,8 +2246,8 @@
           "surveyCount": 3,
           "wellBeing": 0,
           "safety": 0,
-          "ecology": 39.66,
-          "nuisance": 24.15
+          "ecology": 39.519999999999996,
+          "nuisance": 23.799999999999997
         },
         "changedBy": {
           "tickCount": 0
