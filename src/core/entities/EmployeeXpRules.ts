@@ -22,7 +22,7 @@ export interface XpAward {
 }
 
 /** Award amount for `category` at employee's current proficiency (default level 1). */
-function awardFor(employee: Employee, category: SkillCategory): XpAward {
+function computeAwardFor(employee: Employee, category: SkillCategory): XpAward {
   const qual = employee.qualifications.find(q => q.category === category);
   const level = qual?.proficiencyLevel ?? 1;
   return { category, amount: computeXpPerTick(level) };
@@ -43,11 +43,11 @@ export function computeTaskXpAwards(employee: Employee, action: PendingAction): 
   const awards: XpAward[] = [];
 
   if (action.requiredSkill !== null) {
-    awards.push(awardFor(employee, action.requiredSkill));
+    awards.push(computeAwardFor(employee, action.requiredSkill));
   }
 
   if (action.requiredVehicleRole !== null) {
-    awards.push(awardFor(employee, ROLE_LICENCE_REQUIRED[action.requiredVehicleRole]));
+    awards.push(computeAwardFor(employee, ROLE_LICENCE_REQUIRED[action.requiredVehicleRole]));
   }
 
   return awards;
