@@ -123,6 +123,20 @@ export function chunkIndexOf(worldCoord: number): number {
 }
 
 /**
+ * Clamp a chunk's owned sub-rect to the chunk's own tile bounds — i.e. to
+ * `[cx*CHUNK_SIZE, cx*CHUNK_SIZE + CHUNK_SIZE) × [cz*CHUNK_SIZE, cz*CHUNK_SIZE + CHUNK_SIZE)`.
+ *
+ * STUB — no logic yet, will be implemented by @implementer.
+ */
+export function clampChunkRectToTile(
+  _cx: number, _cz: number,
+  _rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+): { minX: number; minZ: number; maxX: number; maxZ: number } {
+  // TODO: implement
+  throw new Error('not implemented');
+}
+
+/**
  * One chunk of storage: CHUNK_SIZE × sizeY × CHUNK_SIZE voxels, plus the
  * sub-rect of it the site actually owns.
  *
