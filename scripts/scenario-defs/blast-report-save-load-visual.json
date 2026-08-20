@@ -1,0 +1,306 @@
+{
+  "name": "blast-report-save-load-visual",
+  "description": "Regression coverage for #571: a Blast Report modal, dismissed by a real click, must stay closed after a save+load round trip -- even past the ~3s real-time delay (BLAST_REPORT_DELAY_MS, BlastReportModal.ts) that would otherwise re-arm it. Before the fix, `load` replaced ctx.state wholesale with a *new* state.lastBlastReport object (deep-cloned from the save), and the modal's identity check (report !== lastShownReport) treated that new reference as a fresh, never-shown report -- reopening it ~3s later over whatever panel the player had moved on to. The fix stamps lastShownReport from the swapped-in state inside reset() (closeStaleLevelOverlays), so a report identical in content to one already dismissed does not re-arm. Sanity checks bracket the regression check: the modal must still genuinely open for a real new report (step 'blast'), and must still genuinely close on a real click (step 'dismiss report').",
+  "steps": [
+    {
+      "command": "new_game seed:42 staffed:true",
+      "timeout": 15,
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:2 cols:2 spacing:5 depth:6 start:15,15",
+      "description": "Two increment clicks on the spacing stepper raise it 3->5m before dragging, so the (15,15)-(20,20) rectangle computes the declared 2x2 instead of the default-spacing 3x3.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"spacing\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 20,
+          "z2": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 4,
+          "holeCount": 0
+        },
+        "note": "2 rows x 2 cols = 4 holes ordered (ghosts), none drilled yet (#553)"
+      }
+    },
+    {
+      "command": "tick 90",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 4 holes well inside this pad.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 90"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "timeout": 125,
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 4,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 4
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "description": "Fires the blast and waits out BLAST_REPORT_DELAY_MS (3000ms, BlastReportModal.ts) in real time so the report modal genuinely opens -- sanity check that the fix did not just disable the modal outright.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1000
+        },
+        {
+          "type": "wait",
+          "durationMs": 2500
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0
+        },
+        "usable": "[data-action=\"report-close\"]",
+        "note": "sanity check: a genuinely new blast report opens the modal for real"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Dismiss the report through its real CLOSE button (data-action=report-close), not a console command -- the command field stays the inert `state` read since command mode has no DOM/modal to dismiss.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "blocked": "[data-action=\"report-close\"]",
+        "note": "sanity check: the real click actually closes the modal"
+      }
+    },
+    {
+      "command": "state",
+      "description": "Save to real UI slot_1 via the Saves modal (SavesModal.ts) -- a separate, IndexedDB-backed path from the console save/load commands' in-memory slots. Command field stays inert; this step's real effect only exists through the clicks.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-saves-modal"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"save-here\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saves-modal > div > div:first-child button"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        },
+        "blocked": "[data-action=\"report-close\"]",
+        "note": "the report modal, already dismissed above, stays closed through the save itself"
+      }
+    },
+    {
+      "command": "state",
+      "description": "#571: load slot_1 back via the Saves modal's own Load button (main.ts's setOnLoad -> load command -> uiManager.closeStaleLevelOverlays), the click-driven path this whole scenario exists to exercise. This swaps ctx.state wholesale, giving state.lastBlastReport a brand-new object identity even though its content is the same already-dismissed report.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saveload-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-saves-modal"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-saves-modal [data-slot=\"slot_1\"] [data-action=\"load\"]"
+        },
+        {
+          "type": "wait",
+          "durationMs": 300
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        },
+        "blocked": "[data-action=\"report-close\"]",
+        "note": "reset() runs synchronously inside the load dispatch, so the modal is already closed the instant load finishes -- this alone does not yet prove the regression fixed, see the next step"
+      }
+    },
+    {
+      "command": "state",
+      "description": "#571's actual regression check: wait out BLAST_REPORT_DELAY_MS again in real time with no further player action after load, then screenshot. Before the fix, BlastReportModal.update() saw the freshly-deserialized state.lastBlastReport as a never-shown report (reference != lastShownReport) and re-armed its 3s open delay right here, popping the CLOSE-already-clicked report back over whatever the player had moved on to.",
+      "interaction": [
+        {
+          "type": "wait",
+          "durationMs": 1500
+        },
+        {
+          "type": "wait",
+          "durationMs": 2000
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "blocked": "[data-action=\"report-close\"]",
+        "note": "#571: modal must NOT have reopened -- this is the bug's own repro window"
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    }
+  ]
+}

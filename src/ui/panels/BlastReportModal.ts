@@ -103,11 +103,21 @@ export class BlastReportModal {
   /** Whether a report has arrived but is still waiting out its open delay (#545). */
   get pending(): boolean { return this.pendingReport !== null; }
 
-  /** Discard any in-flight deferred report and close the modal (#545). */
-  reset(): void {
+  /**
+   * Discard any in-flight deferred report and close the modal (#545).
+   * `currentReport` is the replacing state's lastBlastReport, e.g. from a
+   * caller swapping ctx.state wholesale (#571, `load`): stamping it into
+   * lastShownReport means a later update() tick that sees that same-identity
+   * report treats it as already-shown and does not re-arm the delay timer,
+   * even though the new state object's reference differs from whatever was
+   * shown before the swap. Defaults to null, matching a fresh level's
+   * lastBlastReport (new_game, campaign transition).
+   */
+  reset(currentReport: BlastReport | null = null): void {
     this.pendingReport = null;
     this.pendingDeadlineMs = null;
     this.hide();
+    this.lastShownReport = currentReport;
   }
 
   update(state: GameState): void {

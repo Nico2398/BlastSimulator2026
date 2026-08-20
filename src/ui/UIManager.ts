@@ -311,9 +311,13 @@ export class UIManager {
    * Close overlays whose visibility is a stale carry-over from a previous
    * level's ended state, not something the player is mid-answering. Call
    * whenever ctx.state is replaced with a new object (new_game, campaign
-   * transition, sandbox start) — a fresh GameState's lastBlastReport is
-   * always null, so BlastReportModal.update() never re-closes itself on its
-   * own (it only ever opens on a new report; see BlastReportModal#update).
+   * transition, sandbox start, `load`) — a fresh new_game/campaign-transition
+   * state's lastBlastReport is always null, but a `load`-ed state's is
+   * whatever was last set before saving, structurally equal to but a
+   * different reference from anything BlastReportModal has already shown.
+   * Forwarding state.lastBlastReport into reset() stamps it as
+   * already-shown, so BlastReportModal.update() doesn't mistake it for a
+   * new report on its very next tick and re-arm (#571).
    * reset() drops both a visible report and a pending/armed-but-not-yet-open
    * one (#545) — a report queued right before a transition must not survive
    * into the next level's state.
@@ -323,8 +327,8 @@ export class UIManager {
    * is excluded too — its update() already closes itself the instant
    * state.levelEndReason reads null, which a fresh level's state always is.
    */
-  closeStaleLevelOverlays(): void {
-    this.blastReportModal.reset();
+  closeStaleLevelOverlays(state: GameState): void {
+    this.blastReportModal.reset(state.lastBlastReport);
   }
 
   /** Read-only accessor for tests (#504) — whether the BlastReportModal is currently open. */

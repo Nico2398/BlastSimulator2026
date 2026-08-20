@@ -473,9 +473,9 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
   // state (e.g. BlastReportModal left open from an earlier site's last
   // blast) — a second `sandbox start` otherwise left that site's "Rating:
   // Perfect" dialog covering the new site's terrain (#504).
-  if (enteredNewLevel) {
+  if (enteredNewLevel && ctx.state) {
     mainMenu.hide();
-    uiManager.closeStaleLevelOverlays();
+    uiManager.closeStaleLevelOverlays(ctx.state);
   }
 
   // (Re)seed the weather cycle whenever ctx.state was replaced with a new
@@ -992,6 +992,12 @@ savesModal.setOnLoad((state) => {
     };
     regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
   }
+  // Close any overlay whose visibility is a stale carry-over from the
+  // previous session's ended state (e.g. BlastReportModal left open from an
+  // earlier blast) — same fixup runGameCommand's enteredNewLevel branch does
+  // for the console `load` command; this is the Saves modal's Load button,
+  // the only other real path that swaps ctx.state (#571).
+  uiManager.closeStaleLevelOverlays(ctx.state);
   gameRenderer.syncFromContext(ctx);
 });
 
