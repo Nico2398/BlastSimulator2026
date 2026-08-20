@@ -1,0 +1,119 @@
+name: "Recover a run this session's slot blocked"
+description: >
+  Reacts to the one event this pipeline had no hook for: GitHub Actions
+  silently dropping a *queued* run. `agentic-runner` (claude-runner.yml,
+  opencode-runner.yml) keeps only one pending run per concurrency group — a
+  second one that arrives before the first starts cancels it outright, zero
+  job steps, nothing left to retry from. #572 and #610 were both exactly
+  this: a real assignment queued correctly behind a live session, then
+  evicted seconds later by that same session's own trailing wrap-up comment
+  on its way out — a no-op that never mentions the agent, but still claimed
+  the one pending slot before resolving to nothing.
+
+  The issue that assignment was for is left `in-progress` with no session and
+  no PR. Because `selectNextAssignable`'s single-flight guard treats any
+  `in-progress` issue as a live run, the *whole queue* stops behind it, not
+  just that one issue — until `agentic-watchdog.yml`'s hourly sweep notices.
+
+  This runs at the tail of every session, right before the concurrency slot
+  it holds is freed, and asks the one question whose answer does not depend
+  on a clock: is any *other* issue sitting `in-progress` with no deliverable
+  PR and nothing queued or live behind this run to finish it? If so, that
+  assignment was dropped, not merely slow — release it exactly as the
+  watchdog would, so `handle-failure.yml`'s existing `blocked` reaction
+  chains the queue past it immediately instead of after a stall threshold.
+
+inputs:
+  token:
+    description: >
+      Token used to read issues/runs and to label/comment. Must be a PAT —
+      labelling with GITHUB_TOKEN raises no `issues: labeled` event, so
+      `handle-failure.yml` would never chain past the recovered issue.
+    required: true
+  self_issue:
+    description: "This run's own issue number, excluded from the sweep. Empty is fine."
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - id: recover
+      uses: actions/github-script@v7
+      env:
+        SELF_ISSUE: ${{ inputs.self_issue }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          const RUNNERS = ['claude-runner.yml', 'opencode-runner.yml'];
+          const mine = parseInt(process.env.SELF_ISSUE || '', 10);
+
+          // Required from the workspace, not vendored into this YAML: the same
+          // rules and the same deliverable predicate every other entry point
+          // reaches through them, so this cannot silently disagree with what
+          // `agentic-assign` or `agentic-watchdog` would decide.
+          const rules = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/assignability.cjs`);
+          const { createIssueApi } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/issue-api.cjs`);
+          const api = createIssueApi(github, { owner, repo, log: core.info });
+
+          // If anything is genuinely queued or already running behind this
+          // job, the slot is correctly spoken for — the normal case on every
+          // successful hand-off, including the usual one where the next
+          // session is simply waiting its turn. Only silence behind this run,
+          // with an issue still `in-progress` and nothing to show for it, is
+          // suspicious.
+          for (const workflow_id of RUNNERS) {
+            for (const status of ['queued', 'in_progress']) {
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner, repo, workflow_id, status, per_page: 10,
+              });
+              const others = data.workflow_runs.filter((run) => run.id !== context.runId);
+              if (others.length > 0) {
+                core.info(
+                  `${workflow_id}: ${others.length} ${status} run(s) besides this one — the slot is spoken for.`
+                );
+                return;
+              }
+            }
+          }
+
+          const busy = await api.listIssuesByLabel(rules.IN_PROGRESS);
+          let recovered = 0;
+          for (const issue of busy) {
+            if (issue.number === mine) continue;
+
+            // Unknown is not evidence either way — leave it for the watchdog,
+            // which retries the same read later rather than guessing now.
+            const deliverable = await api.deliverableFor(issue.number);
+            if (deliverable.unknown) {
+              core.warning(`#${issue.number}: pull requests could not be read — leaving it for the watchdog.`);
+              continue;
+            }
+            const carrier = deliverable.pipeline ?? deliverable.closers[0];
+            if (carrier) {
+              core.info(`#${issue.number}: pull request #${carrier.number} carries it — leaving alone.`);
+              continue;
+            }
+
+            core.warning(`#${issue.number}: in-progress, no PR, nothing queued behind this run — recovering now.`);
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: issue.number,
+              body: [
+                '🕳️ **This run was lost — caught at hand-off, not by the hourly sweep.**',
+                '',
+                `Issue #${issue.number} was assigned while this session held the single-flight \`agentic-runner\` slot. Its own triggered run never started a job — almost certainly cancelled while queued, by another event landing in the same window and taking the one pending-run slot GitHub Actions holds per concurrency group.`,
+                '',
+                'Marking it `blocked` so `handle-failure.yml` chains the queue past it right away, rather than leaving every later assignment deferred behind it until the next stall sweep.',
+              ].join('\n'),
+            });
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: issue.number, labels: [rules.BLOCKED],
+            });
+            await github.rest.issues.removeLabel({
+              owner, repo, issue_number: issue.number, name: rules.IN_PROGRESS,
+            }).catch(() => {});
+            recovered += 1;
+          }
+          core.info(`Recovered ${recovered} issue(s).`);

@@ -16,7 +16,40 @@ concurrency:
   # Repo-wide, and shared by name with the other runner: exactly one autonomous
   # agent session may run at a time, whichever runtime it is. Queued runs wait
   # rather than cancel the live one.
-  group: agentic-runner
+  #
+  # But `issue_comment`/`pull_request_review_comment` carry no content filter at
+  # the workflow level — every comment anywhere in the repo creates a run here,
+  # whether or not the job's own `if:` below will act on it. GitHub Actions
+  # keeps only one *pending* run per group; a second one that arrives before the
+  # first starts silently cancels it, zero steps, nothing to retry from. #572
+  # and #610 were both a real assignment's run queued correctly behind a live
+  # session, then evicted seconds later by that same session's own trailing
+  # wrap-up comment — a no-op that never mentions @opencode and would have
+  # resolved `if:` false, but still claimed the slot on its way to finding that
+  # out. So this mirrors the job's own `if:` here too: only a trigger the job
+  # will actually act on may contend for the shared slot. Everything else gets
+  # its own group, keyed by this run's id, so it can never evict real work —
+  # the same reasoning `auto-assign-next.yml` already applies to keep auto-merge
+  # arming out of the `agentic-assignment` group.
+  group: >-
+    ${{
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.comment.user.type != 'Bot' &&
+          (
+            startsWith(github.event.comment.body, '@opencode ') ||
+            contains(github.event.comment.body, ' @opencode ') ||
+            endsWith(github.event.comment.body, ' @opencode') ||
+            github.event.comment.body == '@opencode' ||
+            startsWith(github.event.comment.body, '@OpenCode ') ||
+            contains(github.event.comment.body, ' @OpenCode ') ||
+            endsWith(github.event.comment.body, ' @OpenCode') ||
+            github.event.comment.body == '@OpenCode'
+          )
+        )
+      ) && 'agentic-runner' || format('agentic-runner-noop-{0}', github.run_id)
+    }}
   cancel-in-progress: false
 
 permissions:
@@ -223,6 +256,18 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           head: ${{ steps.context.outputs.feature_branch }}
+
+      # Last step, deliberately: the concurrency slot this job holds frees the
+      # moment it finishes, so this is the last chance to notice whether that
+      # slot's own queue lost something on the way in. See the action for why —
+      # #572, #610.
+      - name: Recover a run this session's slot blocked
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/agentic-recover-blocked
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          self_issue: ${{ steps.context.outputs.issue }}
 
       # No chaining step here, deliberately. A run whose deliverable was an
       # answer or an executed command closes its own issue and stops there: it
