@@ -84,6 +84,16 @@ export function seedTaskTimerFields(state: GameState, employee: Employee, action
 }
 
 /**
+ * Converts a grid-cell distance (from either the octile-heuristic estimate
+ * or a real findPath's totalCost) into ticks, at AGENT_WALK_SPEED cells per
+ * tick. Single source of truth for both estimateTravelTicks (heuristic) and
+ * resolveActionCost (pathfinding) (#614).
+ */
+function cellsToTravelTicks(cells: number): number {
+  throw new Error('not implemented');
+}
+
+/**
  * Straight-line (octile-heuristic) travel ticks for `employee` to reach
  * `action`'s target — see `octileHeuristic` in `Pathfinding.ts`. Shared by
  * `estimateActionCost` (always uses this direct-line estimate) and
