@@ -1,10 +1,10 @@
 // BlastSimulator2026 — Fleet panel (redesign P6)
 // Traffic advisory banner, then one card per vehicle: name/id/role, status
 // chip, HP gauge, LOAD gauge (haulers only), driver row or licensed-crew
-// picker, BREAK (breakEligibility.ts, #484), SCRAP (confirm, real residual
-// value). Hauling is self-dispatching (#552) — there is no Haul button
-// anymore; a qualified idle employee auto-claims a free debris_hauler and
-// drives it to the nearest fragment on its own.
+// picker, SCRAP (confirm, real residual value). Both Haul and Break are
+// self-dispatching now (#552, #618) — there is no button for either; a
+// qualified idle employee/driver auto-claims the free vehicle and does the
+// work on its own.
 // DEALERSHIP below the roster: every role/tier with a real stat-multiplier
 // line from VEHICLE_TIER_MULTIPLIERS, dispatching `vehicle buy`.
 //
@@ -23,7 +23,6 @@ import { computeScrapResidualValue, getAllVehicleRoles, getVehicleDefByTier } fr
 import { VEHICLE_TIER_MULTIPLIERS } from '../../core/config/balance.js';
 import { computeTrafficAdvisory } from '../../core/events/EventEngine.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { BreakEligibilityCache, makeBreakButton, refreshBreakButtons } from '../breakEligibility.js';
 import { vehicleDisplayName, makeStatusChip, makeHpGauge, makeLoadGauge, makeDriverRow, makeAssignRow } from '../fleetDetailSections.js';
 import type { ConfirmModalConfig } from './ConfirmModal.js';
 import type { CommandResult } from '../../console/ConsoleRunner.js';
@@ -41,7 +40,6 @@ export class FleetPanel {
   private lastSignature = '';
   private lastState: GameState | null = null;
   private readonly locale = new LocaleTextRegistry();
-  private readonly breakCache = new BreakEligibilityCache();
 
   constructor(container: HTMLElement) {
     this.el = el('div', { className: 'bsx-root', attrs: { id: 'bs-vehicle-panel' } });
@@ -87,20 +85,15 @@ export class FleetPanel {
 
   update(state: GameState): void {
     this.lastState = state;
-    // Reachable-fragment eligibility only changes once per game tick, not
-    // once per rendered frame (mirrors VehiclePanel.ts's own comment).
-    this.breakCache.refresh(state);
 
     const signature = this.computeSignature(state);
     if (signature === this.lastSignature) {
       this.refreshDynamic(state);
-      refreshBreakButtons(this.bodyEl, state, this.breakCache, this.dispatch);
       this.refreshDealershipAffordability(state.cash);
       return;
     }
     this.lastSignature = signature;
     this.render(state);
-    refreshBreakButtons(this.bodyEl, state, this.breakCache, this.dispatch);
     this.refreshDealershipAffordability(state.cash);
   }
 
@@ -111,8 +104,6 @@ export class FleetPanel {
   }
 
   dispose(): void { this.el.remove(); }
-
-  private readonly dispatch = (cmd: string): unknown => this.gameConsole?.(cmd);
 
   /**
    * Structural facts only: which cards exist, whether each has a driver
@@ -254,9 +245,6 @@ export class FleetPanel {
     );
 
     const actions = el('div', { attrs: { style: 'display:flex;gap:6px' } });
-    actions.dataset['breakSlot'] = String(v.id);
-    const breakBtn = makeBreakButton(v, this.breakCache, this.dispatch);
-    if (breakBtn) actions.appendChild(breakBtn);
     const scrapBtn = button('danger', '', { icon: 'trash' });
     scrapBtn.style.cssText = 'width:34px;height:28px;padding:0';
     scrapBtn.title = t('ui.fleet.scrap');
