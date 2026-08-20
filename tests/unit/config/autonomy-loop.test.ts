@@ -435,8 +435,12 @@ describe('a session recovers a run its own slot blocked, on its way out', () => 
     expect(action).toContain('api.deliverableFor');
   });
 
+  // #614: a concurrency-blocked run can be reported by the Actions API as
+  // `pending`, not only `queued` — the narrower two-status check missed it
+  // live and blocked a run that went on to open its PR. Full set mirrors
+  // agentic-ci-failure.yml's own LIVE array for the identical check.
   it('only recovers when nothing is queued or live behind this run', () => {
-    expect(action).toContain("['queued', 'in_progress']");
+    expect(action).toContain("['queued', 'in_progress', 'waiting', 'requested', 'pending']");
     expect(action).toContain('run.id !== context.runId');
   });
 
