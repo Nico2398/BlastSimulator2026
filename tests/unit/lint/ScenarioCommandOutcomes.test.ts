@@ -35,10 +35,35 @@ import { mkdtempSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { tmpdir } from 'os';
 import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
-import { createGameEngine } from '../../../scripts/shared/command-runner.js';
+import { createGameEngine, runWaitUntil } from '../../../scripts/shared/command-runner.js';
 import { runCommand } from '../../../src/console/createRunner.js';
 import { serializeGameState } from '../../../src/console-api.js';
-import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import type { InteractionStepAction, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+
+/**
+ * `waitUntil` (issue #590) is the one interaction action that replaces a
+ * step's `command` entirely in the real runner (`runWaitUntil`,
+ * command-runner.ts) rather than executing it — the field carries a plain
+ * descriptive string by convention (scenario-defs.md), never a real console
+ * command. Replaying that string through plain `runCommand`, as this lint
+ * otherwise does, always reports "Unknown command" — a false positive.
+ *
+ * The fix is not to skip the step: `runWaitUntil` is what actually advances
+ * the engine (ticking until the named field settles) — every later step in
+ * the file depends on that state having genuinely moved (holes drilled,
+ * charges loaded). Skipping it silently leaves the engine stalled, which
+ * surfaces as *downstream* steps failing against never-completed queued
+ * work — a second false positive, just one step removed from the first.
+ * Driving the same `runWaitUntil` the real runner uses keeps this lint's
+ * replay honest with the live engine, per its own doc comment above.
+ */
+function findWaitUntilAction(
+  step: ScenarioStepDef,
+): Extract<InteractionStepAction, { type: 'waitUntil' }> | undefined {
+  return step.interaction?.find(
+    (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
+  );
+}
 
 const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
 
@@ -64,12 +89,16 @@ function findUndeclaredRefusals(name: string, scratchDir: string): UndeclaredRef
 
   scenario.steps.forEach((rawStep, i) => {
     const step = rawStep as ScenarioStepDef;
+    const waitUntilAction = findWaitUntilAction(step);
     let result: { success: boolean; output: string };
     try {
-      result = runCommand(engine, step.command);
+      result = waitUntilAction
+        ? { success: true, output: runWaitUntil(engine, waitUntilAction).output }
+        : runCommand(engine, step.command);
     } catch {
       return;
     }
+    if (waitUntilAction) return; // no refusal concept for a wait — it completed or threw above
 
     // Scratch dump for diagnosis — throwaway tmp location only.
     writeFileSync(

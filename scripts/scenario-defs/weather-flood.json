@@ -253,7 +253,8 @@
       "interaction": [
         { "type": "resolveEventIfPending" }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -267,7 +268,8 @@
       "interaction": [
         { "type": "resolveEventIfPending" }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -287,7 +289,8 @@
       "interaction": [
         { "type": "resolveEventIfPending" }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",

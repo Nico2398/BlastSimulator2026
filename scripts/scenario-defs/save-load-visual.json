@@ -298,7 +298,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",

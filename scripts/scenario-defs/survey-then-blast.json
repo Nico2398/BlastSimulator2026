@@ -644,7 +644,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -663,7 +664,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -688,7 +690,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -697,7 +700,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -727,7 +731,8 @@
       "interaction": [
         { "type": "resolveEventIfPending" }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -741,7 +746,8 @@
       "interaction": [
         { "type": "resolveEventIfPending" }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -761,7 +767,8 @@
       "interaction": [
         { "type": "resolveEventIfPending" }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",

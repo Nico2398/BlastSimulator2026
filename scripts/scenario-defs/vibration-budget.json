@@ -194,7 +194,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -221,7 +222,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
@@ -344,7 +346,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -558,7 +561,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -577,7 +581,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -604,7 +609,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
@@ -667,7 +673,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -889,7 +896,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -916,7 +924,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
@@ -979,7 +988,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",

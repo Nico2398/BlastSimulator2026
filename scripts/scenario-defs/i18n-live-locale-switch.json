@@ -133,7 +133,8 @@
           "selector": "#bs-saveload-btn"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "state",
@@ -201,7 +202,8 @@
           "selector": "#bs-event-dialog .bs-event-dismiss"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "state full",

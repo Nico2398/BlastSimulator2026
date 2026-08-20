@@ -55,6 +55,18 @@
       }
     },
     {
+      "command": "time resume",
+      "timeout": 30,
+      "description": "Command-mode-only unpause (issue #585): tutorial_start now genuinely sets isPaused (matches a real player's first view of the tutorial, paused so the card can be read) -- and tickCommand's own loop stops after exactly one real tick while paused regardless of the requested count, so every bare `tick N` below (training waits, haul waits) would silently advance only 1 tick without this. Interaction mode's own waitForTutorialStep steps drive their own real clock independent of console pause state, so this resume has no effect there.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
       "command": "time speed:2",
       "timeout": 30,
       "description": "time-speed complete: real click on the speed button cycles 1x to 2x, card advances to Hire Surveyor",
@@ -554,7 +566,8 @@
         {
           "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
@@ -601,7 +614,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto",
@@ -709,7 +723,8 @@
       ],
       "expect": {
         "tutorialStep": "hire-manager"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "employee hire role:manager",
@@ -735,9 +750,9 @@
       }
     },
     {
-      "command": "contract accept 20",
+      "command": "contract accept type:rubble_disposal",
       "timeout": 30,
-      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this PR the accept click is scoped to `[data-contract-id]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. That scoping doesn't hold under the tutorial's own rails here, though: tutorialStages.ts's own 'contract-accept' stage declares its live target as the UNSCOPED `#bs-contract-panel .bs-contract-accept` (not a specific id), so a click scoped to one exact id is racing the offer pool's own refresh clock (REFRESH_INTERVAL, Contract.ts) on top of the tutorial rail's own gating -- under real render load this file (300+ extra ticks reaching this point) hit exactly that race, the id scoped here rotating out of the DOM between the wait and the click. Unscoped instead, matching the tutorial's own permitted target: this step's only assertion is which tutorial stage is reached next (`hire-driver`), not which contract identity was accepted, so there's no silent-divergence risk the way level1-win-efficient.json's own scoped case guards against -- `command`'s own id (20) still exercises command mode's real accept path independently.",
+      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this PR the accept click is scoped to `[data-contract-id]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. That scoping doesn't hold under the tutorial's own rails here, though: tutorialStages.ts's own 'contract-accept' stage declares its live target as the UNSCOPED `#bs-contract-panel .bs-contract-accept` (not a specific id), so a click scoped to one exact id is racing the offer pool's own refresh clock (REFRESH_INTERVAL, Contract.ts) on top of the tutorial rail's own gating -- under real render load this file (300+ extra ticks reaching this point) hit exactly that race, the id scoped here rotating out of the DOM between the wait and the click. Unscoped instead, matching the tutorial's own permitted target: this step's only assertion is which tutorial stage is reached next (`hire-driver`), not which contract identity was accepted, so there's no silent-divergence risk the way level1-win-efficient.json's own scoped case guards against. #553/#555 (issue #585): a hardcoded id here is exactly as fragile as the DOM-scoped click above and for the same reason -- the contract pool's ids increment off total elapsed ticks (Contract.ts), and #553/#555's own queued drilling/digging/charging work pushed this file's tick count at accept-time far past whatever it was when any specific id was last confirmed live. `type:rubble_disposal` selects by contract shape instead of identity: the pattern-1 blast's drilled zone (confirmed via direct trace) yields no sellable ore at all, only waste rock, so a rubble-disposal offer is the one contract type this blast can ever actually fulfil regardless of which numeric ids the pool happens to be issuing when this step runs.",
       "role": "player",
       "interaction": [
         {
@@ -818,9 +833,9 @@
       }
     },
     {
-      "command": "vehicle driver 2 4",
+      "command": "vehicle driver 3 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1 (destroyed by its own blast, but the id isn't reused).",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real. #553/#555 (issue #585, confirmed via direct trace): vehicle #3, not #1 or #2 -- the drill_rig and rock_digger bought earlier take vehicle slots #1 and #2, both within range of the pattern-1 blast and destroyed by it, but ids are never reused.",
       "role": "player",
       "interaction": [
         {
@@ -880,9 +895,9 @@
       }
     },
     {
-      "command": "tick 1",
+      "command": "tick 40",
       "timeout": 90,
-      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it.",
+      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #585: command mode's own tick count raised 1 -> 40 (confirmed via direct trace) -- storedMassKg plateaus around tick 30 once the hauler's first delivery lands (a separate, deeper HaulDispatch gap stalls its second dispatch, same as #552's own tutorial-interactive finding), and a single tick left storage empty for the delivery attempt right after.",
       "role": "player",
       "interaction": [
         {
@@ -901,9 +916,9 @@
       }
     },
     {
-      "command": "contract deliver 20 amount:200",
+      "command": "contract deliver type:rubble_disposal amount:200",
       "timeout": 90,
-      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. Left unmarked: command mode's own `contract deliver` fails synchronously here (\"Not enough stored material\" -- command mode's automatic dispatch (#552) needs real ticks to actually drive/load/deliver, and the haul-debris step above only advances a single tick, so nothing is ever in storage there), while interaction mode's identical click genuinely succeeds because the tutorial's own waitForTutorialStep gate only advances once delivery truly completes -- activeContractCount would drop to 0 there but stay 1 in command mode, so it is not safely checkable across both modes (same class as Findings #21/#22/#31). #553: contract ID drifted from #1 to #20 (see the accept step's own note); amount lowered from 5000 to 200 to match contract #20's own 430kg cap.",
+      "description": "contract-deliver complete: Deliver clicked with the panel's own pre-filled remaining amount, finishing the contract accepted earlier; the finances card then auto-advances. #585: command mode's own delivery now genuinely succeeds -- the haul-debris step above raised its wait to tick 40 (storage has ~1837kg by then, confirmed via direct trace), and `type:rubble_disposal` resolves the same accepted contract the accept step above named the same way. amount:200 exceeds every rubble-disposal offer's own quantity seen in trace (120-170kg), so this caps at whatever the contract still needs and completes it outright rather than partially delivering. Whether it reads COMPLETED or a partial \"Delivered to\" is pool-size-dependent and not asserted here, matching interaction mode's own identical click, which is unaffected by this command-mode-only tick/selector fix.",
       "role": "player",
       "interaction": [
         {

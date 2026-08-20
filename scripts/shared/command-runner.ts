@@ -41,7 +41,7 @@ import { checkGoalAgainstState, checkCommandOutcome } from './scenario-goal.js';
  * event genuinely pauses it exactly as it would for a real player — a
  * scenario wanting to prove that dwells on it with `resolveEventIfPending`.
  */
-function runWaitUntil(
+export function runWaitUntil(
   engine: RunnerWithContext,
   action: Extract<InteractionStepAction, { type: 'waitUntil' }>,
 ): { output: string; gameState: Record<string, unknown> | null } {

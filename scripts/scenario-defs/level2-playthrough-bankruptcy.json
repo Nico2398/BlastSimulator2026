@@ -46,7 +46,8 @@
           "cash": 0
         }
       },
-      "description": "No `cash:` here on purpose: this command fails (tier-2 level, locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it."
+      "description": "No `cash:` here on purpose: this command fails (tier-2 level, locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it.",
+      "commandOutcome": "refused"
     },
     {
       "command": "time resume",
@@ -797,7 +798,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -843,7 +845,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -889,7 +892,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "finances",
@@ -985,7 +989,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -1031,7 +1036,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -1077,7 +1083,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "finances",
@@ -1173,7 +1180,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -1218,7 +1226,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -1264,7 +1273,8 @@
           "cash": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "finances",
@@ -1359,7 +1369,8 @@
         },
         "note": "issues #596/#597: cash dropped entirely -- whether an event is actually pending here (and what it costs once chosen) now depends on the same event-timing fix, so this step's cash delta can be zero (no-op) or a real cost depending on host timing; neither equals/increased/decreased is safe to assert. tickCount re-measured to 135 (see the tick-15 step above); no event is pending here (real run confirmed a no-op)."
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -1404,7 +1415,8 @@
         },
         "note": "issues #596/#597: cash dropped entirely, same event-timing class as the tick-130 event-choose step above."
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 15",
@@ -1449,7 +1461,8 @@
         },
         "note": "issues #596/#597: cash dropped entirely, same event-timing class as the earlier event-choose steps above."
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "finances",
@@ -1540,7 +1553,8 @@
         },
         "note": "issues #596/#597: cash dropped entirely, same event-timing class as the earlier event-choose steps above."
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1585,7 +1599,8 @@
         },
         "note": "issues #596/#597: cash dropped entirely, same event-timing class as the earlier event-choose steps above."
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "finances",

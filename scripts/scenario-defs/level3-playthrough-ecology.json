@@ -155,6 +155,7 @@
         }
       ],
       "description": "campaign start level:treranium_depths FAILS at step 1 (\"Level treranium_depths is locked. Complete previous levels first.\" -- Campaign.ts unlocks only tier-1 levels by default, treranium_depths is tier 3) -- a real, pre-existing scenario bug predating #553 (Finding #24), untouched by this pass. Every subsequent command runs against whatever the substitute new_game seed:3666 staffed:true produced instead of the intended level.",
+      "commandOutcome": "refused",
       "role": "setup",
       "expect": {
         "equals": {
@@ -339,7 +340,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -387,7 +389,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -435,7 +438,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -483,7 +487,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -531,7 +536,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -579,7 +585,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -627,7 +634,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -675,7 +683,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -723,7 +732,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -771,7 +781,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -819,7 +830,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -867,7 +879,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -915,7 +928,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "employee hire role:driller",
@@ -1750,7 +1764,8 @@
           "levelEnded": false,
           "levelEndReason": null
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "finances",

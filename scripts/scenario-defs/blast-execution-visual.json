@@ -165,7 +165,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
@@ -205,7 +206,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -225,7 +227,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -245,7 +248,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -265,7 +269,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 6",
@@ -291,7 +296,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -549,7 +555,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:2 stemming:2",
@@ -589,7 +596,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -609,7 +617,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -629,7 +638,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -649,7 +659,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 4",
@@ -675,7 +686,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -781,7 +793,8 @@
           "timeoutMs": 2000
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "inspect 45,20,0",
@@ -913,7 +926,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -932,7 +946,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -957,7 +972,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
@@ -1042,7 +1058,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1062,7 +1079,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1082,7 +1100,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1102,7 +1121,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1128,7 +1148,8 @@
         }
       ],
       "role": "player",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently misses events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halt and the run diverges while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -1809,7 +1830,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 150",
@@ -1834,7 +1856,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
@@ -2035,7 +2058,8 @@
           "timeoutMs": 2000
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "inspect 10,10,0",
@@ -2172,7 +2196,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -2191,7 +2216,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -2217,7 +2243,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
