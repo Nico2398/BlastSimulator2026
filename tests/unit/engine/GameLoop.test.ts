@@ -1689,6 +1689,42 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
     expect(qual().proficiencyLevel).toBe(2);
     expect(qual().xp).toBeGreaterThanOrEqual(XP_THRESHOLDS[2]);
   });
+
+  // ── Regression pin for issue #619 (XP-per-tick extraction) ───────────────
+  // tickTaskProgress delegates its per-tick XP award to the pure
+  // computeXpPerTick(proficiencyLevel) in EmployeeXpRules.ts. These
+  // assertions pin the observable per-tick XP award at the minimum and
+  // maximum proficiency levels through tickTaskProgress, so the extraction
+  // stays behaviour preserving regardless of which code path computes it.
+  it('grants the pinned per-tick XP award at proficiency level 1 (Rookie)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 1);
+    dispatchAndClaim(state, employee.id, 1);
+
+    const qual = () => employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual().xp).toBe(0);
+
+    tickTaskProgress(state, employee);
+
+    expect(qual().xp).toBe(1); // level 1 -> XP_PER_TICK_BASE + floor(1 * 0.5) = 1
+  });
+
+  it('grants the pinned per-tick XP award at proficiency level 5 (Master)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng);
+    assignSkill(state.employees, employee.id, 'blasting', 5);
+    dispatchAndClaim(state, employee.id, 1);
+
+    const qual = () => employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual().xp).toBe(0);
+
+    tickTaskProgress(state, employee);
+
+    expect(qual().xp).toBe(3); // level 5 -> XP_PER_TICK_BASE + floor(5 * 0.5) = 3
+  });
 });
 
 // ── Task 3.11: tickNeedRestoration ───────────────────────────────────────────

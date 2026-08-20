@@ -11,6 +11,7 @@ import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, gainXp, type NeedKey, type Employee, type SkillCategory } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
+import { computeXpPerTick } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
 import { tickVehicle, tickVehicleTaskState, tickEmployeeMovement, type EmployeeMovementResult } from './EntityMovementTick.js';
@@ -1140,7 +1141,7 @@ export function tickTaskProgress(state: GameState, emp: Employee, emitter?: Even
   if (skill !== null) {
     const qual = emp.qualifications.find(q => q.category === skill);
     const currentLevel = qual?.proficiencyLevel ?? 1;
-    const xpPerTick = 1 + Math.floor(currentLevel * 0.5);
+    const xpPerTick = computeXpPerTick(currentLevel);
     const xpResult = gainXp(state.employees, emp.id, skill, xpPerTick, emitter);
     if (xpResult) {
       leveledUp = xpResult.leveledUp;
