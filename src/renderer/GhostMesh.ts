@@ -44,16 +44,28 @@ function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
     side: THREE.DoubleSide,
   });
 
-  // Fresnel rim-light shader injection (#613). Stub only — GLSL injection is
-  // implementer's job.
+  // Fresnel rim-light shader injection (#613) — edges facing away from the
+  // camera glow brighter than faces facing it, layered on top of the
+  // opacity pulse driven from update(). Identical GLSL for both claimed and
+  // unclaimed materials; only opacity/pulse-speed differ between them.
   material.onBeforeCompile = (shader) => {
-    // TODO(#613): implement rim fresnel injection
-    void shader;
-    void RIM_COLOR;
-    void RIM_POWER;
-    void RIM_INTENSITY;
+    shader.uniforms['rimColor'] = { value: RIM_COLOR };
+    shader.uniforms['rimPower'] = { value: RIM_POWER };
+    shader.uniforms['rimIntensity'] = { value: RIM_INTENSITY };
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform vec3 rimColor;\nuniform float rimPower;\nuniform float rimIntensity;',
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n' +
+          'float rimFresnel = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), rimPower);\n' +
+          'totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel;',
+      );
   };
-  material.customProgramCacheKey = () => 'ghost-rim-v1';
+  material.customProgramCacheKey = () => 'ghost-mesh-fresnel-v1';
 
   return material;
 }
