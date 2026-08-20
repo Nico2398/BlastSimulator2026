@@ -873,12 +873,12 @@
       "role": "player"
     },
     {
-      "command": "tick 10",
-      "description": "Long enough for the rock_fragmenter to clear the boulders blocking the debris_hauler driver's own action window, and for the driver to then haul the first cleared fragment all the way to the freight_warehouse.",
+      "command": "tick 20",
+      "description": "Long enough for the rock_fragmenter to clear the boulders blocking the debris_hauler driver's own action window, and for the driver to then haul the first cleared fragment all the way to the freight_warehouse. #611: widened from tick 10 to tick 20 -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking rather than only inside the bounded top-N reachability window, so an employee licensed for both vehicle roles in this file (driver #4, driving.truck + driving.excavator) reaches and reserves-ahead a haul_debris action for the debris_hauler (vehicle #3) sooner, then keeps working its own rock_fragmenter queue for longer before finally freeing up to drive the haul itself -- first pickup now lands around tick 169 (measured via direct trace) instead of within the original tick-10 round ending at 167, a couple of ticks too early to observe. 20 ticks reaches tick 177, well past the first delivery.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 10"
+          "command": "tick 20"
         }
       ],
       "role": "setup",

@@ -983,6 +983,52 @@ describe('tickEmployees — vehicle-gated actions (#550)', () => {
     expect(state.pendingActions.find(a => a.id === 2)!.holderId).toBe(employee.id);
     expect(employee.activeActionId).toBe(2);
   });
+
+  // ── #611: isClaimable pre-filter starvation ─────────────────────────────
+  //
+  // The #552 fallthrough above only skips an unclaimable candidate WITHIN
+  // the bounded top-N loop (selectBestActionForEmployee's `continue`) — that
+  // `continue` still consumes one of the ACTION_SELECTION_MAX_PATH_ATTEMPTS
+  // attempts. A backlog of more than ACTION_SELECTION_MAX_PATH_ATTEMPTS
+  // unlicensed vehicle-gated actions, all cheaper-ranked than one licensed
+  // drill action, burns the whole budget and leaves the employee idle.
+
+  it('does not let an unlicensed haul backlog larger than the attempt budget starve a farther, licensed drill action (#611)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0); // has 'blasting' already
+    assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED.drill_rig, 1);
+    purchaseVehicle(state.vehicles, 'drill_rig', 0, 0);
+    // No debris_hauler vehicle purchased at all, and the employee holds no
+    // ROLE_LICENCE_REQUIRED.debris_hauler licence either — findVehicleForClaim
+    // can never succeed for any of the haul actions below.
+
+    const unlicensedHauls: PendingAction[] = [];
+    for (let i = 1; i <= 8; i++) {
+      unlicensedHauls.push({
+        id: i,
+        type: 'general_work',
+        requiredSkill: null,
+        requiredVehicleRole: 'debris_hauler',
+        targetX: i, targetZ: 0, targetY: 0,
+        payload: {},
+        targetEmployeeId: null,
+        status: 'queued',
+        holderId: null,
+      });
+    }
+
+    // Farther (higher estimated cost) than every haul candidate, but the
+    // employee is both qualified (blasting) and licensed (drill_rig) for it,
+    // and a free drill_rig vehicle exists.
+    const drillAction = makeVehicleGatedAction({ id: 100 });
+    state.pendingActions.push(...unlicensedHauls, drillAction);
+
+    tickEmployees(state);
+
+    expect(employee.activeActionId).toBe(drillAction.id);
+    expect(state.pendingActions.find(a => a.id === drillAction.id)!.holderId).toBe(employee.id);
+  });
 });
 
 // ── Issue #553: drilling becomes work — drill_hole PendingActions ───────────
