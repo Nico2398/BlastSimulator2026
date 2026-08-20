@@ -1,15 +1,12 @@
-// BlastSimulator2026 — Red-phase tests for computeXpPerTick (issue #619)
+// BlastSimulator2026 — Unit tests for computeXpPerTick (issue #619)
 //
-// Extraction target: src/core/entities/EmployeeXpRules.ts's computeXpPerTick,
-// pulled out of GameLoop.ts's tickTaskProgress
+// computeXpPerTick lives in src/core/entities/EmployeeXpRules.ts and was
+// extracted from GameLoop.ts's tickTaskProgress
 // (`const xpPerTick = 1 + Math.floor(currentLevel * 0.5);`).
 //
 // Formula: XP_PER_TICK_BASE + floor(proficiencyLevel * XP_PER_TICK_LEVEL_SCALE)
 // With XP_PER_TICK_BASE = 1 and XP_PER_TICK_LEVEL_SCALE = 0.5, pinned values:
 //   level 1 -> 1, level 2 -> 2, level 3 -> 2, level 4 -> 3, level 5 -> 3
-//
-// DO NOT implement anything here — the stub in EmployeeXpRules.ts is
-// deliberately unfinished. These tests must fail against it.
 
 import { describe, it, expect } from 'vitest';
 import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js';

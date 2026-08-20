@@ -1691,12 +1691,11 @@ describe('tickTaskProgress — per-tick countdown, incremental XP, and completio
   });
 
   // ── Regression pin for issue #619 (XP-per-tick extraction) ───────────────
-  // tickTaskProgress currently computes xpPerTick inline
-  // (`1 + Math.floor(currentLevel * 0.5)`); it will be rewired to call the
-  // new pure computeXpPerTick(proficiencyLevel) from EmployeeXpRules.ts.
-  // These assertions pin the observable per-tick XP award for the minimum
-  // and maximum proficiency levels so the extraction stays behaviour
-  // preserving regardless of which code path computes it.
+  // tickTaskProgress delegates its per-tick XP award to the pure
+  // computeXpPerTick(proficiencyLevel) in EmployeeXpRules.ts. These
+  // assertions pin the observable per-tick XP award at the minimum and
+  // maximum proficiency levels through tickTaskProgress, so the extraction
+  // stays behaviour preserving regardless of which code path computes it.
   it('grants the pinned per-tick XP award at proficiency level 1 (Rookie)', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
