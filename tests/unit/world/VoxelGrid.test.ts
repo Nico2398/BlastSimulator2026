@@ -7,6 +7,7 @@ import {
   computeVoxelColumnSurfaceHeight,
   setVoxelBoundsReporter,
   chunkIndexOf,
+  clampChunkRectToTile,
   CHUNK_SIZE,
 } from '../../../src/core/world/VoxelGrid.js';
 
@@ -130,6 +131,175 @@ describe('chunkIndexOf', () => {
   it('ignores the fractional part of a continuous coordinate', () => {
     expect(chunkIndexOf(17.9)).toBe(1);
     expect(chunkIndexOf(-0.5)).toBe(-1);
+  });
+});
+
+// #609: VoxelGridCodec.decodeChunkInto forwards `chunk.r` from parsed save
+// JSON straight into VoxelGrid with no validation against the grid's real
+// dimensions. clampChunkRectToTile is the one shared function that validates
+// a chunk's owned sub-rect against its own tile before VoxelGrid accepts it
+// from untrusted save data (restoreChunkRaw / addChunkWithRect below).
+describe('clampChunkRectToTile', () => {
+  it('leaves a well-formed rect already inside the chunk\'s own tile unchanged', () => {
+    const rect = { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+    expect(clampChunkRectToTile(0, 0, rect)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
+  });
+
+  it('leaves a legitimately partial edge-chunk rect unchanged', () => {
+    const rect = { minX: 0, minZ: 0, maxX: 9, maxZ: CHUNK_SIZE };
+    expect(clampChunkRectToTile(0, 0, rect)).toEqual({ minX: 0, minZ: 0, maxX: 9, maxZ: CHUNK_SIZE });
+  });
+
+  it('#609: clamps the issue\'s literal repro (maxX/maxZ ~1e12) down to the chunk\'s own tile', () => {
+    const rect = { minX: 0, minZ: 0, maxX: 1e12, maxZ: 1e12 };
+    expect(clampChunkRectToTile(0, 0, rect)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
+  });
+
+  it('clamps a bound far below the tile up to the tile\'s own low edge, not to 0', () => {
+    const rect = { minX: -1e12, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+    expect(clampChunkRectToTile(0, 0, rect).minX).toBe(0);
+  });
+
+  it('a chunk far from the origin clamps a below-range minX up to THAT chunk\'s own tile edge, not to 0', () => {
+    const rect = { minX: -1e12, minZ: 32, maxX: 48, maxZ: 48 };
+    const result = clampChunkRectToTile(2, 2, rect); // chunk (2,2)'s tile is x/z in [32, 48)
+    expect(result.minX).toBe(32);
+  });
+
+  it('forces maxX to equal minX (never inverted) when independent clamping leaves maxX < minX', () => {
+    const rect = { minX: 20, minZ: 0, maxX: 5, maxZ: CHUNK_SIZE };
+    const result = clampChunkRectToTile(0, 0, rect);
+    // minX: round(20) clamped into [0,16] -> 16. maxX: round(5) clamped into [0,16] -> 5.
+    // 5 < 16, so maxX is forced up to minX rather than staying inverted.
+    expect(result.minX).toBe(16);
+    expect(result.maxX).toBe(16);
+  });
+
+  it('forces maxZ to equal minZ symmetrically', () => {
+    const rect = { minX: 0, minZ: 20, maxX: CHUNK_SIZE, maxZ: 5 };
+    const result = clampChunkRectToTile(0, 0, rect);
+    expect(result.minZ).toBe(16);
+    expect(result.maxZ).toBe(16);
+  });
+
+  describe('non-finite bounds fall back to their own tile edge, independently, per axis', () => {
+    it('NaN minX falls back to the tile\'s low X edge', () => {
+      const rect = { minX: NaN, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).minX).toBe(0);
+    });
+    it('NaN maxX falls back to the tile\'s high X edge', () => {
+      const rect = { minX: 0, minZ: 0, maxX: NaN, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).maxX).toBe(CHUNK_SIZE);
+    });
+    it('NaN minZ falls back to the tile\'s low Z edge', () => {
+      const rect = { minX: 0, minZ: NaN, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).minZ).toBe(0);
+    });
+    it('NaN maxZ falls back to the tile\'s high Z edge', () => {
+      const rect = { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: NaN };
+      expect(clampChunkRectToTile(0, 0, rect).maxZ).toBe(CHUNK_SIZE);
+    });
+    it('NaN in all four positions falls back to the full tile, never propagating NaN into the result', () => {
+      const rect = { minX: NaN, minZ: NaN, maxX: NaN, maxZ: NaN };
+      const result = clampChunkRectToTile(0, 0, rect);
+      expect(Number.isNaN(result.minX)).toBe(false);
+      expect(Number.isNaN(result.minZ)).toBe(false);
+      expect(Number.isNaN(result.maxX)).toBe(false);
+      expect(Number.isNaN(result.maxZ)).toBe(false);
+      expect(result).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
+    });
+  });
+
+  describe('Infinity / -Infinity bounds fall back exactly like NaN', () => {
+    it('+Infinity minX falls back to the tile\'s low X edge', () => {
+      const rect = { minX: Infinity, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).minX).toBe(0);
+    });
+    it('-Infinity minX also falls back to the tile\'s low X edge (not to -Infinity clamped)', () => {
+      const rect = { minX: -Infinity, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).minX).toBe(0);
+    });
+    it('+Infinity maxX falls back to the tile\'s high X edge', () => {
+      const rect = { minX: 0, minZ: 0, maxX: Infinity, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).maxX).toBe(CHUNK_SIZE);
+    });
+    it('-Infinity maxX also falls back to the tile\'s high X edge (not to the low edge)', () => {
+      const rect = { minX: 0, minZ: 0, maxX: -Infinity, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).maxX).toBe(CHUNK_SIZE);
+    });
+    it('+Infinity minZ falls back to the tile\'s low Z edge', () => {
+      const rect = { minX: 0, minZ: Infinity, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+      expect(clampChunkRectToTile(0, 0, rect).minZ).toBe(0);
+    });
+    it('-Infinity maxZ falls back to the tile\'s high Z edge', () => {
+      const rect = { minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: -Infinity };
+      expect(clampChunkRectToTile(0, 0, rect).maxZ).toBe(CHUNK_SIZE);
+    });
+  });
+
+  it('rounds a non-integer minX via Math.round before clamping (round vs. truncate diverge here)', () => {
+    // round(15.6) = 16 (stays 16 after clamping to [0,16]); Math.trunc(15.6)
+    // would give 15 instead -- a different final value, so this assertion is
+    // only meaningful under Math.round.
+    const rect = { minX: 15.6, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE };
+    expect(clampChunkRectToTile(0, 0, rect).minX).toBe(16);
+  });
+
+  it('rounds a non-integer maxX via Math.round before clamping, independently of minX', () => {
+    // round(7.6) = 8; Math.trunc(7.6) would give 7 instead -- both values sit
+    // within [0,16], so the final clamped result differs by which is used.
+    const rect = { minX: 0, minZ: 0, maxX: 7.6, maxZ: CHUNK_SIZE };
+    expect(clampChunkRectToTile(0, 0, rect).maxX).toBe(8);
+  });
+
+  it('clamps a rect that is a valid finite rect for a DIFFERENT chunk\'s tile into this chunk\'s own tile, rather than accepting it as-is', () => {
+    // {minX:16,...,maxX:32,...} is exactly chunk (1,1)'s own tile, not (0,0)'s.
+    const rect = { minX: 16, minZ: 16, maxX: 32, maxZ: 32 };
+    const result = clampChunkRectToTile(0, 0, rect);
+    expect(result).toEqual({ minX: 16, minZ: 16, maxX: 16, maxZ: 16 }); // collapsed onto (0,0)'s own high edge
+  });
+
+  it('treats a non-number value at runtime (corrupted JSON bypassing TS types) as non-finite and falls back to the tile edge', () => {
+    const rect = {
+      minX: ('16' as unknown as number),
+      minZ: 0,
+      maxX: CHUNK_SIZE,
+      maxZ: CHUNK_SIZE,
+    };
+    expect(clampChunkRectToTile(0, 0, rect).minX).toBe(0);
+  });
+});
+
+// #609: restoreChunkRaw and addChunkWithRect are the two entry points
+// untrusted save data reaches VoxelGrid through -- both must route their
+// `rect` argument through clampChunkRectToTile before assigning it onto the
+// chunk, so a corrupted save rect can never leave chunk.x0/z0/x1/z1 wider
+// than the chunk's own CHUNK_SIZE tile.
+describe('VoxelGrid — clamps untrusted rects reaching restoreChunkRaw / addChunkWithRect (#609)', () => {
+  it('restoreChunkRaw clamps a corrupted rect (matching the issue\'s repro) into the chunk\'s own tile', () => {
+    const grid = new VoxelGrid(16, 4, 16);
+    const n = CHUNK_SIZE * grid.sizeY * CHUNK_SIZE;
+    const density = new Float64Array(n);
+    const compId = new Uint16Array(n);
+    const fracture = new Float64Array(n).fill(1.0);
+
+    grid.restoreChunkRaw(0, 0, { minX: 0, minZ: 0, maxX: 1e12, maxZ: 1e12 }, density, compId, fracture, new Map());
+
+    expect(grid.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
+  });
+
+  it('addChunkWithRect clamps a corrupted rect into the chunk\'s own tile', () => {
+    const grid = new VoxelGrid(0, 4, 0); // empty shell, same starting point decodeVoxelGrid builds
+    grid.addChunkWithRect(0, 0, { minX: 0, minZ: 0, maxX: 1e12, maxZ: 1e12 });
+
+    expect(grid.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
+  });
+
+  it('addChunkWithRect on an already-owned chunk also clamps, not just on first allocation', () => {
+    const grid = new VoxelGrid(16, 4, 16); // owns chunk (0,0) already, full tile
+    grid.addChunkWithRect(0, 0, { minX: -1e12, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
+
+    expect(grid.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: CHUNK_SIZE, maxZ: CHUNK_SIZE });
   });
 });
 

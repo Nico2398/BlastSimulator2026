@@ -187,6 +187,66 @@ describe('encodeVoxelGrid dirty-chunk selection (#473 D4)', () => {
   });
 });
 
+// #609: a corrupted/hand-edited save (e.g. r: [0, 0, 1e12, 1e12]) must not
+// reach TerrainMesh's chunk-iteration loops unclamped -- VoxelGrid clamps at
+// its own two save-facing entry points (restoreChunkRaw / addChunkWithRect),
+// so decodeVoxelGrid ends up with a grid whose chunk rects are always sane
+// regardless of what the JSON claimed.
+describe('decodeVoxelGrid — corrupted chunk rects are clamped, not trusted verbatim (#609)', () => {
+  it('a corrupted chunks[].r (matching the issue\'s literal repro) is clamped to the chunk\'s real tile', () => {
+    const grid = new VoxelGrid(16, 4, 16);
+    const payload = encodeVoxelGrid(grid); // no `gen` -> every owned chunk stored dirty, with a real r
+    expect(payload.chunks).toHaveLength(1);
+
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      chunks: [{ ...payload.chunks[0]!, r: [0, 0, 1e12, 1e12] }],
+    };
+
+    // decodeChunkInto's own arrays are sized from sizeY alone (unrelated to
+    // `r`), and restoreChunkRaw's internal rescan is already bounded against
+    // the chunk's real storage span independently of this fix -- so this
+    // path was never actually at hang risk; what was wrong is that the
+    // corrupted rect survived into the grid's own x0/z0/x1/z1 state
+    // unclamped, which is what TerrainMesh iterates directly over.
+    const decoded = decodeVoxelGrid(corrupted);
+
+    expect(decoded.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: 16, maxZ: 16 });
+  });
+
+  // Planner note (#609): decodeVoxelGrid's pristine loop below calls
+  // `generateTerrainRegion(grid, terrain, config, { minX, minZ, maxX, maxZ })`
+  // with the RAW tuple values it just destructured from `payload.pristine` --
+  // not with the rect VoxelGrid.addChunkWithRect actually clamped internally
+  // (addChunkWithRect returns void, so the clamped rect never comes back to
+  // this caller). The planned fix only touches VoxelGrid.ts, so that
+  // `generateTerrainRegion` call keeps walking the *unclamped* range
+  // regardless of this fix -- a magnitude anywhere near the issue's literal
+  // 1e12 repro would make that synchronous, single-threaded column loop
+  // genuinely un-interruptible (no vitest timeout preempts a running
+  // for-loop). This test therefore uses a much smaller out-of-tile
+  // magnitude: large enough to prove the corruption reached the pristine
+  // path and that VoxelGrid's own state (chunkRect) ends up clamped either
+  // way, small enough to never risk hanging the suite regardless of whether
+  // decodeVoxelGrid itself is ever also updated to clamp before calling
+  // generateTerrainRegion.
+  it('a corrupted pristine tuple is clamped for the grid\'s own state via addChunkWithRect, proving that entry point is covered too', () => {
+    const gen = { seed: 42, climateBias: [0, 0] as [number, number], sizeX: 16, sizeY: 4, sizeZ: 16 };
+    const grid = generateTerrain({ ...gen });
+    const payload = encodeVoxelGrid(grid, gen);
+    expect(payload.pristine).toEqual([[0, 0, 0, 0, 16, 16]]);
+
+    const corrupted: SerializedVoxels = {
+      ...payload,
+      pristine: [[0, 0, 0, 0, 40, 40]], // well outside (0,0)'s real [0,16) tile, but bounded (see note above)
+    };
+
+    const decoded = decodeVoxelGrid(corrupted);
+
+    expect(decoded.chunkRect(0, 0)).toEqual({ minX: 0, minZ: 0, maxX: 16, maxZ: 16 });
+  });
+});
+
 describe('decodeVoxelGrid — v6 upgrade path (#473 P3)', () => {
   it('loads a v6 dense payload at the same coordinates, mutations intact', () => {
     const v6: SerializedVoxelsV6 = {

@@ -11,7 +11,7 @@
 // therefore grow without the save growing with it: save size tracks play, not
 // level size.
 
-import { VoxelGrid, CHUNK_SIZE, type VoxelRockComposition } from '../world/VoxelGrid.js';
+import { VoxelGrid, CHUNK_SIZE, clampChunkRectToTile, type VoxelRockComposition } from '../world/VoxelGrid.js';
 import { buildTerrainContext, generateTerrainRegion, type TerrainConfig } from '../world/TerrainGen.js';
 import { bytesToBase64, base64ToBytes } from './Base64.js';
 
@@ -239,8 +239,15 @@ export function decodeVoxelGrid(payload: AnySerializedVoxels): VoxelGrid {
     };
     const terrain = buildTerrainContext(config);
     for (const [cx, cz, minX, minZ, maxX, maxZ] of payload.pristine) {
-      grid.addChunkWithRect(cx, cz, { minX, minZ, maxX, maxZ });
-      generateTerrainRegion(grid, terrain, config, { minX, minZ, maxX, maxZ });
+      // The tuple comes straight from untrusted save JSON — clamp it once,
+      // here, and hand the SAME clamped rect to both consumers below.
+      // addChunkWithRect also clamps internally, but returns void, so its
+      // clamped rect never reaches this caller; without this, an extreme
+      // raw value (e.g. 1e12) would reach generateTerrainRegion's column
+      // loop directly and hang it (#609).
+      const clamped = clampChunkRectToTile(cx, cz, { minX, minZ, maxX, maxZ });
+      grid.addChunkWithRect(cx, cz, clamped);
+      generateTerrainRegion(grid, terrain, config, clamped);
       grid.markChunkPristine(cx, cz);
     }
   }
