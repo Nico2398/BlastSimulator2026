@@ -204,3 +204,135 @@ describe('computeTaskXpAwards', () => {
     expect(second).toEqual(first);
   });
 });
+
+// ── computeTaskXpAwards — driving licence XP for vehicle-gated actions
+// (issue #622) ────────────────────────────────────────────────────────────
+//
+// Extends the #621 rule function so an action carrying a requiredVehicleRole
+// also grants XP to that role's licence category, mapped through
+// ROLE_LICENCE_REQUIRED (VehicleDriverAssignment.ts): debris_hauler ->
+// driving.truck, rock_fragmenter -> driving.excavator, drill_rig ->
+// driving.drill_rig. drill_hole carries both requiredSkill: 'blasting' and
+// requiredVehicleRole: 'drill_rig', so it grants both awards; haul_debris
+// and fragment_debris carry requiredSkill: null, so they grant the driving
+// award alone; on-foot skilled actions (survey) are unaffected.
+
+describe('computeTaskXpAwards — driving licence XP for vehicle-gated actions (#622)', () => {
+  const SEED = 42;
+
+  function makeAction(overrides: Partial<PendingAction> & { requiredSkill: PendingAction['requiredSkill'] }): PendingAction {
+    return {
+      id: 1,
+      type: 'general_work',
+      requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: {},
+      targetEmployeeId: null,
+      status: 'in_progress',
+      holderId: null,
+      ...overrides,
+    };
+  }
+
+  function makeEmployee(role: 'driller' | 'blaster' | 'driver' | 'surveyor' | 'manager' = 'blaster'): Employee {
+    const state = createEmployeeState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state, role, rng);
+    return employee;
+  }
+
+  it('drill_hole-shaped action (requiredSkill: blasting, requiredVehicleRole: drill_rig) returns both a blasting award and a driving.drill_rig award', () => {
+    const employee = makeEmployee('driller'); // arrives with 'blasting' level 1, no driving.drill_rig qualification (defaults to level 1)
+    const action = makeAction({ type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig' });
+
+    const awards = computeTaskXpAwards(employee, action);
+
+    expect(awards).toHaveLength(2);
+    expect(awards).toEqual(expect.arrayContaining([
+      { category: 'blasting', amount: computeXpPerTick(1) },
+      { category: 'driving.drill_rig', amount: computeXpPerTick(1) },
+    ]));
+  });
+
+  it('drill_hole-shaped dual award scales each category independently via computeXpPerTick at its own proficiency level (not hardcoded, not shared)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state, 'driller', rng); // 'blasting' level 1
+    assignSkill(state, employee.id, 'driving.drill_rig', 4);
+    const action = makeAction({ type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig' });
+
+    const awards = computeTaskXpAwards(employee, action);
+
+    expect(awards).toHaveLength(2);
+    expect(awards).toEqual(expect.arrayContaining([
+      { category: 'blasting', amount: computeXpPerTick(1) },
+      { category: 'driving.drill_rig', amount: computeXpPerTick(4) },
+    ]));
+    // Regression guard: the two awards' amounts must differ when the two
+    // proficiency levels differ, or a shared/hardcoded amount would still
+    // pass the arrayContaining check above.
+    expect(computeXpPerTick(4)).not.toBe(computeXpPerTick(1));
+  });
+
+  it('haul_debris-shaped action (requiredSkill: null, requiredVehicleRole: debris_hauler) returns exactly one driving.truck award', () => {
+    const employee = makeEmployee('driver'); // arrives with 'driving.truck' level 1
+    const action = makeAction({ type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler' });
+
+    const awards = computeTaskXpAwards(employee, action);
+
+    expect(awards).toEqual([{ category: 'driving.truck', amount: computeXpPerTick(1) }]);
+  });
+
+  it('haul_debris-shaped award scales via computeXpPerTick at the employee\'s driving.truck proficiency (not hardcoded)', () => {
+    const state = createEmployeeState();
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state, 'driver', rng);
+    assignSkill(state, employee.id, 'driving.truck', 3);
+    const action = makeAction({ type: 'haul_debris', requiredSkill: null, requiredVehicleRole: 'debris_hauler' });
+
+    const awards = computeTaskXpAwards(employee, action);
+
+    expect(awards).toEqual([{ category: 'driving.truck', amount: computeXpPerTick(3) }]);
+    // Regression guard against a hardcoded amount.
+    expect(computeXpPerTick(3)).not.toBe(computeXpPerTick(1));
+  });
+
+  it('fragment_debris-shaped action (requiredSkill: null, requiredVehicleRole: rock_fragmenter) returns exactly one driving.excavator award', () => {
+    const employee = makeEmployee('blaster'); // no driving.excavator qualification -> defaults to level 1
+    const action = makeAction({ type: 'fragment_debris', requiredSkill: null, requiredVehicleRole: 'rock_fragmenter' });
+
+    const awards = computeTaskXpAwards(employee, action);
+
+    expect(awards).toEqual([{ category: 'driving.excavator', amount: computeXpPerTick(1) }]);
+  });
+
+  it('survey-shaped action (requiredVehicleRole: null) still returns exactly one award — regression guard, unaffected by the new vehicle-role rule', () => {
+    const employee = makeEmployee('surveyor'); // arrives with 'geology' level 1
+    const action = makeAction({ type: 'survey', requiredSkill: 'geology', requiredVehicleRole: null });
+
+    const awards = computeTaskXpAwards(employee, action);
+
+    expect(awards).toEqual([{ category: 'geology', amount: computeXpPerTick(1) }]);
+  });
+
+  it('an action with both requiredSkill and requiredVehicleRole null (e.g. general_work) returns an empty array', () => {
+    const employee = makeEmployee('blaster');
+    const action = makeAction({ type: 'general_work', requiredSkill: null, requiredVehicleRole: null });
+
+    expect(computeTaskXpAwards(employee, action)).toEqual([]);
+  });
+
+  it('dual-award computation does not mutate the employee or action objects, and is deterministic across repeated calls', () => {
+    const employee = makeEmployee('driller');
+    const action = makeAction({ type: 'drill_hole', requiredSkill: 'blasting', requiredVehicleRole: 'drill_rig' });
+    const employeeBefore = JSON.parse(JSON.stringify(employee));
+    const actionBefore = JSON.parse(JSON.stringify(action));
+
+    const first = computeTaskXpAwards(employee, action);
+    const second = computeTaskXpAwards(employee, action);
+
+    expect(JSON.parse(JSON.stringify(employee))).toEqual(employeeBefore);
+    expect(JSON.parse(JSON.stringify(action))).toEqual(actionBefore);
+    expect(second).toEqual(first);
+  });
+});
