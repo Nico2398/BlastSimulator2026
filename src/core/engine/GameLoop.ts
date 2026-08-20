@@ -358,8 +358,10 @@ function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, r
  * rock_fragmenter but only a debris_hauler driver is free), the employee
  * gave up for the tick instead of falling through to the next-cheapest
  * candidate they could actually perform. Folding the check into selection
- * lets it fall through to the next-ranked candidate (bounded by
- * ACTION_SELECTION_MAX_PATH_ATTEMPTS, same as the reachability check) —
+ * lets it fall through to the next-ranked candidate — isClaimable is applied
+ * as a pre-filter over the whole pool before ranking (#611), so it no longer
+ * shares the bounded ACTION_SELECTION_MAX_PATH_ATTEMPTS window with the
+ * reachability check; that budget is spent entirely on resolveActionCost —
  * generalizes to any action type whose claim can fail this gate, not just
  * haul/fragment ones.
  */

@@ -146,27 +146,27 @@ export interface SelectedAction {
 }
 
 /**
- * Picks the best action for `employee` out of `candidates`. Ranks by
- * `estimateActionCost`, ties broken by lowest `action.id`, then resolves the
- * real cost (via `resolveActionCost`) only for the top candidates up to
- * `ACTION_SELECTION_MAX_PATH_ATTEMPTS`, returning the first reachable one for
- * which the optional `isClaimable` predicate also passes.
+ * Picks the best action for `employee` out of `candidates`. First filters out
+ * every candidate the optional `isClaimable` predicate rejects, then ranks
+ * the remainder by `estimateActionCost` (ties broken by lowest `action.id`),
+ * then resolves the real cost (via `resolveActionCost`) for the top ranked
+ * candidates up to `ACTION_SELECTION_MAX_PATH_ATTEMPTS`, returning the first
+ * reachable one.
  *
  * `isClaimable` (default: always true) lets a caller apply a claim-time gate
  * — e.g. GameLoop.ts's vehicle-availability check (`findVehicleForClaim`) —
  * without this module importing that gate itself (would cycle back into the
- * tick orchestrator, see header). Checked before the (pricier) real-cost
- * resolution so a candidate that can never be claimed right now doesn't
- * spend a `findPath` call. Bounded by the same
- * `ACTION_SELECTION_MAX_PATH_ATTEMPTS` budget as reachability — a nearest
- * candidate that keeps failing this gate (#552: e.g. an oversized fragment
- * with no rock_fragmenter driver free) is skipped in favor of the next-
- * cheapest one the employee can actually perform this tick, instead of
- * leaving them idle, but only within that bounded top-N window rather than
- * scanning the whole candidate list.
+ * tick orchestrator, see header). Applied as a pre-filter over the whole
+ * candidate pool, before ranking and before the bounded attempt loop, so a
+ * backlog of candidates that categorically fail it (#611: e.g. haul actions
+ * requiring a vehicle-role licence the employee doesn't hold) can never burn
+ * through the `ACTION_SELECTION_MAX_PATH_ATTEMPTS` budget without a single
+ * real `findPath` resolution — every attempt in the bounded loop is now
+ * spent on `resolveActionCost` only, never on discovering unclaimability.
  *
- * Returns `null` when `candidates` is empty or none of the top-ranked ones
- * are both reachable and claimable.
+ * Returns `null` when `candidates` is empty, when every candidate fails
+ * `isClaimable`, or when none of the top-ranked claimable candidates are
+ * reachable.
  */
 /**
  * Claim-time gate for a `dig_ramp_segment` PendingAction — mirrors the shape
@@ -202,7 +202,10 @@ export function selectBestActionForEmployee(
 ): SelectedAction | null {
   if (candidates.length === 0) return null;
 
-  const ranked = [...candidates].sort((a, b) => {
+  const claimable = candidates.filter(isClaimable);
+  if (claimable.length === 0) return null;
+
+  const ranked = [...claimable].sort((a, b) => {
     const costDiff = estimateActionCost(state, employee, a) - estimateActionCost(state, employee, b);
     return costDiff !== 0 ? costDiff : a.id - b.id;
   });
@@ -210,7 +213,6 @@ export function selectBestActionForEmployee(
   const attempts = Math.min(ranked.length, ACTION_SELECTION_MAX_PATH_ATTEMPTS);
   for (let i = 0; i < attempts; i++) {
     const candidate = ranked[i]!;
-    if (!isClaimable(candidate)) continue;
     const resolved = resolveActionCost(state, employee, candidate);
     if (resolved !== null) {
       return { action: candidate, totalTicks: resolved.totalTicks };
