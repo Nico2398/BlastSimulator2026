@@ -540,8 +540,15 @@ export class TerrainMesh {
     if (range.max < SURFACE_THRESHOLD) return true; // uniformly air
     if (range.min < SURFACE_THRESHOLD) return false; // genuinely mixed — a surface crosses this slab
 
-    // #610: topmost-slab guard belongs here — before the "Uniformly solid"
-    // slabSafe logic below. See issue #610.
+    // #610: the grid's own topmost y-slab has no slab above it to read —
+    // chunkDensityRange(cx, cz, cy+1) returns null there because cy+1 is
+    // past the grid's own height, not because there's nothing to worry
+    // about. Out-of-bounds voxel reads (VoxelGrid.ownerOf/densityAt) always
+    // come back as air, so this slab's own top row of march cubes always
+    // samples a real solid/air crossing at y = sizeY, regardless of how
+    // solid or boxed-in the slab is. Never skippable.
+    const topmostSlabIndex = Math.ceil(this.grid.sizeY / CHUNK_SIZE) - 1;
+    if (cy === topmostSlabIndex) return false;
 
     // Uniformly solid. Unlike x/z, rebuildChunk's y-loop has no "-1" halo
     // start (yStart is always oy, never oy-1) — the only vertical read past
