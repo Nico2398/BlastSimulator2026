@@ -540,6 +540,9 @@ export class TerrainMesh {
     if (range.max < SURFACE_THRESHOLD) return true; // uniformly air
     if (range.min < SURFACE_THRESHOLD) return false; // genuinely mixed — a surface crosses this slab
 
+    // #610: topmost-slab guard belongs here — before the "Uniformly solid"
+    // slabSafe logic below. See issue #610.
+
     // Uniformly solid. Unlike x/z, rebuildChunk's y-loop has no "-1" halo
     // start (yStart is always oy, never oy-1) — the only vertical read past
     // this chunk's own slab is its topmost cube's far corner, which lands
