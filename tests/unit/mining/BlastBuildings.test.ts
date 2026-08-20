@@ -101,7 +101,8 @@ describe('checkProtectedPositions', () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.holeId).toBe(holes[0]!.id);
-    expect(errors[0]!.issue.toLowerCase()).toContain('protected');
+    // #633: issue must be a translation key, not raw English prose.
+    expect(errors[0]!.issue).toBe('blast.validation.protected_position');
   });
 
   it('returns no errors when no hole overlaps any building footprint cell', () => {
@@ -130,7 +131,7 @@ describe('checkProtectedPositions', () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0]!.holeId).toBe(underBuilding.id);
-    expect(errors[0]!.issue.toLowerCase()).toContain('protected');
+    expect(errors[0]!.issue).toBe('blast.validation.protected_position');
   });
 
   it('floors non-integer hole coordinates before footprint lookup', () => {
@@ -145,7 +146,7 @@ describe('checkProtectedPositions', () => {
     const errors: ValidationError[] = checkProtectedPositions(holes, buildingState);
 
     expect(errors).toHaveLength(1);
-    expect(errors[0]!.issue.toLowerCase()).toContain('protected');
+    expect(errors[0]!.issue).toBe('blast.validation.protected_position');
   });
 });
 
