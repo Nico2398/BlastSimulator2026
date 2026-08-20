@@ -38,8 +38,8 @@
       "role": "observe"
     },
     {
-      "command": "contract negotiate id:1",
-      "description": "First negotiation attempt (round 1). No state field exists for a contract's own terms (price/deadline/penalty) -- there is nothing to negotiate over but the contracts a fresh dusty_hollow start already offers, so the target id is fixed at 1 throughout this file rather than reading it back from `contract list`'s text output, which expect can't do.",
+      "command": "contract negotiate type:supply material:dirtite",
+      "description": "First negotiation attempt (round 1). No state field exists for a contract's own terms (price/deadline/penalty) -- there is nothing to negotiate over but the contracts a fresh dusty_hollow start already offers, so the target is fixed at the supply/dirtite offer throughout this file (confirmed id 1 in a fresh dusty_hollow start, issue #635) rather than reading it back from `contract list`'s text output, which expect can't do.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -79,7 +79,7 @@
       }
     },
     {
-      "command": "contract negotiate id:1",
+      "command": "contract negotiate type:supply material:dirtite",
       "description": "Second negotiation attempt (round 2) on the same still-available contract -- this is the file's own premise made real: repeated negotiation produces both outcomes.",
       "interaction": [
         {
@@ -96,15 +96,15 @@
       }
     },
     {
-      "command": "contract accept id:1",
+      "command": "contract accept type:supply material:dirtite",
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -116,7 +116,7 @@
           "cash": 0
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581/#635: the accept click is scoped to `[data-contract-type=\"supply\"][data-contract-material=\"dirtite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the supply/dirtite contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it -- and, unlike the numeric id it replaces (#635), survives the offer pool rotating past it."
     },
     {
       "command": "tick 10",
@@ -137,14 +137,14 @@
       }
     },
     {
-      "command": "contract deliver 1 amount:50",
+      "command": "contract deliver type:supply material:dirtite amount:50",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 1 amount:50"
+          "command": "contract deliver type:supply material:dirtite amount:50"
         }
       ],
-      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline, so nothing is ever in storage. A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-id=\"1\"]`, issue #513) rather than performing one.",
+      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline, so nothing is ever in storage. A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-type=\"supply\"][data-contract-material=\"dirtite\"]`, issue #513/#635) rather than performing one.",
       "expect": {
         "equals": {
           "activeContractCount": 1
@@ -153,7 +153,7 @@
           "cash": 0
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-deliver",
         "note": "the contract stays active/undelivered -- this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline"
       },
       "role": "guard"
