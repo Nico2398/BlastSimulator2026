@@ -5,6 +5,9 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Vehicle } from '../../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
+import { NavGrid } from '../../../../src/core/nav/NavGrid.js';
+import { addBlastFragments } from '../../../../src/core/economy/Logistics.js';
+import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js';
 
 function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
@@ -12,6 +15,7 @@ function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
     targetX: 5, targetZ: 5, driverId: null, state: 'idle', payloadKg: 0,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
     haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
+    breakFragmentId: null, breakPhase: null, reservedForActionId: null,
     ...overrides,
   };
 }
@@ -41,6 +45,31 @@ function makeState(vehicles: Vehicle[] = [], employees: Employee[] = []): GameSt
   return state;
 }
 
+/** A flat, fully walkable size×size NavGrid, mirroring the retired
+ *  FleetPanel.break.test.ts's own fixture — GameState.navGrid is null until
+ *  a world is built via `new_game`. */
+function makeFlatNavGrid(size: number): NavGrid {
+  const cells = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => ({ type: 'walkable' as const, moveCost: 1.0, benchLevel: 0, vehicleOccupied: false })));
+  return new NavGrid(size, size, cells, 0);
+}
+
+// Oversized boulder — volume must exceed OVERSIZED_FRAGMENT_THRESHOLD (0.5 m³,
+// see BoulderFragmentation.ts) so it would have been eligible for
+// findReachableOversizedFragment (the retired #484 break-eligibility gate).
+function makeOversizedFragment(id: number, x: number, z: number, mass = 5000): FragmentData {
+  return {
+    id,
+    position: { x, y: 0, z },
+    volume: 1.0,
+    mass,
+    rockId: 'cruite',
+    oreDensities: {},
+    initialVelocity: { x: 0, y: 0, z: 0 },
+    isProjection: false,
+  };
+}
+
 function makePanel(): { panel: FleetPanel; container: HTMLElement } {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -68,6 +97,20 @@ describe('FleetPanel', () => {
     const { panel } = makePanel();
     panel.update(makeState([makeVehicle({ id: 5, type: 'debris_hauler', driverId: 1 })], [makeEmployee({ id: 1 })]));
     expect(panel.root.querySelector('.bs-vehicle-haul-btn')).toBeNull();
+  });
+
+  it('shows no Break button for a rock_fragmenter with a reachable oversized fragment (breakEligibility.ts retired, #618)', () => {
+    const { panel } = makePanel();
+    const state = makeState(
+      [makeVehicle({ id: 5, type: 'rock_fragmenter', x: 0, z: 0, targetX: 0, targetZ: 0, driverId: 1 })],
+      [makeEmployee({ id: 1 })],
+    );
+    state.navGrid = makeFlatNavGrid(20);
+    addBlastFragments(state.logistics, [makeOversizedFragment(1, 3, 3)]);
+
+    panel.update(state);
+
+    expect(panel.root.querySelector('.bs-vehicle-break-btn')).toBeNull();
   });
 
   it('shows no traffic banner with no jam', () => {
