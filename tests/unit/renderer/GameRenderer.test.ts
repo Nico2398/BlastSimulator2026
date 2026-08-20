@@ -882,3 +882,66 @@ describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
     setSamplerSpy.mockRestore();
   });
 });
+
+// ── Staged level load (#474) ──
+//
+// enterLevel() in main.ts no longer drives the whole load through one
+// syncFromContext() call — it runs buildPlayableMesh() / buildLandscapeMesh()
+// / buildAmbient() / finishLevelLoad() as separate weighted LoadPhases, so
+// the loading screen can paint a frame between each. These prove the staged
+// path lands in the same place syncFromContext() always did.
+
+describe('GameRenderer — staged level load (#474)', () => {
+  async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
+    const { newGameCommand } = await import('../../../src/console/commands/world.js');
+    const ctx: MiningContext = { state: null, grid: null, landscape: null, emitter: new EventEmitter() };
+    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
+    expect(result.success).toBe(true);
+    return ctx;
+  }
+
+  it('buildPlayableMesh() + buildLandscapeMesh() + buildAmbient() + finishLevelLoad(), run as separate staged calls, reach the same end state as one syncFromContext() call', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await makeLandscapeCtx();
+
+    renderer.buildPlayableMesh(ctx);
+    renderer.buildLandscapeMesh(ctx);
+    renderer.buildAmbient(ctx);
+    renderer.finishLevelLoad(ctx);
+
+    expect(renderer.lastGridId).toBe(ctx.grid!.id);
+    expect(renderer.terrain).not.toBeNull();
+    expect(renderer.landscape).not.toBeNull();
+    // Grass is the unconditional ambient signal the existing #458 T7.2 tests
+    // already rely on — present whenever buildAmbient() actually ran.
+    expect(sm.scene.children.find((c) => c.name === 'vegetation-grass')).toBeDefined();
+    expect(sm.cameraController.frameSite).toHaveBeenCalled();
+  });
+
+  it('finishLevelLoad() records the same bookkeeping loadGame() does, so a later syncFromContext() call does not repeat the load', async () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = await makeLandscapeCtx();
+    const buildAllSpy = vi.spyOn(TerrainMesh.prototype, 'buildAll');
+
+    renderer.buildPlayableMesh(ctx);
+    renderer.buildLandscapeMesh(ctx);
+    renderer.buildAmbient(ctx);
+    renderer.finishLevelLoad(ctx);
+    expect(buildAllSpy).toHaveBeenCalledTimes(1);
+
+    // Same seed, same grid — without finishLevelLoad()'s bookkeeping this
+    // would look like an unseen seed and re-run the whole load, doubling the
+    // cost the staged phases were just charged for.
+    renderer.syncFromContext(ctx);
+    expect(buildAllSpy).toHaveBeenCalledTimes(1);
+
+    buildAllSpy.mockRestore();
+  });
+
+  it('finishLevelLoad() is a no-op without a loaded state/grid, rather than throwing', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    expect(() => renderer.finishLevelLoad({ state: null, grid: null, landscape: null, emitter: new EventEmitter() })).not.toThrow();
+  });
+});

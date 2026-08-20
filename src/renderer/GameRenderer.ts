@@ -158,7 +158,8 @@ export class GameRenderer {
       // A differently-sized grid needs a fresh landscape too — same rebuild
       // loadGame() does, but this branch fires even when loadGame() didn't
       // (campaign level swaps grid size while keeping the seed, #458 T3.2).
-      this.rebuildLandscapeMesh(ctx);
+      this.buildLandscapeMesh(ctx);
+      this.buildAmbient(ctx);
       // A campaign level can swap in a differently-sized grid while keeping the
       // seed, so loadGame() never runs. Re-frame or the new site renders as a
       // small off-centre patch of the previous site's view.
@@ -166,7 +167,31 @@ export class GameRenderer {
     }
 
     this.lastState = ctx.state;
+    this.syncEntities(ctx);
+  }
 
+  /**
+   * Complete a staged level load driven phase-by-phase by the loading screen
+   * (#474): `enterLevel` in main.ts runs buildPlayableMesh() /
+   * buildLandscapeMesh() / buildAmbient() as separate weighted LoadPhases,
+   * bypassing syncFromContext() entirely so each one gets its own presented
+   * frame. This finishes it — frame the camera, then record the same
+   * bookkeeping syncFromContext() sets after loadGame() (so a later
+   * syncFromContext() call treats the load as already done rather than
+   * repeating it) and run the same per-call entity/state sync
+   * syncFromContext() performs every time it runs.
+   */
+  finishLevelLoad(ctx: MiningContext): void {
+    if (!ctx.state || !ctx.grid) return;
+    this.frameCameraOnGrid();
+    this.loadedSeed = ctx.state.seed;
+    this.lastState = ctx.state;
+    this.syncEntities(ctx);
+  }
+
+  /** Per-call entity/state sync shared by syncFromContext() and finishLevelLoad() (#474). */
+  private syncEntities(ctx: MiningContext): void {
+    if (!ctx.state) return;
     // Sync entities added since last call
     syncEntitySets(
       ctx.state, this.buildings, this.renderedBuildingIds,
@@ -711,7 +736,7 @@ export class GameRenderer {
     this.refreshPanLeash();
 
     // A null ctx.landscape means the grid itself was just replaced (new game,
-    // campaign level, load) and rebuildLandscapeMesh is about to run with a
+    // campaign level, load) and buildLandscapeMesh is about to run with a
     // fresh handle. Rebuilding here would cut the new site against the old
     // level's landscape and then be thrown away.
     if (!ctx.landscape || !ctx.grid || !this.landscape || !this.landscapeHandle) return;
@@ -745,8 +770,8 @@ export class GameRenderer {
    * The landscape's theoretical height function, ready to hand to
    * TerrainMesh.setEdgeHeightSampler() — or null when no landscape can be
    * built yet (no world/biome). Calls ensureLandscape(), which caches on
-   * ctx.landscape, so calling this before rebuildLandscapeMesh() does not
-   * duplicate the (expensive) structure-set build; rebuildLandscapeMesh()
+   * ctx.landscape, so calling this before buildLandscapeMesh() does not
+   * duplicate the (expensive) structure-set build; buildLandscapeMesh()
    * simply gets the same cached handle back (#559).
    */
   private landscapeEdgeHeightSampler(ctx: MiningContext): ((x: number, z: number) => number) | null {
@@ -774,7 +799,7 @@ export class GameRenderer {
     const area = ctx.playableArea;
     if (!grid || !area || !this.terrain) return;
     // Never trace the world's rivers from a render path just to find out
-    // there is no wall to draw — rebuildLandscapeMesh hands over the set it
+    // there is no wall to draw — buildLandscapeMesh hands over the set it
     // already built, and calls this again once it has.
     if (!area.hasStructures()) return;
 
@@ -799,6 +824,23 @@ export class GameRenderer {
   // ---------- Internal ----------
 
   private loadGame(ctx: MiningContext): void {
+    this.buildPlayableMesh(ctx);
+    this.buildLandscapeMesh(ctx);
+    this.buildAmbient(ctx);
+    this.frameCameraOnGrid();
+  }
+
+  /**
+   * Stage 1 of a level load (#474): clear the scene and rebuild everything
+   * except the landscape zone and its ambient dressing — the playable
+   * terrain mesh (marching cubes over the grid the player actually mines),
+   * buildings, vehicles, characters, sky, wind/clouds, fragments, blast
+   * effects and overlays. Public so the loading screen can pace this as its
+   * own weighted phase (`enterLevel` in main.ts); `loadGame()` also calls it
+   * directly for callers that still want the whole load in one shot (tests,
+   * the debug-preview path that never drives the loading screen at all).
+   */
+  buildPlayableMesh(ctx: MiningContext): void {
     const state = ctx.state!;
     const grid = ctx.grid!;
     this.clearAll();
@@ -862,28 +904,28 @@ export class GameRenderer {
     // Blast effects
     this.blastEffects = new BlastEffects(scene, this.sm.camera);
 
-    // Landscape zone — real ground continuing past the playable rect (#458 T3.2)
-    this.rebuildLandscapeMesh(ctx);
-
     // Blast plan overlay (hidden until shown)
     this.blastOverlay = new BlastPlanOverlay(scene);
 
     // Ghost previews (initially empty)
     this.ghosts = new GhostMesh(scene);
-
-    // Frame the whole site
-    this.frameCameraOnGrid();
   }
 
   /**
-   * Build (or rebuild) the landscape mesh for the current grid (#458 T3.2).
-   * Triggers ensureLandscape()'s lazy build — the first real consumer of it
-   * (T2.1 kept it lazy specifically because nothing rendered it yet).
-   * Command-mode scenarios never construct a GameRenderer at all, so this
-   * cost never lands on the fast, frequently-run scenario suite; only the
-   * browser game and interaction-mode/visual harnesses pay it.
+   * Stage 2 of a level load (#474): the landscape zone — its coarse map
+   * (built lazily by ensureLandscape(), cached on ctx.landscape so this is a
+   * cache hit if a caller already forced it, e.g. main.ts's own "landscape
+   * map" phase or buildPlayableMesh()'s edge-height sampler above), the
+   * marching-cubes mesh past the playable rect, aerial-perspective
+   * calibration, and the border wall. Split from buildAmbient() below
+   * because it costs meaningfully more (a full landscape mesh vs. a handful
+   * of particle systems) and the loading screen weights the two
+   * differently. Command-mode scenarios never construct a GameRenderer at
+   * all, so this cost never lands on the fast, frequently-run scenario
+   * suite; only the browser game and interaction-mode/visual harnesses pay
+   * it.
    */
-  private rebuildLandscapeMesh(ctx: MiningContext): void {
+  buildLandscapeMesh(ctx: MiningContext): void {
     if (!this.terrain || !ctx.state?.world || !ctx.grid) return;
     const biome = getBiome(ctx.state.mineType);
     if (!biome) return;
@@ -916,16 +958,28 @@ export class GameRenderer {
     aerial.setHeightRef(handle.groundLevelY);
     aerial.setGrade(BIOME_GRADES[biome.id] ?? NEUTRAL_GRADE);
 
-    // Birds/smoke/water/vegetation (#458 T7.2/D12/A26) — rebuilt from the
-    // landscape's own StructureSet every time this runs (a campaign level
-    // swap can call rebuildLandscapeMesh again for the same GameRenderer, so
-    // stale instances from the previous grid must go first or their meshes
-    // pile up in the scene).
     // The "not here" marker: the frontier between claimable ground and the
     // generated structures a claim can never take (#473 D6/P4). Sized from
     // the terrain's own height range so it stands on the ground rather than
     // floating or being buried.
     this.rebuildBorderWall(ctx);
+  }
+
+  /**
+   * Stage 3 of a level load (#474): birds, chimney smoke, water, vegetation
+   * sway, and the per-biome dust-devil/firefly extras — rebuilt from the
+   * landscape's own StructureSet every time this runs (a campaign level swap
+   * can call this again for the same GameRenderer, so stale instances from
+   * the previous grid must go first or their meshes pile up in the scene).
+   * Requires buildLandscapeMesh() to have already cached ctx.landscape this
+   * load — the cheapest of the three staged rebuilds, so it carries the
+   * loading screen's lightest weight.
+   */
+  buildAmbient(ctx: MiningContext): void {
+    if (!ctx.state?.world || !ctx.grid || !ctx.landscape) return;
+    const biome = getBiome(ctx.state.mineType);
+    if (!biome) return;
+    const handle = ctx.landscape;
 
     this.birds?.dispose();
     this.smoke?.dispose();

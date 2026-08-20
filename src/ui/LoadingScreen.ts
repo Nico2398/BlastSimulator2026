@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Level loading screen (redesign P8, strata backdrop)
 //
 // Entering a level runs several seconds of synchronous work — terrain
-// generation, then marching-cubes meshing of both the playable grid and the
-// landscape. On the largest sites that is over five seconds during which the
-// main thread never yields.
+// generation, the landscape map, marching-cubes meshing of both the playable
+// grid and the landscape, and the ambient rebuild. On the largest sites that
+// is over five seconds during which the main thread never yields.
 //
 // The important part is not the overlay itself but WHEN it reaches the
 // screen. `show(); generateEverything(); hide();` displays nothing at all: the
@@ -12,6 +12,11 @@
 // to solve exactly that — it waits for a frame to be presented before each
 // blocking chunk, so the overlay and its current label are actually on screen
 // while the work happens.
+//
+// A phase's `weight` (#474) is its share of that work, not its position in
+// the list — the bar moves proportionally to what each step actually costs
+// (see main.ts's LOAD_PHASE_WEIGHT), so a small quick step doesn't visually
+// eat the same slice as the biggest one.
 
 import { t } from '../core/i18n/I18n.js';
 import { QuipBag, TipBag } from './loadingQuips.js';
@@ -42,6 +47,18 @@ export function nextPaint(): Promise<void> {
  */
 export interface LoadPhase {
   run: () => void;
+  /**
+   * Relative cost of this phase against the others in the same run, so the
+   * bar advances proportionally to actual work rather than to a position in
+   * the list (#474). Omitted/`<= 0` counts as 1 — every existing call site
+   * that never set a weight keeps its old equal-split behaviour exactly.
+   */
+  weight?: number;
+}
+
+/** Sum of a phase list's weights, defaulting an unset or non-positive weight to 1. */
+function totalWeight(phases: readonly LoadPhase[]): number {
+  return phases.reduce((sum, p) => sum + (p.weight && p.weight > 0 ? p.weight : 1), 0);
 }
 
 /** One key/value row in the briefing block under the subtitle. */
@@ -239,20 +256,23 @@ export class LoadingScreen {
   }
 
   /**
-   * Lay `phaseCount` segment marks onto the progress track.
+   * Lay one segment mark per phase boundary onto the progress track.
    *
-   * Boundaries mirror the fractions `setPhase` already drives the bar to
-   * ((i+1)/(phaseCount+1) for each phase index i) — one mark per phase
-   * boundary, none at 0% or 100%.
+   * Positions mirror the fractions `runPhases` drives the bar to — cumulative
+   * weight so far over (total weight + 1), the same +1 that reserves the
+   * final slot for the "ready" bump. Equal-weight phases (the default) land
+   * marks at the old k/(phaseCount+1) spacing exactly.
    */
-  private renderSegmentMarks(phaseCount: number): void {
+  private renderSegmentMarks(phases: readonly LoadPhase[]): void {
     this.marksLayer.replaceChildren();
-    if (phaseCount <= 0) return;
-    const total = phaseCount + 1;
-    for (let i = 1; i <= phaseCount; i++) {
+    if (phases.length === 0) return;
+    const total = totalWeight(phases) + 1;
+    let cumulative = 0;
+    for (const phase of phases) {
+      cumulative += phase.weight && phase.weight > 0 ? phase.weight : 1;
       const mark = document.createElement('div');
       mark.className = 'bsx-loading-mark';
-      mark.style.left = `${(i / total) * 100}%`;
+      mark.style.left = `${(cumulative / total) * 100}%`;
       this.marksLayer.appendChild(mark);
     }
   }
@@ -294,15 +314,19 @@ export class LoadingScreen {
    */
   async runPhases(phases: readonly LoadPhase[], siteInfo?: LoadingSiteInfo): Promise<void> {
     this.show(siteInfo);
-    this.renderSegmentMarks(phases.length);
+    this.renderSegmentMarks(phases);
     await nextPaint();
     try {
+      const total = totalWeight(phases) + 1;
+      let cumulative = 0;
       for (let i = 0; i < phases.length; i++) {
         const phase = phases[i]!;
-        // (i+1)/(n+1), not i/n: the bar would otherwise sit at zero through
-        // the longest phase, which reads as nothing happening. This starts it
-        // moving on the first phase and still leaves the last step for "ready".
-        this.setPhase(this.quips.next(), (i + 1) / (phases.length + 1));
+        cumulative += phase.weight && phase.weight > 0 ? phase.weight : 1;
+        // cumulative/(total weight + 1), not a position in the list: a
+        // heavier phase should move the bar further than a light one, and
+        // the +1 reserves the last slot for the "ready" bump below rather
+        // than letting the final phase claim 100% on its own.
+        this.setPhase(this.quips.next(), cumulative / total);
         this.setStage(i + 1, phases.length);
         await nextPaint();
         phase.run();

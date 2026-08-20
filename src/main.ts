@@ -25,7 +25,7 @@ import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
 import { createRunner, runCommand } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
-import { regenerateGrid, restoreGrid, terrainGenDatum, DEFAULT_GRID_SIZE } from './console/commands/world.js';
+import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLandscape, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
@@ -228,10 +228,10 @@ levelEndScreen.setOnBackToPortfolio(() => {
 
 // --- Level loading ---
 // Entering a level blocks the main thread for seconds. enterLevel splits that
-// into phases the loading screen can paint between, so the wait reads as a
-// load rather than a hang. Terrain generation and scene meshing are roughly
-// half the cost each, which is why the renderer sync is deferred out of the
-// command and run as its own phase.
+// into several weighted phases the loading screen can paint between (#474),
+// so the bar advances roughly in proportion to the work rather than sitting
+// still through the biggest step and snapping at the end. See
+// LOAD_PHASE_WEIGHT and enterLevel() below.
 const loadingScreen = new LoadingScreen(uiContainer);
 
 /**
@@ -278,10 +278,48 @@ function buildSandboxLoadingSiteInfo(config: SandboxConfig): LoadingSiteInfo {
   };
 }
 
+/**
+ * Weighted LoadPhase costs for enterLevel() below (#474) — default-and-record,
+ * since the sandbox this was tuned in measures the same load anywhere from
+ * 16s to 32s (a property of the environment, not the game) and re-measuring
+ * cleanly needs a GPU this sandbox doesn't have. Ranked by what each step
+ * actually walks: terrain generation and the playable mesh both touch the
+ * full 3D voxel grid, so they get the heaviest weight; the landscape map and
+ * its mesh cover a coarser, 2D-ish structure past the playable rect, so half
+ * that; the ambient rebuild is a handful of particle systems, cheapest of
+ * the five. Re-tune against real measurements if they diverge from this.
+ */
+const LOAD_PHASE_WEIGHT = {
+  terrain: 3,
+  landscapeMap: 2,
+  playableMesh: 3,
+  landscapeMesh: 2,
+  ambient: 1,
+} as const;
+
 function enterLevel(commands: readonly string[], siteInfo?: LoadingSiteInfo): Promise<void> {
   return loadingScreen.runPhases([
-    { run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); } },
-    { run: () => { gameRenderer.syncFromContext(ctx); } },
+    {
+      weight: LOAD_PHASE_WEIGHT.terrain,
+      run: () => { for (const cmd of commands) runGameCommand(cmd, { syncRenderer: false }); },
+    },
+    {
+      weight: LOAD_PHASE_WEIGHT.landscapeMap,
+      // Forces ensureLandscape()'s lazy build now, as its own weighted step,
+      // rather than letting it happen implicitly (and uncounted) inside the
+      // playable-mesh phase's edge-height sampler below — buildPlayableMesh()
+      // still calls ensureLandscape() itself, but by then it's a cache hit.
+      run: () => {
+        const cfg = ctx.state && terrainConfigOf(ctx.state);
+        if (cfg) ensureLandscape(ctx, cfg);
+      },
+    },
+    { weight: LOAD_PHASE_WEIGHT.playableMesh, run: () => { gameRenderer.buildPlayableMesh(ctx); } },
+    { weight: LOAD_PHASE_WEIGHT.landscapeMesh, run: () => { gameRenderer.buildLandscapeMesh(ctx); } },
+    {
+      weight: LOAD_PHASE_WEIGHT.ambient,
+      run: () => { gameRenderer.buildAmbient(ctx); gameRenderer.finishLevelLoad(ctx); },
+    },
   ], siteInfo);
 }
 
@@ -441,9 +479,10 @@ console.log = (...args: unknown[]) => {
  * Run a console command.
  *
  * `syncRenderer: false` runs everything except the scene rebuild, so a level
- * load can charge the player for generation and meshing as two separate
- * phases with a painted frame between them (see LoadingScreen). Only the
- * level-entry paths pass it; every other caller gets the immediate sync.
+ * load can charge the player for generation, meshing and dressing as several
+ * separate weighted phases, each with a painted frame between them (see
+ * LoadingScreen, enterLevel()). Only the level-entry paths pass it; every
+ * other caller gets the immediate sync.
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const prevState = ctx.state;
