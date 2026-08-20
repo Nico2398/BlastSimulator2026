@@ -992,6 +992,12 @@ savesModal.setOnLoad((state) => {
     };
     regenerateGrid(ctx, { seed: state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
   }
+  // Close any overlay whose visibility is a stale carry-over from the
+  // previous session's ended state (e.g. BlastReportModal left open from an
+  // earlier blast) — same fixup runGameCommand's enteredNewLevel branch does
+  // for the console `load` command; this is the Saves modal's Load button,
+  // the only other real path that swaps ctx.state (#571).
+  uiManager.closeStaleLevelOverlays(ctx.state);
   gameRenderer.syncFromContext(ctx);
 });
 
