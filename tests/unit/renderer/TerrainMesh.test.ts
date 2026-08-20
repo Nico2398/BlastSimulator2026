@@ -795,6 +795,44 @@ describe('TerrainMesh', () => {
       expect(skirtInternals(tm).canSkipChunkMarch(0, 0, 0, rect)).toBe(false);
       tm.dispose();
     });
+
+    it('returns false for the topmost y-slab even when uniformly solid, sizeY an exact multiple of CHUNK_SIZE (#610)', () => {
+      // fullySolidMultiChunkGrid: 3x3 chunks horizontally, sizeY = CHUNK_SIZE*2
+      // (32 with CHUNK_SIZE=16), solid from y=0 through y=sizeY-1 with zero
+      // headroom above the last written row. Topmost slab index is
+      // ceil(32/16)-1 = 1. chunkDensityRange(1, 1, cy=2) is out of range and
+      // returns null, so an unpatched slabSafe(null) treats "no data above"
+      // as "safe to skip" — wrong, because the topmost slab's own top row of
+      // march cubes always samples an out-of-bounds y=sizeY corner, which
+      // VoxelGrid.ownerOf reads as air, guaranteeing a real surface crossing
+      // there. The topmost slab must never be treated as skippable.
+      const grid = fullySolidMultiChunkGrid();
+      const tm = new TerrainMesh(makeScene(), grid);
+      const rect = grid.chunkRect(1, 1)!;
+      const topmostSlabIndex = Math.ceil(MULTI_CHUNK_SIZE_Y / CHUNK_SIZE) - 1;
+      expect(skirtInternals(tm).canSkipChunkMarch(1, topmostSlabIndex, 1, rect)).toBe(false);
+      tm.dispose();
+    });
+
+    it('returns false for the topmost y-slab even when uniformly solid, sizeY NOT a multiple of CHUNK_SIZE (#610)', () => {
+      // Same 3x3 horizontal footprint, but sizeY = CHUNK_SIZE + 4 (20 with
+      // CHUNK_SIZE=16): the topmost slab is partial, spanning only y=16..19
+      // (4 rows, not a full 16). Still solid throughout with zero headroom at
+      // the array's own ceiling. Topmost slab index is ceil(20/16)-1 = 1 —
+      // same failure mode as the exact-multiple case above.
+      const sizeXZ = CHUNK_SIZE * 3;
+      const sizeY = CHUNK_SIZE + 4;
+      const grid = new VoxelGrid(sizeXZ, sizeY, sizeXZ);
+      for (let x = 0; x < sizeXZ; x++)
+        for (let y = 0; y < sizeY; y++)
+          for (let z = 0; z < sizeXZ; z++)
+            grid.setVoxel(x, y, z, makeSolidVoxel());
+      const tm = new TerrainMesh(makeScene(), grid);
+      const rect = grid.chunkRect(1, 1)!;
+      const topmostSlabIndex = Math.ceil(sizeY / CHUNK_SIZE) - 1;
+      expect(skirtInternals(tm).canSkipChunkMarch(1, topmostSlabIndex, 1, rect)).toBe(false);
+      tm.dispose();
+    });
   });
 
   describe('boundary/skirt walls without a sampler still march full depth (#560 fallback)', () => {
