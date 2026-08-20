@@ -450,6 +450,41 @@ describe('a session recovers a run its own slot blocked, on its way out', () => 
   });
 });
 
+// #614: the "is a runner session live" predicate is deliberately inlined
+// twice — here and in agentic-ci-failure.yml's guard — because the latter
+// runs with no checkout and cannot `require()` a shared .cjs module. Pinning
+// each copy on its own was not enough: agentic-ci-failure.yml has carried
+// the full non-terminal status set since #507 (13 Aug), agentic-recover-blocked
+// shipped with only `['queued', 'in_progress']` three weeks later in #641,
+// and nothing compared the two, so #614's `pending` run was invisible to one
+// check and would have been caught by the other. Assert the copies equal
+// each other, not just that each individually contains what it should.
+describe('the runner-liveness predicate cannot drift between its two copies', () => {
+  const recover = readFileSync(
+    join(ROOT, '.github/actions/agentic-recover-blocked/action.yml'), 'utf8'
+  );
+  const failsafe = workflow('agentic-ci-failure.yml');
+
+  const extract = (source, name) => {
+    const match = new RegExp(`const ${name} = (\\[[^\\]]*\\]);`).exec(source);
+    expect(match, `${name} array not found`).not.toBeNull();
+    return match[1];
+  };
+
+  it('polls the same runner workflows in both copies', () => {
+    expect(extract(recover, 'RUNNERS')).toBe(extract(failsafe, 'RUNNERS'));
+  });
+
+  it('polls the same set of non-terminal run statuses in both copies', () => {
+    const recoverLive = extract(recover, 'LIVE');
+    const failsafeLive = extract(failsafe, 'LIVE');
+    expect(recoverLive).toBe(failsafeLive);
+    // Pin the content too, not only the agreement — two copies that agree on
+    // a narrowed set would pass the line above and still reproduce #614.
+    expect(recoverLive).toBe("['queued', 'in_progress', 'waiting', 'requested', 'pending']");
+  });
+});
+
 // PR #434 was opened by the pipeline, fully verified, marked `READY TO MERGE`,
 // went green — and sat open. Both arming paths ran and both reported success:
 // the `enablePullRequestAutoMerge` mutation named its variable `$method`, which
