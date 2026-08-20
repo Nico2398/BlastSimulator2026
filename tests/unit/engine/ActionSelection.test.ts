@@ -13,7 +13,7 @@
 // .claude/rules/core-purity.md, not just transitive coverage through
 // GameLoop.ts's tickEmployees tests).
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   estimateActionCost,
   resolveActionCost,
@@ -21,6 +21,7 @@ import {
   computeActionWorkTicks,
   resolveRestNeedKey,
 } from '../../../src/core/engine/ActionSelection.js';
+import * as PathfindingModule from '../../../src/core/nav/Pathfinding.js';
 import { createGame, type GameState, type PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { createEmployeeState, hireEmployee, killEmployee, assignSkill, type Employee, type SkillCategory } from '../../../src/core/entities/Employee.js';
@@ -334,6 +335,99 @@ describe('selectBestActionForEmployee', () => {
     // The budget is spent entirely on the 5 unreachable near candidates, so
     // the reachable one is never reached — cost control over correctness.
     expect(result).toBeNull();
+  });
+
+  // ── isClaimable pre-filter starvation (#611) ───────────────────────────
+  //
+  // #552's fallthrough only skips an unclaimable candidate WITHIN the
+  // bounded top-N loop via `continue` — that `continue` still consumes one
+  // of the ACTION_SELECTION_MAX_PATH_ATTEMPTS attempts. A backlog of more
+  // than ACTION_SELECTION_MAX_PATH_ATTEMPTS unclaimable candidates, all
+  // ranked ahead of a genuinely claimable one, therefore burns the entire
+  // budget on candidates that can never succeed and never even reaches the
+  // claimable candidate. The fix pre-filters by isClaimable BEFORE ranking,
+  // so the budget is spent only on already-claimable candidates.
+
+  it('an unclaimable backlog larger than the attempt budget does not starve a farther claimable candidate (#611)', () => {
+    const state = makeState(40, 40);
+    const emp = makeEmployee(state, 0, 0);
+
+    const QUALIFIED_ID = 100;
+
+    // ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3 = 8 cheap candidates, all ranked
+    // ahead of the qualified one, all unclaimable.
+    expect(ACTION_SELECTION_MAX_PATH_ATTEMPTS).toBe(5);
+    const unclaimableBacklog: PendingAction[] = [];
+    for (let i = 1; i <= ACTION_SELECTION_MAX_PATH_ATTEMPTS + 3; i++) {
+      unclaimableBacklog.push(makeAction({ id: i, targetX: 1 + i, targetZ: 0 }));
+    }
+
+    // Farther (higher estimated cost) than every backlog candidate, but
+    // reachable AND claimable.
+    const qualified = makeAction({ id: QUALIFIED_ID, targetX: 30, targetZ: 0 });
+
+    const isClaimable = (action: PendingAction): boolean => action.id === QUALIFIED_ID;
+
+    const result = selectBestActionForEmployee(
+      state, emp, [...unclaimableBacklog, qualified], isClaimable,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.action.id).toBe(QUALIFIED_ID);
+  });
+
+  it('bounds real-cost resolution to ACTION_SELECTION_MAX_PATH_ATTEMPTS spent on claimable candidates, never wasted on an unclaimable backlog (#611)', () => {
+    const state = makeState(30, 60);
+    blockColumn(state.navGrid!, 15); // isolates x >= 16 from the employee at x = 0
+    const emp = makeEmployee(state, 0, 0);
+
+    // 10 unclaimable candidates, cheapest-ranked of the whole pool — a
+    // caller-side gate (e.g. GameLoop.ts's vehicle-availability check)
+    // rejects every one of them, well past the attempt budget.
+    const unclaimable: PendingAction[] = [];
+    for (let i = 1; i <= 10; i++) {
+      unclaimable.push(makeAction({ id: i, targetX: 1 + i, targetZ: 0 }));
+    }
+
+    // 5 claimable-but-unreachable candidates (behind the wall at x = 15),
+    // ranked (by cost) ahead of the one claimable-and-reachable candidate
+    // below within the claimable subset.
+    const claimableUnreachable: PendingAction[] = [];
+    for (let i = 0; i < ACTION_SELECTION_MAX_PATH_ATTEMPTS; i++) {
+      claimableUnreachable.push(makeAction({ id: 21 + i, targetX: 16 + i, targetZ: 0 }));
+    }
+
+    // Claimable and reachable (near side of the wall), but far higher cost
+    // (via z-distance) than every claimable-unreachable candidate above —
+    // ranked 6th within the claimable subset, i.e. just past the budget.
+    const claimableReachable = makeAction({ id: 30, targetX: 10, targetZ: 50 });
+
+    const claimableIds = new Set<number>([...claimableUnreachable.map(c => c.id), claimableReachable.id]);
+    const isClaimable = (action: PendingAction): boolean => claimableIds.has(action.id);
+
+    const findPathSpy = vi.spyOn(PathfindingModule, 'findPath');
+
+    const result = selectBestActionForEmployee(
+      state, emp, [...unclaimable, ...claimableUnreachable, claimableReachable], isClaimable,
+    );
+
+    // Budget (5) is spent entirely on the 5 claimable-but-unreachable
+    // candidates, so the 6th-ranked (claimable, reachable) one is never
+    // reached — same "cost control over correctness" tradeoff as the
+    // reachability-only budget test above, but now proven to apply to the
+    // CLAIMABLE subset specifically, not the raw candidate list.
+    expect(result).toBeNull();
+    // The unclaimable backlog (cheaper-ranked than everything claimable)
+    // must never consume a real-cost resolution: at least one, and never
+    // more than ACTION_SELECTION_MAX_PATH_ATTEMPTS, real-cost resolutions
+    // happen — all of them against claimable candidates. Old (buggy) code
+    // burns the whole budget's `continue`s on the 10 unclaimable candidates
+    // (cheaper-ranked than the whole claimable subset) and never calls
+    // findPath at all.
+    expect(findPathSpy.mock.calls.length).toBeGreaterThan(0);
+    expect(findPathSpy.mock.calls.length).toBeLessThanOrEqual(ACTION_SELECTION_MAX_PATH_ATTEMPTS);
+
+    findPathSpy.mockRestore();
   });
 });
 
