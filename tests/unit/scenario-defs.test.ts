@@ -188,21 +188,6 @@ const KNOWN_COMMANDS = [
 /** Commands that inspect state — valid as a final playthrough step */
 const INSPECTION_COMMANDS = ['campaign', 'state', 'scores', 'finances', 'stats', 'inspect'];
 
-// Pre-existing files still on a bare/`id:` numeric contract selector,
-// grandfathered the same way issue #515's role lint grandfathered untagged
-// steps: a documented, individually-tracked exception rather than a silent
-// pass. Tracked for migration in issue #635 — remove a name from here as
-// its file moves to `type:`/`material:`, never add one back.
-const CONTRACT_ID_SELECTOR_EXCEPTIONS = [
-  'contract-negotiation',
-  'contract-panel-visual',
-  'economy-display-visual',
-  'level1-playthrough-win',
-  'level1-win-conservative',
-  'tutorial-interactive',
-  'tutorial-playthrough',
-];
-
 // ──────────────────────────────────────────────
 // 1. File existence & valid JSON
 // ──────────────────────────────────────────────
@@ -383,8 +368,6 @@ describe('"contract" commands use type:/material:, not a numeric id (issue #597)
     !/\btype:/.test(rest) && (/\bid:\d+/.test(rest) || /^\s*\d+/.test(rest));
 
   for (const name of ALL_SCENARIO_NAMES) {
-    if (CONTRACT_ID_SELECTOR_EXCEPTIONS.includes(name)) continue;
-
     it(`${name} — no contract command uses a bare/id: numeric selector`, () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       const offenders: string[] = [];
