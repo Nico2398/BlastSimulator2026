@@ -22,7 +22,7 @@ import { surveyCommand } from '../../src/console/commands/mining.js';
 import { tickEmployees } from '../../src/core/engine/GameLoop.js';
 import { computeTaskDuration } from '../../src/core/entities/EmployeeTaskDuration.js';
 import { Random } from '../../src/core/math/Random.js';
-import { SURVEY_DURATION_TICKS } from '../../src/core/config/balance.js';
+import { SURVEY_DURATION_TICKS, XP_THRESHOLDS } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -557,6 +557,51 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
 // surveyors and three unclaimed survey targets at different distances, the
 // way a real scenario or player-facing flow would. Red until tickEmployees
 // is rewired onto ActionSelection.ts's cost-based selection (#549).
+
+// ── Issue #620: training must not cost xp progress ──────────────────────────
+//
+// gainXp derives proficiencyLevel from cumulative qual.xp against
+// XP_THRESHOLDS, so two employees landing on the same level should need the
+// same additional xp to reach the next one — regardless of whether they got
+// there via training or via task xp accumulation. Red until tickTraining
+// floors qual.xp at XP_THRESHOLDS[newLevel] instead of leaving it untouched.
+
+describe('training and natural xp accumulation land at equal xp for the same level (#620)', () => {
+  it('a trained employee and a naturally-progressed employee at the same level need equal additional xp', () => {
+    const ctx = makeCtx();
+
+    // Employee A: reaches blasting level 3 through training, starting from a
+    // partial level-2 xp balance.
+    const empAId = hireOne(ctx, 'blaster'); // holds blasting at level 1
+    assignSkill(ctx.state!.employees, empAId, 'blasting', 2);
+    const qualA = ctx.state!.employees.employees.find(e => e.id === empAId)!
+      .qualifications.find(q => q.category === 'blasting')!;
+    qualA.xp = 150; // partial progress toward the level-3 threshold (300)
+
+    const startA = startTraining(ctx.state!.employees, empAId, 1, 'blasting', 5, 500);
+    expect(startA.success).toBe(true);
+    for (let i = 0; i < 5; i++) tickTraining(ctx.state!.employees);
+    expect(qualA.proficiencyLevel).toBe(3);
+
+    // Employee B: reaches blasting level 3 purely through gainXp, starting
+    // from the identical partial level-2 xp balance and given exactly enough
+    // xp to cross the level-3 threshold (300).
+    const empBId = hireOne(ctx, 'blaster');
+    assignSkill(ctx.state!.employees, empBId, 'blasting', 2);
+    const qualB = ctx.state!.employees.employees.find(e => e.id === empBId)!
+      .qualifications.find(q => q.category === 'blasting')!;
+    qualB.xp = 150;
+
+    const gainResult = gainXp(ctx.state!.employees, empBId, 'blasting', XP_THRESHOLDS[3] - qualB.xp, ctx.emitter);
+    expect(gainResult).not.toBeNull();
+    expect(qualB.proficiencyLevel).toBe(3);
+
+    // Both landed on level 3 — they must need equal additional xp to reach
+    // level 4, i.e. carry equal xp.
+    expect(qualA.xp).toBe(qualB.xp);
+    expect(XP_THRESHOLDS[4] - qualA.xp).toBe(XP_THRESHOLDS[4] - qualB.xp);
+  });
+});
 
 describe('Cost-based per-employee dispatch — full tick pipeline (#549)', () => {
   it('pairs each surveyor with their own nearest survey target, never double-claims, and every target eventually resolves', () => {

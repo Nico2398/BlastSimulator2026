@@ -24,6 +24,7 @@ import {
   MAX_PROFICIENCY,
 } from '../../../src/core/entities/EmployeeTraining.js';
 import type { Building, BuildingType, BuildingTier } from '../../../src/core/entities/Building.js';
+import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 
 const SEED = 42;
 
@@ -198,6 +199,74 @@ describe('licences no role is hired with', () => {
     }
 
     expect(planTraining(employee, 'geology', 3)).toBeNull();
+  });
+});
+
+// ── Completion floors xp at the new level's threshold (#620) ────────────────
+//
+// gainXp derives proficiencyLevel from cumulative qual.xp against
+// XP_THRESHOLDS. tickTraining's existing-qualification branch used to raise
+// proficiencyLevel directly without touching xp, so a trained employee held
+// xp: 0 at their new level while a naturally-progressed peer at the same
+// level already carried partial progress — training silently cost ~half a
+// level's worth of progress toward the next one.
+
+describe('tickTraining floors qual.xp at the new level threshold', () => {
+  it('training from level 2 to level 3 raises xp to at least the level-3 threshold', () => {
+    const { state, employee } = makeStateWithOne('driller'); // holds blasting at level 1
+    assignSkill(state, employee.id, 'blasting', 2);
+
+    const result = enrolInTraining(state, employee.id, school('blasting_academy'), 'blasting');
+    expect(result.success, result.error).toBe(true);
+    for (let i = 0; i < result.plan!.ticks; i++) tickTraining(state);
+
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual.proficiencyLevel).toBe(3);
+    expect(qual.xp).toBeGreaterThanOrEqual(XP_THRESHOLDS[3]);
+  });
+
+  it('never lowers xp that already exceeds the new level threshold before completion', () => {
+    const { state, employee } = makeStateWithOne('driller');
+    assignSkill(state, employee.id, 'blasting', 2);
+
+    const result = enrolInTraining(state, employee.id, school('blasting_academy'), 'blasting');
+    expect(result.success, result.error).toBe(true);
+
+    // The employee already carries more xp than the level-3 threshold (300)
+    // by the time the course completes — training must not claw it back down.
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    qual.xp = 500;
+
+    for (let i = 0; i < result.plan!.ticks; i++) tickTraining(state);
+
+    expect(qual.proficiencyLevel).toBe(3);
+    expect(qual.xp).toBe(500);
+  });
+
+  it('a brand-new qualification from training still starts at level 1 with 0 xp', () => {
+    const { state, employee } = makeStateWithOne('driver'); // holds driving.truck only
+    expect(employee.qualifications.some(q => q.category === 'driving.excavator')).toBe(false);
+
+    const result = enrolInTraining(state, employee.id, school('driving_center'), 'driving.excavator');
+    expect(result.success, result.error).toBe(true);
+    for (let i = 0; i < result.plan!.ticks; i++) tickTraining(state);
+
+    const qual = employee.qualifications.find(q => q.category === 'driving.excavator')!;
+    expect(qual.proficiencyLevel).toBe(1);
+    expect(qual.xp).toBe(XP_THRESHOLDS[1]);
+  });
+
+  it('training from level 4 to level 5 (MAX_PROFICIENCY) floors xp at the level-5 threshold', () => {
+    const { state, employee } = makeStateWithOne('driller');
+    assignSkill(state, employee.id, 'blasting', 4);
+
+    const result = enrolInTraining(state, employee.id, school('blasting_academy'), 'blasting');
+    expect(result.success, result.error).toBe(true);
+    for (let i = 0; i < result.plan!.ticks; i++) tickTraining(state);
+
+    const qual = employee.qualifications.find(q => q.category === 'blasting')!;
+    expect(qual.proficiencyLevel).toBe(MAX_PROFICIENCY);
+    expect(qual.xp).toBeGreaterThanOrEqual(XP_THRESHOLDS[5]);
   });
 });
 
