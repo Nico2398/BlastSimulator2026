@@ -406,6 +406,7 @@ The pipeline runs under Claude Code or OpenCode. One repository variable decides
 | `AGENTIC_AUTO_ASSIGN_ENABLED` | `true` / anything else | Whether a finished issue chains to the next `ready` one |
 | `AGENTIC_AUTO_MERGE_ENABLED` | `true` / anything else | Whether a PR whose body carries `READY TO MERGE` gets GitHub native auto-merge |
 | `AGENTIC_STALL_MINUTES` | minutes, default `240` | How long an issue may stay `in-progress` without a linked PR before the watchdog marks it `blocked` |
+| `CLAUDE_REVIEW_ENABLED` | `false` / anything else, default enabled | Whether opening or marking a hand-written PR ready-for-review triggers the automatic Claude Code review |
 
 Set them under **Settings → Secrets and variables → Actions → Variables**. Switching agent is a one-value change; nothing else moves.
 
