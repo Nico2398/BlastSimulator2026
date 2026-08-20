@@ -90,7 +90,7 @@ export function seedTaskTimerFields(state: GameState, employee: Employee, action
  * resolveActionCost (pathfinding) (#614).
  */
 function cellsToTravelTicks(cells: number): number {
-  throw new Error('not implemented');
+  return cells / AGENT_WALK_SPEED;
 }
 
 /**
@@ -102,7 +102,7 @@ function cellsToTravelTicks(cells: number): number {
  * NavGrid has been built yet.
  */
 function estimateTravelTicks(employee: Employee, action: PendingAction): number {
-  return octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ) / AGENT_WALK_SPEED;
+  return cellsToTravelTicks(octileHeuristic(employee.x, employee.z, action.targetX, action.targetZ));
 }
 
 /**
@@ -145,7 +145,7 @@ export function resolveActionCost(state: GameState, employee: Employee, action: 
 
   if (!path.found) return null;
 
-  const travelTicks = path.totalCost / AGENT_WALK_SPEED;
+  const travelTicks = cellsToTravelTicks(path.totalCost);
   return { totalTicks: travelTicks + workTicks };
 }
 
