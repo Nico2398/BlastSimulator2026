@@ -29,7 +29,10 @@ export interface XpAward {
  * in that category (default 1 if unqualified).
  */
 export function computeTaskXpAwards(employee: Employee, action: PendingAction): XpAward[] {
-  void employee;
-  void action;
-  throw new Error('not implemented');
+  if (action.requiredSkill === null) return [];
+
+  const qual = employee.qualifications.find(q => q.category === action.requiredSkill);
+  const level = qual?.proficiencyLevel ?? 1;
+
+  return [{ category: action.requiredSkill, amount: computeXpPerTick(level) }];
 }
