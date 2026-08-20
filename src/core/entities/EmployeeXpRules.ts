@@ -9,7 +9,5 @@ import { XP_PER_TICK_BASE, XP_PER_TICK_LEVEL_SCALE } from '../config/balance.js'
  * Formula: XP_PER_TICK_BASE + floor(proficiencyLevel * XP_PER_TICK_LEVEL_SCALE)
  */
 export function computeXpPerTick(proficiencyLevel: 1 | 2 | 3 | 4 | 5): number {
-  // TODO: implement
-  void proficiencyLevel;
-  return XP_PER_TICK_BASE + XP_PER_TICK_LEVEL_SCALE;
+  return XP_PER_TICK_BASE + Math.floor(proficiencyLevel * XP_PER_TICK_LEVEL_SCALE);
 }

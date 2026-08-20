@@ -412,6 +412,7 @@ export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
 export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
+export { computeXpPerTick } from './EmployeeXpRules.js';
 export type {
   ProficiencyLevel, TrainingPlan, StartTrainingResult, TrainingCompletion,
 } from './EmployeeTraining.js';
