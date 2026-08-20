@@ -862,18 +862,27 @@
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"rock_digger\"][data-tier=\"1\"]"
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 2,
+          "z": 8
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "issue #585 (command-mode-only fix; interaction array intentionally left as the original rock_digger click -- see below): the repo-wide commandOutcome audit found this file's 4 contract-deliver steps refused with 'Not enough <ore> in storage: 0.0 kg available' no matter how many ticks preceded them. Direct trace (createGameEngine + runCommand replay) found the real cause: this file never once builds a freight_warehouse anywhere in its 187 steps -- and HaulingTask.ts's requestHaulFragment (the only code path that ever increments storedMassKg/collectedOre, called from both the manual haul and the auto-dispatch haul_debris action alike) hard-requires findNearestActiveBuildingOfType(..., 'freight_warehouse', ...) to resolve a depot before a hauler will so much as pick up a fragment. With none built, storedMassKg traced flat at 0.0 for 600+ ticks past blast 1 regardless of wait length -- not a timing gap, a missing prerequisite. Fixed by building one here instead of the second rock_digger this file also buys: sandbox-traced across the full 187-step file (both before and after this fix), vehicle #5 (this purchase, staffed's own #3 already covers rock_digger and sits idle the whole run too) never gets a driver or leaves 'idle' -- this file drills no ramps (no dig_ramp_segment command anywhere in it), the only task type a rock_digger claims, so the purchase was dead weight. Swapping it for a $15,000 T1 warehouse ($35,000 cheaper than the rock_digger it replaces) at (2,8) -- clear of all 4 drill patterns' footprints (confirmed via trace: patterns span roughly x10-37/z15-46) and close to the vehicle spawn row (z:2) -- actually improves the cash trajectory (was $3,278 after all 3 buys, now $38,278) rather than worsening it, and (also confirmed via trace) leaves blast 1's own death toll and timing untouched, unlike every warehouse tile tried closer to the drill patterns, which perturbed blast 1's own navgrid-dependent hole-completion timing and its death count. The vehicle-buy-assign step right after this one now assigns driller #8 to vehicle #6 (drill_rig), not #7 -- see that step's own note.",
+      "description": "issue #585: the repo-wide commandOutcome audit found this file's 4 contract-deliver steps refused with 'Not enough <ore> in storage: 0.0 kg available' no matter how many ticks preceded them. Direct trace (createGameEngine + runCommand replay) found the real cause: this file never once builds a freight_warehouse anywhere in its 187 steps -- and HaulingTask.ts's requestHaulFragment (the only code path that ever increments storedMassKg/collectedOre, called from both the manual haul and the auto-dispatch haul_debris action alike) hard-requires findNearestActiveBuildingOfType(..., 'freight_warehouse', ...) to resolve a depot before a hauler will so much as pick up a fragment. With none built, storedMassKg traced flat at 0.0 for 600+ ticks past blast 1 regardless of wait length -- not a timing gap, a missing prerequisite. Fixed by building one here instead of the second rock_digger this file also bought: sandbox-traced across the full 187-step file, vehicle #5 (that purchase; staffed's own #3 already covers rock_digger and sits idle the whole run too) never got a driver or left 'idle' -- this file drills no ramps (no dig_ramp_segment command anywhere in it), the only task type a rock_digger claims, so the purchase was dead weight both before and after this fix. Swapping it for a $15,000 T1 warehouse ($35,000 cheaper than the rock_digger it replaces) at (2,8) -- clear of all 4 drill patterns' footprints (confirmed via trace: patterns span roughly x10-37/z15-46) and close to the vehicle spawn row (z:2) -- actually improves the cash trajectory (was $3,278 after all 3 buys, now $38,278) rather than worsening it, and (also confirmed via trace) leaves blast 1's own death toll and timing untouched, unlike every warehouse tile tried closer to the drill patterns, which perturbed blast 1's own navgrid-dependent hole-completion timing and its death count. Interaction is a real build-panel click (this step lands at tick 32, well before the tick-132 bankruptcy overlay that blocks every later click in this file) -- a command-only interaction here would have let command mode and interaction mode silently diverge on world state from this point on, exactly what .claude/rules/scenario-defs.md warns against. The vehicle-buy-assign step right after this one now assigns driller #8 to vehicle #6 (drill_rig), not #7 -- see that step's own note.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -892,6 +901,10 @@
       "command": "vehicle buy debris_hauler",
       "interaction": [
         {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
           "type": "awaitUsable",
           "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
@@ -900,7 +913,7 @@
           "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         }
       ],
-      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion.",
+      "description": "Was an unmarked command step that overdrew: the Fleet panel disables a dealership row on `cash < def.purchaseCost` (setTierButtonAffordable, FleetPanel.ts), so no click could buy this while the console bought it anyway. The console now refuses an unaffordable purchase and the run is funded for the fleet, so this is a real click on the debris_hauler tier-1 row ($25,000). awaitUsable is the affordability assertion. issue #585: re-opens the Fleet panel explicitly -- the previous step now builds a freight_warehouse (Build panel) instead of buying a second rock_digger (Fleet panel), so Fleet is no longer already open here the way it was before.",
       "expect": {
         "equals": {
           "tickCount": 32,
@@ -947,14 +960,14 @@
       "interaction": [
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel [data-vehicle-id=\"7\"] .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"6\"] .bs-vehicle-assign-btn"
         }
       ],
-      "description": "#553: driller #8 crews the second drill_rig -- 2 concurrent driller/drill_rig pairs (staffed's #1/#1 and this pair) for the drilling wait below. issue #585 (command-mode-only renumber): vehicle #6, not #7 -- the previous step now buys a freight_warehouse instead of a second rock_digger (see its own note), so this file's own purchase order (staffed #1-4, then debris_hauler, then drill_rig) numbers the second drill_rig #6. Interaction mode's own click sequence is unaffected (still buys the rock_digger for real there, so vehicle #7 stays the correct id on that path) -- command mode and interaction mode diverge into two separately-consistent vehicle rosters from here on, same as the previous step.",
+      "description": "#553: driller #8 crews the second drill_rig -- 2 concurrent driller/drill_rig pairs (staffed's #1/#1 and this pair) for the drilling wait below. issue #585: vehicle #6, not #7 -- the earlier build-freight_warehouse step now really builds one via a real click too (not just command mode), so the second rock_digger this file used to buy never happens in either mode, and the second drill_rig is #6 in both.",
       "role": "player",
       "expect": {
         "equals": {
