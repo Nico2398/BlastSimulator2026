@@ -1,13 +1,13 @@
 ---
 name: agentic-issue-creation
-description: Create GitHub issues formatted for agentic pipeline consumption with complete context, files, test files, dependencies, and verification criteria. Use when creating issues for autonomous coding agents.
+description: Create or edit GitHub issues for agentic pipeline consumption — context, files, test files, dependencies (setting or reading a blocked_by relationship), labels, and verification criteria. Use when creating an issue for autonomous coding agents, or when editing an existing one's dependencies, labels, or lifecycle state.
 ---
 
 # Skill: agentic-issue-creation
 
 ## When to Use
 
-Use when creating a GitHub issue that an autonomous run will pick up. An issue is the only input the pipeline takes, so it has to stand on its own — the run starts with the issue body and the codebase, and nothing else.
+Use when creating a GitHub issue that an autonomous run will pick up, or when editing an already-filed one's dependencies, labels, or lifecycle state. An issue is the only input the pipeline takes, so it has to stand on its own — the run starts with the issue body and the codebase, and nothing else. Setting a `blocked_by` relationship on an existing issue is this skill's task exactly as much as authoring a new one is — see "Setting a dependency" below.
 
 Two shapes are valid, and they differ in how much of the answer is already known:
 
