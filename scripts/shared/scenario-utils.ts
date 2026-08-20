@@ -155,9 +155,17 @@ export function effectiveStepTimeoutMs(step: ScenarioStepDef, defaultOuterSecond
 
   let maxInnerMs = 0;
   for (const action of step.interaction ?? []) {
-    if (!('timeoutMs' in action)) continue;
-    const timeoutMs = action.timeoutMs ?? DEFAULT_INNER_TIMEOUT_MS[action.type] ?? 0;
-    maxInnerMs = Math.max(maxInnerMs, timeoutMs);
+    // `awaitUsable`/`resolveEventIfPending`/`clickIfPresent`/`waitUntil`
+    // declare a real `timeoutMs` field to read when present; `zoomOut`/
+    // `focusTile`/`clickEntity` share the same real inner deadline
+    // (interaction-driver.ts's DEFAULT_TIMEOUT_MS) but have no such field on
+    // their own type, so `explicit` stays undefined for them and the table
+    // below is the only source. An action with neither — no field and no
+    // table entry — has no timeoutMs concept and is skipped.
+    const explicit = 'timeoutMs' in action ? action.timeoutMs : undefined;
+    const fallback = DEFAULT_INNER_TIMEOUT_MS[action.type];
+    if (explicit === undefined && fallback === undefined) continue;
+    maxInnerMs = Math.max(maxInnerMs, explicit ?? fallback ?? 0);
   }
 
   return maxInnerMs === 0 ? declaredMs : Math.max(declaredMs, maxInnerMs + TIMEOUT_MARGIN_MS);

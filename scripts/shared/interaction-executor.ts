@@ -14,6 +14,7 @@ import { awaitPlacementArmed } from './tile-picker.js';
 import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './interaction-types.js';
 import type { PlayerAction } from './interaction-types.js';
 import { runAction, waitForUiUpdate } from './interaction-driver.js';
+import { TOOLBAR_TARGET } from '../../src/ui/tutorialStepHelpers.js';
 
 /** How long a tile-space action waits for its picker to open. */
 const PICKER_TIMEOUT_MS = 5000;
@@ -820,8 +821,13 @@ export async function executeActionOnPage(
     case 'ensurePanel': {
       // #bs-toolbar's own `data-panel` -> the panel element __uiState()
       // reports visibility for (main.ts's `panels` map). `settings` opens a
-      // modal, not a toggle panel, and is deliberately absent here.
-      const PANEL_ELEMENT_ID: Record<string, string> = {
+      // modal, not a toggle panel, and is deliberately absent here even
+      // though TOOLBAR_TARGET carries it — that absence, not TOOLBAR_TARGET's
+      // own key set, is what makes "settings" rejected below. The click
+      // selector itself reuses TOOLBAR_TARGET (tutorialStepHelpers.ts, pure
+      // data — the tutorial's own highlight targets) rather than rebuilding
+      // the same `#bs-toolbar [data-panel="..."]` string by hand a second time.
+      const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
         blast: 'bs-blast-panel',
         contracts: 'bs-contract-panel',
         ops: 'bs-operations-panel',
@@ -830,8 +836,10 @@ export async function executeActionOnPage(
         employees: 'bs-employee-panel',
         survey: 'bs-survey-panel',
       };
-      const panelId = PANEL_ELEMENT_ID[action.panel];
-      if (panelId === undefined) {
+      const panelKey = action.panel as keyof typeof TOOLBAR_TARGET;
+      const panelId = PANEL_ELEMENT_ID[panelKey];
+      const selector = TOOLBAR_TARGET[panelKey];
+      if (panelId === undefined || selector === undefined) {
         throw new Error(`ensurePanel: unknown panel "${action.panel}" (not a toggle panel, or misspelled)`);
       }
 
@@ -845,7 +853,7 @@ export async function executeActionOnPage(
 
       onProgress?.(`ensurePanel "${action.panel}" ${alreadyOpen ? 'already open' : 'opening'}`);
       if (!alreadyOpen) {
-        await waitUsableAndClick(page, `#bs-toolbar [data-panel="${action.panel}"]`, action.timeout ?? 10000);
+        await waitUsableAndClick(page, selector, action.timeout ?? 10000);
       }
       break;
     }

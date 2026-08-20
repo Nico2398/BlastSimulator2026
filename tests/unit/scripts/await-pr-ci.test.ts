@@ -13,6 +13,7 @@ import {
   missingGatedJobs,
   parseArgs,
   verdictOf,
+  wantedGatedLabels,
   type WorkflowJob,
   type WorkflowRun,
 } from '../../../scripts/await-pr-ci.js';
@@ -212,5 +213,24 @@ describe("asking a CI run's own jobs before trusting its conclusion", () => {
     // Production build reports `skipped` on every PR without build-check —
     // that is the normal, correct case, not evidence of anything missing.
     expect(missingGatedJobs([], [job({ name: 'Production build', conclusion: 'skipped' })])).toEqual([]);
+  });
+});
+
+// wantedGatedLabels is the fail-closed answer for when no ci.yml run exists
+// on the head at all -- main() used to fall through to `missing = []` (a
+// pass) in exactly that case, disagreeing with agentic-auto-merge's own
+// `ciRuns.length === 0` branch, which already failed closed. A code-review
+// round on PR #638 found the disagreement independently twice before this
+// test existed.
+describe('wantedGatedLabels — the fail-closed case when no ci.yml run exists at all', () => {
+  it('is empty when the PR carries no gated label', () => {
+    expect(wantedGatedLabels([])).toEqual([]);
+    expect(wantedGatedLabels(['agent-task', 'ready'])).toEqual([]);
+  });
+
+  it('names every gated label the PR carries, with no jobs to consult', () => {
+    expect(wantedGatedLabels(['full-ci'])).toEqual(['full-ci']);
+    expect(wantedGatedLabels(['build-check'])).toEqual(['build-check']);
+    expect(wantedGatedLabels(['full-ci', 'build-check'])).toEqual(['full-ci', 'build-check']);
   });
 });

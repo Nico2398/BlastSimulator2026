@@ -176,7 +176,8 @@ export type InteractionStepAction =
    * know or assume what a preceding step left open.
    *
    * `panel` is one of `#bs-toolbar`'s own `data-panel` values (see
-   * `tutorialStepHelpers.ts`'s `PANEL_SELECTORS`): `blast`, `contracts`,
+   * `tutorialStepHelpers.ts`'s `TOOLBAR_TARGET`, which `ensurePanel`'s own
+   * implementation reuses for the click selector): `blast`, `contracts`,
    * `ops`, `build`, `vehicles`, `employees`, `survey`. `settings` is not a
    * toggle panel (it opens a modal) and is not supported here.
    */

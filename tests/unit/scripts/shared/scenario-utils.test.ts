@@ -80,4 +80,23 @@ describe('effectiveStepTimeoutMs', () => {
     });
     expect(effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS)).toBe(120000 + 5000);
   });
+
+  // zoomOut/focusTile/clickEntity carry no `timeoutMs` field on their own
+  // type (unlike awaitUsable, which shares their real 6000ms inner deadline
+  // via interaction-driver.ts's DEFAULT_TIMEOUT_MS) -- a code-review round
+  // on PR #638 found DEFAULT_INNER_TIMEOUT_MS's entries for these three were
+  // unreachable dead code because of exactly that, contradicting this
+  // function's own doc comment. These three low-declared-timeout cases would
+  // have reproduced PR #616's own outer-race bug for a step whose only
+  // action was one of them.
+  it.each(['zoomOut', 'focusTile', 'clickEntity'] as const)(
+    'derives past a low declared timeout for a lone %s action, via its 6000ms default',
+    (type) => {
+      const action = type === 'zoomOut' ? { type }
+        : type === 'focusTile' ? { type, x: 1, z: 1 }
+        : { type, kind: 'building' as const, id: 1 };
+      const s = step({ timeout: 3, interaction: [action] });
+      expect(effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS)).toBe(6000 + 5000);
+    },
+  );
 });

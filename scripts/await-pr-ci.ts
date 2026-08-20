@@ -100,6 +100,20 @@ export function missingGatedJobs(labels: string[], jobs: WorkflowJob[]): string[
 }
 
 /**
+ * Which of `LABEL_GATED_JOBS`' labels a PR carries — the fail-closed answer
+ * for when no `ci.yml` run exists on the head at all to ask `missingGatedJobs`
+ * about (a workflow-file syntax error, or a run not yet indexed by the runs
+ * API). Mirrors `agentic-auto-merge/action.yml`'s own `ciRuns.length === 0`
+ * branch, which already treats "no run found" as every wanted label missing
+ * rather than as a pass — the two must not disagree about it, and reporting
+ * green on a run that never happened is exactly the absence-of-evidence gap
+ * this whole check exists to close.
+ */
+export function wantedGatedLabels(labels: string[]): string[] {
+  return LABEL_GATED_JOBS.filter((g) => labels.includes(g.label)).map((g) => g.label);
+}
+
+/**
  * Conclusions that mean nothing is going to repeat this run. `cancelled` and
  * `stale` sit with the failures because the dedup below already drops a
  * superseded run — one that survives it was cancelled for good. `skipped` and
@@ -321,9 +335,17 @@ async function main(): Promise<number> {
     if (verdict === 'green') {
       const ciRun = latest.find((run) => run.path === '.github/workflows/ci.yml');
       const labels = (pr.labels ?? []).map((l) => l.name);
-      const missing = ciRun ? missingGatedJobs(labels, jobsForRun(ciRun.id)) : [];
+      // No gated label at all -- most PRs -- skips the jobs fetch entirely
+      // rather than paying a `gh api` round trip for a check that's a no-op.
+      // No `ci.yml` run on the head at all is not a pass on the labels it
+      // does gate -- fails closed, matching agentic-auto-merge's own
+      // `ciRuns.length === 0` branch (see wantedGatedLabels's doc comment).
+      const wanted = wantedGatedLabels(labels);
+      const missing = wanted.length === 0 ? []
+        : ciRun ? missingGatedJobs(labels, jobsForRun(ciRun.id))
+        : wanted;
 
-      if (ciRun && missing.length > 0) {
+      if (missing.length > 0) {
         // Every workflow run on the head reported success -- but a run
         // reports `success` the moment every job in it either passed or was
         // skipped, and a job a label gates can be skipped for the same
@@ -333,9 +355,10 @@ async function main(): Promise<number> {
         // that gap instead of reporting green on an absence of evidence.
         console.log(
           `CI RED — pull request #${pr.number}: every workflow run reported success, `
-          + `but the job(s) gated behind ${missing.join(', ')} did not fully run.`
+          + `but the job(s) gated behind ${missing.join(', ')} did not fully run`
+          + (ciRun ? '.' : ' (no ci.yml run found on this head at all).')
         );
-        console.log(`  ${ciRun.html_url}`);
+        if (ciRun) console.log(`  ${ciRun.html_url}`);
         console.log('Re-push (or re-run the CI workflow) so the label is evaluated against a live run.');
         return 1;
       }

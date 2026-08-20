@@ -685,6 +685,35 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
   });
 });
 
+// The two LABEL_GATED_JOBS array literals -- one real TS
+// (scripts/await-pr-ci.ts, exported and unit-tested directly), one inline
+// github-script JS (this same action.yml, extracted above for its own tests)
+// -- can drift with nothing in either test suite noticing, since each only
+// proves its own copy's behavior. That drift already produced a real
+// disagreement once (a PR review round found await-pr-ci.ts's no-ci.yml-run
+// case reading GREEN where this action's own equivalent reads every gated
+// label missing) before this test existed. Comparing the two literals
+// directly is what would have caught it before the behavior ever diverged.
+describe('LABEL_GATED_JOBS stays identical between await-pr-ci.ts and this action', () => {
+  it('the two array literals are the same value, not just similarly shaped', () => {
+    const actionSource = readFileSync(
+      join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
+    );
+    const actionStart = actionSource.indexOf('const LABEL_GATED_JOBS');
+    const actionEnd = actionSource.indexOf('];', actionStart) + 2;
+    const actionArray = new Function(`${actionSource.slice(actionStart, actionEnd)} return LABEL_GATED_JOBS;`)();
+
+    const tsSource = readFileSync(join(ROOT, 'scripts/await-pr-ci.ts'), 'utf8');
+    const tsStart = tsSource.indexOf('const LABEL_GATED_JOBS');
+    const tsEnd = tsSource.indexOf('];', tsStart) + 2;
+    // Strip the TS-only type annotation the YAML copy has no equivalent for.
+    const tsDecl = tsSource.slice(tsStart, tsEnd).replace(': { label: string; jobNamePrefix: string }[]', '');
+    const tsArray = new Function(`${tsDecl} return LABEL_GATED_JOBS;`)();
+
+    expect(actionArray).toEqual(tsArray);
+  });
+});
+
 // Every wait in this action was a guess at something an event already reports.
 // A sleeping runner is also the one state that cannot say what it is waiting
 // for, which is how #499's ten minutes of identical log lines ended in a wrong
