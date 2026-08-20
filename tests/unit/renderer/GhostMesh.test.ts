@@ -310,6 +310,19 @@ describe('GhostMesh', () => {
       // presence is the signature of a real fresnel injection, not just any
       // string append.
       expect(shader.fragmentShader).toContain('dot(');
+      // A dot-product alone proves nothing if the result is never used —
+      // assert it actually accumulates into totalEmissiveRadiance, the line
+      // Three's Phong shader reads to make emissive glow visible on screen.
+      // A no-op that computes rimFresnel but discards it would still pass
+      // the assertions above; this one closes that loophole.
+      expect(shader.fragmentShader).toContain('totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel * rimOpacityCompensation;');
+      // The injection must land immediately after the emissivemap_fragment
+      // chunk — that's the point in Three's Phong fragment shader where
+      // totalEmissiveRadiance exists and is still open to additive terms.
+      const emissiveChunkIndex = shader.fragmentShader.indexOf('#include <emissivemap_fragment>');
+      const rimTermIndex = shader.fragmentShader.indexOf('totalEmissiveRadiance += rimColor');
+      expect(emissiveChunkIndex).toBeGreaterThanOrEqual(0);
+      expect(rimTermIndex).toBeGreaterThan(emissiveChunkIndex);
       gm.dispose();
     });
 

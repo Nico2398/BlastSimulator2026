@@ -65,17 +65,18 @@ function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
     shader.uniforms['rimColor'] = { value: RIM_COLOR };
     shader.uniforms['rimPower'] = { value: RIM_POWER };
     shader.uniforms['rimIntensity'] = { value: RIM_INTENSITY };
+    shader.uniforms['rimOpacityFloor'] = { value: RIM_OPACITY_FLOOR };
 
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        '#include <common>\nuniform vec3 rimColor;\nuniform float rimPower;\nuniform float rimIntensity;',
+        '#include <common>\nuniform vec3 rimColor;\nuniform float rimPower;\nuniform float rimIntensity;\nuniform float rimOpacityFloor;',
       )
       .replace(
         '#include <emissivemap_fragment>',
         '#include <emissivemap_fragment>\n' +
           'float rimFresnel = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), rimPower);\n' +
-          `float rimOpacityCompensation = 1.0 / max(opacity, ${RIM_OPACITY_FLOOR.toFixed(2)});\n` +
+          'float rimOpacityCompensation = 1.0 / max(opacity, rimOpacityFloor);\n' +
           'totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel * rimOpacityCompensation;',
       );
   };
