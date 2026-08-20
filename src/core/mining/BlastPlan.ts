@@ -33,11 +33,13 @@ export function validateBlastPlan(
     if (!plan.charges[hole.id]) {
       errors.push({
         holeId: hole.id,
-        issue: loadingHoleIds?.has(hole.id) ? 'Charge still loading' : 'Missing charge',
+        issue: loadingHoleIds?.has(hole.id)
+          ? 'blast.validation.charge_loading'
+          : 'blast.validation.missing_charge',
       });
     }
     if (plan.delays[hole.id] === undefined) {
-      errors.push({ holeId: hole.id, issue: 'Missing sequence delay' });
+      errors.push({ holeId: hole.id, issue: 'blast.validation.missing_delay' });
     }
   }
 
@@ -68,7 +70,7 @@ export function checkProtectedPositions(
     const az = Math.floor(hole.z);
     for (const building of buildingState.buildings) {
       if (isBuildingFootprintCell(building, ax, az)) {
-        errors.push({ holeId: hole.id, issue: 'Position is protected by a building' });
+        errors.push({ holeId: hole.id, issue: 'blast.validation.protected_position' });
         break; // one error per hole is enough
       }
     }
