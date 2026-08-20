@@ -23,10 +23,31 @@ const CLAIMED_OPACITY_MIN = 0.10;        // dimmest pulse value, claimed
 const CLAIMED_OPACITY_MAX = 0.30;        // brightest pulse value, claimed
 const CLAIMED_PULSE_SPEED = 1.1;         // radians / second, claimed
 
+// Fresnel-based holographic rim-light (#613) — edges facing away from the
+// camera glow brighter than faces facing it, layered on top of the existing
+// pulse-opacity behaviour above. Same blue as GHOST_COLOR in both ghost
+// states — no second color.
+//
+// The rim term is added into totalEmissiveRadiance, which the standard
+// transparent alpha-blend then multiplies by the material's (pulsing,
+// 0.10-0.60) `opacity` uniform before it reaches the screen — exactly where
+// the rim should read strongest (thin grazing-angle sliver), the ghost is
+// also most see-through, diluting it. RIM_OPACITY_FLOOR compensates: the rim
+// contribution is divided by max(opacity, RIM_OPACITY_FLOOR) in-shader so its
+// on-screen brightness stays roughly independent of the opacity pulse
+// (floored rather than divided by raw opacity so it can't blow up as opacity
+// approaches 0). Original tuning (RIM_INTENSITY 1.0, no compensation) pixel-
+// sampled only a ~6-8% grazing-angle brightness delta — imperceptible at
+// normal viewing distance (#613 visual feedback).
+const RIM_COLOR         = new THREE.Color(GHOST_COLOR); // reuses ghost base color
+const RIM_POWER         = 1.5;           // fresnel exponent — widened vs 2.0 so the glow band reads as an edge, not a sliver
+const RIM_INTENSITY     = 2.2;           // additive glow multiplier
+const RIM_OPACITY_FLOOR = 0.25;          // floor for the opacity-compensation divisor (caps compensation at 4x)
+
 /** Builds a ghost mesh material at the given starting opacity — the unclaimed
  *  and claimed materials differ only in that value (#547 review). */
 function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
-  return new THREE.MeshPhongMaterial({
+  const material = new THREE.MeshPhongMaterial({
     color: GHOST_COLOR,
     emissive: EMISSIVE_COLOR,
     emissiveIntensity: 0.5,
@@ -35,6 +56,33 @@ function createGhostMaterial(opacity: number): THREE.MeshPhongMaterial {
     depthWrite: false,
     side: THREE.DoubleSide,
   });
+
+  // Fresnel rim-light shader injection (#613) — edges facing away from the
+  // camera glow brighter than faces facing it, layered on top of the
+  // opacity pulse driven from update(). Identical GLSL for both claimed and
+  // unclaimed materials; only opacity/pulse-speed differ between them.
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms['rimColor'] = { value: RIM_COLOR };
+    shader.uniforms['rimPower'] = { value: RIM_POWER };
+    shader.uniforms['rimIntensity'] = { value: RIM_INTENSITY };
+    shader.uniforms['rimOpacityFloor'] = { value: RIM_OPACITY_FLOOR };
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform vec3 rimColor;\nuniform float rimPower;\nuniform float rimIntensity;\nuniform float rimOpacityFloor;',
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n' +
+          'float rimFresnel = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), rimPower);\n' +
+          'float rimOpacityCompensation = 1.0 / max(opacity, rimOpacityFloor);\n' +
+          'totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel * rimOpacityCompensation;',
+      );
+  };
+  material.customProgramCacheKey = () => 'ghost-mesh-fresnel-v1';
+
+  return material;
 }
 
 // ---------- Main class ----------

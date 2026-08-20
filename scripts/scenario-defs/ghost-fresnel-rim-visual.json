@@ -1,0 +1,186 @@
+{
+  "name": "ghost-fresnel-rim-visual",
+  "description": "Issue #613: verifies the fresnel-based rim-light shader on pending-action ghost previews (GhostMesh.ts) renders visibly, and reads distinctly between an unclaimed ghost (brighter, faster opacity pulse) and a claimed ghost (dimmer, slower pulse, #547) in the same frame. Exactly one surveyor is hired so the first dispatch tick claims exactly one of two queued survey targets and leaves the other queued -- deterministic without needing precise nearest-of-two distance tuning (contrast action-queue-dispatch.json's two-surveyor setup, which exists to prove cost-based *dispatch correctness* rather than to hold a claimed/unclaimed pair still for a screenshot).",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:32",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 mine_type:desert size:32"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 50000,
+          "employeeCount": 0
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "description": "Single surveyor, spawns near world centre (16,16) -- see action-queue-dispatch.json's own comment on hireEmployee's spawn placement.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1200
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "survey seismic x:12 z:12",
+      "description": "Target A -- queued first, so the single surveyor's first dispatch tick claims this one (lower id, ties broken by id per ActionSelection.ts).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"survey\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"seismic\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 12,
+          "z": 12
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "increased": [
+          "pendingActionCount"
+        ]
+      }
+    },
+    {
+      "command": "survey core_sample x:20 z:20",
+      "description": "Target B -- queued second. The lone surveyor is only ever available to claim one action per tick, so this stays queued (unclaimed ghost) once Target A is claimed below.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"core_sample\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "pendingActionCount": 2,
+          "surveyCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 1",
+      "description": "One dispatch tick -- long enough for tickEmployees to claim Target A, not long enough for travel or work to finish on either. Both actions stay in pendingActions (#547: a claimed action stays until it completes) so both ghosts render this step -- Target A's claimed (dim/slow), Target B's unclaimed (bright/fast). This is the frame the rim-light shader is inspected against.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 1"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 2,
+          "surveyCount": 0
+        }
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "closeup-a",
+      "yaw": 45,
+      "pitch": 20,
+      "target": [12, 12],
+      "distance": 5
+    },
+    {
+      "name": "closeup-b",
+      "yaw": 135,
+      "pitch": 20,
+      "target": [20, 20],
+      "distance": 5
+    },
+    {
+      "name": "edge-on-a",
+      "yaw": 2,
+      "pitch": 3,
+      "target": [12, 12],
+      "distance": 2.2
+    }
+  ]
+}

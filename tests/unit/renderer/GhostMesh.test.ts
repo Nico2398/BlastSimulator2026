@@ -224,4 +224,148 @@ describe('GhostMesh', () => {
       gm.dispose();
     });
   });
+
+  // ── #613: fresnel rim-light on ghost materials ──────────────────────────
+  // Edges facing away from the camera should glow brighter than faces facing
+  // it, layered on top of the existing pulse-opacity behaviour. Vitest has no
+  // WebGL context, so onBeforeCompile is never invoked by a real compile —
+  // these tests invoke the hook directly with a hand-built minimal fake
+  // shader object, matching the standard Phong fresnel-into-emissive
+  // injection point (#common / #emissivemap_fragment chunks).
+
+  describe('fresnel rim-light (#613)', () => {
+    function makeFakeShader() {
+      return {
+        uniforms: {} as Record<string, { value: unknown }>,
+        vertexShader: 'void main() {}',
+        fragmentShader: '#include <common>\nvoid main() {\n#include <emissivemap_fragment>\n}',
+      };
+    }
+
+    it('unclaimed and claimed materials stay MeshPhongMaterial with an onBeforeCompile hook assigned', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1, { claimed: false }), makePreview(2, { claimed: true })]);
+
+      const unclaimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 3) as THREE.Mesh;
+      const claimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 6) as THREE.Mesh;
+      const unclaimedMat = unclaimedMesh.material as THREE.MeshPhongMaterial;
+      const claimedMat = claimedMesh.material as THREE.MeshPhongMaterial;
+
+      expect(unclaimedMat).toBeInstanceOf(THREE.MeshPhongMaterial);
+      expect(claimedMat).toBeInstanceOf(THREE.MeshPhongMaterial);
+      expect(typeof unclaimedMat.onBeforeCompile).toBe('function');
+      expect(typeof claimedMat.onBeforeCompile).toBe('function');
+      gm.dispose();
+    });
+
+    it('onBeforeCompile injects rim uniforms (color, fresnel power, intensity) into the shader', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1)]);
+      const mat = (scene.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
+
+      const shader = makeFakeShader();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mat.onBeforeCompile!(shader as any, {} as any);
+
+      expect(shader.uniforms.rimColor).toBeDefined();
+      expect(shader.uniforms.rimPower).toBeDefined();
+      expect(shader.uniforms.rimIntensity).toBeDefined();
+      gm.dispose();
+    });
+
+    it('rim uniform values carry the configured fresnel power/intensity, and the rim color is blue-dominant', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1)]);
+      const mat = (scene.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
+
+      const shader = makeFakeShader();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mat.onBeforeCompile!(shader as any, {} as any);
+
+      const rimColor = shader.uniforms.rimColor.value as THREE.Color;
+      expect(rimColor.b).toBeGreaterThan(rimColor.r);
+      expect(typeof shader.uniforms.rimPower.value).toBe('number');
+      expect(shader.uniforms.rimPower.value).toBeGreaterThan(0);
+      expect(typeof shader.uniforms.rimIntensity.value).toBe('number');
+      expect(shader.uniforms.rimIntensity.value).toBeGreaterThan(0);
+      gm.dispose();
+    });
+
+    it('onBeforeCompile injects fresnel GLSL into the fragment shader, changing it from the original', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1)]);
+      const mat = (scene.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
+
+      const shader = makeFakeShader();
+      const originalFragmentShader = shader.fragmentShader;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mat.onBeforeCompile!(shader as any, {} as any);
+
+      expect(shader.fragmentShader).not.toBe(originalFragmentShader);
+      // The fresnel term is a dot-product of view direction and normal — its
+      // presence is the signature of a real fresnel injection, not just any
+      // string append.
+      expect(shader.fragmentShader).toContain('dot(');
+      // A dot-product alone proves nothing if the result is never used —
+      // assert it actually accumulates into totalEmissiveRadiance, the line
+      // Three's Phong shader reads to make emissive glow visible on screen.
+      // A no-op that computes rimFresnel but discards it would still pass
+      // the assertions above; this one closes that loophole.
+      expect(shader.fragmentShader).toContain('totalEmissiveRadiance += rimColor * rimIntensity * rimFresnel * rimOpacityCompensation;');
+      // The injection must land immediately after the emissivemap_fragment
+      // chunk — that's the point in Three's Phong fragment shader where
+      // totalEmissiveRadiance exists and is still open to additive terms.
+      const emissiveChunkIndex = shader.fragmentShader.indexOf('#include <emissivemap_fragment>');
+      const rimTermIndex = shader.fragmentShader.indexOf('totalEmissiveRadiance += rimColor');
+      expect(emissiveChunkIndex).toBeGreaterThanOrEqual(0);
+      expect(rimTermIndex).toBeGreaterThan(emissiveChunkIndex);
+      gm.dispose();
+    });
+
+    it('unclaimed and claimed materials get the same rim treatment — rim color/power/intensity do not diverge by claimed state', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1, { claimed: false }), makePreview(2, { claimed: true })]);
+
+      const unclaimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 3) as THREE.Mesh;
+      const claimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 6) as THREE.Mesh;
+      const unclaimedMat = unclaimedMesh.material as THREE.MeshPhongMaterial;
+      const claimedMat = claimedMesh.material as THREE.MeshPhongMaterial;
+
+      const unclaimedShader = makeFakeShader();
+      const claimedShader = makeFakeShader();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      unclaimedMat.onBeforeCompile!(unclaimedShader as any, {} as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      claimedMat.onBeforeCompile!(claimedShader as any, {} as any);
+
+      const unclaimedColor = unclaimedShader.uniforms.rimColor.value as THREE.Color;
+      const claimedColor = claimedShader.uniforms.rimColor.value as THREE.Color;
+      expect(claimedColor.r).toBeCloseTo(unclaimedColor.r);
+      expect(claimedColor.g).toBeCloseTo(unclaimedColor.g);
+      expect(claimedColor.b).toBeCloseTo(unclaimedColor.b);
+      expect(claimedShader.uniforms.rimPower.value).toBe(unclaimedShader.uniforms.rimPower.value);
+      expect(claimedShader.uniforms.rimIntensity.value).toBe(unclaimedShader.uniforms.rimIntensity.value);
+      gm.dispose();
+    });
+
+    it('update(dt) still only animates opacity — material base color is untouched by the pulse', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1)]);
+      const mat = (scene.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
+
+      const colorBefore = mat.color.clone();
+      for (let i = 0; i < 60; i++) {
+        gm.update(1 / 60);
+      }
+      expect(mat.color.equals(colorBefore)).toBe(true);
+      expect(mat.transparent).toBe(true);
+      gm.dispose();
+    });
+  });
 });
