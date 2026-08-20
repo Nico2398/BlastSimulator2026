@@ -17,9 +17,11 @@ on:
     # overall run still reports `success` and agentic-auto-merge treats it as
     # green. PR #615 merged exactly that way; #616 only got its interaction
     # shards because of 30 unrelated follow-up pushes (each a `synchronize`)
-    # after the label landed. `ready_for_review` closes the same gap for a
-    # draft PR labeled before going ready.
-    types: [opened, synchronize, reopened, labeled, ready_for_review]
+    # after the label landed. `labeled` fires the same regardless of draft
+    # state and its check run attaches to the head SHA, so a label applied
+    # while the PR is still draft is already covered by the time it goes
+    # ready -- no `ready_for_review` type needed on top.
+    types: [opened, synchronize, reopened, labeled]
   schedule:
     # Weekly full run (Monday 4am UTC) to catch regressions
     - cron: '0 4 * * 1'
