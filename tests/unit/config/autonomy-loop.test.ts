@@ -930,12 +930,14 @@ describe('the sweep that runs when the checks come in', () => {
 // shards from 30 unrelated follow-up pushes after the label landed --
 // `synchronize` was already in the list, `labeled` was not. Mirrors the same
 // fix already proven for `auto-assign-next.yml`'s READY TO MERGE marker
-// above.
+// above. `labeled` fires the same on a draft PR and its check run attaches
+// to the head SHA, so no separate `ready_for_review` type is needed to cover
+// a label applied before a PR goes ready.
 describe('ci.yml re-evaluates full-ci/build-check when the label lands', () => {
-  it('includes labeled and ready_for_review alongside the defaults', () => {
+  it('includes labeled alongside the defaults', () => {
     const ci = workflow('ci.yml');
     const types = /pull_request:[\s\S]*?types:\s*\[([^\]]+)\]/.exec(ci)?.[1] ?? '';
-    for (const type of ['opened', 'synchronize', 'reopened', 'labeled', 'ready_for_review']) {
+    for (const type of ['opened', 'synchronize', 'reopened', 'labeled']) {
       expect(types, `ci.yml's pull_request trigger is missing \`${type}\``).toContain(type);
     }
   });
