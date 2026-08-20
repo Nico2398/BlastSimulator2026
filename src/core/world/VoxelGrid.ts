@@ -126,14 +126,36 @@ export function chunkIndexOf(worldCoord: number): number {
  * Clamp a chunk's owned sub-rect to the chunk's own tile bounds — i.e. to
  * `[cx*CHUNK_SIZE, cx*CHUNK_SIZE + CHUNK_SIZE) × [cz*CHUNK_SIZE, cz*CHUNK_SIZE + CHUNK_SIZE)`.
  *
- * STUB — no logic yet, will be implemented by @implementer.
+ * This is the one place untrusted save data (a chunk's `x0/z0/x1/z1` rect,
+ * read straight from parsed JSON) gets validated before it reaches
+ * `VoxelGrid` storage — every downstream consumer (TerrainMesh's marching
+ * cubes loops, etc.) then only ever sees bounds already inside the tile, so
+ * a corrupted/hand-edited save (e.g. a rect of `1e12`) can't turn a render
+ * loop into an unbounded scan (#609).
  */
 export function clampChunkRectToTile(
-  _cx: number, _cz: number,
-  _rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+  cx: number, cz: number,
+  rect: { minX: number; minZ: number; maxX: number; maxZ: number },
 ): { minX: number; minZ: number; maxX: number; maxZ: number } {
-  // TODO: implement
-  throw new Error('not implemented');
+  const tileX0 = cx * CHUNK_SIZE;
+  const tileX1 = tileX0 + CHUNK_SIZE;
+  const tileZ0 = cz * CHUNK_SIZE;
+  const tileZ1 = tileZ0 + CHUNK_SIZE;
+
+  const clampAxis = (value: number, lo: number, hi: number, fallback: number): number => {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.max(lo, Math.min(hi, Math.round(value)));
+  };
+
+  let minX = clampAxis(rect.minX, tileX0, tileX1, tileX0);
+  let maxX = clampAxis(rect.maxX, tileX0, tileX1, tileX1);
+  let minZ = clampAxis(rect.minZ, tileZ0, tileZ1, tileZ0);
+  let maxZ = clampAxis(rect.maxZ, tileZ0, tileZ1, tileZ1);
+
+  if (maxX < minX) maxX = minX;
+  if (maxZ < minZ) maxZ = minZ;
+
+  return { minX, minZ, maxX, maxZ };
 }
 
 /**
@@ -407,7 +429,8 @@ export class VoxelGrid {
    */
   addChunkWithRect(cx: number, cz: number, rect: { minX: number; minZ: number; maxX: number; maxZ: number }): void {
     const chunk = this.chunks.get(chunkKey(cx, cz)) ?? this.allocateChunk(cx, cz);
-    chunk.x0 = rect.minX; chunk.z0 = rect.minZ; chunk.x1 = rect.maxX; chunk.z1 = rect.maxZ;
+    const clamped = clampChunkRectToTile(cx, cz, rect);
+    chunk.x0 = clamped.minX; chunk.z0 = clamped.minZ; chunk.x1 = clamped.maxX; chunk.z1 = clamped.maxZ;
     this.recomputeBounds();
   }
 
@@ -704,7 +727,8 @@ export class VoxelGrid {
   ): void {
     let chunk = this.chunks.get(chunkKey(cx, cz));
     if (!chunk) chunk = this.allocateChunk(cx, cz);
-    chunk.x0 = rect.minX; chunk.z0 = rect.minZ; chunk.x1 = rect.maxX; chunk.z1 = rect.maxZ;
+    const clamped = clampChunkRectToTile(cx, cz, rect);
+    chunk.x0 = clamped.minX; chunk.z0 = clamped.minZ; chunk.x1 = clamped.maxX; chunk.z1 = clamped.maxZ;
     chunk.density.set(density);
     chunk.compId.set(compId);
     chunk.fracture.set(fracture);
@@ -723,12 +747,12 @@ export class VoxelGrid {
     // honestly falls back to {min:0, max:0} for one no owned column reaches.
     //
     // `rect` (and therefore chunk.x0/x1/z0/z1, just assigned above) comes
-    // straight from deserialized save JSON and is never validated against
-    // the grid's real dimensions — a corrupted/hand-edited save with an
-    // absurd rect (e.g. maxX/maxZ ~1e12) must not turn this loop into an
-    // unbounded scan. Clamp to the chunk's actual storage span, the same
-    // defensive clamping forEachInRegion already does against real grid
-    // bounds elsewhere in this file.
+    // straight from deserialized save JSON — `clampChunkRectToTile` above is
+    // the load-bearing guard against an absurd rect (e.g. maxX/maxZ ~1e12)
+    // reaching chunk.x0/x1/z0/z1 at all (#609). This extra clamp to the
+    // chunk's actual storage span is now harmless defense-in-depth left over
+    // from before that guard existed, matching forEachInRegion's own
+    // defensive clamping elsewhere in this file.
     const zLo = Math.max(chunk.z0, chunk.cz * CHUNK_SIZE);
     const zHi = Math.min(chunk.z1, chunk.cz * CHUNK_SIZE + CHUNK_SIZE);
     const xLo = Math.max(chunk.x0, chunk.cx * CHUNK_SIZE);
