@@ -208,6 +208,7 @@ describe('a mention is never a deliverable', () => {
     '.github/workflows/agentic-watchdog.yml',
     '.github/actions/agentic-run-state/action.yml',
     '.github/actions/agentic-assign/action.yml',
+    '.github/actions/agentic-recover-blocked/action.yml',
     '.github/scripts/assignability.cjs',
   ])('%s never reads a cross-reference as a pull request', (file) => {
     const code = readFileSync(join(ROOT, file), 'utf8')
@@ -348,6 +349,100 @@ describe('auto-merge does not depend on the PR author', () => {
 
     expect(code).not.toMatch(/login\s*[=!]==/);
     expect(code).not.toMatch(/['"`]github-actions/);
+  });
+});
+
+// #572 and #610: `agentic-runner`'s workflow-level triggers carry no content
+// filter — every comment anywhere in the repository creates a run, whether or
+// not the job's own `if:` below will act on it. GitHub Actions keeps only one
+// *pending* run per concurrency group, so a burst of such no-op runs (a
+// session's own trailing wrap-up comment among them) could silently cancel an
+// already-queued real assignment before its job ever started: zero job steps,
+// nothing to retry from, and the issue stuck `in-progress` deferring every
+// later assignment behind it (`selectNextAssignable`'s single-flight guard
+// treats any `in-progress` issue as a live run).
+describe('the runner concurrency group only admits a run the job will act on', () => {
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])(
+    "%s's group mirrors its own job `if:`, and isolates everything else",
+    (name) => {
+      const text = workflow(name);
+      const concurrency = text.slice(text.indexOf('\nconcurrency:'), text.indexOf('\npermissions:'));
+      const jobIf = text.slice(text.indexOf('\n    if: >'), text.indexOf('\n    runs-on:'));
+      expect(jobIf).toContain('if: >');
+
+      // Every clause the job's `if:` branches on must also appear in the
+      // group expression, so a run the job will skip cannot still queue.
+      for (const clause of ["github.event_name == 'workflow_dispatch'", "github.event.comment.user.type != 'Bot'"]) {
+        expect(concurrency, `${name}: group is missing \`${clause}\``).toContain(clause);
+        expect(jobIf, `${name}: job \`if:\` is missing \`${clause}\``).toContain(clause);
+      }
+
+      // A matching trigger still resolves to the one shared, serialising
+      // name; anything else gets its own group keyed by this run, so it can
+      // never contend for — or evict — a real queued run.
+      expect(concurrency).toContain("&& 'agentic-runner' ||");
+      expect(concurrency).toMatch(/format\('agentic-runner-noop-\{0\}',\s*github\.run_id\)/);
+      expect(concurrency).toContain('cancel-in-progress: false');
+    }
+  );
+});
+
+// The recovery step is the runner's own last chance to notice its group still
+// dropped something — two genuine mentions racing past `agentic-assignment`'s
+// own lock, a webhook truly lost. It must never become a second assigning
+// path of its own: it only ever labels `blocked`, exactly as the watchdog
+// does, and `handle-failure.yml`'s existing reaction does the rest.
+describe('a session recovers a run its own slot blocked, on its way out', () => {
+  const RECOVER_ACTION = 'uses: ./.github/actions/agentic-recover-blocked';
+
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])(
+    '%s runs the recovery step last, unconditionally',
+    (name) => {
+      const text = workflow(name);
+      const idx = text.indexOf(RECOVER_ACTION);
+      expect(idx, `${name}: recovery step missing`).toBeGreaterThan(-1);
+      expect(text.indexOf('uses: ./.github/actions/agentic-auto-merge')).toBeLessThan(idx);
+
+      // No further step after it — the whole tail end of the job is covered
+      // by the time it runs, right as its hold on the concurrency slot ends.
+      expect(text.indexOf('- name:', idx)).toBe(-1);
+
+      const start = text.lastIndexOf('- name:', idx);
+      const step = text.slice(start, text.indexOf('\n\n', idx));
+      expect(step).toMatch(/if:\s*always\(\)/);
+    }
+  );
+
+  it.each(['claude-runner.yml', 'opencode-runner.yml'])('%s hands the recovery step the PAT', (name) => {
+    const text = workflow(name);
+    const start = text.indexOf(RECOVER_ACTION);
+    const block = text.slice(start, start + 300);
+    const token = /token:\s*\$\{\{\s*secrets\.(\w+)\s*\}\}/.exec(block);
+    expect(token?.[1]).toBe('PAT_TOKEN_COPILOT_AUTOMATION');
+  });
+
+  const action = readFileSync(join(ROOT, '.github/actions/agentic-recover-blocked/action.yml'), 'utf8');
+
+  it('never assigns — only ever labels the issue it recovers `blocked`', () => {
+    expect(action).not.toContain(ASSIGN_ACTION);
+    expect(action).toContain('rules.BLOCKED');
+    expect(action).not.toContain('rules.READY');
+  });
+
+  it('reuses the shared deliverable check rather than a fifth inline copy', () => {
+    expect(action).toContain('.github/scripts/issue-api.cjs');
+    expect(action).toContain('.github/scripts/assignability.cjs');
+    expect(action).toContain('api.deliverableFor');
+  });
+
+  it('only recovers when nothing is queued or live behind this run', () => {
+    expect(action).toContain("['queued', 'in_progress']");
+    expect(action).toContain('run.id !== context.runId');
+  });
+
+  it('excludes its own issue from the sweep', () => {
+    expect(action).toContain('self_issue');
+    expect(action).toContain('issue.number === mine');
   });
 });
 
