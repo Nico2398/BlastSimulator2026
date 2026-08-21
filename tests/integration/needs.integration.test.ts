@@ -414,10 +414,23 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
 // `employee dispatch`, re-issued the moment they go genuinely idle — never
 // while mid-walk or resting) across a multi-hundred-tick stretch, once with
 // a policy applied and once without, to prove the opt-in gate for real: an
-// applied policy keeps every need gauge and scores.wellBeing off the floor;
+// applied policy keeps the hunger/fatigue gauges themselves off the floor;
 // without one, only the pre-existing (unrelated, unchanged by #678) collapse
 // safety net protects the employee, and it lets the run reach collapse
 // territory that an applied policy's tighter thresholds never approach.
+//
+// scores.wellBeing is deliberately NOT asserted here. It tracks avgMorale
+// (ScoreManager.updateScores), and morale is driven by needsMoraleEffect
+// (EmployeeNeeds.ts), which penalizes any gauge below its own "comfortable"
+// threshold of 50 — well above SitePolicy's rest thresholds (hunger 40,
+// fatigue 25). A continuously-working employee spends real time in that
+// 30-49/15-29 band even when correctly protected from ever collapsing, so
+// morale — and with it wellBeing, via applyDecay's deliberate zero-pinning,
+// same mechanism level1-lose-revolt/level1-lose-ecology depend on — can
+// still reach 0. That's the pre-existing morale system working as designed
+// (gameplay-employee-needs), not a gap in shouldForceRest/
+// getEffectiveThresholds: #678 only asked the policy to force rest at its
+// own thresholds, never to keep every gauge above morale's comfortable band.
 
 describe('forced rest under an applied SitePolicy — driven through the console (#678)', () => {
   /**
@@ -455,7 +468,7 @@ describe('forced rest under an applied SitePolicy — driven through the console
 
   const RUN_TICKS = 300;
 
-  it('keeps every need gauge and scores.wellBeing above 0 across a long run when a policy is applied', () => {
+  it('keeps hunger and fatigue above 0 across a long run when a policy is applied', () => {
     const ctx = makeCtx();
     const state = ctx.state!;
     state.cash = 1_000_000;
@@ -473,18 +486,15 @@ describe('forced rest under an applied SitePolicy — driven through the console
 
     let minHunger = 100;
     let minFatigue = 100;
-    let minWellBeing = state.scores.wellBeing;
 
     driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
       minHunger = Math.min(minHunger, emp.hunger);
       minFatigue = Math.min(minFatigue, emp.fatigue);
-      minWellBeing = Math.min(minWellBeing, state.scores.wellBeing);
     });
 
     expect(sawForcedRestTransition).toBe(true);
     expect(minHunger).toBeGreaterThan(0);
     expect(minFatigue).toBeGreaterThan(0);
-    expect(minWellBeing).toBeGreaterThan(0);
   });
 
   it('WITHOUT a policy applied, the same run reaches collapse territory (opt-in contrast case)', () => {
