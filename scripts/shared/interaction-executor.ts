@@ -866,31 +866,54 @@ export async function executeActionOnPage(
       let lastValue: unknown;
       let ticksUsed = 0;
       for (;;) {
-        const stateResult = await page.evaluate((field: string) => {
-          const run = (window as unknown as {
-            __gameConsole?: (c: string) => { output?: unknown };
-          }).__gameConsole;
-          run?.('tick 1');
-          const getState = (window as unknown as {
-            __gameState?: () => Record<string, unknown> | null;
-          }).__gameState;
-          const st = getState === undefined ? null : getState();
-          // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
-          // regex-matching `event status`'s text output.
-          if (st?.pendingEvent) run?.('event choose 0');
-          return {
-            value: st ? st[field] : undefined,
-            tickCount: st && typeof st.tickCount === 'number' ? st.tickCount : null,
-          };
-        }, action.field);
+        let tickCountAfter: number | null = null;
+        if (onTrace) {
+          // Same call as the untraced branch below, plus reading back the
+          // resulting tick count in the same round trip — only paid when a
+          // caller actually asked to trace (issue #674's diagnostic tool).
+          // Mirrors the 'command' case's own onTrace branch above.
+          const stateResult = await page.evaluate((field: string) => {
+            const run = (window as unknown as {
+              __gameConsole?: (c: string) => { output?: unknown };
+            }).__gameConsole;
+            run?.('tick 1');
+            const getState = (window as unknown as {
+              __gameState?: () => Record<string, unknown> | null;
+            }).__gameState;
+            const st = getState === undefined ? null : getState();
+            // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
+            // regex-matching `event status`'s text output.
+            if (st?.pendingEvent) run?.('event choose 0');
+            return {
+              value: st ? st[field] : undefined,
+              tickCount: st && typeof st.tickCount === 'number' ? st.tickCount : null,
+            };
+          }, action.field);
+          lastValue = stateResult.value;
+          tickCountAfter = stateResult.tickCount;
+        } else {
+          lastValue = await page.evaluate((field: string) => {
+            const run = (window as unknown as {
+              __gameConsole?: (c: string) => { output?: unknown };
+            }).__gameConsole;
+            run?.('tick 1');
+            const getState = (window as unknown as {
+              __gameState?: () => Record<string, unknown> | null;
+            }).__gameState;
+            const st = getState === undefined ? null : getState();
+            // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
+            // regex-matching `event status`'s text output.
+            if (st?.pendingEvent) run?.('event choose 0');
+            return st ? st[field] : undefined;
+          }, action.field);
+        }
         ticksUsed++;
-        lastValue = stateResult.value;
         // Diagnostic trace only (issue #674): each internal `tick 1` this
         // loop issues is itself a concrete command, the same one
         // command-mode's own `runWaitUntil` issues once per tick — this is
         // the hook a caller uses to compare the two loops' actual
         // throughput/ordering.
-        onTrace?.({ command: 'tick 1', success: true, tickCountAfter: stateResult.tickCount });
+        onTrace?.({ command: 'tick 1', success: true, tickCountAfter });
         onProgress?.(
           `waitUntil "${action.field}" = ${JSON.stringify(lastValue)} `
           + `(want ${JSON.stringify(action.equals)}), tick ${ticksUsed}/${action.maxTicks}`,
