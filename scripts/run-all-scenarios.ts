@@ -48,6 +48,7 @@ interface ParsedArgs {
   scenarios: string[];
   port: number;
   shard?: ShardSpec;
+  reportDrift: boolean;
 }
 
 function parseShardArg(raw: string): ShardSpec {
@@ -83,7 +84,7 @@ function parseArgs(): ParsedArgs {
     }
   }
 
-  return { mode, scenarios, port, ...(shard ? { shard } : {}) };
+  return { mode, scenarios, port, ...(shard ? { shard } : {}), reportDrift: false };
 }
 
 /**

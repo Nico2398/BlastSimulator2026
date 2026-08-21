@@ -23,6 +23,7 @@ export interface ParsedArgs {
   viewport: { width: number; height: number };
   mode: string;
   screenshots: boolean;
+  reportDrift: boolean;
 }
 
 function parseViewsArg(raw: string): ShotDef[] {
@@ -122,5 +123,6 @@ export function parseArgs(): ParsedArgs {
     viewport,
     mode,
     screenshots,
+    reportDrift: false,
   };
 }

@@ -14,7 +14,7 @@ import {
   buildScenarioReport,
   type ReportableStep,
 } from './scenario-utils.js';
-import { checkGoalAgainstState, checkCommandOutcome } from './scenario-goal.js';
+import { checkGoalAgainstState, checkCommandOutcome, type GoalMismatch } from './scenario-goal.js';
 
 /**
  * Command-mode side of the `waitUntil` action (issue #590): loop the
@@ -95,6 +95,37 @@ export interface ScenarioResult {
   failed: boolean;
   error?: string;
   reportPath?: string;
+  driftRecords?: DriftRecord[];
+}
+
+/**
+ * A single drift-report entry (issue #679): one `equals`/`changedBy`
+ * mismatch, located to the scenario/step/command that produced it.
+ */
+export interface DriftRecord extends GoalMismatch {
+  scenario: string;
+  step: number;
+  command: string;
+}
+
+/**
+ * Formats a batch of `DriftRecord`s into a human-readable report.
+ *
+ * TODO: implement — stub only during skeleton phase (#679).
+ */
+export function formatDriftReport(records: DriftRecord[]): string {
+  void records;
+  return '';
+}
+
+/**
+ * Writes a formatted drift report to `path`.
+ *
+ * TODO: implement — stub only during skeleton phase (#679).
+ */
+export function writeDriftReportFile(records: DriftRecord[], path: string): void {
+  void records;
+  void path;
 }
 
 export function createGameEngine(): RunnerWithContext {
@@ -105,7 +136,9 @@ export function runSteps(
   engine: RunnerWithContext,
   steps: ScenarioStepDef[],
   outDir: string,
-): StepResult[] {
+  reportDrift?: boolean,
+): Array<StepResult & { driftMismatches?: GoalMismatch[] }> {
+  void reportDrift;
   mkdirSync(outDir, { recursive: true });
   const { ctx } = engine;
   const results: StepResult[] = [];
@@ -137,8 +170,8 @@ export function runSteps(
       if (outcomeViolation !== null) throw new Error(outcomeViolation);
 
       if (step.expect) {
-        const violation = checkGoalAgainstState(step.expect, before, gameState);
-        if (violation !== null) throw new Error(`expect failed: ${violation}`);
+        const goalResult = checkGoalAgainstState(step.expect, before, gameState);
+        if (goalResult.violation !== null) throw new Error(`expect failed: ${goalResult.violation}`);
       }
     } catch (err: unknown) {
       error = err instanceof Error ? err.message : String(err);
@@ -178,6 +211,7 @@ export function runScenario(
   name: string,
   steps: ScenarioStepDef[],
   baseOutDir: string,
+  reportDrift?: boolean,
 ): ScenarioResult {
   const outDir = resolve(baseOutDir, `scenario-${name}-command`);
   const errors: string[] = [];
@@ -185,7 +219,7 @@ export function runScenario(
   console.log(`\n[${name}] Running ${steps.length} steps...`);
 
   try {
-    const results = runSteps(engine, steps, outDir);
+    const results = runSteps(engine, steps, outDir, reportDrift);
     const failedSteps = results.filter(r => r.error);
     for (const fs of failedSteps) {
       errors.push(`  Step ${fs.step} ("${fs.command}"): ${fs.error}`);

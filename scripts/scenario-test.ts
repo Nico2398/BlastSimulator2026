@@ -55,13 +55,13 @@ const SCREENSHOT_DIR = resolve(process.cwd(), 'screenshots');
 
 /** Run scenario in command mode (pure Node.js, no browser). */
 async function runScenarioCommand(
-  name: string, steps: ScenarioStepDef[],
+  name: string, steps: ScenarioStepDef[], reportDrift = false,
 ): Promise<StepResult[]> {
   const engine = createGameEngine();
   const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-command`);
 
   console.log(`\n--- Scenario: ${name} ---`);
-  const results = runSteps(engine, steps, outDir);
+  const results = runSteps(engine, steps, outDir, reportDrift);
 
   // Print per-step summary to stdout (matching expected CI output format)
   for (const r of results) {
@@ -88,7 +88,7 @@ async function runScenarioCommand(
 }
 
 // Main
-const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots } = parseArgs();
+const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots, reportDrift } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
@@ -126,7 +126,7 @@ function exitForResults(results: StepResult[]): never {
 }
 
 if (mode === 'command') {
-  runScenarioCommand(name, steps)
+  runScenarioCommand(name, steps, reportDrift)
     .then(exitForResults)
     .catch(err => {
       console.error('Scenario failed:', err);
