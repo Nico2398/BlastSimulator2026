@@ -410,6 +410,7 @@ export function assignSkill(
 export type { GainXpResult } from './EmployeeGainXp.js';
 export { gainXp } from './EmployeeGainXp.js';
 export type { NeedKey } from './EmployeeNeeds.js';
+export type { EmployeeWorkState } from './EmployeeNeeds.js';
 export { tickNeeds, tickNeedGauges, getNeedMultiplier, tickNeedMorale, replenishNeed, needsMoraleEffect, checkCollapse } from './EmployeeNeeds.js';
 export { computeTaskDuration } from './EmployeeTaskDuration.js';
 export { computeXpPerTick } from './EmployeeXpRules.js';

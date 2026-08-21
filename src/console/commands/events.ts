@@ -182,7 +182,9 @@ export function tickCommand(
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
       const isWorking = emp.activeActionId !== null && emp.restTicksRemaining === null;
-      tickNeedGauges(emp, isWorking);
+      // TODO(#680): replace with employeeWorkState(emp) once implemented —
+      // placeholder keeps the tri-state signature compiling for skeleton phase.
+      tickNeedGauges(emp, isWorking ? 'working' : 'idle');
       emp.morale = Math.max(0, Math.min(100, emp.morale + needsMoraleEffect(emp)));
     }
     const firedEvents: FiredEvent[] = [];

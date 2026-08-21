@@ -8,6 +8,16 @@ import { NEED_DRAIN_RATES, NEED_THRESHOLDS, NEED_PRODUCTIVITY_MULTIPLIERS, NEED_
 export type NeedKey = 'hunger' | 'fatigue' | 'breakNeed';
 
 /**
+ * Work-state classification used to select the correct NEED_DRAIN_RATES tier
+ * for {@link tickNeedGauges} (#680).
+ * - 'working': actively performing a task (drains fastest).
+ * - 'idle': not working and not resting (e.g. routed toward a rest destination
+ *   but not yet arrived).
+ * - 'resting': actively resting (restTicksRemaining !== null).
+ */
+export type EmployeeWorkState = 'working' | 'idle' | 'resting';
+
+/**
  * Drain all need gauges by one tick.
  *
  * Hunger and fatigue drain faster while working than while idle.
@@ -165,14 +175,13 @@ export function checkCollapse(employee: Employee): NeedKey | null {
  * High morale (>70) slows drain (×0.85), low morale (<30) accelerates drain (×1.20).
  * Call this each tick for each employee.
  * All gauges are clamped to a minimum of 0.
+ *
+ * @param workState Tri-state work classification (#680) selecting the
+ *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting'.
  */
-export function tickNeedGauges(employee: Employee, isWorking: boolean): void {
-  const multiplier = getMoraleDrainMultiplier(employee.morale);
-
-  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
-  for (const gauge of gauges) {
-    const baseRate = isWorking ? NEED_DRAIN_RATES[gauge].working : NEED_DRAIN_RATES[gauge].idle;
-    const actualDrain = baseRate * multiplier;
-    employee[gauge] = Math.max(0, employee[gauge] - actualDrain);
-  }
+export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState): void {
+  // TODO: implement tri-state drain-rate selection (#680); currently a stub.
+  void employee;
+  void workState;
+  void getMoraleDrainMultiplier;
 }
