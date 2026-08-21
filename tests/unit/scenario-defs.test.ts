@@ -392,38 +392,51 @@ describe('"contract" commands use type:/material:, not a numeric id (issue #597)
 });
 
 // ──────────────────────────────────────────────
-// 7c. No step's JSON (any field — selector, expect.blocked, expect.usable,
-// etc., not just command strings) contains a literal `data-contract-id="N"`
+// 7c. No step's FUNCTIONAL fields — the ones that actually drive DOM
+// targeting or command dispatch (`command`, `interaction[].command`,
+// `interaction[].selector` on any action that carries one, and
+// `expect.blocked`/`expect.usable`) — contain a literal `data-contract-id="N"`
 // DOM selector (issue #654). The contract-offer pool rotates on
 // `CONTRACT_REFRESH_INTERVAL`, so an id baked straight into a guard selector
 // (e.g. `#bs-contract-panel [data-contract-id="26"] .bs-contract-deliver`)
 // pins to whatever the pool happened to resolve to at authoring time and
 // breaks the moment an upstream timing change shifts tick counts — the same
 // class of flake 7b already guards against for `contract` command strings,
-// widened here to catch the id showing up in ANY field of a step. This check
-// is field-name agnostic by design: it does not care which selector or
-// attribute the implementer uses to target a contract row, only that the
-// literal numeric id is gone.
+// widened here to catch the id showing up in any functional field of a step.
+//
+// Deliberately scoped to those fields, NOT the whole `JSON.stringify(step)`
+// (post-review fix, issue #654): a step's free-text `description` narrates
+// its own authoring history in prose and can legitimately quote an old,
+// already-fixed selector (e.g. "...previously scoped to
+// `[data-contract-id=\"19\"] .bs-contract-accept`...") without that prose
+// being a live violation. Scanning the whole step produced a false positive
+// on level3-playthrough-win.json step 79, whose live `command`/`selector`/
+// `expect` fields are already migrated to `type:`/`data-contract-type`
+// selectors — only its description mentions the old id it moved away from.
 //
 // level1-win-efficient.json is exempted by name: it has its own pre-existing
-// literal `data-contract-id="N"` selectors that predate #654 and need a
-// separate migration. That migration is out of scope for #654 — this is a
-// deliberate, named skip, not a loophole.
-//
-// level3-playthrough-win.json is exempted the same way: pre-existing literal
-// id, out of scope for this issue — follow-up needed. Issue #654 names
-// exactly one file to fix (level2-playthrough-win.json), whose probe history
-// is specific to that file's own tick counts; level3's violation is real but
-// separate.
+// literal `data-contract-id="N"` selectors in real `selector`/`expect.blocked`
+// fields that predate #654 and need a separate migration. That migration is
+// out of scope for #654 — this is a deliberate, named skip, not a loophole.
 // ──────────────────────────────────────────────
 describe('No step contains a literal data-contract-id="N" DOM selector (issue #654)', () => {
-  // Matches the pattern in a step's raw field value (data-contract-id="26")
-  // as well as inside a JSON.stringify()'d string, where the CSS selector's
-  // own double quotes come out backslash-escaped (data-contract-id=\"26\").
-  const LITERAL_CONTRACT_ID = /data-contract-id=\\?"\d+\\?"/;
+  // Matches the pattern in a step's raw field value (data-contract-id="26").
+  const LITERAL_CONTRACT_ID = /data-contract-id="\d+"/;
 
-  // Deliberate, named exemptions — see comment above. Not part of #654's scope.
-  const EXEMPT_SCENARIOS = new Set(['level1-win-efficient', 'level3-playthrough-win']);
+  // Deliberate, named exemption — see comment above. Not part of #654's scope.
+  const EXEMPT_SCENARIOS = new Set(['level1-win-efficient']);
+
+  /** Every functional (DOM/command-dispatching) string field of a step, not free text like `description`. */
+  const functionalStrings = (step: ScenarioStepDef): string[] => {
+    const values: string[] = [step.command];
+    if (step.expect?.blocked !== undefined) values.push(step.expect.blocked);
+    if (step.expect?.usable !== undefined) values.push(step.expect.usable);
+    for (const action of step.interaction ?? []) {
+      if ('command' in action && typeof action.command === 'string') values.push(action.command);
+      if ('selector' in action && typeof action.selector === 'string') values.push(action.selector);
+    }
+    return values;
+  };
 
   for (const name of ALL_SCENARIO_NAMES) {
     if (EXEMPT_SCENARIOS.has(name)) {
@@ -431,16 +444,17 @@ describe('No step contains a literal data-contract-id="N" DOM selector (issue #6
       continue;
     }
 
-    it(`${name} — no step JSON contains a literal data-contract-id="N" selector`, () => {
+    it(`${name} — no step's functional fields contain a literal data-contract-id="N" selector`, () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       const offenders: string[] = [];
 
       for (let i = 0; i < scenario.steps.length; i++) {
         const step = scenario.steps[i] as ScenarioStepDef;
-        const serialized = JSON.stringify(step);
-        const match = LITERAL_CONTRACT_ID.exec(serialized);
-        if (match) {
-          offenders.push(`step[${i}]: ${match[0]}`);
+        for (const value of functionalStrings(step)) {
+          const match = LITERAL_CONTRACT_ID.exec(value);
+          if (match) {
+            offenders.push(`step[${i}]: ${match[0]}`);
+          }
         }
       }
 
