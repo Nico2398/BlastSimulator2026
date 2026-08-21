@@ -105,7 +105,7 @@ export function writeTraceEntry(path: string, entry: ScenarioTraceEntry): void {
  * can differ only in incidental spacing without that being the divergence
  * this tool exists to find.
  */
-function normalizeCommand(command: string): string {
+export function normalizeCommand(command: string): string {
   return command.trim().replace(/\s+/g, ' ');
 }
 

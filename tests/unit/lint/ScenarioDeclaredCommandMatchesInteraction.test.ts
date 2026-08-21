@@ -26,13 +26,9 @@
 import { describe, it, expect } from 'vitest';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { normalizeCommand } from '../../../scripts/shared/scenario-trace.js';
 
 const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
-
-/** Trims and collapses internal whitespace so incidental spacing is not a mismatch. */
-function normalize(command: string): string {
-  return command.trim().replace(/\s+/g, ' ');
-}
 
 /**
  * The step's single `command` action, when its interaction array consists of
@@ -62,7 +58,7 @@ describe('repo-wide — a step\'s declared command is what interaction mode runs
         const step = rawStep as ScenarioStepDef;
         const actual = loneCommandAction(step);
         if (actual === null) return;
-        if (normalize(actual) !== normalize(step.command)) {
+        if (normalizeCommand(actual) !== normalizeCommand(step.command)) {
           violations.push(
             `  ${file}.json step[${stepIndex}]: declares "${step.command}" but interaction mode runs "${actual}"`,
           );
