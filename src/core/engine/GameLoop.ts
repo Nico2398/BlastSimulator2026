@@ -1421,7 +1421,7 @@ function forceShiftRestIfNeededByPolicy(
   // serviced.
   const hungerDeficit = emp.hunger - thresholds.hunger;
   const fatigueDeficit = emp.fatigue - thresholds.fatigue;
-  const needKey: NeedKey = hungerDeficit <= fatigueDeficit ? 'hunger' : 'fatigue';
+  const needKey: NeedKey = hungerDeficit < fatigueDeficit ? 'hunger' : 'fatigue';
 
   // Find nearest living_quarters of any tier for target coordinates.
   const building = findNearestLivingQuarters(state, emp.x, emp.z);
