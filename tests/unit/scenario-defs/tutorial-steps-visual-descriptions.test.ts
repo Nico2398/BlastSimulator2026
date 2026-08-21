@@ -1,52 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 
-const SCENARIO_PATH = path.resolve(
-    __dirname,
-    '../../scripts/scenario-defs/tutorial-steps-visual.json'
-);
-
-interface ScenarioStep {
-    command: string;
-    description?: string;
-    expect?: {
-        equals?: Record<string, unknown>;
-        note?: string;
-        [key: string]: unknown;
-    };
-    [key: string]: unknown;
-}
-
-interface ScenarioFile {
-    steps: ScenarioStep[];
-    [key: string]: unknown;
-}
+const SCENARIO_NAME = 'tutorial-steps-visual';
+const SCENARIO_PATH = path.resolve(SCENARIO_DIR, `${SCENARIO_NAME}.json`);
 
 function readRawFile(): string {
     return fs.readFileSync(SCENARIO_PATH, 'utf-8');
 }
 
-function readParsedFile(): ScenarioFile {
-    return JSON.parse(readRawFile()) as ScenarioFile;
-}
-
-function findStepByCommandPrefix(steps: ScenarioStep[], prefix: string): ScenarioStep {
-    const step = steps.find((s) => s.command.startsWith(prefix));
+function findStep(
+    steps: ScenarioStepDef[],
+    predicate: (s: ScenarioStepDef) => boolean,
+    label: string
+): ScenarioStepDef {
+    const step = steps.find(predicate);
     if (!step) {
         throw new Error(
-            `findStepByCommandPrefix: no step found whose command starts with "${prefix}" — ` +
-                'the scenario file structure changed; update the lookup, do not assume a positional index.'
-        );
-    }
-    return step;
-}
-
-function findStepByExactCommand(steps: ScenarioStep[], command: string): ScenarioStep {
-    const step = steps.find((s) => s.command === command);
-    if (!step) {
-        throw new Error(
-            `findStepByExactCommand: no step found with command === "${command}" — ` +
+            `findStep: no step found matching "${label}" — ` +
                 'the scenario file structure changed; update the lookup, do not assume a positional index.'
         );
     }
@@ -69,8 +42,12 @@ describe('tutorial-steps-visual.json descriptions', () => {
     });
 
     it('step 23 (drill_plan grid) description describes the real 3x3/9-hole grid', () => {
-        const { steps } = readParsedFile();
-        const step = findStepByCommandPrefix(steps, 'drill_plan grid rows:3 cols:3');
+        const { steps } = loadScenarioDef(SCENARIO_NAME);
+        const step = findStep(
+            steps,
+            (s) => s.command.startsWith('drill_plan grid rows:3 cols:3'),
+            'drill_plan grid rows:3 cols:3'
+        );
 
         expect(step.description).toMatch(/3x3/);
         expect(step.description).toMatch(/9-hole|9 hole/i);
@@ -79,7 +56,7 @@ describe('tutorial-steps-visual.json descriptions', () => {
     });
 
     it('step 24 (tick 400) description describes 9 holes, not 16', () => {
-        const { steps } = readParsedFile();
+        const { steps } = loadScenarioDef(SCENARIO_NAME);
         const drillPlanIndex = steps.findIndex((s) =>
             s.command.startsWith('drill_plan grid rows:3 cols:3')
         );
@@ -104,16 +81,16 @@ describe('tutorial-steps-visual.json descriptions', () => {
     });
 
     it('step 26 (tick 225) description reasons about 9 holes charging first', () => {
-        const { steps } = readParsedFile();
-        const step = findStepByExactCommand(steps, 'tick 225');
+        const { steps } = loadScenarioDef(SCENARIO_NAME);
+        const step = findStep(steps, (s) => s.command === 'tick 225', 'tick 225');
 
         expect(step.description).toMatch(/FIRST of 9 holes/i);
         expect(step.description).toMatch(/all 9 holes/i);
     });
 
     it('step 29 (blast) description re-derives deathCount:2 against the real footprint, assertion itself untouched', () => {
-        const { steps } = readParsedFile();
-        const step = findStepByExactCommand(steps, 'blast');
+        const { steps } = loadScenarioDef(SCENARIO_NAME);
+        const step = findStep(steps, (s) => s.command === 'blast', 'blast');
 
         const mentionsRealFootprint =
             step.description?.includes('20-26') ||
