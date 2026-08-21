@@ -3871,6 +3871,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
       const state = createGame({ seed: SEED });
       const rng = new Random(SEED);
       applyPolicy(state, { shiftMode: 'shift_8h' });
+      state.buildings.unlockedTiers.living_quarters = 3;
       // Co-located with the employee (0,0) so arrival resolves in one step
       // (mirrors this file's own resolveArrival doc comment).
       placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, tier);
