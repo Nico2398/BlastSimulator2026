@@ -442,6 +442,24 @@ const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
   survey: 'bs-survey-panel',
 };
 
+/**
+ * Whether the panel element `panelId` (a `PANEL_ELEMENT_ID` value) is
+ * currently visible, read from the page's own `__uiState()` mirror rather
+ * than the DOM directly. Shared by `ensurePanel` (checking the panel it is
+ * about to toggle) and `ensureStep` (checking the Blast panel is open before
+ * touching its step tabs) so the same `page.evaluate` closure exists once
+ * (#652).
+ */
+async function isPanelVisible(page: Page, panelId: string): Promise<boolean> {
+  return page.evaluate((id: string) => {
+    const getUiState = (window as unknown as {
+      __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
+    }).__uiState;
+    const st = getUiState === undefined ? null : getUiState();
+    return st?.panels[id]?.visible ?? false;
+  }, panelId);
+}
+
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
@@ -860,13 +878,7 @@ export async function executeActionOnPage(
         throw new Error(`ensurePanel: unknown panel "${action.panel}" (not a toggle panel, or misspelled)`);
       }
 
-      const alreadyOpen = await page.evaluate((id: string) => {
-        const getUiState = (window as unknown as {
-          __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
-        }).__uiState;
-        const st = getUiState === undefined ? null : getUiState();
-        return st?.panels[id]?.visible ?? false;
-      }, panelId);
+      const alreadyOpen = await isPanelVisible(page, panelId);
 
       onProgress?.(`ensurePanel "${action.panel}" ${alreadyOpen ? 'already open' : 'opening'}`);
       if (!alreadyOpen) {
@@ -875,15 +887,8 @@ export async function executeActionOnPage(
       break;
     }
     case 'ensureStep': {
-      const blastPanelId = PANEL_ELEMENT_ID.blast as string;
-      const panelVisible = await page.evaluate((id: string) => {
-        const getUiState = (window as unknown as {
-          __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
-        }).__uiState;
-        const st = getUiState === undefined ? null : getUiState();
-        return st?.panels[id]?.visible ?? false;
-      }, blastPanelId);
-      if (!panelVisible) {
+      const blastPanelId = PANEL_ELEMENT_ID.blast;
+      if (blastPanelId === undefined || !(await isPanelVisible(page, blastPanelId))) {
         throw new Error(
           "ensureStep: the Blast panel is not open — call ensurePanel({ panel: 'blast' }) first",
         );
