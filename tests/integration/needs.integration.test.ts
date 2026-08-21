@@ -22,6 +22,7 @@ import {
   NEED_REST_DURATIONS,
   NEED_COLLAPSE_THRESHOLDS,
   AGENT_WALK_SPEED,
+  NEED_DRAIN_RATES,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ describe('Employee needs', () => {
     emp.fatigue = 100;
     emp.breakNeed = 100;
 
-    tickNeedGauges(emp, true);
+    tickNeedGauges(emp, 'working');
 
     // working drain rates at 1×: hunger=1, fatigue=2, breakNeed=0.8
     expect(emp.hunger).toBe(99);
@@ -87,7 +88,7 @@ describe('Employee needs', () => {
     emp.breakNeed = 100;
 
     // Record values after one working tick
-    tickNeedGauges(emp, true);
+    tickNeedGauges(emp, 'working');
     const workingHunger = emp.hunger;
     const workingFatigue = emp.fatigue;
     const workingBreak = emp.breakNeed;
@@ -96,7 +97,7 @@ describe('Employee needs', () => {
     emp.hunger = 100;
     emp.fatigue = 100;
     emp.breakNeed = 100;
-    tickNeedGauges(emp, false);
+    tickNeedGauges(emp, 'idle');
 
     // idle drain rates at 1×: hunger=0.5, fatigue=0.5, breakNeed=0
     // Hunger and fatigue drain less when idle
@@ -113,7 +114,7 @@ describe('Employee needs', () => {
     // Set hunger to a value that would go negative in one working tick
     emp.hunger = 0.5;
 
-    tickNeedGauges(emp, true);
+    tickNeedGauges(emp, 'working');
 
     expect(emp.hunger).toBe(0);
     // Ensure it never went negative
@@ -275,15 +276,18 @@ describe('Employee needs', () => {
   });
 });
 
-// ── tick command — resting employee drains at idle rate, not working rate ────
+// ── tick command — resting employee drains at the 'resting' tier, not idle ───
 //
-// Fixes the bug where a resting employee (activeActionId set to the rest
-// action, restTicksRemaining non-null) was drained at the working rate
-// because the old isWorking check only looked at activeActionId. See
-// src/console/commands/events.ts: isWorking now also requires
-// restTicksRemaining === null.
+// #680: the original fix (isWorking now also requires restTicksRemaining ===
+// null) only got a resting employee OUT of the working-rate bucket — it fell
+// into the idle bucket instead, at NEED_DRAIN_RATES.*.idle, which still
+// drains hunger/fatigue. That undermines rest's own completion-time
+// replenishment lump sum: an employee resting for many ticks keeps leaking
+// gauges the whole time. The full fix adds a third 'resting' tier
+// (employeeWorkState classifies restTicksRemaining !== null as 'resting') at
+// drain rate 0 — gauges hold steady during active rest.
 
-describe('tick command — idle-vs-working drain rate for resting employees', () => {
+describe('tick command — resting employees drain at the resting tier (rate 0), not idle', () => {
   let ctx: GameContext;
   let empId: number;
 
@@ -292,7 +296,7 @@ describe('tick command — idle-vs-working drain rate for resting employees', ()
     empId = hireOne(ctx);
   });
 
-  it('drains a resting employee at the idle rate during tick', () => {
+  it('drains a resting employee at the resting-tier rate (0) during tick, not the idle rate', () => {
     const emp = getEmployee(ctx, empId);
     // Simulate mid-rest: claimed by a rest action, timer running.
     emp.activeActionId = 999;
@@ -304,13 +308,84 @@ describe('tick command — idle-vs-working drain rate for resting employees', ()
     const result = tickCommand(ctx, ['1'], {});
 
     expect(result.success).toBe(true);
-    // idle rate: hunger drains 0.5/tick (not 1 as it would while genuinely working)
-    expect(emp.hunger).toBe(99.5);
-    // idle rate: breakNeed does not drain at all while idle (0, vs 0.8 working)
+    // resting tier: hunger does not drain at all (0/tick — not 0.5 idle, not 1 working)
+    expect(emp.hunger).toBe(100);
+    // resting tier: breakNeed does not drain at all either (0, same as idle here, but for the resting reason)
     expect(emp.breakNeed).toBe(100);
     // Rest state itself is untouched by the needs-drain step.
     expect(emp.restTicksRemaining).toBe(10);
     expect(emp.activeActionId).toBe(999);
+  });
+});
+
+// ── #680 regression: travel-toward-rest misclassified as 'working' ──────────
+//
+// Root cause under test: before the fix, isWorking = activeActionId !== null
+// && restTicksRemaining === null. An employee routed to rest but still
+// walking there (activeActionId set to the rest action, pendingRestDuration
+// !== null, restTicksRemaining still null because they haven't arrived) has
+// activeActionId !== null and restTicksRemaining === null — so the old check
+// misclassified them as WORKING and drained them at the working rate while
+// they were merely walking. The fix's employeeWorkState() must classify this
+// exact state as 'idle' (pendingRestDuration !== null excludes it from
+// 'working'), not 'resting' (that requires restTicksRemaining !== null) and
+// not 'working'.
+
+describe('#680 regression — an employee walking toward rest drains at the idle rate, not working', () => {
+  it('drains hunger/fatigue at the idle rate (not working) while travelling to a distant living_quarters', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    const empId = hireOne(ctx, 'driller');
+    const emp = getEmployee(ctx, empId);
+
+    // Same distance/tick budget as the "does not decrement restTicksRemaining
+    // while the employee is still travelling" test above (proven safe: a few
+    // ticks in, the employee is still mid-walk, not yet at (20,20)).
+    state.cash = 100_000;
+    const build = buildCommand(ctx, ['living_quarters'], { at: '20,20', tier: '1' });
+    expect(build.success).toBe(true);
+
+    emp.x = 0;
+    emp.z = 0;
+    emp.hunger = 20; // below warning threshold — triggers routing toward rest
+    emp.fatigue = 100;
+    emp.breakNeed = 100;
+
+    // First tick: routed toward the living_quarters, but not arrived yet.
+    tickCommand(ctx, ['1'], {});
+    expect(emp.destinationX).not.toBeNull();
+    expect(emp.destinationZ).not.toBeNull();
+    expect(emp.activeActionId).not.toBeNull();
+    // Still travelling: rest has not started (restTicksRemaining stays null
+    // until ArrivalGate promotes pendingRestDuration on arrival).
+    expect(emp.restTicksRemaining).toBeNull();
+
+    const fatigueAfterFirstTick = emp.fatigue;
+
+    // A few more ticks — still travelling (distance from (0,0) to (20,20) is
+    // well beyond a few ticks at AGENT_WALK_SPEED), rest still has not started.
+    const TRAVEL_SAMPLE_TICKS = 3;
+    for (let i = 0; i < TRAVEL_SAMPLE_TICKS; i++) tickCommand(ctx, ['1'], {});
+
+    // Confirms the test's own distance/tick budget is sized correctly,
+    // independent of the drain-rate bug under test.
+    expect(emp.x === 20 && emp.z === 20).toBe(false); // still travelling
+    expect(emp.restTicksRemaining).toBeNull(); // rest has not started
+
+    // The bug: fatigue (working rate 2/tick) drains far faster than the idle
+    // rate (0.5/tick) predicts, because activeActionId is set (the rest
+    // action) and restTicksRemaining is still null — the old isWorking check
+    // misclassified this as WORKING. Assert a band, not just an upper bound,
+    // so this test is RED against both failure modes: a no-op/unimplemented
+    // tickNeedGauges (drain = 0, fails the lower bound) and the pre-fix
+    // working-rate misclassification (drain ≈ 2/tick × 3 = 6, fails the upper
+    // bound). Only the idle rate (0.5/tick × 3 = 1.5, ±headroom for the
+    // morale multiplier) lands inside the band.
+    const fatigueDrainedDuringTravel = fatigueAfterFirstTick - emp.fatigue;
+    const idleRateLowerBound = NEED_DRAIN_RATES.fatigue.idle * TRAVEL_SAMPLE_TICKS * 0.5; // well below even a low-morale idle drain
+    const idleRateUpperBound = NEED_DRAIN_RATES.fatigue.idle * TRAVEL_SAMPLE_TICKS * 1.2; // 1.2 = low-morale multiplier headroom, still « working rate
+    expect(fatigueDrainedDuringTravel).toBeGreaterThan(idleRateLowerBound);
+    expect(fatigueDrainedDuringTravel).toBeLessThanOrEqual(idleRateUpperBound);
   });
 });
 
@@ -521,5 +596,124 @@ describe('forced rest under an applied SitePolicy — driven through the console
     expect(Math.min(minHunger, minFatigue)).toBeLessThanOrEqual(
       Math.max(NEED_COLLAPSE_THRESHOLDS.hunger, NEED_COLLAPSE_THRESHOLDS.fatigue),
     );
+  });
+});
+
+// ── #680 acceptance test — tri-state needs drain must prevent a false revolt ─
+//
+// Issue's own named acceptance scenario: a staffed site, a reachable tier-1
+// living_quarters, a shift_8h SitePolicy applied, and 400+ continuous ticks
+// of real drilling work must never let scores.wellBeing collapse hard enough
+// for a permanent worker revolt (`revolt:triggered`, WorkerRevolt.ts) to
+// fire. Under the pre-fix code an employee routed toward rest but still
+// travelling is drained at the WORKING rate (the misclassification bug), and
+// an employee actively resting is drained at the IDLE rate instead of
+// holding steady — both erode the gauges faster than the rest cycle can
+// replenish them, eventually driving wellBeing to 0 for a sustained
+// REVOLT_TICKS stretch even though a protective policy is applied.
+//
+// The contrast case proves the mechanism itself is untouched: an unhoused,
+// unrelieved crew under the identical drive still collapses/revolts — #680
+// only fixes the drain-rate misclassification, it does not make the game
+// unloseable.
+
+describe('#680 acceptance — a policy-protected, housed crew never revolts across a long continuous-work run', () => {
+  /**
+   * Keep `empId` continuously working at their own position (no walking
+   * time wasted) for `ticks` real console ticks: re-dispatch only when
+   * genuinely idle (never mid-walk to a rest, never resting, never in
+   * training) so any forced rest — collapse-driven or policy-driven — is
+   * free to claim them instead of being starved out by a greedy redispatch.
+   * Mirrors the #678 driveContinuousWork helper above.
+   */
+  function driveContinuousWork(
+    ctx: GameContext,
+    empId: number,
+    ticks: number,
+    onTick: (emp: Employee) => void,
+  ): void {
+    const state = ctx.state!;
+    for (let i = 0; i < ticks; i++) {
+      const emp = getEmployee(ctx, empId);
+      if (
+        emp.alive && !emp.injured && emp.trainingState === null &&
+        emp.activeActionId === null && emp.restTicksRemaining === null && emp.pendingRestDuration === null
+      ) {
+        employeeCommand(ctx, ['dispatch', String(empId)], { x: String(emp.x), z: String(emp.z) });
+      }
+
+      tickCommand(ctx, ['1'], {});
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      if (state.isPaused) state.isPaused = false;
+
+      onTick(getEmployee(ctx, empId));
+    }
+  }
+
+  const RUN_TICKS = 400;
+
+  it('never fires revolt:triggered, and scores.wellBeing never sits pinned at 0 long enough to end the level, across 400+ ticks with an applied shift_8h policy', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 1_000_000;
+    const empId = hireOne(ctx, 'driller');
+
+    const build = buildCommand(ctx, ['living_quarters'], { at: '0,0', tier: '1' });
+    expect(build.success).toBe(true);
+
+    const policyResult = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
+    expect(policyResult.success).toBe(true);
+    expect(state.sitePolicy.revision).toBeGreaterThan(0);
+
+    let revoltFired = false;
+    ctx.emitter.on('revolt:triggered', () => { revoltFired = true; });
+
+    let minHunger = 100;
+    let minFatigue = 100;
+    driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
+      minHunger = Math.min(minHunger, emp.hunger);
+      minFatigue = Math.min(minFatigue, emp.fatigue);
+    });
+
+    // Sanity check that the run actually exercised the needs-drain/rest
+    // machinery rather than trivially never engaging it — a driller working
+    // continuously for 400 ticks must dip its gauges below the starting 100
+    // at some point (drained by working, restored by the shift's rest
+    // cycles). A frozen tickNeedGauges (needs-drain unimplemented) would
+    // leave both gauges pinned at 100 the entire run and fail this.
+    expect(minHunger).toBeLessThan(100);
+    expect(minFatigue).toBeLessThan(100);
+
+    expect(revoltFired).toBe(false);
+    expect(state.levelEndReason).not.toBe('worker_revolt');
+  });
+
+  it('CONTRAST: the same drive on an unhoused, unrelieved crew (no living_quarters, no policy) does still collapse/revolt', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 1_000_000;
+    const empId = hireOne(ctx, 'driller');
+
+    // Deliberately no living_quarters and no set_policy call — the crew has
+    // no rest destination and no policy-driven forced-rest thresholds.
+    expect(state.buildings.buildings.some(b => b.type === 'living_quarters')).toBe(false);
+    expect(state.sitePolicy.revision).toBe(0);
+
+    let revoltFired = false;
+    ctx.emitter.on('revolt:triggered', () => { revoltFired = true; });
+    let sawCollapse = false;
+
+    // Generous extra headroom over the acceptance run's own 400 ticks — an
+    // unhoused crew has no replenishment building at all, so it may take
+    // longer than the housed case to accumulate a sustained wellBeing=0
+    // stretch (REVOLT_TICKS) on top of driving morale to 0 in the first place.
+    driveContinuousWork(ctx, empId, RUN_TICKS + 400, (emp) => {
+      sawCollapse = sawCollapse || emp.collapsing;
+    });
+
+    // Either the permanent revolt actually fires, or at minimum the crew
+    // repeatedly collapses from unmet needs — the punishing mechanism #680
+    // does not remove, it only fixes which rate an employee drains at.
+    expect(revoltFired || sawCollapse).toBe(true);
   });
 });

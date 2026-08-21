@@ -763,7 +763,9 @@ describe('Employee — need meters (7.1)', () => {
 // Task 7.3 — tickNeedGauges: morale-adjusted drain rates
 //
 // Function under test:
-//   tickNeedGauges(employee, isWorking)
+//   tickNeedGauges(employee, workState)
+// workState is the tri-state classification from #680:
+//   'working' | 'idle' | 'resting'
 // Drain rates are multiplied by a morale-dependent factor:
 //   morale > 70 → NEED_MORALE_DRAIN_MULTIPLIERS.high (0.85)
 //   morale < 30 → NEED_MORALE_DRAIN_MULTIPLIERS.low  (1.20)
@@ -782,7 +784,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const fatigueBefore = employee.fatigue;
     const breakNeedBefore = employee.breakNeed;
 
-    tickNeedGauges(employee, true);
+    tickNeedGauges(employee, 'working');
 
     const expectedHunger = hungerBefore - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.high;
     const expectedFatigue = fatigueBefore - NEED_DRAIN_RATES.fatigue.working * NEED_MORALE_DRAIN_MULTIPLIERS.high;
@@ -799,7 +801,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.morale = 20; // < 30 → low morale
 
-    tickNeedGauges(employee, true);
+    tickNeedGauges(employee, 'working');
 
     expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
     expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
@@ -813,7 +815,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.morale = 50; // normal range
 
-    tickNeedGauges(employee, true);
+    tickNeedGauges(employee, 'working');
 
     expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.normal, 5);
     expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.working * NEED_MORALE_DRAIN_MULTIPLIERS.normal, 5);
@@ -827,7 +829,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.morale = 70; // exactly at boundary — should be normal
 
-    tickNeedGauges(employee, true);
+    tickNeedGauges(employee, 'working');
 
     expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * 1.0, 5);
   });
@@ -839,7 +841,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.morale = 30; // exactly at boundary — should be normal
 
-    tickNeedGauges(employee, true);
+    tickNeedGauges(employee, 'working');
 
     expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * 1.0, 5);
   });
@@ -851,7 +853,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.morale = 80;
 
-    tickNeedGauges(employee, false); // idle
+    tickNeedGauges(employee, 'idle'); // idle
 
     expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.idle * NEED_MORALE_DRAIN_MULTIPLIERS.high, 5);
     expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.idle * NEED_MORALE_DRAIN_MULTIPLIERS.high, 5);
@@ -866,7 +868,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const { employee } = hireEmployee(state, 'driller', rng);
     employee.morale = 20;
 
-    tickNeedGauges(employee, false); // idle
+    tickNeedGauges(employee, 'idle'); // idle
 
     expect(employee.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.idle * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
     expect(employee.fatigue).toBeCloseTo(100 - NEED_DRAIN_RATES.fatigue.idle * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
@@ -883,7 +885,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     employee.breakNeed = 0;
     employee.morale = 20; // low morale — would drain faster
 
-    tickNeedGauges(employee, true);
+    tickNeedGauges(employee, 'working');
 
     expect(employee.hunger).toBe(0);
     expect(employee.fatigue).toBe(0);
@@ -898,7 +900,7 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     employee.morale = 20; // low morale
     employee.breakNeed = 100;
 
-    tickNeedGauges(employee, false); // idle
+    tickNeedGauges(employee, 'idle'); // idle
 
     expect(employee.breakNeed).toBe(100); // idle rate = 0
   });
@@ -915,13 +917,82 @@ describe('Employee — tickNeedGauges (7.3)', () => {
     const { employee: emp2 } = hireEmployee(state2, 'driller', rng2);
     emp2.morale = 100;
 
-    tickNeedGauges(emp1, true);
-    tickNeedGauges(emp2, true);
+    tickNeedGauges(emp1, 'working');
+    tickNeedGauges(emp2, 'working');
 
     // morale=0: ×1.20
     expect(emp1.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.low, 5);
     // morale=100: ×0.85
     expect(emp2.hunger).toBeCloseTo(100 - NEED_DRAIN_RATES.hunger.working * NEED_MORALE_DRAIN_MULTIPLIERS.high, 5);
+  });
+
+  // ── Test 11 (NEW, #680) ─────────────────────────────────────────────────────
+  it('resting: hunger/fatigue/breakNeed do not drain at all (rate 0), unlike working', () => {
+    const state = createEmployeeState();
+    const rng = new Random(1);
+    const { employee } = hireEmployee(state, 'driller', rng);
+    employee.morale = 50; // normal morale — isolates the tier, not the multiplier
+    employee.hunger = 100;
+    employee.fatigue = 100;
+    employee.breakNeed = 100;
+
+    tickNeedGauges(employee, 'resting');
+
+    expect(employee.hunger).toBe(100);
+    expect(employee.fatigue).toBe(100);
+    expect(employee.breakNeed).toBe(100);
+    // NEED_DRAIN_RATES.*.resting is defined as 0 in balance.ts
+    expect(NEED_DRAIN_RATES.hunger.resting).toBe(0);
+    expect(NEED_DRAIN_RATES.fatigue.resting).toBe(0);
+    expect(NEED_DRAIN_RATES.breakNeed.resting).toBe(0);
+  });
+
+  // ── Test 12 (NEW, #680) ─────────────────────────────────────────────────────
+  it('resting drains strictly less than idle, which drains strictly less than working', () => {
+    const makeEmp = () => {
+      const s = createEmployeeState();
+      const r = new Random(1);
+      const { employee } = hireEmployee(s, 'driller', r);
+      employee.morale = 50;
+      employee.hunger = 100;
+      employee.fatigue = 100;
+      return employee;
+    };
+
+    const working = makeEmp();
+    const idle = makeEmp();
+    const resting = makeEmp();
+
+    tickNeedGauges(working, 'working');
+    tickNeedGauges(idle, 'idle');
+    tickNeedGauges(resting, 'resting');
+
+    expect(resting.hunger).toBeGreaterThan(idle.hunger);
+    expect(idle.hunger).toBeGreaterThan(working.hunger);
+    expect(resting.fatigue).toBeGreaterThan(idle.fatigue);
+    expect(idle.fatigue).toBeGreaterThan(working.fatigue);
+  });
+
+  // ── Test 13 (NEW, #680) ─────────────────────────────────────────────────────
+  it('resting tier nets zero drain regardless of morale multiplier (low, normal, high)', () => {
+    const moraleValues = [0, 20, 50, 80, 100];
+    for (const morale of moraleValues) {
+      const state = createEmployeeState();
+      const rng = new Random(1);
+      const { employee } = hireEmployee(state, 'driller', rng);
+      employee.morale = morale;
+      employee.hunger = 100;
+      employee.fatigue = 100;
+      employee.breakNeed = 100;
+
+      tickNeedGauges(employee, 'resting');
+
+      // 0 × any multiplier is still 0 — the resting tier is immune to the
+      // morale-drain multiplier because its base rate is itself 0.
+      expect(employee.hunger).toBe(100);
+      expect(employee.fatigue).toBe(100);
+      expect(employee.breakNeed).toBe(100);
+    }
   });
 });
 
