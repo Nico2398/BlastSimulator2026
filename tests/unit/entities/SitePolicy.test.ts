@@ -12,8 +12,8 @@ import {
   createSitePolicy,
   getShiftDurationTicks,
   shouldForceRest,
-  // ── #678: getEffectiveThresholds — currently `throw new Error('not implemented')`.
-  // Tests below are the Red-phase spec for it.
+  // ── #678: getEffectiveThresholds — merges a policy's own thresholds over
+  // the site defaults. Tests below cover it.
   getEffectiveThresholds,
   type ShiftMode,
   type SitePolicy,

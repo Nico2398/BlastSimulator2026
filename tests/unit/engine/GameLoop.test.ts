@@ -3538,9 +3538,8 @@ describe('processShiftCycle (7.9)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // processShiftCycle — under an applied policy (#678)
 //
-// SitePolicy.shouldForceRest was dead code until now: processShiftCycle must
-// consult it (via the forceShiftRestIfNeededByPolicy skeleton, currently
-// `throw new Error('not implemented')`) so that once a policy is APPLIED
+// SitePolicy.shouldForceRest was dead code until now: processShiftCycle
+// consults it (via forceShiftRestIfNeededByPolicy) so that once a policy is APPLIED
 // (state.sitePolicy.revision > 0), forced rest fires for real — at any
 // living_quarters tier (tier 1 included) or in place if none exists — using
 // the policy's own shift-duration/hunger/fatigue thresholds instead of the
@@ -3881,7 +3880,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
       employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
       employee.fatigue = 50;
 
-      processShiftCycle(state, []); // throws today (skeleton) — fires once implemented
+      processShiftCycle(state, []); // fires forced rest via the applied policy
       resolveArrival(state); // promotes pendingRestDuration/NeedKey -> restTicksRemaining/restNeedKey
 
       // Directly collapse the rest to its final tick — permitted per this
