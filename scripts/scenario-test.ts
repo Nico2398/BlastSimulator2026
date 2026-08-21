@@ -44,7 +44,13 @@
 
 import { resolve } from 'path';
 import type { ScenarioStepDef, StepResult } from './shared/scenario-types.js';
-import { createGameEngine, runSteps } from './shared/command-runner.js';
+import {
+  createGameEngine,
+  runSteps,
+  toDriftRecords,
+  emitDriftReport,
+  type GoalMismatch,
+} from './shared/command-runner.js';
 import {
   formatStepIndex,
 } from './shared/scenario-utils.js';
@@ -55,13 +61,13 @@ const SCREENSHOT_DIR = resolve(process.cwd(), 'screenshots');
 
 /** Run scenario in command mode (pure Node.js, no browser). */
 async function runScenarioCommand(
-  name: string, steps: ScenarioStepDef[],
-): Promise<StepResult[]> {
+  name: string, steps: ScenarioStepDef[], reportDrift = false,
+): Promise<Array<StepResult & { driftMismatches?: GoalMismatch[] }>> {
   const engine = createGameEngine();
   const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-command`);
 
   console.log(`\n--- Scenario: ${name} ---`);
-  const results = runSteps(engine, steps, outDir);
+  const results = runSteps(engine, steps, outDir, reportDrift);
 
   // Print per-step summary to stdout (matching expected CI output format)
   for (const r of results) {
@@ -84,11 +90,12 @@ async function runScenarioCommand(
     screenshotPath: '',
     statePath: r.statePath,
     ...(r.error !== undefined ? { error: r.error } : {}),
+    ...(r.driftMismatches !== undefined ? { driftMismatches: r.driftMismatches } : {}),
   }));
 }
 
 // Main
-const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots } = parseArgs();
+const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots, reportDrift } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
@@ -126,7 +133,15 @@ function exitForResults(results: StepResult[]): never {
 }
 
 if (mode === 'command') {
-  runScenarioCommand(name, steps)
+  runScenarioCommand(name, steps, reportDrift)
+    .then(results => {
+      if (reportDrift) {
+        const driftRecords = toDriftRecords(results, name);
+        const driftPath = resolve(SCREENSHOT_DIR, `scenario-${name}-command`, 'drift-report.json');
+        emitDriftReport(driftRecords, driftPath);
+      }
+      return results;
+    })
     .then(exitForResults)
     .catch(err => {
       console.error('Scenario failed:', err);

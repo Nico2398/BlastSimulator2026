@@ -20,6 +20,12 @@ function run(steps: ScenarioStepDef[]) {
   return runSteps(engine, steps, outDir);
 }
 
+function runDrift(steps: ScenarioStepDef[]) {
+  const engine = createGameEngine();
+  const outDir = resolve(tmpdir(), `bs2026-scenario-expect-drift-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  return runSteps(engine, steps, outDir, true);
+}
+
 describe('command-mode runSteps checks a step\'s expect, not just whether the command threw', () => {
   it('passes a step whose expect.equals matches the real post-command state', () => {
     const results = run([
@@ -96,3 +102,63 @@ describe('command-mode runSteps checks a step\'s expect, not just whether the co
     expect(results[0]!.error).toBeUndefined();
   });
 });
+
+// ──────────────────────────────────────────────
+// reportDrift mode (issue #679): runSteps(engine, steps, outDir, true) runs
+// every step to completion instead of stopping at the first equals/changedBy
+// mismatch, collecting the mismatches on the step's own result instead of
+// throwing. Directional (increased/decreased) goals are never suppressed.
+// ──────────────────────────────────────────────
+describe('runSteps with reportDrift=true', () => {
+  const mismatchedScenario: ScenarioStepDef[] = [
+    { command: 'new_game seed:42', expect: { equals: { cash: 1 } } },
+    { command: 'employee hire role:driller', expect: { increased: ['employeeCount'] } },
+  ];
+
+  it('does not set .error on a step whose expect.equals mismatches, and populates .driftMismatches instead', () => {
+    const results = runDrift(mismatchedScenario);
+    expect(results[0]!.error).toBeUndefined();
+    expect(results[0]!.driftMismatches).toBeDefined();
+    expect(results[0]!.driftMismatches!.length).toBeGreaterThan(0);
+    expect(results[0]!.driftMismatches![0]!.field).toBe('cash');
+    expect(results[0]!.driftMismatches![0]!.goalType).toBe('equals');
+  });
+
+  it('lets the scenario run to completion — the step after a drifted step still executes', () => {
+    const results = runDrift(mismatchedScenario);
+    // Second step ran for real against the post-first-step state (a hire genuinely happened).
+    expect(results).toHaveLength(2);
+    expect(results[1]!.error).toBeUndefined();
+    expect(results[1]!.commandOutput).not.toBe('');
+  });
+
+  it('the exact same scenario without reportDrift still fails normally (drift-on vs drift-off, side by side)', () => {
+    const results = run(mismatchedScenario);
+    expect(results[0]!.error).toMatch(/expect failed/);
+    expect(results[0]!.error).toMatch(/cash/);
+  });
+
+  it('a failed increased/decreased goal still sets .error even with reportDrift=true — directional goals are never suppressed', () => {
+    const results = runDrift([
+      { command: 'new_game seed:42' },
+      // `state` is a pure read — nothing increases.
+      { command: 'state', expect: { increased: ['employeeCount'] } },
+    ]);
+    expect(results[1]!.error).toMatch(/expect failed/);
+    expect(results[1]!.error).toMatch(/employeeCount/);
+  });
+
+  it('a scenario with zero mismatches under reportDrift=true leaves every step\'s .driftMismatches unset', () => {
+    const results = runDrift([
+      { command: 'new_game seed:42', expect: { equals: { cash: 50000, buildingCount: 0 } } },
+      { command: 'employee hire role:driller', expect: { increased: ['employeeCount'] } },
+    ]);
+    expect(results[0]!.driftMismatches).toBeUndefined();
+    expect(results[1]!.driftMismatches).toBeUndefined();
+  });
+});
+
+// `runScenario`'s own `driftRecords` aggregation (scenario/step/command
+// plus the mismatch) is covered in tests/unit/command-runner.test.ts —
+// same function, same steps, same assertions as an earlier version of this
+// block; kept there only, matching that file's own stated scope.

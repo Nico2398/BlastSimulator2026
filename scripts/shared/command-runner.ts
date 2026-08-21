@@ -3,7 +3,7 @@
 // Used by both scenario-test.ts (single scenario) and run-all-scenarios.ts (batch).
 
 import { mkdirSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { createRunner, serializeGameState } from '../../src/console-api.js';
 import { runCommand } from '../../src/console/createRunner.js';
 import type { RunnerWithContext } from '../../src/console/createRunner.js';
@@ -14,7 +14,8 @@ import {
   buildScenarioReport,
   type ReportableStep,
 } from './scenario-utils.js';
-import { checkGoalAgainstState, checkCommandOutcome } from './scenario-goal.js';
+import { checkGoalAgainstState, checkCommandOutcome, type GoalMismatch } from './scenario-goal.js';
+export type { GoalMismatch } from './scenario-goal.js';
 
 /**
  * Command-mode side of the `waitUntil` action (issue #590): loop the
@@ -95,6 +96,78 @@ export interface ScenarioResult {
   failed: boolean;
   error?: string;
   reportPath?: string;
+  driftRecords?: DriftRecord[];
+}
+
+/**
+ * A single drift-report entry (issue #679): one `equals`/`changedBy`
+ * mismatch, located to the scenario/step/command that produced it.
+ */
+export interface DriftRecord extends GoalMismatch {
+  scenario: string;
+  step: number;
+  command: string;
+}
+
+/**
+ * Formats a batch of `DriftRecord`s into a human-readable report — one line
+ * per mismatch, naming the scenario, step, field, expected value, and
+ * actual value.
+ */
+export function formatDriftReport(records: DriftRecord[]): string {
+  if (records.length === 0) {
+    return 'Drift report: no drift found — every equals/changedBy goal matched exactly.';
+  }
+  const lines = [`Drift report: ${records.length} mismatch(es) found:`];
+  for (const r of records) {
+    lines.push(
+      `scenario "${r.scenario}" step ${r.step}: ${r.field} expected ${JSON.stringify(r.expected)}, got ${JSON.stringify(r.actual)}`,
+    );
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Writes the raw drift records to `path` as JSON, creating the parent
+ * directory if it does not already exist.
+ */
+export function writeDriftReportFile(records: DriftRecord[], path: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(records, null, 2));
+}
+
+/**
+ * Turns a step's raw `driftMismatches` into `DriftRecord`s tagged with the
+ * scenario/step/command that produced them — the one aggregation both
+ * `runScenario` (below) and any caller holding its own per-step result array
+ * (`scenario-test.ts`, which needs those results for its own console
+ * printing and can't just delegate to `runScenario`) need to perform.
+ */
+export function toDriftRecords(
+  results: Array<{ step: number; command: string; driftMismatches?: GoalMismatch[] }>,
+  scenario: string,
+): DriftRecord[] {
+  const records: DriftRecord[] = [];
+  for (const r of results) {
+    if (r.driftMismatches) {
+      for (const m of r.driftMismatches) {
+        records.push({ ...m, scenario, step: r.step, command: r.command });
+      }
+    }
+  }
+  return records;
+}
+
+/**
+ * Prints the drift report to stdout, writes it to `path` as JSON, and logs
+ * the confirmation — the 4-statement sequence both CLI entry points
+ * (`run-all-scenarios.ts`, `scenario-test.ts`) run identically after a
+ * `--report-drift` batch, differing only in which directory `path` lands in.
+ */
+export function emitDriftReport(records: DriftRecord[], path: string): void {
+  console.log(`\n${formatDriftReport(records)}`);
+  writeDriftReportFile(records, path);
+  console.log(`Drift report written to ${path}`);
 }
 
 export function createGameEngine(): RunnerWithContext {
@@ -105,10 +178,11 @@ export function runSteps(
   engine: RunnerWithContext,
   steps: ScenarioStepDef[],
   outDir: string,
-): StepResult[] {
+  reportDrift?: boolean,
+): Array<StepResult & { driftMismatches?: GoalMismatch[] }> {
   mkdirSync(outDir, { recursive: true });
   const { ctx } = engine;
-  const results: StepResult[] = [];
+  const results: Array<StepResult & { driftMismatches?: GoalMismatch[] }> = [];
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!;
@@ -122,6 +196,7 @@ export function runSteps(
     let error: string | undefined;
     let result: { success: boolean; output: string } = { success: false, output: '' };
     let gameState: Record<string, unknown> | null = null;
+    let driftMismatches: GoalMismatch[] | undefined;
 
     try {
       if (waitUntilAction) {
@@ -137,8 +212,13 @@ export function runSteps(
       if (outcomeViolation !== null) throw new Error(outcomeViolation);
 
       if (step.expect) {
-        const violation = checkGoalAgainstState(step.expect, before, gameState);
-        if (violation !== null) throw new Error(`expect failed: ${violation}`);
+        const goalResult = checkGoalAgainstState(step.expect, before, gameState);
+        if (reportDrift && goalResult.mismatches.length > 0) {
+          driftMismatches = goalResult.mismatches;
+        }
+        if (goalResult.violation !== null && !(reportDrift && goalResult.isDriftOnly)) {
+          throw new Error(`expect failed: ${goalResult.violation}`);
+        }
       }
     } catch (err: unknown) {
       error = err instanceof Error ? err.message : String(err);
@@ -163,6 +243,7 @@ export function runSteps(
       gameState,
       statePath,
       ...(error !== undefined ? { error } : {}),
+      ...(driftMismatches !== undefined ? { driftMismatches } : {}),
     });
   }
 
@@ -178,6 +259,7 @@ export function runScenario(
   name: string,
   steps: ScenarioStepDef[],
   baseOutDir: string,
+  reportDrift?: boolean,
 ): ScenarioResult {
   const outDir = resolve(baseOutDir, `scenario-${name}-command`);
   const errors: string[] = [];
@@ -185,7 +267,7 @@ export function runScenario(
   console.log(`\n[${name}] Running ${steps.length} steps...`);
 
   try {
-    const results = runSteps(engine, steps, outDir);
+    const results = runSteps(engine, steps, outDir, reportDrift);
     const failedSteps = results.filter(r => r.error);
     for (const fs of failedSteps) {
       errors.push(`  Step ${fs.step} ("${fs.command}"): ${fs.error}`);
@@ -196,7 +278,17 @@ export function runScenario(
     } else {
       console.log(`[${name}] OK — ${steps.length} steps`);
     }
-    return { name, totalSteps: steps.length, failed: failedSteps.length > 0, error: errors.join('\n'), reportPath: resolve(outDir, 'report.json') };
+
+    const driftRecords: DriftRecord[] = reportDrift ? toDriftRecords(results, name) : [];
+
+    return {
+      name,
+      totalSteps: steps.length,
+      failed: failedSteps.length > 0,
+      error: errors.join('\n'),
+      reportPath: resolve(outDir, 'report.json'),
+      ...(driftRecords.length > 0 ? { driftRecords } : {}),
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[${name}] FAILED — ${msg}`);

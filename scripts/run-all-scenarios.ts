@@ -10,6 +10,15 @@
  *
  * Default mode: command (pure Node.js, no browser, ~24s for all 99).
  * Interaction mode: shared Puppeteer browser, ~2-3min for all 99.
+ *
+ * --report-drift (command mode only, issue #679): a step whose only
+ * failures are equals/changedBy mismatches no longer marks the step (or its
+ * scenario) as failed — it runs to completion instead, and every such
+ * mismatch is collected into a drift report (stdout + drift-report.json)
+ * rather than aborting the run. Directional goals (increased/decreased)
+ * still fail the run as before. This means a run under --report-drift can
+ * exit 0 while its drift report is non-empty — that's the point: it's a
+ * run-to-completion report, not a pass/fail gate.
  */
 
 import { readdirSync, mkdirSync, writeFileSync } from 'fs';
@@ -18,7 +27,9 @@ import type { ScenarioStepDef } from './shared/scenario-types.js';
 import {
   createGameEngine,
   runScenario,
+  emitDriftReport,
   type ScenarioResult,
+  type DriftRecord,
 } from './shared/command-runner.js';
 import {
   formatStepIndex,
@@ -48,6 +59,7 @@ interface ParsedArgs {
   scenarios: string[];
   port: number;
   shard?: ShardSpec;
+  reportDrift: boolean;
 }
 
 function parseShardArg(raw: string): ShardSpec {
@@ -66,6 +78,7 @@ function parseArgs(): ParsedArgs {
   let mode = 'command';
   let port = DEV_SERVER_PORT;
   let shard: ShardSpec | undefined;
+  let reportDrift = false;
   const scenarios: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -78,12 +91,14 @@ function parseArgs(): ParsedArgs {
     } else if (args[i] === '--shard' && args[i + 1]) {
       shard = parseShardArg(args[i + 1]!);
       i++;
+    } else if (args[i] === '--report-drift') {
+      reportDrift = true;
     } else if (args[i]) {
       scenarios.push(args[i]!);
     }
   }
 
-  return { mode, scenarios, port, ...(shard ? { shard } : {}) };
+  return { mode, scenarios, port, ...(shard ? { shard } : {}), reportDrift };
 }
 
 /**
@@ -250,7 +265,7 @@ async function runBatchInteraction(
 }
 
 async function main(): Promise<void> {
-  const { mode, scenarios: filterScenarios, port, shard } = parseArgs();
+  const { mode, scenarios: filterScenarios, port, shard, reportDrift } = parseArgs();
 
   const scenarioFiles = readdirSync(SCENARIO_DIR)
     .filter(f => f.endsWith('.json'))
@@ -281,7 +296,7 @@ async function main(): Promise<void> {
       const name = names[i];
       try {
         const steps = loadScenarioDef(name!, SCENARIO_DIR).steps;
-        const result = runScenario(engine, name!, steps, SCREENSHOT_DIR);
+        const result = runScenario(engine, name!, steps, SCREENSHOT_DIR, reportDrift);
         results.push(result);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -294,6 +309,11 @@ async function main(): Promise<void> {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`  Progress: ${i + 1}/${names.length} (${passed} passed, ${failed} failed) [${elapsed}s]`);
     }
+  }
+
+  if (reportDrift && mode === 'command') {
+    const driftRecords: DriftRecord[] = results.flatMap(r => r.driftRecords ?? []);
+    emitDriftReport(driftRecords, resolve(SCREENSHOT_DIR, 'drift-report.json'));
   }
 
   // Summary
