@@ -5,7 +5,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand, buildCommand } from '../../src/console/commands/entities.js';
-import { tickCommand } from '../../src/console/commands/events.js';
+import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
+import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 
 import {
@@ -16,7 +17,12 @@ import {
   getNeedMultiplier,
 } from '../../src/core/entities/EmployeeNeeds.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
-import { NEED_WARNING_THRESHOLDS, NEED_REST_DURATIONS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
+import {
+  NEED_WARNING_THRESHOLDS,
+  NEED_REST_DURATIONS,
+  NEED_COLLAPSE_THRESHOLDS,
+  AGENT_WALK_SPEED,
+} from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -397,5 +403,115 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
 
     expect(emp.restTicksRemaining).toBeNull(); // completed and cleared
     expect(emp.hunger).toBeGreaterThan(NEED_WARNING_THRESHOLDS.hunger);
+  });
+});
+
+// ── #678: forced rest under an applied SitePolicy, driven end to end ────────
+//
+// SitePolicy.shouldForceRest used to be dead code — applying a policy via
+// set_policy changed state.sitePolicy but nothing ever consulted it during a
+// tick. These two tests drive a solo employee kept continuously busy (via
+// `employee dispatch`, re-issued the moment they go genuinely idle — never
+// while mid-walk or resting) across a multi-hundred-tick stretch, once with
+// a policy applied and once without, to prove the opt-in gate for real: an
+// applied policy keeps every need gauge and scores.wellBeing off the floor;
+// without one, only the pre-existing (unrelated, unchanged by #678) collapse
+// safety net protects the employee, and it lets the run reach collapse
+// territory that an applied policy's tighter thresholds never approach.
+
+describe('forced rest under an applied SitePolicy — driven through the console (#678)', () => {
+  /**
+   * Keep `empId` continuously working at their own position (no walking
+   * time wasted) for `ticks` real console ticks: re-dispatch only when
+   * genuinely idle (never mid-walk to a rest, never resting, never in
+   * training) so any forced rest — collapse-driven or policy-driven — is
+   * free to claim them instead of being starved out by a greedy redispatch.
+   * Resolves pending events and un-pauses exactly like tickWithEvents in
+   * tests/integration/full-level/helpers.ts.
+   */
+  function driveContinuousWork(
+    ctx: GameContext,
+    empId: number,
+    ticks: number,
+    onTick: (emp: Employee) => void,
+  ): void {
+    const state = ctx.state!;
+    for (let i = 0; i < ticks; i++) {
+      const emp = getEmployee(ctx, empId);
+      if (
+        emp.alive && !emp.injured && emp.trainingState === null &&
+        emp.activeActionId === null && emp.restTicksRemaining === null && emp.pendingRestDuration === null
+      ) {
+        employeeCommand(ctx, ['dispatch', String(empId)], { x: String(emp.x), z: String(emp.z) });
+      }
+
+      tickCommand(ctx, ['1'], {});
+      if (state.events.pendingEvent) eventCommand(ctx, ['choose', '0'], {});
+      if (state.isPaused) state.isPaused = false;
+
+      onTick(getEmployee(ctx, empId));
+    }
+  }
+
+  const RUN_TICKS = 300;
+
+  it('keeps every need gauge and scores.wellBeing above 0 across a long run when a policy is applied', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 1_000_000;
+    const empId = hireOne(ctx, 'driller');
+
+    const build = buildCommand(ctx, ['living_quarters'], { at: '0,0', tier: '1' });
+    expect(build.success).toBe(true);
+
+    const policyResult = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
+    expect(policyResult.success).toBe(true);
+    expect(state.sitePolicy.revision).toBeGreaterThan(0);
+
+    let sawForcedRestTransition = false;
+    ctx.emitter.on('employee:shift_change', () => { sawForcedRestTransition = true; });
+
+    let minHunger = 100;
+    let minFatigue = 100;
+    let minWellBeing = state.scores.wellBeing;
+
+    driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
+      minHunger = Math.min(minHunger, emp.hunger);
+      minFatigue = Math.min(minFatigue, emp.fatigue);
+      minWellBeing = Math.min(minWellBeing, state.scores.wellBeing);
+    });
+
+    expect(sawForcedRestTransition).toBe(true);
+    expect(minHunger).toBeGreaterThan(0);
+    expect(minFatigue).toBeGreaterThan(0);
+    expect(minWellBeing).toBeGreaterThan(0);
+  });
+
+  it('WITHOUT a policy applied, the same run reaches collapse territory (opt-in contrast case)', () => {
+    const ctx = makeCtx();
+    const state = ctx.state!;
+    state.cash = 1_000_000;
+    const empId = hireOne(ctx, 'driller');
+
+    const build = buildCommand(ctx, ['living_quarters'], { at: '0,0', tier: '1' });
+    expect(build.success).toBe(true);
+
+    // No set_policy call — revision stays 0, the opt-in gate stays closed.
+    expect(state.sitePolicy.revision).toBe(0);
+
+    let sawCollapse = false;
+    let minHunger = 100;
+    let minFatigue = 100;
+
+    driveContinuousWork(ctx, empId, RUN_TICKS, (emp) => {
+      sawCollapse = sawCollapse || emp.collapsing;
+      minHunger = Math.min(minHunger, emp.hunger);
+      minFatigue = Math.min(minFatigue, emp.fatigue);
+    });
+
+    expect(sawCollapse).toBe(true);
+    expect(Math.min(minHunger, minFatigue)).toBeLessThanOrEqual(
+      Math.max(NEED_COLLAPSE_THRESHOLDS.hunger, NEED_COLLAPSE_THRESHOLDS.fatigue),
+    );
   });
 });
