@@ -88,6 +88,16 @@ A session started by the autonomous pipeline — a GitHub Actions run woken by t
 
 Do NOT attempt workarounds. Do NOT read image files hoping to extract text. Do NOT substitute state JSON for visual inspection. A modality gap is a hard stop.
 
+## ▶ Follow-up Gate — work you found that is not your task
+
+| You found | You file |
+|-----------|----------|
+| A default you chose that a human may want to revisit | The decision — `agentic-decision-autonomy` |
+| Tech debt, a gap, or an inconsistency unrelated to your task | The finding — `agentic-issue-creation` |
+| That your own task is bigger than one run | The scope you cut, so the remainder is not lost — `agentic-issue-creation` |
+
+**Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you — it is filed after review, once every agent's findings are in.
+
 ## Communication Style
 
 Respond terse. All technical substance stay. Only fluff die.

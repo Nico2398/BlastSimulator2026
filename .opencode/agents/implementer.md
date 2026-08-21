@@ -59,6 +59,12 @@ Adding/modifying console command:
 3. Handler: `GameState` + parsed args → core logic → `CommandResult`
 4. `ConsoleFormatter` → human-readable output
 
+## Scope Overrun
+
+The plan sized this task on what a reader could see. When the codebase disagrees — the change reaches far more call sites than the plan lists, or landing it means re-deriving values across many files — say so in the hand-back rather than working through it. A run that spends its whole budget is killed mid-work, and what survives is an unreviewed branch nobody can finish.
+
+Report `SCOPE OVERRUN: <the slice that reaches green alone> | <the remainder>`. The orchestrator decides, cuts, and files the remainder per `agentic-issue-creation`. Landing a coherent slice is a finished run; landing half of everything is not.
+
 ## Key References
 
 - `dev-architecture` — module boundaries, data flow
