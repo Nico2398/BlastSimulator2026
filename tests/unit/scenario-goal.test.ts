@@ -214,7 +214,7 @@ describe('checkGoalAgainstState — combined and empty goals', () => {
 
 // ──────────────────────────────────────────────
 // checkGoalAgainstState — drift-report fields (issue #679): `.mismatches`
-// and `.onlyDriftViolations`, exhaustive over equals/changedBy failures and
+// and `.isDriftOnly`, exhaustive over equals/changedBy failures and
 // never populated by increased/decreased failures.
 // ──────────────────────────────────────────────
 describe('checkGoalAgainstState — mismatches (drift report, issue #679)', () => {
@@ -263,34 +263,34 @@ describe('checkGoalAgainstState — mismatches (drift report, issue #679)', () =
     expect(result.mismatches).toEqual([]);
   });
 
-  it('onlyDriftViolations is true when the only failure is equals/changedBy', () => {
+  it('isDriftOnly is true when the only failure is equals/changedBy', () => {
     const result = checkGoalAgainstState(
       { equals: { cash: 70000 } },
       {},
       { cash: 80000 },
     );
     expect(result.violation).not.toBeNull();
-    expect(result.onlyDriftViolations).toBe(true);
+    expect(result.isDriftOnly).toBe(true);
   });
 
-  it('onlyDriftViolations is false when a directional goal also fails alongside an equals/changedBy mismatch', () => {
+  it('isDriftOnly is false when a directional goal also fails alongside an equals/changedBy mismatch', () => {
     const result = checkGoalAgainstState(
       { increased: ['employeeCount'], equals: { cash: 70000 } },
       { employeeCount: 1, cash: 0 },
       { employeeCount: 1, cash: 80000 },
     );
     expect(result.violation).not.toBeNull();
-    expect(result.onlyDriftViolations).toBe(false);
+    expect(result.isDriftOnly).toBe(false);
   });
 
-  it('when nothing fails, violation is null (onlyDriftViolations is meaningless there, but must not be truthy)', () => {
+  it('when nothing fails, violation is null (isDriftOnly is meaningless there, but must not be truthy)', () => {
     const result = checkGoalAgainstState(
       { increased: ['cash'], equals: { buildingCount: 1 } },
       { cash: 100 },
       { cash: 200, buildingCount: 1 },
     );
     expect(result.violation).toBeNull();
-    expect(result.onlyDriftViolations).toBeFalsy();
+    expect(result.isDriftOnly).toBeFalsy();
   });
 
   it('violation text and check ordering (increased → decreased → equals → changedBy) is unchanged from before drift-report support', () => {

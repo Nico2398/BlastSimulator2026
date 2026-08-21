@@ -98,6 +98,6 @@ describe('runScenario — driftRecords (issue #679)', () => {
     ];
     const result = runScenario(engine, 'no-drift-test-scenario', steps, outDir, true);
 
-    expect(result.driftRecords ?? []).toEqual([]);
+    expect(result.driftRecords).toBeUndefined();
   });
 });

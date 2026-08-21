@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'path';
 import { tmpdir } from 'os';
-import { createGameEngine, runSteps, runScenario } from '../../scripts/shared/command-runner.js';
+import { createGameEngine, runSteps } from '../../scripts/shared/command-runner.js';
 import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 
 function run(steps: ScenarioStepDef[]) {
@@ -153,34 +153,12 @@ describe('runSteps with reportDrift=true', () => {
       { command: 'new_game seed:42', expect: { equals: { cash: 50000, buildingCount: 0 } } },
       { command: 'employee hire role:driller', expect: { increased: ['employeeCount'] } },
     ]);
-    expect(results[0]!.driftMismatches ?? []).toEqual([]);
-    expect(results[1]!.driftMismatches ?? []).toEqual([]);
+    expect(results[0]!.driftMismatches).toBeUndefined();
+    expect(results[1]!.driftMismatches).toBeUndefined();
   });
 });
 
-describe('runScenario with reportDrift=true (issue #679)', () => {
-  it('populates ScenarioResult.driftRecords with scenario/step/command plus the mismatch, when steps have mismatches', () => {
-    const engine = createGameEngine();
-    const outDir = resolve(tmpdir(), `bs2026-run-scenario-drift-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    const steps: ScenarioStepDef[] = [
-      { command: 'new_game seed:42', expect: { equals: { cash: 1 } } },
-    ];
-    const result = runScenario(engine, 'drift-scenario', steps, outDir, true);
-    expect(result.driftRecords).toBeDefined();
-    const rec = result.driftRecords!.find(r => r.field === 'cash')!;
-    expect(rec).toBeDefined();
-    expect(rec.scenario).toBe('drift-scenario');
-    expect(rec.step).toBe(0);
-    expect(rec.command).toBe('new_game seed:42');
-  });
-
-  it('leaves driftRecords absent/empty when there are no mismatches', () => {
-    const engine = createGameEngine();
-    const outDir = resolve(tmpdir(), `bs2026-run-scenario-no-drift-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    const steps: ScenarioStepDef[] = [
-      { command: 'new_game seed:42', expect: { equals: { cash: 50000, buildingCount: 0 } } },
-    ];
-    const result = runScenario(engine, 'clean-scenario', steps, outDir, true);
-    expect(result.driftRecords ?? []).toEqual([]);
-  });
-});
+// `runScenario`'s own `driftRecords` aggregation (scenario/step/command
+// plus the mismatch) is covered in tests/unit/command-runner.test.ts —
+// same function, same steps, same assertions as an earlier version of this
+// block; kept there only, matching that file's own stated scope.

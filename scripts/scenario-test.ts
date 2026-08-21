@@ -47,9 +47,8 @@ import type { ScenarioStepDef, StepResult } from './shared/scenario-types.js';
 import {
   createGameEngine,
   runSteps,
-  formatDriftReport,
-  writeDriftReportFile,
-  type DriftRecord,
+  toDriftRecords,
+  emitDriftReport,
   type GoalMismatch,
 } from './shared/command-runner.js';
 import {
@@ -137,13 +136,9 @@ if (mode === 'command') {
   runScenarioCommand(name, steps, reportDrift)
     .then(results => {
       if (reportDrift) {
-        const driftRecords: DriftRecord[] = results.flatMap(r =>
-          (r.driftMismatches ?? []).map(m => ({ ...m, scenario: name, step: r.step, command: r.command })),
-        );
-        console.log(`\n${formatDriftReport(driftRecords)}`);
+        const driftRecords = toDriftRecords(results, name);
         const driftPath = resolve(SCREENSHOT_DIR, `scenario-${name}-command`, 'drift-report.json');
-        writeDriftReportFile(driftRecords, driftPath);
-        console.log(`Drift report written to ${driftPath}`);
+        emitDriftReport(driftRecords, driftPath);
       }
       return results;
     })

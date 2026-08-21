@@ -10,6 +10,15 @@
  *
  * Default mode: command (pure Node.js, no browser, ~24s for all 99).
  * Interaction mode: shared Puppeteer browser, ~2-3min for all 99.
+ *
+ * --report-drift (command mode only, issue #679): a step whose only
+ * failures are equals/changedBy mismatches no longer marks the step (or its
+ * scenario) as failed — it runs to completion instead, and every such
+ * mismatch is collected into a drift report (stdout + drift-report.json)
+ * rather than aborting the run. Directional goals (increased/decreased)
+ * still fail the run as before. This means a run under --report-drift can
+ * exit 0 while its drift report is non-empty — that's the point: it's a
+ * run-to-completion report, not a pass/fail gate.
  */
 
 import { readdirSync, mkdirSync, writeFileSync } from 'fs';
@@ -18,8 +27,7 @@ import type { ScenarioStepDef } from './shared/scenario-types.js';
 import {
   createGameEngine,
   runScenario,
-  formatDriftReport,
-  writeDriftReportFile,
+  emitDriftReport,
   type ScenarioResult,
   type DriftRecord,
 } from './shared/command-runner.js';
@@ -305,10 +313,7 @@ async function main(): Promise<void> {
 
   if (reportDrift && mode === 'command') {
     const driftRecords: DriftRecord[] = results.flatMap(r => r.driftRecords ?? []);
-    console.log(`\n${formatDriftReport(driftRecords)}`);
-    const driftPath = resolve(SCREENSHOT_DIR, 'drift-report.json');
-    writeDriftReportFile(driftRecords, driftPath);
-    console.log(`Drift report written to ${driftPath}`);
+    emitDriftReport(driftRecords, resolve(SCREENSHOT_DIR, 'drift-report.json'));
   }
 
   // Summary

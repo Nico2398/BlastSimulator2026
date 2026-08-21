@@ -136,6 +136,40 @@ export function writeDriftReportFile(records: DriftRecord[], path: string): void
   writeFileSync(path, JSON.stringify(records, null, 2));
 }
 
+/**
+ * Turns a step's raw `driftMismatches` into `DriftRecord`s tagged with the
+ * scenario/step/command that produced them — the one aggregation both
+ * `runScenario` (below) and any caller holding its own per-step result array
+ * (`scenario-test.ts`, which needs those results for its own console
+ * printing and can't just delegate to `runScenario`) need to perform.
+ */
+export function toDriftRecords(
+  results: Array<{ step: number; command: string; driftMismatches?: GoalMismatch[] }>,
+  scenario: string,
+): DriftRecord[] {
+  const records: DriftRecord[] = [];
+  for (const r of results) {
+    if (r.driftMismatches) {
+      for (const m of r.driftMismatches) {
+        records.push({ ...m, scenario, step: r.step, command: r.command });
+      }
+    }
+  }
+  return records;
+}
+
+/**
+ * Prints the drift report to stdout, writes it to `path` as JSON, and logs
+ * the confirmation — the 4-statement sequence both CLI entry points
+ * (`run-all-scenarios.ts`, `scenario-test.ts`) run identically after a
+ * `--report-drift` batch, differing only in which directory `path` lands in.
+ */
+export function emitDriftReport(records: DriftRecord[], path: string): void {
+  console.log(`\n${formatDriftReport(records)}`);
+  writeDriftReportFile(records, path);
+  console.log(`Drift report written to ${path}`);
+}
+
 export function createGameEngine(): RunnerWithContext {
   return createRunner();
 }
@@ -182,7 +216,7 @@ export function runSteps(
         if (reportDrift && goalResult.mismatches.length > 0) {
           driftMismatches = goalResult.mismatches;
         }
-        if (goalResult.violation !== null && !(reportDrift && goalResult.onlyDriftViolations)) {
+        if (goalResult.violation !== null && !(reportDrift && goalResult.isDriftOnly)) {
           throw new Error(`expect failed: ${goalResult.violation}`);
         }
       }
@@ -245,16 +279,7 @@ export function runScenario(
       console.log(`[${name}] OK — ${steps.length} steps`);
     }
 
-    const driftRecords: DriftRecord[] = [];
-    if (reportDrift) {
-      for (const r of results) {
-        if (r.driftMismatches) {
-          for (const m of r.driftMismatches) {
-            driftRecords.push({ ...m, scenario: name, step: r.step, command: r.command });
-          }
-        }
-      }
-    }
+    const driftRecords: DriftRecord[] = reportDrift ? toDriftRecords(results, name) : [];
 
     return {
       name,

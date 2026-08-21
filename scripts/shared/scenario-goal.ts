@@ -35,7 +35,7 @@ export interface GoalCheckResult {
   /** Every equals/changedBy field that mismatched, exhaustively (not just the first). Never contains increased/decreased failures. */
   mismatches: GoalMismatch[];
   /** True only when violation is non-null and every contributing failure is in `mismatches` — i.e. no increased/decreased goal also failed. */
-  onlyDriftViolations: boolean;
+  isDriftOnly: boolean;
 }
 
 /**
@@ -120,7 +120,7 @@ export function checkGoalAgainstState(
   return {
     violation,
     mismatches,
-    onlyDriftViolations: violation !== null && violationIsDrift,
+    isDriftOnly: violation !== null && violationIsDrift,
   };
 }
 
