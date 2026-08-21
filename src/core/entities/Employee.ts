@@ -394,7 +394,7 @@ export function assignSkill(
   level: 1 | 2 | 3 | 4 | 5,
 ): boolean {
   const emp = state.employees.find(e => e.id === employeeId);
-  if (!emp) return false;
+  if (!emp || !emp.alive) return false;
 
   const idx = emp.qualifications.findIndex(q => q.category === category);
   const qual: SkillQualification = { category, proficiencyLevel: level, xp: 0 };

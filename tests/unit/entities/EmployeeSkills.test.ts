@@ -17,6 +17,7 @@ import { XP_THRESHOLDS } from '../../../src/core/config/balance.js';
 import {
   createEmployeeState,
   hireEmployee,
+  killEmployee,
   type EmployeeState,
   // ── New exports (CH1.4 — not yet implemented in Employee.ts) ────────────────
   assignSkill,
@@ -133,6 +134,28 @@ describe('assignSkill', () => {
     const before = state.employees.length;
     assignSkill(state, 9999, 'geology' as SkillCategory, 1);
     expect(state.employees.length).toBe(before);
+  });
+
+  // ── #675: assignSkill against a dead employee ──────────────────────────────
+
+  it('returns false when the employee is not alive', () => {
+    expect(killEmployee(state, empId)).toBe(true);
+
+    const ok = assignSkill(state, empId, 'blasting' as SkillCategory, 1);
+    expect(ok).toBe(false);
+  });
+
+  it('does not modify qualifications when the employee is not alive', () => {
+    const emp = state.employees.find(e => e.id === empId)!;
+    const before = JSON.parse(JSON.stringify(emp.qualifications));
+
+    killEmployee(state, empId);
+    // 'geology' is not the driller's starting qualification — a category the
+    // employee doesn't already hold, so a missing guard would append a new
+    // entry rather than silently no-op on an unchanged value.
+    assignSkill(state, empId, 'geology' as SkillCategory, 3);
+
+    expect(emp.qualifications).toEqual(before);
   });
 });
 

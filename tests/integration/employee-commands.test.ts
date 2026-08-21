@@ -6,6 +6,7 @@ import { employeeCommand, needsCommand } from '../../src/console/commands/entiti
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { drillPlanCommand, type MiningContext } from '../../src/console/commands/mining.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { killEmployee } from '../../src/core/entities/Employee.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -162,6 +163,33 @@ describe('Console — employee assign_skill', () => {
       );
       expect(result.success, `category "${category}" should be accepted`).toBe(true);
     }
+  });
+
+  // ── #675: assign_skill against a dead employee ────────────────────────────
+
+  it('refuses to assign a skill to a dead employee', () => {
+    killEmployee(ctx.state!.employees, empId);
+
+    const result = employeeCommand(
+      ctx,
+      ['assign_skill', String(empId)],
+      { skill: 'blasting', level: '3' },
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Employee #${empId} is dead and cannot be assigned a skill.`);
+  });
+
+  it('does not append a qualification when the refused call targets a dead employee', () => {
+    const emp = ctx.state!.employees.employees.find(e => e.id === empId)!;
+    const before = emp.qualifications.length;
+
+    killEmployee(ctx.state!.employees, empId);
+    // 'geology' is not the blaster's starting qualification, so a missing
+    // guard would grow the array rather than merely overwrite a value.
+    employeeCommand(ctx, ['assign_skill', String(empId)], { skill: 'geology', level: '3' });
+
+    expect(emp.qualifications.length).toBe(before);
   });
 });
 
