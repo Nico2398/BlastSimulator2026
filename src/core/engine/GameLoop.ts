@@ -1008,8 +1008,14 @@ function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedK
  *
  * Only owns employees whose restNeedKey identifies a resting need (set at
  * rest-start by the three creators above, or by tickEmployees when it claims
- * a queued autoInsertNeedTasks action) — Bunkhouse Tier 2+ shift-cycle rest
- * leaves restNeedKey null and remains owned by processShiftCycle/completeRestTick.
+ * a queued autoInsertNeedTasks action). Bunkhouse Tier 2+ shift-cycle rest
+ * under the legacy no-policy path leaves restNeedKey null and remains owned
+ * by processShiftCycle/completeRestTick — but once a site policy has been
+ * applied, forceShiftRestIfNeededByPolicy (#678) sets pendingRestNeedKey/
+ * restNeedKey for its own shift-forced rests too, so those ARE owned here,
+ * not by completeRestTick. This function also resets ticksWorked on
+ * completion, but only for rests it can identify as policy-forced (payload's
+ * triggeredBy === 'shift_cycle_policy') — see the check inline below.
  *
  * Injury does not block completion — an employee who becomes injured mid-rest
  * must still have their rest action finished and cleaned up, or activeActionId
@@ -1029,11 +1035,29 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     if (emp.restTicksRemaining > 0) continue;
 
     const completedActionId = emp.activeActionId;
+    // forceShiftRestIfNeededByPolicy marks its own rest action's payload with
+    // triggeredBy: 'shift_cycle_policy' (checked before completeRestForEmployee
+    // clears activeActionId) — that marker is what distinguishes it here from
+    // the other three rest creators (tickCollapse/tickNeedRestoration/
+    // autoInsertNeedTasks), whose payloads never use that value. Only a
+    // policy-forced shift rest restarts the continuous-work clock; see
+    // forceShiftRestIfNeededByPolicy's doc comment (#678).
+    const completedAction = completedActionId !== null
+      ? state.pendingActions.find(a => a.id === completedActionId)
+      : undefined;
+    const isPolicyShiftRest = completedAction?.payload.triggeredBy === 'shift_cycle_policy';
+
     completeRestForEmployee(state, emp, needKey);
     // tickCollapse/tickNeedRestoration/autoInsertNeedTasks leave the rest
     // action in pendingActions at creation (self-claimed or claimed later via
     // tickEmployees), so nothing else removes it once the rest completes.
     if (completedActionId !== null) completePendingAction(state, completedActionId);
+
+    // Mirrors completeRestTick's unconditional ticksWorked = 0 on completion —
+    // without this, a policy-forced rest never resets the continuous-work
+    // clock (nothing else does), so the very next tick immediately re-trips
+    // shouldForceRest and yanks the employee back into rest (#678).
+    if (isPolicyShiftRest) emp.ticksWorked = 0;
 
     completed.push({ employeeId: emp.id, needKey });
   }
@@ -1053,7 +1077,16 @@ export interface ShiftCycleResult {
 }
 
 /**
- * Process the shift/rest cycle for employees with bunkhouse tier >= 2.
+ * Process the shift/rest cycle for employees. With no site policy ever
+ * applied (state.sitePolicy.revision === 0), this is gated on bunkhouse
+ * tier >= 2 as before (#678) and uses the legacy fatigue-only,
+ * fixed-duration forceShiftRestIfNeeded/completeRestTick path. Once a policy
+ * has been applied, it runs for every alive/non-injured employee regardless
+ * of bunkhouse tier (a tier-1 living_quarters, or no building at all, is a
+ * valid rest destination under a policy) and routes force-rest through the
+ * policy-aware forceShiftRestIfNeededByPolicy, whose completion is owned by
+ * tickGeneralRestCompletion instead of completeRestTick.
+ *
  * Empties restTicksRemaining on completion and transitions employees
  * between working and resting states.
  *
@@ -1061,6 +1094,7 @@ export interface ShiftCycleResult {
  *   1. Complete rests — decrement restTicksRemaining, replenish fatigue on completion
  *   2. Increment ticksWorked — for active employees not currently resting
  *   3. Force shift rest — when ticksWorked reaches the work-duration threshold
+ *      (legacy path), or when SitePolicy.shouldForceRest trips (policy path)
  *
  * @param state - The game state (mutated in place)
  * @param firedEvents - Accumulator for events fired this tick
@@ -1231,8 +1265,11 @@ function completeRestTick(
 ): void {
   if (emp.restTicksRemaining === null) return;
   // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks (hunger,
-  // breakNeed, or Tier-1 living_quarters fatigue) carry a restNeedKey and are owned
-  // by tickGeneralRestCompletion instead — skip them here to avoid double-processing.
+  // breakNeed, or Tier-1 living_quarters fatigue), or — once a site policy has
+  // been applied (#678) — by forceShiftRestIfNeededByPolicy, all carry a
+  // restNeedKey and are owned by tickGeneralRestCompletion instead — skip
+  // them here to avoid double-processing. This function only ever runs the
+  // legacy no-policy path (processShiftCycle only calls it when !policyApplied).
   if (emp.restNeedKey !== null) return;
 
   emp.restTicksRemaining -= 1;
