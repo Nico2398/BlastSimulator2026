@@ -23,6 +23,7 @@ import {
 } from './ActionSelection.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, releaseVehicleOnCompletion } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { shouldForceRest, getEffectiveThresholds } from '../entities/SitePolicy.js';
 
 // ── Config ──
 
@@ -1075,7 +1076,16 @@ export function processShiftCycle(
     b => b.type === 'living_quarters' && b.tier >= 2 && b.active,
   );
 
-  if (!hasBunkhouse) {
+  // #678: an applied policy (revision > 0 — see SitePolicy.ts's own doc
+  // comment on `revision` for why this, not a value comparison, is what
+  // "has the player set a policy?" means) runs shift-cycle processing
+  // regardless of bunkhouse tier — a tier-1 living_quarters, or no building
+  // at all, is a valid rest destination under a policy, not a disqualifier.
+  // With no policy ever applied, behaviour is byte-for-byte identical to
+  // before #678: gated on hasBunkhouse alone, same legacy rest path below.
+  const policyApplied = state.sitePolicy.revision > 0;
+
+  if (!policyApplied && !hasBunkhouse) {
     return { restCompleted: [], shiftRested: [], active: false };
   }
 
@@ -1094,7 +1104,11 @@ export function processShiftCycle(
     incrementWorkTick(state, emp);
 
     // Phase 3: Force shift rest when work quota is met
-    forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested, _emitter);
+    if (policyApplied) {
+      forceShiftRestIfNeededByPolicy(state, emp, firedEvents, shiftRested, _emitter);
+    } else {
+      forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested, _emitter);
+    }
   }
 
   return { restCompleted, shiftRested, active: true };
@@ -1319,7 +1333,27 @@ function forceShiftRestIfNeeded(
  * > 0) forces rest for real, using any living_quarters tier (tier 1
  * included) or resting in place if none exists.
  *
- * TODO: implement — not yet wired into processShiftCycle.
+ * Same guard shape as the legacy function: skip an employee already resting
+ * (restTicksRemaining !== null), already walking to a queued rest
+ * (pendingRestDuration !== null), or currently idle (activeActionId ===
+ * null — shouldForceRest's own `isWorking` gate; an idle employee has
+ * nothing to interrupt and is handled by the other need-restoration paths
+ * instead). shouldForceRest itself then decides, per SitePolicy's rules: a
+ * full shift under a timed mode (shift_8h/shift_12h), or hunger/fatigue at
+ * or below its effective threshold (custom-mode per-employee overrides via
+ * getEffectiveThresholds) for every mode including continuous/custom.
+ *
+ * Unlike the legacy function (fatigue-only, fixed SHIFT_SLEEP_DURATION_TICKS,
+ * tier>=2 only), this routes to the nearest living_quarters of ANY tier
+ * (findNearestLivingQuarters is already tier-unfiltered), replenishes
+ * whichever need actually tripped the threshold (hunger if
+ * emp.hunger <= thresholds.hunger, else fatigue — covers both a
+ * fatigue-threshold trip and a shift-duration trip, matching the legacy
+ * function's fatigue-only shift rest), and sets pendingRestNeedKey so
+ * completion routes through the general tickGeneralRestCompletion /
+ * completeRestForEmployee path (NEED_REST_DURATIONS-based duration,
+ * BUILDING_REPLENISH_RATES-based replenishment, NEED_REST_NO_BUILDING_CAP
+ * when resting in place) instead of processShiftCycle's own completeRestTick.
  */
 function forceShiftRestIfNeededByPolicy(
   state: GameState,
@@ -1328,7 +1362,55 @@ function forceShiftRestIfNeededByPolicy(
   shiftRested: number[],
   _emitter?: EventEmitter,
 ): void {
-  throw new Error('not implemented');
+  if (emp.restTicksRemaining !== null) return;
+  // Already walking to a queued rest — see forceShiftRestIfNeeded's own
+  // comment on the same check (#437).
+  if (emp.pendingRestDuration !== null) return;
+  if (emp.activeActionId === null) return;
+
+  const snapshot = { id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked };
+  if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
+
+  const thresholds = getEffectiveThresholds(state.sitePolicy, emp.id);
+  const needKey: NeedKey = emp.hunger <= thresholds.hunger ? 'hunger' : 'fatigue';
+
+  // Find nearest living_quarters of any tier for target coordinates.
+  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  let targetX = emp.x;
+  let targetZ = emp.z;
+  let buildingId: number | undefined;
+  let restDuration = NEED_REST_DURATIONS[needKey];
+
+  if (building) {
+    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
+    targetX = approach.x;
+    targetZ = approach.z;
+    buildingId = building.id;
+  } else {
+    // No living_quarters at all — the employee rests in place.
+    restDuration *= NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
+  }
+
+  // The rest timer itself does not start until ArrivalGate.tickArrivalGate
+  // confirms the employee has walked to the building (#437).
+  emp.pendingRestDuration = restDuration;
+  emp.pendingRestNeedKey = needKey;
+
+  // Immediately claimed — status/holderId reflect that from creation (#547).
+  const restAction = createRestPendingAction(state, {
+    targetX,
+    targetZ,
+    targetEmployeeId: emp.id,
+    payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId },
+  }, emp.id);
+
+  state.pendingActions.push(restAction);
+  emp.activeActionId = restAction.id;
+  emp.destinationX = targetX;
+  emp.destinationZ = targetZ;
+  shiftRested.push(emp.id);
+  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
 }
 
 /**

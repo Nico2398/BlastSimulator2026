@@ -83,16 +83,7 @@ export function shouldForceRest(
   }
 
   // Determine effective thresholds
-  let hungerThreshold = policy.hungerRestThreshold;
-  let fatigueThreshold = policy.fatigueRestThreshold;
-
-  if (policy.shiftMode === 'custom' && employee.id !== undefined) {
-    const override = policy.customThresholds[employee.id];
-    if (override !== undefined) {
-      hungerThreshold = override.hunger;
-      fatigueThreshold = override.fatigue;
-    }
-  }
+  const { hunger: hungerThreshold, fatigue: fatigueThreshold } = getEffectiveThresholds(policy, employee.id);
 
   // Need-based rest check
   if (employee.hunger <= hungerThreshold || employee.fatigue <= fatigueThreshold) {
@@ -106,9 +97,18 @@ export function shouldForceRest(
  * Returns the effective hunger/fatigue rest thresholds for an employee under
  * this policy — per-employee `customThresholds` override (in 'custom' mode)
  * take precedence over the policy-level defaults when present.
- *
- * TODO: implement
  */
 export function getEffectiveThresholds(policy: SitePolicy, employeeId?: number): { hunger: number; fatigue: number } {
-  throw new Error('not implemented');
+  let hungerThreshold = policy.hungerRestThreshold;
+  let fatigueThreshold = policy.fatigueRestThreshold;
+
+  if (policy.shiftMode === 'custom' && employeeId !== undefined) {
+    const override = policy.customThresholds[employeeId];
+    if (override !== undefined) {
+      hungerThreshold = override.hunger;
+      fatigueThreshold = override.fatigue;
+    }
+  }
+
+  return { hunger: hungerThreshold, fatigue: fatigueThreshold };
 }
