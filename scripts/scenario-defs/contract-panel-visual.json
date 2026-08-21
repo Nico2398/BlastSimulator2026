@@ -42,15 +42,15 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 1",
+      "command": "contract accept type:supply material:dirtite",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"1\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -61,9 +61,9 @@
         "equals": {
           "activeContractCount": 1
         },
-        "note": "real click on the Contracts panel's first available row -- contract #1 (Supply dirtite) is genuinely first in both the console list and the panel, matching `contract accept 1`'s explicit id; no Finding #55-class mismatch here"
+        "note": "real click on the Contracts panel's supply/dirtite offer -- contract #1 (Supply dirtite) is genuinely first in both the console list and the panel, confirmed via a real interaction-mode run; no Finding #55-class mismatch here"
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"1\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #1 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581/#635: the accept click is scoped to `[data-contract-type=\"supply\"][data-contract-material=\"dirtite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the supply/dirtite contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it -- and, unlike the numeric id it replaces (#635), survives the offer pool rotating past it."
     },
     {
       "command": "contract status",
@@ -138,15 +138,15 @@
       "role": "observe"
     },
     {
-      "command": "contract accept 2",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -157,9 +157,9 @@
         "equals": {
           "activeContractCount": 2
         },
-        "note": "2nd real click on the same unqualified .bs-contract-accept selector -- with contract #1 already moved to active, the panel's first available row is now #2 (Dispose of rubble), matching `contract accept 2`'s explicit id; verified via a real interaction-mode run rather than assumed from panel-ordering logic"
+        "note": "2nd real click, now scoped to the rubble_disposal offer -- with the supply/dirtite contract already moved to active, the panel's first available row is now #2 (Dispose of rubble); verified via a real interaction-mode run rather than assumed from panel-ordering logic"
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-id=\"2\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted contract #2 literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-id]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it."
+      "description": "#513/#581/#635: the accept click is scoped to `[data-contract-type=\"rubble_disposal\"]` (no `material:` clause -- rubble contracts carry `materialId=''`), the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the rubble_disposal contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it -- and, unlike the numeric id it replaces (#635), survives the offer pool rotating past it."
     },
     {
       "command": "contract status",
@@ -198,14 +198,14 @@
       "commandOutcome": "either"
     },
     {
-      "command": "contract deliver 2 amount:300",
+      "command": "contract deliver type:rubble_disposal amount:300",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 2 amount:300"
+          "command": "contract deliver type:rubble_disposal amount:300"
         }
       ],
-      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 because this scenario never mines or hauls, so nothing is ever in storage (0.0 kg available). A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-id=\"2\"]`, issue #513) rather than performing one.",
+      "description": "role: guard (issue #515): both the amount input and DELIVER button are genuinely disabled here \u2014 `amountInput.disabled = maxDeliverable <= 0` and `deliverBtn.disabled = maxDeliverable <= 0` (ContractsPanel.ts) \u2014 because this scenario never mines or hauls, so nothing is ever in storage (0.0 kg available). A real click cannot land on either control, so this proves the same refusal `expect.blocked` already asserted (now scoped to `[data-contract-type=\"rubble_disposal\"]`, issue #513/#635) rather than performing one.",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -214,7 +214,7 @@
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"2\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
         "note": "delivery fails honestly (0.0 kg available) -- this scenario never mines or hauls, so nothing is ever in storage; see this step's own BLOCKED FINDING description for the #445 silent-no-op class this surfaced"
       },
       "role": "guard",

@@ -561,7 +561,7 @@
       }
     },
     {
-      "command": "contract accept 5",
+      "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
           "type": "clickSelector",
@@ -569,11 +569,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -587,17 +587,17 @@
           "tickCount": 0
         }
       },
-      "description": "#554: contract id renumbered 3 -> 5 -- charging is now queued, real work (the wait_until step drains the first pattern's charge order before the file can proceed), so this checkpoint's tickCount lands later than the pre-#554 trace and the pool has refreshed further (CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3) by the time this step runs, so ids 1-4 are long gone from it. #5 (rubble, 260kg @ $1.74/kg, 75-tick deadline, $136 penalty) is genuinely first in the live pool at this tick -- probed via `contract list`. #513/#581: the accept click is scoped to `[data-contract-id=\"5\"]`, the contract this step's `command` names -- unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so scoping keeps both channels testing the same acceptance."
+      "description": "#554: this contract's numeric id kept renumbering run to run (charging is now queued, real work, so this checkpoint's tickCount lands later than earlier traces and the pool refreshes further -- CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3 -- by the time this step runs). #635 drops the numeric id for the stable `type:rubble_disposal` selector (rubble, 260kg @ $1.74/kg, 75-tick deadline, $136 penalty -- confirmed via `contract list`; materialId '' for this type, so no `material:` clause). #513/#581: the accept click is scoped to `[data-contract-type=\"rubble_disposal\"]`, the contract this step's `command` names -- unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so scoping keeps both channels testing the same acceptance."
     },
     {
-      "command": "contract deliver 5 amount:300",
+      "command": "contract deliver type:rubble_disposal amount:300",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 5 amount:300"
+          "command": "contract deliver type:rubble_disposal amount:300"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against this contract -- the single driller this file hires never touches hauling, and no debris_hauler is ever bought. The console command is no better: it returns success:false (\"Not enough rubble in storage: 0.0 kg available, 300.0 kg requested\") and command mode only fails a step on a thrown exception, so this is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. Issue #585 (this session): `commandOutcome: 'refused'` restored -- the #585 audit (commit 7162e090) already classified this exact shape, 'contract deliver on an empty warehouse', as a guard step that declares the field with no description change (see tutorial-playthrough.json's own three identically-worded guard steps), but this file's #553/#554/#555 rescue-merge redrifted the contract id/amount here (id 5, 300kg, rubble) away from whatever numbers that original fix last saw, and the field was lost in the process. The guard's own claim was never wrong -- confirmed via a live `ScenarioCommandOutcomes` replay and a full `run-all-scenarios` run that the refusal text above is still word-for-word what actually happens; only the structural declaration was missing.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against this contract -- the single driller this file hires never touches hauling, and no debris_hauler is ever bought. The console command is no better: it returns success:false (\"Not enough rubble in storage: 0.0 kg available, 300.0 kg requested\") and command mode only fails a step on a thrown exception, so this is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. #635: dropped the numeric id for `type:rubble_disposal`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- the #585 audit (commit 7162e090) already classified this exact shape, 'contract deliver on an empty warehouse', as a guard step that declares the field with no description change (see tutorial-playthrough.json's own three identically-worded guard steps), but this file's #553/#554/#555 rescue-merge redrifted the contract id/amount here away from whatever numbers that original fix last saw, and the field was lost in the process. The guard's own claim was never wrong -- confirmed via a live `ScenarioCommandOutcomes` replay and a full `run-all-scenarios` run that the refusal text above is still word-for-word what actually happens; only the structural declaration was missing.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -605,7 +605,7 @@
           "activeContractCount": 1
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"5\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver",
         "note": "stays active/undelivered -- economy-full-loop.json is the file that actually hauls stock and completes a delivery.",
         "changedBy": {
           "tickCount": 0
@@ -935,7 +935,7 @@
       }
     },
     {
-      "command": "contract accept 7",
+      "command": "contract accept type:supply material:blingite",
       "interaction": [
         {
           "type": "clickSelector",
@@ -943,11 +943,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"7\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"7\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -961,17 +961,17 @@
           "tickCount": 0
         }
       },
-      "description": "#554: contract id renumbered 5 -> 7 for this file's second accept -- id 5 (accepted above) is no longer offered, and ids 1-6 have rolled out of the pool by the time this step runs (CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3, independent of anything this file does). #7 (blingite bulk, 440kg @ $22.11/kg, 97-tick deadline, $2919 penalty) is genuinely first in the live pool at this tick -- probed via `contract list`. #513/#581: the accept click is scoped to `[data-contract-id=\"7\"]`, the contract this step's `command` names, for the same DOM-order-coupling reason documented on the first accept step above."
+      "description": "#554: this contract's numeric id kept renumbering run to run for this file's second accept (the earlier rubble accept above, plus contract-pool refreshes -- CONTRACT_REFRESH_INTERVAL=20, CONTRACTS_PER_REFRESH=3 -- independent of anything this file does). #635 drops the numeric id for the stable `type:supply material:blingite` selector (blingite bulk, 440kg @ $22.11/kg, 97-tick deadline, $2919 penalty -- confirmed via `contract list`). #513/#581: the accept click is scoped to `[data-contract-type=\"supply\"][data-contract-material=\"blingite\"]`, the contract this step's `command` names, for the same DOM-order-coupling reason documented on the first accept step above."
     },
     {
-      "command": "contract deliver 7 amount:400",
+      "command": "contract deliver type:supply material:blingite amount:400",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 7 amount:400"
+          "command": "contract deliver type:supply material:blingite amount:400"
         }
       ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (rubble #5, blingite #7) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 400.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. Issue #585 (this session): `commandOutcome: 'refused'` restored -- same retrofit as the deliver step above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount (id 7, 400kg, blingite); the guard's own claim was already correct, re-confirmed via the same live replay.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (rubble, blingite supply) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 400.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:blingite`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the deliver step above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -979,7 +979,7 @@
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"7\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"blingite\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }
@@ -1343,7 +1343,7 @@
       }
     },
     {
-      "command": "contract accept 8",
+      "command": "contract accept type:supply material:gloomium",
       "interaction": [
         {
           "type": "clickSelector",
@@ -1351,11 +1351,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"8\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"gloomium\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-id=\"8\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"gloomium\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1369,17 +1369,17 @@
           "tickCount": 0
         }
       },
-      "description": "#554: contract id renumbered 7 -> 8 for this file's third accept -- id 7 (accepted above) is no longer offered by this tick, matching the live pool at tick 195 (probed via `contract list`) -- #8, Supply gloomium (bulk), 320kg @ $67.86/kg, 44-tick deadline, $6,514 penalty. Same DOM-order scoping reasoning as the two accept steps above."
+      "description": "#554: this contract's numeric id kept renumbering run to run for this file's third accept (the two earlier accepts above, plus the pool refreshing further by this tick). #635 drops the numeric id for the stable `type:supply material:gloomium` selector -- Supply gloomium (bulk), 320kg @ $67.86/kg, 44-tick deadline, $6,514 penalty, confirmed via `contract list` at tick 195. Same DOM-order scoping reasoning as the two accept steps above."
     },
     {
-      "command": "contract deliver 8 amount:250",
+      "command": "contract deliver type:supply material:gloomium amount:250",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver 8 amount:250"
+          "command": "contract deliver type:supply material:gloomium amount:250"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available, 250.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. Issue #585 (this session): `commandOutcome: 'refused'` restored -- same retrofit as the two deliver steps above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount (id 8, 250kg, gloomium); the guard's own claim was already correct, re-confirmed via the same live replay.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available, 250.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:gloomium`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the two deliver steps above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1387,7 +1387,7 @@
           "activeContractCount": 3
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-id=\"8\"] .bs-contract-deliver",
+        "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"gloomium\"] .bs-contract-deliver",
         "changedBy": {
           "tickCount": 0
         }

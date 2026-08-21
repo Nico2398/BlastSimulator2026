@@ -1548,9 +1548,9 @@
           "command": "contract deliver type:ore_sale amount:100"
         }
       ],
-      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace: storedMassKg ~2160kg available against the 100kg requested) rather than refusing -- the step's own `expect.blocked` still holds and is still checked, but only in interaction mode, where nothing about this fix applies (see above); a step whose command now succeeds proving a *different* mode's control stays unreachable is not a contradiction, since command mode and interaction mode run two independent action sequences from here on (this file's own top-level description covers why interaction mode's is permanently blocked from tick 132 on, for an unrelated reason -- LevelEndScreen's overlay, not empty storage).",
+      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace: storedMassKg ~2160kg available against the 100kg requested) rather than refusing -- the step's own `expect.blocked` still holds and is still checked, but only in interaction mode, where nothing about this fix applies (see above); a step whose command now succeeds proving a *different* mode's control stays unreachable is not a contradiction, since command mode and interaction mode run two independent action sequences from here on (this file's own top-level description covers why interaction mode's is permanently blocked from tick 132 on, for an unrelated reason -- LevelEndScreen's overlay, not empty storage). #654 (merge, agrees independently on interaction mode): the same `data-contract-type=\"ore_sale\"` type-based selector this step's own `expect.blocked` already used, arrived at separately on main before #585's freight_warehouse fix landed there -- interaction mode's own storage genuinely never fills in main's version of this file (no freight_warehouse), so #654's own \"blocked because storage never holds anything\" reasoning holds for interaction mode exactly as before; command mode's divergent, now-succeeding path is this branch's own addition on top.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"26\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -1585,9 +1585,9 @@
           "command": "contract deliver type:ore_sale amount:40"
         }
       ],
-      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the first deliver step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the earlier deliver step. Lands on the same contract the first delivery above did (see the second accept step's own note on why) -- confirmed via direct trace: both deliveries succeed against contract #30 there, taking it to 140/490kg, still short of completion, matching this file's own `activeContractCount: 2` a few steps below.",
+      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the first deliver step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the earlier deliver step. Lands on the same contract the first delivery above did (see the second accept step's own note on why) -- confirmed via direct trace: both deliveries succeed against contract #30 there, taking it to 140/490kg, still short of completion, matching this file's own `activeContractCount: 2` a few steps below. #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main -- see the first deliver step's own note for why command mode and interaction mode diverge here.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"26\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -2410,9 +2410,9 @@
           "command": "contract deliver type:ore_sale amount:100"
         }
       ],
-      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) and, unlike pattern 1's own two-delivery group, this one contract's own quantity (100kg, the first rubble-disposal offer in the pool at this tick) happens to exactly match the amount requested -- the delivery COMPLETES the contract outright (with an early bonus) rather than partially delivering, which is why `activeContractCount` reads 0, not 1, a few steps below despite the accept just above genuinely having added one. `expect.blocked` still holds and is still checked in interaction mode only, for the unrelated LevelEndScreen reason (this file's own top-level description) -- see the pattern-1 deliver step's own note for why a succeeding command and a still-blocked interaction control aren't a contradiction.",
+      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) and, unlike pattern 1's own two-delivery group, this one contract's own quantity (100kg, the first rubble-disposal offer in the pool at this tick) happens to exactly match the amount requested -- the delivery COMPLETES the contract outright (with an early bonus) rather than partially delivering, which is why `activeContractCount` reads 0, not 1, a few steps below despite the accept just above genuinely having added one. `expect.blocked` still holds and is still checked in interaction mode only, for the unrelated LevelEndScreen reason (this file's own top-level description) -- see the pattern-1 deliver step's own note for why a succeeding command and a still-blocked interaction control aren't a contradiction. #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"71\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -2990,9 +2990,9 @@
           "command": "contract deliver type:ore_sale amount:300"
         }
       ],
-      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above (leftover pattern-1/2 stock, not pattern 3's own phantom blast). Command mode now genuinely succeeds (confirmed via direct trace) -- the first rubble-disposal offer in the pool at this tick is 90kg, so the 300kg requested caps down to 90kg and the delivery COMPLETES the contract outright (with an early bonus), which is why `activeContractCount` reads 0, not 1, a few steps below despite the accept just above genuinely having added one (same completes-immediately shape as pattern 2's own group above).",
+      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above (leftover pattern-1/2 stock, not pattern 3's own phantom blast). Command mode now genuinely succeeds (confirmed via direct trace) -- the first rubble-disposal offer in the pool at this tick is 90kg, so the 300kg requested caps down to 90kg and the delivery COMPLETES the contract outright (with an early bonus), which is why `activeContractCount` reads 0, not 1, a few steps below despite the accept just above genuinely having added one (same completes-immediately shape as pattern 2's own group above). #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"101\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -3689,9 +3689,9 @@
           "command": "contract deliver type:ore_sale amount:350"
         }
       ],
-      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) -- the first rubble-disposal offer in the pool at this tick is 250kg, so the 350kg requested caps down to 250kg and the delivery COMPLETES the contract outright (with an early bonus), same completes-immediately shape as patterns 2 and 3's own groups above, which is why `activeContractCount` reads 0, not 1, at every step for the rest of this file despite the accept just above genuinely having added one.",
+      "description": "issue #585 (command-mode-only; interaction array intentionally left as the original `type:ore_sale` -- see the accept step's own note): switched from `type:ore_sale` to `type:rubble_disposal`, same reasoning as the accept step above. Command mode now genuinely succeeds (confirmed via direct trace) -- the first rubble-disposal offer in the pool at this tick is 250kg, so the 350kg requested caps down to 250kg and the delivery COMPLETES the contract outright (with an early bonus), same completes-immediately shape as patterns 2 and 3's own groups above, which is why `activeContractCount` reads 0, not 1, at every step for the rest of this file despite the accept just above genuinely having added one. #654 (merge, agrees independently on interaction mode): same `data-contract-type=\"ore_sale\"` selector this step's own `expect.blocked` already used, arrived at separately on main; `usable` on goto-ops also dropped there -- covered by the same overlay as everything else.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"139\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },

@@ -21,8 +21,8 @@
       "command": "vehicle driver 1 1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -120,8 +120,8 @@
       "command": "employee fire 2",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickIfPresent",
@@ -266,8 +266,8 @@
       "command": "vehicle buy drill_rig tier:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -317,8 +317,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -353,8 +353,8 @@
       "command": "vehicle buy drill_rig tier:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -403,8 +403,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -439,8 +439,8 @@
       "command": "vehicle buy drill_rig tier:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -489,8 +489,8 @@
       "command": "drill_plan grid rows:7 cols:7 spacing:2 depth:6 diameter:0.089 start:5,5",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -1011,8 +1011,8 @@
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -2007,8 +2007,8 @@
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -2080,7 +2080,6 @@
         }
       ],
       "role": "player",
-      "description": "Blast panel was last closed by the employee-hiring loop above (last opened #bs-toolbar [data-panel=\"employees\"] at step 71) -- clicking #bs-blast-panel [data-step=\"2\"] directly on a hidden panel (display:none on the whole panel root, BlastWorkshop.ts) hits a zero-size element, confirmed by real interaction-mode CI. Reopen the Blast panel via its toolbar tab first, same as step 23 above.",
       "expect": {
         "increased": [
           "orderedChargeCount"
