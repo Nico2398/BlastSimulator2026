@@ -101,3 +101,14 @@ export function shouldForceRest(
 
   return false;
 }
+
+/**
+ * Returns the effective hunger/fatigue rest thresholds for an employee under
+ * this policy — per-employee `customThresholds` override (in 'custom' mode)
+ * take precedence over the policy-level defaults when present.
+ *
+ * TODO: implement
+ */
+export function getEffectiveThresholds(policy: SitePolicy, employeeId?: number): { hunger: number; fatigue: number } {
+  throw new Error('not implemented');
+}

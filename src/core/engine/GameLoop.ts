@@ -1314,6 +1314,24 @@ function forceShiftRestIfNeeded(
 }
 
 /**
+ * Site-policy-aware variant of forceShiftRestIfNeeded (#678) — consults
+ * SitePolicy.shouldForceRest so an applied policy (state.sitePolicy.revision
+ * > 0) forces rest for real, using any living_quarters tier (tier 1
+ * included) or resting in place if none exists.
+ *
+ * TODO: implement — not yet wired into processShiftCycle.
+ */
+function forceShiftRestIfNeededByPolicy(
+  state: GameState,
+  emp: Employee,
+  firedEvents: FiredEvent[],
+  shiftRested: number[],
+  _emitter?: EventEmitter,
+): void {
+  throw new Error('not implemented');
+}
+
+/**
  * Shared completion path for any vehicle-gated action (#552): continuity-
  * promote a same-role follow-up action if one exists (mirrors
  * tryContinueVehicleGatedAction), else release the vehicle/dismount the
