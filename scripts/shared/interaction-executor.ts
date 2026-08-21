@@ -425,6 +425,41 @@ export function checkStepActionAllowed(
  *   fires, instead of a bare "Step N timed out after Xms" (issue: PR #616
  *   review round, item 5 — richer timeout diagnostics).
  */
+// #bs-toolbar's own `data-panel` -> the panel element __uiState() reports
+// visibility for (main.ts's `panels` map). `settings` opens a modal, not a
+// toggle panel, and is deliberately absent here even though TOOLBAR_TARGET
+// carries it — that absence, not TOOLBAR_TARGET's own key set, is what makes
+// "settings" rejected in the `ensurePanel` case below. Module scope (not
+// case-local) so both `ensurePanel` and `ensureStep` can reference the same
+// map instead of hardcoding a panel element id a second time (#652).
+const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
+  blast: 'bs-blast-panel',
+  contracts: 'bs-contract-panel',
+  ops: 'bs-operations-panel',
+  build: 'bs-build-panel',
+  vehicles: 'bs-vehicle-panel',
+  employees: 'bs-employee-panel',
+  survey: 'bs-survey-panel',
+};
+
+/**
+ * Whether the panel element `panelId` (a `PANEL_ELEMENT_ID` value) is
+ * currently visible, read from the page's own `__uiState()` mirror rather
+ * than the DOM directly. Shared by `ensurePanel` (checking the panel it is
+ * about to toggle) and `ensureStep` (checking the Blast panel is open before
+ * touching its step tabs) so the same `page.evaluate` closure exists once
+ * (#652).
+ */
+async function isPanelVisible(page: Page, panelId: string): Promise<boolean> {
+  return page.evaluate((id: string) => {
+    const getUiState = (window as unknown as {
+      __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
+    }).__uiState;
+    const st = getUiState === undefined ? null : getUiState();
+    return st?.panels[id]?.visible ?? false;
+  }, panelId);
+}
+
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
@@ -831,23 +866,11 @@ export async function executeActionOnPage(
       break;
     }
     case 'ensurePanel': {
-      // #bs-toolbar's own `data-panel` -> the panel element __uiState()
-      // reports visibility for (main.ts's `panels` map). `settings` opens a
-      // modal, not a toggle panel, and is deliberately absent here even
-      // though TOOLBAR_TARGET carries it — that absence, not TOOLBAR_TARGET's
-      // own key set, is what makes "settings" rejected below. The click
-      // selector itself reuses TOOLBAR_TARGET (tutorialStepHelpers.ts, pure
-      // data — the tutorial's own highlight targets) rather than rebuilding
-      // the same `#bs-toolbar [data-panel="..."]` string by hand a second time.
-      const PANEL_ELEMENT_ID: Partial<Record<keyof typeof TOOLBAR_TARGET, string>> = {
-        blast: 'bs-blast-panel',
-        contracts: 'bs-contract-panel',
-        ops: 'bs-operations-panel',
-        build: 'bs-build-panel',
-        vehicles: 'bs-vehicle-panel',
-        employees: 'bs-employee-panel',
-        survey: 'bs-survey-panel',
-      };
+      // PANEL_ELEMENT_ID is module-scoped (see above) so `ensureStep` below
+      // can reuse it too. The click selector itself reuses TOOLBAR_TARGET
+      // (tutorialStepHelpers.ts, pure data — the tutorial's own highlight
+      // targets) rather than rebuilding the same
+      // `#bs-toolbar [data-panel="..."]` string by hand a second time.
       const panelKey = action.panel as keyof typeof TOOLBAR_TARGET;
       const panelId = PANEL_ELEMENT_ID[panelKey];
       const selector = TOOLBAR_TARGET[panelKey];
@@ -855,13 +878,7 @@ export async function executeActionOnPage(
         throw new Error(`ensurePanel: unknown panel "${action.panel}" (not a toggle panel, or misspelled)`);
       }
 
-      const alreadyOpen = await page.evaluate((id: string) => {
-        const getUiState = (window as unknown as {
-          __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
-        }).__uiState;
-        const st = getUiState === undefined ? null : getUiState();
-        return st?.panels[id]?.visible ?? false;
-      }, panelId);
+      const alreadyOpen = await isPanelVisible(page, panelId);
 
       onProgress?.(`ensurePanel "${action.panel}" ${alreadyOpen ? 'already open' : 'opening'}`);
       if (!alreadyOpen) {
@@ -870,6 +887,13 @@ export async function executeActionOnPage(
       break;
     }
     case 'ensureStep': {
+      const blastPanelId = PANEL_ELEMENT_ID.blast;
+      if (blastPanelId === undefined || !(await isPanelVisible(page, blastPanelId))) {
+        throw new Error(
+          "ensureStep: the Blast panel is not open — call ensurePanel({ panel: 'blast' }) first",
+        );
+      }
+
       const active = await page.evaluate(() => {
         const getUiState = (window as unknown as {
           __uiState?: () => { activeBlastStep: number } | null;

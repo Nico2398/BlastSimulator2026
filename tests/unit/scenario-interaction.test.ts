@@ -345,19 +345,25 @@ describe('executeActionOnPage — ensurePanel (PR #616 review round, item 7)', (
 
 describe('executeActionOnPage — ensureStep (PR #616 review round, item 7)', () => {
   it('does not click when __uiState().activeBlastStep already matches', async () => {
-    const evaluate = vi.fn().mockResolvedValueOnce(2);
+    // First resolved value stands for the panel-visibility read
+    // (__uiState().panels['bs-blast-panel'].visible === true); the second
+    // stands for the activeBlastStep read that follows it (#652).
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(2);
     const page = fakePage({ evaluate });
     const step: ScenarioStepDef = { command: 'charge hole:H1 explosive:boomite amount:5kg stemming:2m', role: 'setup' };
     const action = { type: 'ensureStep' as const, step: 2 as const };
 
     await executeActionOnPage(page, action, step);
 
-    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(evaluate).toHaveBeenCalledTimes(2);
     expect(page.click).not.toHaveBeenCalled();
   });
 
   it('clicks the step tab when __uiState().activeBlastStep does not match', async () => {
     const evaluate = vi.fn()
+      .mockResolvedValueOnce(true) // panel-visibility read: Blast panel open
       .mockResolvedValueOnce(3)
       .mockResolvedValueOnce(null); // waitUsableAndClick's own probe: usable now
     const page = fakePage({ evaluate });
@@ -367,6 +373,42 @@ describe('executeActionOnPage — ensureStep (PR #616 review round, item 7)', ()
     await executeActionOnPage(page, action, step);
 
     expect(page.click).toHaveBeenCalledWith('#bs-blast-panel [data-step="2"]');
+  });
+
+  // Issue #652: ensureStep clicks the tab selector without ever checking
+  // whether the Blast panel itself is open. With the panel closed, the tab
+  // is display:none and waitUsableAndClick times out with a generic "control
+  // not usable" message instead of naming the real cause. ensureStep must
+  // read __uiState().panels['bs-blast-panel'].visible (via the module-scope
+  // PANEL_ELEMENT_ID.blast) before its activeBlastStep check and reject with
+  // a message naming ensurePanel({ panel: 'blast' }) as the fix, never
+  // reaching the tab-click path.
+  it('rejects naming ensurePanel when the Blast panel is not open, without ever clicking', async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce(false); // panel-visibility read: Blast panel closed
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'charge hole:H1 explosive:boomite amount:5kg stemming:2m', role: 'setup' };
+    const action = { type: 'ensureStep' as const, step: 2 as const };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      /ensureStep: the Blast panel is not open — call ensurePanel\(\{ panel: 'blast' \}\) first/,
+    );
+    expect(page.click).not.toHaveBeenCalled();
+  });
+
+  it('treats an undefined panels[\'bs-blast-panel\'] entry identically to visible: false', async () => {
+    // __uiState() itself resolves, but the panels map has no entry at all for
+    // the Blast panel id (e.g. before the panel has ever been mounted) —
+    // must reject the same as an explicit `visible: false`, not throw a
+    // different error or fall through to the tab-click path.
+    const evaluate = vi.fn().mockResolvedValueOnce(undefined);
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'charge hole:H1 explosive:boomite amount:5kg stemming:2m', role: 'setup' };
+    const action = { type: 'ensureStep' as const, step: 2 as const };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      /ensureStep: the Blast panel is not open — call ensurePanel\(\{ panel: 'blast' \}\) first/,
+    );
+    expect(page.click).not.toHaveBeenCalled();
   });
 });
 
