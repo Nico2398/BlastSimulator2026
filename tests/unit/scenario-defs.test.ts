@@ -392,6 +392,58 @@ describe('"contract" commands use type:/material:, not a numeric id (issue #597)
 });
 
 // ──────────────────────────────────────────────
+// 7c. No step's JSON (any field — selector, expect.blocked, expect.usable,
+// etc., not just command strings) contains a literal `data-contract-id="N"`
+// DOM selector (issue #654). The contract-offer pool rotates on
+// `CONTRACT_REFRESH_INTERVAL`, so an id baked straight into a guard selector
+// (e.g. `#bs-contract-panel [data-contract-id="26"] .bs-contract-deliver`)
+// pins to whatever the pool happened to resolve to at authoring time and
+// breaks the moment an upstream timing change shifts tick counts — the same
+// class of flake 7b already guards against for `contract` command strings,
+// widened here to catch the id showing up in ANY field of a step. This check
+// is field-name agnostic by design: it does not care which selector or
+// attribute the implementer uses to target a contract row, only that the
+// literal numeric id is gone.
+//
+// level1-win-efficient.json is exempted by name: it has its own pre-existing
+// literal `data-contract-id="N"` selectors that predate #654 and need a
+// separate migration. That migration is out of scope for #654 — this is a
+// deliberate, named skip, not a loophole.
+// ──────────────────────────────────────────────
+describe('No step contains a literal data-contract-id="N" DOM selector (issue #654)', () => {
+  // Matches the pattern in a step's raw field value (data-contract-id="26")
+  // as well as inside a JSON.stringify()'d string, where the CSS selector's
+  // own double quotes come out backslash-escaped (data-contract-id=\"26\").
+  const LITERAL_CONTRACT_ID = /data-contract-id=\\?"\d+\\?"/;
+
+  // Deliberate, named exemption — see comment above. Not part of #654's scope.
+  const EXEMPT_SCENARIOS = new Set(['level1-win-efficient']);
+
+  for (const name of ALL_SCENARIO_NAMES) {
+    if (EXEMPT_SCENARIOS.has(name)) {
+      it.skip(`${name} — exempted from data-contract-id lint (issue #654, separate follow-up)`, () => {});
+      continue;
+    }
+
+    it(`${name} — no step JSON contains a literal data-contract-id="N" selector`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      const offenders: string[] = [];
+
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i] as ScenarioStepDef;
+        const serialized = JSON.stringify(step);
+        const match = LITERAL_CONTRACT_ID.exec(serialized);
+        if (match) {
+          offenders.push(`step[${i}]: ${match[0]}`);
+        }
+      }
+
+      expect(offenders).toEqual([]);
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
 // 8b. "vehicle buy" steps pass a valid VehicleRole
 // Regression: scripts/scenario-defs/vehicle-traffic.json used to pass
 // "hauler" as the role argument, which is not a member of VehicleRole
