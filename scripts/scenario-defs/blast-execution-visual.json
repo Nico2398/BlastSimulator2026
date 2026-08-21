@@ -36,8 +36,8 @@
       "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -62,8 +62,8 @@
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -100,8 +100,8 @@
       "description": "Grid 1/4. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click lowers it to 2 before dragging, so the (20,20)-(22,22) rectangle (2x2) computes the declared 2x2 at spacing:2 (issue #479 follow-up, Finding #4). Spacing stays at 2 afterward \u2014 it persists across grid operations within a session, so grids 2-4 below inherit it (grid 4/4 decrements it further, down to 1). depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper, so the real drag always produces the panel's own 6m default. Only hole/charge/sequence counts are asserted anywhere in this file (depth-insensitive), so this is a metadata-only correction. #553: shrunk from 3x3 (9 holes) to 2x2 (4 holes) and spacing tightened to 2m -- a single driller cannot land this file's original 9+4+4+64=81 total holes across 4 cycles without a genuine worker_revolt (sandbox-measured); the interaction array's spacing-stepper click and drag rectangle below now match this declared shape.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -378,8 +378,8 @@
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickIfPresent",
@@ -411,8 +411,12 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is). PR #586 CI fix: the toolbar's [data-panel=\"employees\"] click dropped here on purpose -- the crew panel is already open, left that way by the previous cycle's `employee fire` step, which never closes it back. UIManager.togglePanel (src/ui/UIManager.ts) treats the rail button as a real toggle: clicking it while its own panel is already active calls hideAllPanels() instead of opening it. Re-clicking it here closed the panel via that toggle, and the driller hire row survives the close in the DOM (CrewPanel never unmounts on hide(), just sets display:none on #bs-employee-panel), so waitForSelector below still resolved -- inspectSelector's unclickable report (scripts/shared/interaction-executor.ts) also only reads the *clicked* element's own computed style, not its display:none ancestor's, so CI's failure surfaced as \"element has zero size (0x0)\" rather than \"not visible\": a real, deterministic panel-state bug in this scenario, not a rendering race.",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -436,8 +440,8 @@
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -471,11 +475,11 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:45,20",
-      "description": "Grid 2/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing carries over from grid 1 already at 2m, so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2. PR #586 CI fix: the toolbar's [data-panel=\"blast\"] click restored here -- #553's own driller-per-cycle rework (hire/vehicle-buy/fire steps) opens the employees and vehicles panels between grid 1's blast and this step, so #bs-blast-panel is no longer the active panel by the time this step starts; clicking straight into #bs-blast-panel [data-step=\"1\"] hit the same display:none-ancestor \"zero size (0x0)\" failure as the driller-row bug fixed just above (UIManager.showPanel/hideAllPanels, src/ui/UIManager.ts) -- restoring this toolbar click reopens the blast panel first, same as grid 1 already does.",
+      "description": "Grid 2/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing carries over from grid 1 already at 2m, so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -762,8 +766,8 @@
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickIfPresent",
@@ -795,8 +799,12 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is). PR #586 CI fix: the toolbar's [data-panel=\"employees\"] click dropped here on purpose -- the crew panel is already open, left that way by the previous cycle's `employee fire` step, which never closes it back. UIManager.togglePanel (src/ui/UIManager.ts) treats the rail button as a real toggle: clicking it while its own panel is already active calls hideAllPanels() instead of opening it. Re-clicking it here closed the panel via that toggle, and the driller hire row survives the close in the DOM (CrewPanel never unmounts on hide(), just sets display:none on #bs-employee-panel), so waitForSelector below still resolved -- inspectSelector's unclickable report (scripts/shared/interaction-executor.ts) also only reads the *clicked* element's own computed style, not its display:none ancestor's, so CI's failure surfaced as \"element has zero size (0x0)\" rather than \"not visible\": a real, deterministic panel-state bug in this scenario, not a rendering race.",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -820,8 +828,8 @@
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -855,11 +863,11 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:5,45",
-      "description": "Grid 3/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing is still at 2m inherited from grid 1 (grid 2 didn't touch it), so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2. PR #586 CI fix: the toolbar's [data-panel=\"blast\"] click restored here -- same reasoning as grid 2/4's own fix note above: #553's hire/vehicle-buy/fire steps between blast cycles leave the blast panel closed by the time this step starts.",
+      "description": "Grid 3/4. #553: command normalized to spacing:2 -- see grid 1's own note. Spacing is still at 2m inherited from grid 1 (grid 2 didn't touch it), so no stepper clicks needed here; the drag rectangle below is sized to that inherited 2m spacing to produce the declared 2x2.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -1215,8 +1223,8 @@
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickIfPresent",
@@ -1248,8 +1256,12 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is). PR #586 CI fix: the toolbar's [data-panel=\"employees\"] click dropped here on purpose -- the crew panel is already open, left that way by the previous cycle's `employee fire` step, which never closes it back. UIManager.togglePanel (src/ui/UIManager.ts) treats the rail button as a real toggle: clicking it while its own panel is already active calls hideAllPanels() instead of opening it. Re-clicking it here closed the panel via that toggle, and the driller hire row survives the close in the DOM (CrewPanel never unmounts on hide(), just sets display:none on #bs-employee-panel), so waitForSelector below still resolved -- inspectSelector's unclickable report (scripts/shared/interaction-executor.ts) also only reads the *clicked* element's own computed style, not its display:none ancestor's, so CI's failure surfaced as \"element has zero size (0x0)\" rather than \"not visible\": a real, deterministic panel-state bug in this scenario, not a rendering race.",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
           "type": "waitForSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -1273,8 +1285,8 @@
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1308,11 +1320,11 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#586 CI real root cause (live-state confirmed, not the stuck-report-modal theory): grid 4's single driller/drill_rig from #553 keeps working this whole ~1000-tick wait with nothing ever restoring its morale to the \"comfortable\"(>=50) band needsMoraleEffect (EmployeeNeeds.ts) requires just to stop draining -- avgMorale clamps to 0 by roughly tick 400, dragging state.scores.wellBeing (ScoreManager.ts) to 0 with it, and WorkerRevolt.ts ends the level for real (levelEndReason:'worker_revolt') once that holds for REVOLT_TICKS (120, balance.ts) -- confirmed live via window.__gameState()/__uiState() at the failing step: the toolbar was covered by #bs-level-end-screen, not any blast-report overlay. Sandbox-tested fix: 7 more drillers (8 total) on Tier-3 drill_rigs (VEHICLE_TIER_MULTIPLIERS workRate x2.0/speed x1.8, balance.ts) parallelize the 64-hole plan below to done (orderedHoleCount:0) by tick ~421 -- about 150 ticks of margin before revolt would fire at ~571 in the same sandboxed run -- letting the tick-150 wait round below (now 2, not 7) end this grid before wellBeing ever finishes crashing, instead of racing it. Building a Tier-2+ living_quarters was tried and rejected: it enables GameLoop.ts's processShiftCycle, but WORK_DURATION_TICKS is only 6 -- every driller within its search radius spends most of its time walking to and from the bunkhouse rather than drilling, and holeCount actually stalled at 3/64. Firing and re-hiring the driller mid-grid was also tried and rejected: fireEmployee (Employee.ts) refuses a unionized employee (30% chance per hire, Employee.ts's rng.chance(0.3)), and this seed unionizes id4 on its very first roll, so every fire attempt no-ops and each replacement hire only adds another employee dragging the roster average once it, too, crashes. Each of these 7 extra hires needs its own toolbar [data-panel=\"employees\"] reopen click -- the vehicle-buy step right after each one switches the active panel to Vehicles, unlike the original single-hire cycles above where the previous grid's own `employee fire` step already left the Employees panel open. Interaction-mode fix: this and the remaining grid-4 filler hires (50, 53, 56, 59, 62, 65) switched from `equals` on an absolute employeeCount to `changedBy: {employeeCount: 1}`, matching the pattern steps 14/27/44 already established for grid 2/3/4's own first hire. Root cause, confirmed directly (command mode: employee #1 survives its own grid-1 blast and gets properly fired, employeeCount:1 going into grid 2; real interaction mode: employee #1 instead dies in that same blast -- this file's own already-accepted \"No-op if the employee already died in its own blast\" case for the fire step, just landing the other way around from grid-1's own die-vs-survive coin flip than command mode's) -- a dead employee is never spliced from the roster (only a real fire does that), so which baseline grid 4's hires start counting up from is real, mode-dependent, and outside this step's own control. Same class of divergence vibration-budget.json's own history already found and fixed the same way (dropping `employeeCount` from that file's own equals block, scenario-defs.md's own changedBy convention for a field a legitimate per-mode split makes non-deterministic).",
+      "description": "#586 CI real root cause (live-state confirmed, not the stuck-report-modal theory): grid 4's single driller/drill_rig from #553 keeps working this whole ~1000-tick wait with nothing ever restoring its morale to the \"comfortable\"(>=50) band needsMoraleEffect (EmployeeNeeds.ts) requires just to stop draining -- avgMorale clamps to 0 by roughly tick 400, dragging state.scores.wellBeing (ScoreManager.ts) to 0 with it, and WorkerRevolt.ts ends the level for real (levelEndReason:'worker_revolt') once that holds for REVOLT_TICKS (120, balance.ts) -- confirmed live via window.__gameState()/__uiState() at the failing step: the toolbar was covered by #bs-level-end-screen, not any blast-report overlay. Sandbox-tested fix: 7 more drillers (8 total) on Tier-3 drill_rigs (VEHICLE_TIER_MULTIPLIERS workRate x2.0/speed x1.8, balance.ts) parallelize the 64-hole plan below to done (orderedHoleCount:0) by tick ~421 -- about 150 ticks of margin before revolt would fire at ~571 in the same sandboxed run -- letting the tick-150 wait round below (now 2, not 7) end this grid before wellBeing ever finishes crashing, instead of racing it. Building a Tier-2+ living_quarters was tried and rejected: it enables GameLoop.ts's processShiftCycle, but WORK_DURATION_TICKS is only 6 -- every driller within its search radius spends most of its time walking to and from the bunkhouse rather than drilling, and holeCount actually stalled at 3/64. Firing and re-hiring the driller mid-grid was also tried and rejected: fireEmployee (Employee.ts) refuses a unionized employee (30% chance per hire, Employee.ts's rng.chance(0.3)), and this seed unionizes id4 on its very first roll, so every fire attempt no-ops and each replacement hire only adds another employee dragging the roster average once it, too, crashes. Interaction-mode fix: this and the remaining grid-4 filler hires (50, 53, 56, 59, 62, 65) switched from `equals` on an absolute employeeCount to `changedBy: {employeeCount: 1}`, matching the pattern steps 14/27/44 already established for grid 2/3/4's own first hire. Root cause, confirmed directly (command mode: employee #1 survives its own grid-1 blast and gets properly fired, employeeCount:1 going into grid 2; real interaction mode: employee #1 instead dies in that same blast -- this file's own already-accepted \"No-op if the employee already died in its own blast\" case for the fire step, just landing the other way around from grid-1's own die-vs-survive coin flip than command mode's) -- a dead employee is never spliced from the roster (only a real fire does that), so which baseline grid 4's hires start counting up from is real, mode-dependent, and outside this step's own control. Same class of divergence vibration-budget.json's own history already found and fixed the same way (dropping `employeeCount` from that file's own equals block, scenario-defs.md's own changedBy convention for a field a legitimate per-mode split makes non-deterministic).",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1337,8 +1349,8 @@
       "command": "vehicle buy drill_rig tier:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1373,8 +1385,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1399,8 +1411,8 @@
       "command": "vehicle buy drill_rig tier:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1435,8 +1447,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1461,8 +1473,8 @@
       "command": "vehicle buy drill_rig tier:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1497,8 +1509,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1523,8 +1535,8 @@
       "command": "vehicle buy drill_rig tier:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1559,8 +1571,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1585,8 +1597,8 @@
       "command": "vehicle buy drill_rig tier:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1621,8 +1633,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1647,8 +1659,8 @@
       "command": "vehicle buy drill_rig tier:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1683,8 +1695,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1709,8 +1721,8 @@
       "command": "vehicle buy drill_rig tier:3",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -1743,11 +1755,11 @@
     },
     {
       "command": "drill_plan grid rows:8 cols:8 spacing:1 depth:6 start:5,5",
-      "description": "Grid 4/4. #553 restores this file's original 8x8 (64 holes) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts's own coverage regression guard (#404), which locks in a rows:8/cols:8 grid to exceed MAX_ACTIVE_PROJECTILES (256, balance.ts) and exercise the projectile-grouping path once heavily overcharged below. Spacing tightened to 1m (two decrement clicks off the 2m spacing inherited from grids 1-3; the second click is a no-op against the 1m floor, but the first alone would already suffice) so the drag only spans (5,5)-(12,12) -- 8 parallel drillers (see above) clear it in ~2 tick-150 rounds instead of 1 driller needing over 1000 ticks door-to-door, which is what made this grid's wellbeing crash unrecoverable in the first place (#586 CI). PR #586 CI fix: the toolbar's [data-panel=\"blast\"] click restored here -- same reasoning as grid 2/4's own fix note above: #553's hire/vehicle-buy/fire steps between blast cycles leave the blast panel closed by the time this step starts.",
+      "description": "Grid 4/4. #553 restores this file's original 8x8 (64 holes) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts's own coverage regression guard (#404), which locks in a rows:8/cols:8 grid to exceed MAX_ACTIVE_PROJECTILES (256, balance.ts) and exercise the projectile-grouping path once heavily overcharged below. Spacing tightened to 1m (two decrement clicks off the 2m spacing inherited from grids 1-3; the second click is a no-op against the 1m floor, but the first alone would already suffice) so the drag only spans (5,5)-(12,12) -- 8 parallel drillers (see above) clear it in ~2 tick-150 rounds instead of 1 driller needing over 1000 ticks door-to-door, which is what made this grid's wellbeing crash unrecoverable in the first place (#586 CI).",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
@@ -1838,8 +1850,12 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
-      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #586 CI: this step never needs a toolbar reopen click -- the blast panel is still the active panel here, left that way by the drill_plan step above; a prior attempt added one anyway on a wrong \"stuck panel\" theory, which (once the real blocker, the worker-revolt level-end overlay, was fixed at the source above) just toggled this already-open panel closed again (UIManager.togglePanel, src/ui/UIManager.ts) and broke this step in a new way. Removed. #554-followup (issue #586 CI, real failure): a resolveEventIfPending alone did not fix a further 'covered by div' failure here -- root cause is a transient re-render race, not a stuck event dialog: BlastWorkshop.ts's suggestStep() auto-navigates the panel's active step reactively as background charge/drill state changes, and a bare clickSelector (single-shot, no polling) can land mid-re-render. Swapped for the same awaitUsable-then-clickSelector pattern already used everywhere else a control's usability needs polling rather than a one-shot probe -- requireUsable (interaction-driver.ts) retries the same 'covered' check every 150ms up to 6s, so a transient race clears on a later poll instead of failing the first attempt.",
+      "description": "Finding #5 class: stemming:0 (this file's original declared value) is not reachable by any click \u2014 Charge.ts's adjustStemming() floors at Math.max(0.5, ...). Corrected to the true UI-reachable extreme and driven for real: 3 amount-stepper clicks (5->8kg) and 8 stemming-stepper clicks (2.0->0.5m, clamped at the floor) before Charge All, matching blast-overcharge.json's fix. #554-followup (issue #586 CI, real failure): a resolveEventIfPending alone did not fix a further 'covered by div' failure here -- root cause is a transient re-render race, not a stuck event dialog: BlastWorkshop.ts's suggestStep() auto-navigates the panel's active step reactively as background charge/drill state changes, and a bare clickSelector (single-shot, no polling) can land mid-re-render. Swapped for the same awaitUsable-then-clickSelector pattern already used everywhere else a control's usability needs polling rather than a one-shot probe -- requireUsable (interaction-driver.ts) retries the same 'covered' check every 150ms up to 6s, so a transient race clears on a later poll instead of failing the first attempt.",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
         {
           "type": "resolveEventIfPending"
         },
@@ -2016,8 +2032,8 @@
       "description": "#553: fired right after its blast so it doesn't linger idle and drag the roster's average wellbeing down for the rest of this ~400-tick file (see the hire step's own note). No-op if the employee already died in its own blast or unionized against firing -- either way nothing more is needed from them. #586 CI: with 8 drillers now on the roster clustered at the grid (see the hire steps above), this grid's heavy overcharge (8kg boomite, 0.5m stemming) kills all of them in its own blast, live-confirmed via `employee list` showing every one DEAD right after -- CrewPanel.render() filters to `e.alive` roster cards, so once everyone is dead the roster is empty and `.bs-detail-toggle` never exists to click; a plain clickSelector reported it as \"vanished between the wait and the click\" (the toolbar click's own panel refresh is what removes the stale pre-blast render this scenario-runner still had cached in the live DOM). Switched detail-toggle/dismiss/confirm to clickIfPresent, matching this step's own already-documented no-op tolerance -- a control that never becomes usable here (empty roster) is a legitimate outcome, not a failure, same as the unionized-refusal case the description above already accepted.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickIfPresent",
@@ -2049,8 +2065,12 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#560: 5th cycle appended to drill+blast right at the very edge of the site (this file's world is 64x64 -- new_game's DEFAULT_GRID_SIZE, balance.ts -- so 60..61 sits 2-3 cells from the true boundary at 63), proving the boundary/skirt wall stays closed with no see-through gap at the site's own outer edge, not just the interior-ish edges (20/45/5,45/5,5) cycles 1-4 above already exercise. Own fresh driller so this cycle isn't gated behind whichever of ids 1-11 above happens to still be alive in a given mode -- hireEmployee assigns ids from a monotonic counter that ignores firing/death (grid 2-4's own hire steps above already rely on this: id4 was handed out even though ids 1-3 were fired/spliced first), so the next id is deterministically 12 regardless of mode. #601-followup (issue #631, real interaction-mode finding): swapped the bare waitForSelector+clickSelector pair for awaitUsable -- this is the first time interaction mode ever reached this 5th cycle (previously always cut short by the worker-revolt this file's cheat disable_revolt now bypasses, issue #631), and waitForSelector only proves DOM presence, not that the panel has actually finished laying out -- the same class of gap already fixed at the cycle-4 charge step above (awaitUsable retries the usability probe rather than clicking the instant the node exists). #601-followup round 2 (issue #631): removed this step's own toolbar re-click too -- the Employees panel is already open here, left that way by the `employee fire 4` step just above (UIManager.togglePanel closes an ALREADY-active panel on re-click instead of leaving it open, the same class already documented and fixed elsewhere in this suite -- blast-visual-full.json's own vehicle panel, level1-win-efficient.json's tick-15 blocks). `inspect` in between is a read-only console command with no UI interaction, so it does not change which panel is active. Confirmed via direct trace: this step's own awaitUsable timed out with 'present but hidden' -- the toolbar re-click had just toggled the panel closed.",
+      "description": "#560: 5th cycle appended to drill+blast right at the very edge of the site (this file's world is 64x64 -- new_game's DEFAULT_GRID_SIZE, balance.ts -- so 60..61 sits 2-3 cells from the true boundary at 63), proving the boundary/skirt wall stays closed with no see-through gap at the site's own outer edge, not just the interior-ish edges (20/45/5,45/5,5) cycles 1-4 above already exercise. Own fresh driller so this cycle isn't gated behind whichever of ids 1-11 above happens to still be alive in a given mode -- hireEmployee assigns ids from a monotonic counter that ignores firing/death (grid 2-4's own hire steps above already rely on this: id4 was handed out even though ids 1-3 were fired/spliced first), so the next id is deterministically 12 regardless of mode. #601-followup (issue #631, real interaction-mode finding): swapped the bare waitForSelector+clickSelector pair for awaitUsable -- this is the first time interaction mode ever reached this 5th cycle (previously always cut short by the worker-revolt this file's cheat disable_revolt now bypasses, issue #631), and waitForSelector only proves DOM presence, not that the panel has actually finished laying out -- the same class of gap already fixed at the cycle-4 charge step above (awaitUsable retries the usability probe rather than clicking the instant the node exists).",
       "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
         {
           "type": "awaitUsable",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
@@ -2074,8 +2094,8 @@
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+          "type": "ensurePanel",
+          "panel": "vehicles"
         },
         {
           "type": "waitForSelector",
@@ -2112,8 +2132,8 @@
       "description": "#560: right at the very edge of this file's 64x64 world -- holes reach x/z=61, 2-3 cells from the true boundary at 63 -- the same boundary/skirt wall closure #559 already covers at the interior-ish edges cycles 1-4 use (starts 20,20 / 45,20 / 5,45 / 5,5), now proven with a real blast right at the site's own outer edge, where the depth-limited skirt (#560) has the least margin to work with. #601-followup round 3 (issue #631, real interaction-mode finding): one increment click on the spacing stepper before dragging -- cycle 4's own grid decrements it down to 1 (see grid 1's own comment: spacing persists across grid operations within a session), and this cycle never accounted for un-decrementing it back to 2 before its own drag. Confirmed via direct trace: without the click, the (59,59)-(61,61) drag rectangle at the inherited spacing:1 computes a 3x3 grid (orderedHoleCount:9), not this step's own declared 2x2 (orderedHoleCount:4).",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
