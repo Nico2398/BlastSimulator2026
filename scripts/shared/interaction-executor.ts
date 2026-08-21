@@ -875,9 +875,20 @@ export async function executeActionOnPage(
       break;
     }
     case 'ensureStep': {
-      // TODO(#652): implementer adds a panel-visibility check here, before
-      // the activeBlastStep check below, using module-scoped
-      // PANEL_ELEMENT_ID['blast'] rather than a hardcoded 'bs-blast-panel'.
+      const blastPanelId = PANEL_ELEMENT_ID.blast as string;
+      const panelVisible = await page.evaluate((id: string) => {
+        const getUiState = (window as unknown as {
+          __uiState?: () => { panels: Record<string, { visible: boolean }> } | null;
+        }).__uiState;
+        const st = getUiState === undefined ? null : getUiState();
+        return st?.panels[id]?.visible ?? false;
+      }, blastPanelId);
+      if (!panelVisible) {
+        throw new Error(
+          "ensureStep: the Blast panel is not open — call ensurePanel({ panel: 'blast' }) first",
+        );
+      }
+
       const active = await page.evaluate(() => {
         const getUiState = (window as unknown as {
           __uiState?: () => { activeBlastStep: number } | null;
