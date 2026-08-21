@@ -13,14 +13,14 @@
  * @module scripts/compare-scenario-traces
  */
 
-import { mkdirSync } from 'fs';
+import { mkdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { ScenarioStepDef } from './shared/scenario-types.js';
 import { createGameEngine, runSteps } from './shared/command-runner.js';
 import { loadScenarioDef, formatStepIndex, formatCommandSlug, SCENARIO_DIR } from './shared/scenario-utils.js';
 import { initBrowser, suspendDrawing, executeInteractionActions } from './shared/puppeteer-utils.js';
-import { compareTraces } from './shared/scenario-trace.js';
-import type { ScenarioTraceEntry } from './shared/scenario-trace.js';
+import { compareTraces, compareStateSnapshots } from './shared/scenario-trace.js';
+import type { ScenarioTraceEntry, ScenarioStateSnapshot } from './shared/scenario-trace.js';
 
 const SCREENSHOT_DIR = resolve(process.cwd(), 'screenshots');
 const DEV_SERVER_PORT = 5173;
@@ -33,21 +33,50 @@ function tickCountOf(gameState: Record<string, unknown> | null): number | null {
 }
 
 /**
+ * One step's state as it stood *at that step*, read back from the JSON dump
+ * `runSteps` wrote for it.
+ *
+ * Not `StepResult.gameState`: `serializeGameState` hands back an object whose
+ * nested members (drillHoles, chargesByHole) are the engine's own live
+ * collections, so by the time the run ends every step's in-memory "snapshot"
+ * shows the run's final state. The file on disk was serialized at capture
+ * time and is the only per-step record that stays true.
+ */
+function snapshotFromDisk(statePath: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(readFileSync(statePath, 'utf8')) as { gameState?: Record<string, unknown> | null };
+    return parsed.gameState ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Traces command mode: one entry per step, using the step's declared
  * `command` string exactly as `runSteps` executed it — command mode never
  * resolves a step to anything else.
  */
-function runCommandTrace(name: string, steps: ScenarioStepDef[]): ScenarioTraceEntry[] {
+function runCommandTrace(
+  name: string,
+  steps: ScenarioStepDef[],
+): { trace: ScenarioTraceEntry[]; snapshots: ScenarioStateSnapshot[] } {
   const engine = createGameEngine();
   const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-trace-command`);
   const results = runSteps(engine, steps, outDir);
-  return results.map(r => ({
-    stepIndex: r.step,
-    mode: 'command' as const,
-    command: r.command,
-    success: r.error === undefined,
-    tickCountAfter: tickCountOf(r.gameState),
-  }));
+  return {
+    trace: results.map(r => ({
+      stepIndex: r.step,
+      mode: 'command' as const,
+      command: r.command,
+      // The console's own success flag, not `error === undefined`: a step
+      // that declares `commandOutcome: 'refused'` has no error and a refused
+      // command, and interaction mode's side of this comparison records the
+      // console flag too.
+      success: r.commandSuccess ?? r.error === undefined,
+      tickCountAfter: tickCountOf(r.gameState),
+    })),
+    snapshots: results.map(r => ({ stepIndex: r.step, state: snapshotFromDisk(r.statePath) })),
+  };
 }
 
 /**
@@ -68,8 +97,9 @@ async function runInteractionTrace(
   name: string,
   steps: ScenarioStepDef[],
   port: number,
-): Promise<ScenarioTraceEntry[]> {
+): Promise<{ trace: ScenarioTraceEntry[]; snapshots: ScenarioStateSnapshot[] }> {
   const trace: ScenarioTraceEntry[] = [];
+  const snapshots: ScenarioStateSnapshot[] = [];
   const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-trace-interaction`);
   mkdirSync(outDir, { recursive: true });
 
@@ -83,11 +113,12 @@ async function runInteractionTrace(
       const cmdSlug = formatCommandSlug(step.command);
 
       try {
-        await executeInteractionActions(
+        const result = await executeInteractionActions(
           page, step, false, outDir, paddedIdx, cmdSlug,
           undefined,
           (entry) => trace.push({ stepIndex: i, mode: 'interaction', ...entry }),
         );
+        snapshots.push({ stepIndex: i, state: result.gameState });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`  [interaction] step ${i} ("${step.command}") did not complete: ${msg}`);
@@ -99,7 +130,7 @@ async function runInteractionTrace(
     await browser.close();
   }
 
-  return trace;
+  return { trace, snapshots };
 }
 
 /** One line describing a trace entry, or its absence, for the divergence report. */
@@ -122,39 +153,50 @@ async function main(): Promise<void> {
   console.log('\nBlastSimulator2026 — Scenario Trace Comparison');
   console.log(`Scenario: ${scenarioName} (${steps.length} steps)`);
 
-  let commandTrace: ScenarioTraceEntry[];
+  let commandRun: { trace: ScenarioTraceEntry[]; snapshots: ScenarioStateSnapshot[] };
   try {
     console.log('\nRunning command mode...');
-    commandTrace = runCommandTrace(scenarioName, steps);
-    console.log(`  command mode: ${commandTrace.length} trace entries`);
+    commandRun = runCommandTrace(scenarioName, steps);
+    console.log(`  command mode: ${commandRun.trace.length} trace entries`);
   } catch (err: unknown) {
     console.error(`Command-mode run failed: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
     return;
   }
 
-  let interactionTrace: ScenarioTraceEntry[];
+  let interactionRun: { trace: ScenarioTraceEntry[]; snapshots: ScenarioStateSnapshot[] };
   try {
     console.log('Running interaction mode...');
-    interactionTrace = await runInteractionTrace(scenarioName, steps, DEV_SERVER_PORT);
-    console.log(`  interaction mode: ${interactionTrace.length} trace entries`);
+    interactionRun = await runInteractionTrace(scenarioName, steps, DEV_SERVER_PORT);
+    console.log(`  interaction mode: ${interactionRun.trace.length} trace entries`);
   } catch (err: unknown) {
     console.error(`Interaction-mode run failed: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
     return;
   }
 
-  const divergence = compareTraces(commandTrace, interactionTrace);
+  const traceDivergence = compareTraces(commandRun.trace, interactionRun.trace);
+  const stateDivergence = compareStateSnapshots(commandRun.snapshots, interactionRun.snapshots);
 
-  if (divergence === null) {
-    console.log(`\nNo divergence found — both modes agree on all ${commandTrace.length} trace entries.`);
+  if (traceDivergence === null && stateDivergence === null) {
+    console.log(`\nNo divergence found — both modes issue the same commands and read back the same state across all ${commandRun.trace.length} steps.`);
     process.exit(0);
     return;
   }
 
-  console.log(`\nDivergence found at trace index ${divergence.firstDivergentIndex}:`);
-  console.log(`  command:     ${describeEntry(divergence.command)}`);
-  console.log(`  interaction: ${describeEntry(divergence.interaction)}`);
+  if (traceDivergence !== null) {
+    console.log(`\nCommand divergence at step ${traceDivergence.stepIndex} (${traceDivergence.reason}):`);
+    console.log(`  command:     ${describeEntry(traceDivergence.command)}`);
+    console.log(`  interaction: ${describeEntry(traceDivergence.interaction)}`);
+  }
+
+  if (stateDivergence !== null) {
+    console.log(`\nState divergence at step ${stateDivergence.stepIndex} ("${steps[stateDivergence.stepIndex]?.command ?? '?'}"):`);
+    for (const field of stateDivergence.fields) {
+      console.log(`  ${field.field}: command=${JSON.stringify(field.command)} interaction=${JSON.stringify(field.interaction)}`);
+    }
+  }
+
   process.exit(1);
 }
 

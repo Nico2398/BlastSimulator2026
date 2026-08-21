@@ -312,17 +312,6 @@ export interface ScenarioDef {
   name: string;
   description: string;
   steps: ScenarioStepDef[];
-  /**
-   * TODO(#674): temporary — remove this field once #674's engine-level fix
-   * for the interaction-mode dispatch-order divergence lands, then delete
-   * the skip branch in run-all-scenarios.ts's runBatchInteraction that reads
-   * it. When set, the interaction-mode batch runner skips this file entirely
-   * (logging the reason, not silently) instead of running its steps;
-   * command mode is untouched and still runs the file in full. Reserved for
-   * a known, already-diagnosed divergence with an open tracking issue — not
-   * a general-purpose escape hatch.
-   */
-  knownInteractionModeFailure?: string;
   shots?: Array<{
     name: string;
     yaw: number;
@@ -342,6 +331,16 @@ export interface StepResult {
   step: number;
   command: string;
   commandOutput: string;
+  /**
+   * The console's own `success` flag for this step's command, as distinct
+   * from `error` — a refused command (`success: false`) is only an `error`
+   * when the step did not declare `commandOutcome`. Read by
+   * compare-scenario-traces.ts (issue #674), which compares this against
+   * interaction mode's own per-command success flag: the same command
+   * accepted in one mode and refused in the other is exactly the shape of a
+   * click that resolved onto a different entity than the command names.
+   */
+  commandSuccess?: boolean;
   gameState: Record<string, unknown> | null;
   uiState?: Record<string, unknown> | null;
   screenshotPath?: string;
