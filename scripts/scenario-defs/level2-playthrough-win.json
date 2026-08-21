@@ -1576,9 +1576,9 @@
           "command": "contract deliver type:ore_sale amount:100"
         }
       ],
-      "description": "#554: selector-based, same reasoning as the accept step above. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "#654: deliver button for the active ore_sale contract is blocked because storage never holds anything -- nothing in this scenario ever hauls material in. Selector is now type-based (`data-contract-type=\"ore_sale\"`, first-DOM-match) instead of a hardcoded numeric id: it resolves in the same first-match order the preceding `contract deliver type:ore_sale` command already used, so it stays correct across upstream tick-count drift without re-probing an id.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"26\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -1613,9 +1613,9 @@
           "command": "contract deliver type:ore_sale amount:40"
         }
       ],
-      "description": "#554: selector-based, same reasoning as the earlier deliver step. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make.",
+      "description": "#654: deliver button for the active ore_sale contract is blocked because storage never holds anything -- nothing in this scenario ever hauls material in. Selector is now type-based (`data-contract-type=\"ore_sale\"`, first-DOM-match) instead of a hardcoded numeric id: it resolves in the same first-match order the preceding `contract deliver type:ore_sale` command already used, so it stays correct across upstream tick-count drift without re-probing an id.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"26\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -2418,9 +2418,9 @@
           "command": "contract deliver type:ore_sale amount:100"
         }
       ],
-      "description": "#554: selector-based, same reasoning as the accept step above. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for hundreds of ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. #601-followup: id corrected 70 -> 71 -- #601's deterministic `waitUntil` harness fix shifts this file's exact tick counts, and the id this step's own selector needs to match is whatever `type:ore_sale` actually resolved to at the accept step just above at those new tick counts, not the literal id number the original #554 round happened to observe (a live, rotating pool, not a fixed catalog). Re-derived via a direct command-mode probe of this exact step (`contract accept type:ore_sale` -> \"Accepted contract #71: Deliver absurdium ore\"), not guessed.",
+      "description": "#654: deliver button for the active ore_sale contract is blocked because storage never holds anything -- nothing in this scenario ever hauls material in. Selector is now type-based (`data-contract-type=\"ore_sale\"`, first-DOM-match) instead of a hardcoded numeric id: it resolves in the same first-match order the preceding `contract deliver type:ore_sale` command already used, so it stays correct across upstream tick-count drift without re-probing an id.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"71\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -2992,9 +2992,9 @@
           "command": "contract deliver type:ore_sale amount:300"
         }
       ],
-      "description": "#554: selector-based, same reasoning as the accept step above. BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. #601-followup: id corrected 100 -> 101, same mechanism and re-derivation method as this file's earlier #71 guard (a direct command-mode probe of this exact step: `contract accept type:ore_sale` -> \"Accepted contract #101: Deliver sparkium ore\").",
+      "description": "#654: deliver button for the active ore_sale contract is blocked because storage never holds anything -- nothing in this scenario ever hauls material in. Selector is now type-based (`data-contract-type=\"ore_sale\"`, first-DOM-match) instead of a hardcoded numeric id: it resolves in the same first-match order the preceding `contract deliver type:ore_sale` command already used, so it stays correct across upstream tick-count drift without re-probing an id.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"101\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
@@ -3727,9 +3727,9 @@
           "command": "contract deliver type:ore_sale amount:350"
         }
       ],
-      "description": "BLOCKED, same class as this file's other deliver guards: the ACTIVE card's DELIVER button is disabled because storage never holds anything -- nothing in this scenario ever hauls material in, and by now the mine has been bankrupt and running on a destroyed drill fleet for well over a thousand ticks besides. `expect.blocked` proves the guard instead of faking a click no player could make. `usable` on goto-ops dropped -- covered by the same overlay as everything else. #601-followup: id corrected 115 -> 139, same mechanism and re-derivation method as this file's earlier #71/#101 guards (a direct command-mode probe of this exact step: `contract accept type:ore_sale` -> \"Accepted contract #139: Deliver blingite ore\").",
+      "description": "#654: deliver button for the active ore_sale contract is blocked because storage never holds anything -- nothing in this scenario ever hauls material in. `usable` on goto-ops dropped -- covered by the same overlay as everything else. Selector is now type-based (`data-contract-type=\"ore_sale\"`, first-DOM-match) instead of a hardcoded numeric id: it resolves in the same first-match order the preceding `contract deliver type:ore_sale` command already used, so it stays correct across upstream tick-count drift without re-probing an id.",
       "expect": {
-        "blocked": "#bs-contract-panel [data-contract-id=\"139\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"] .bs-contract-deliver"
       },
       "role": "guard"
     },
