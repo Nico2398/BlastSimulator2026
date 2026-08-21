@@ -12,6 +12,9 @@ import {
   createSitePolicy,
   getShiftDurationTicks,
   shouldForceRest,
+  // ── #678: getEffectiveThresholds — merges a policy's own thresholds over
+  // the site defaults. Tests below cover it.
+  getEffectiveThresholds,
   type ShiftMode,
   type SitePolicy,
 } from '../../../src/core/entities/SitePolicy.js';
@@ -25,8 +28,8 @@ describe('createSitePolicy() (3.12)', () => {
     const policy: SitePolicy = createSitePolicy('shift_8h');
 
     expect(policy.shiftMode).toBe('shift_8h');
-    expect(policy.hungerRestThreshold).toBe(40);
-    expect(policy.fatigueRestThreshold).toBe(25);
+    expect(policy.hungerRestThreshold).toBe(60);
+    expect(policy.fatigueRestThreshold).toBe(60);
     expect(policy.socialBreakThreshold).toBe(20);
   });
 
@@ -154,7 +157,7 @@ describe('shouldForceRest() — need-threshold enforcement (3.12)', () => {
   // ── Test 14 ──────────────────────────────────────────────────────────────────
   it('returns true when hunger drops below hungerRestThreshold even if shift is not over', () => {
     const policy = createSitePolicy('shift_8h');
-    // hunger (30) < hungerRestThreshold (40); ticksWorked well below shift end
+    // hunger (30) < hungerRestThreshold (60); ticksWorked well below shift end
     const employee = { hunger: 30, fatigue: 80, ticksWorked: 2 };
 
     const result = shouldForceRest(policy, employee, true);
@@ -165,7 +168,7 @@ describe('shouldForceRest() — need-threshold enforcement (3.12)', () => {
   // ── Test 15 ──────────────────────────────────────────────────────────────────
   it('returns true when fatigue drops below fatigueRestThreshold even if shift is not over', () => {
     const policy = createSitePolicy('shift_8h');
-    // fatigue (20) < fatigueRestThreshold (25); ticksWorked well below shift end
+    // fatigue (20) < fatigueRestThreshold (60); ticksWorked well below shift end
     const employee = { hunger: 80, fatigue: 20, ticksWorked: 2 };
 
     const result = shouldForceRest(policy, employee, true);
@@ -176,8 +179,8 @@ describe('shouldForceRest() — need-threshold enforcement (3.12)', () => {
   // ── Test 16 ──────────────────────────────────────────────────────────────────
   it('returns false when hunger and fatigue are above their thresholds and ticksWorked < shift duration', () => {
     const policy = createSitePolicy('shift_8h');
-    // hunger (50) > 40, fatigue (50) > 25, ticksWorked (3) < 8 → no rest needed
-    const employee = { hunger: 50, fatigue: 50, ticksWorked: 3 };
+    // hunger (70) > 60, fatigue (70) > 60, ticksWorked (3) < 8 → no rest needed
+    const employee = { hunger: 70, fatigue: 70, ticksWorked: 3 };
 
     const result = shouldForceRest(policy, employee, true);
 
@@ -209,7 +212,7 @@ describe('shouldForceRest() — need-threshold enforcement (3.12)', () => {
   // ── Test 19 ──────────────────────────────────────────────────────────────────
   it('returns false when hunger and fatigue are each one point above their thresholds', () => {
     const policy = createSitePolicy('shift_8h');
-    // hunger = 41 > 40, fatigue = 26 > 25 — just above thresholds; shift not over
+    // hunger = 61 > 60, fatigue = 61 > 60 — just above thresholds; shift not over
     const employee = {
       hunger: policy.hungerRestThreshold + 1,
       fatigue: policy.fatigueRestThreshold + 1,
@@ -274,12 +277,70 @@ describe("shouldForceRest() — 'custom' mode with per-employee overrides (3.12)
     // Only override employee 99 — employee 1 has no override
     policy.customThresholds[99] = { hunger: 70, fatigue: 70, social: 70 };
 
-    // Employee 1 should use the default policy thresholds (hunger < 40 → rest)
+    // Employee 1 should use the default policy thresholds (hunger < 60 → rest)
     const employee = { id: 1, hunger: 30, fatigue: 80, ticksWorked: 1 };
 
     const result = shouldForceRest(policy, employee, true);
 
     expect(result).toBe(true);
+  });
+});
+
+// ─── getEffectiveThresholds() (#678) ─────────────────────────────────────────
+//
+// Extracted from shouldForceRest's own custom-mode override lookup so
+// GameLoop.ts's forced-rest-under-policy path (#678) can report which
+// thresholds actually applied, not just a yes/no verdict.
+
+describe('getEffectiveThresholds() (#678)', () => {
+  // ── Test 1 ──────────────────────────────────────────────────────────────────
+  it('returns the policy-level default thresholds for a non-custom mode', () => {
+    const policy = createSitePolicy('shift_8h');
+
+    const result = getEffectiveThresholds(policy, 1);
+
+    expect(result).toEqual({
+      hunger: policy.hungerRestThreshold,
+      fatigue: policy.fatigueRestThreshold,
+    });
+  });
+
+  // ── Test 2 ──────────────────────────────────────────────────────────────────
+  it('returns the per-employee override when shiftMode is custom and one exists for the given id', () => {
+    const policy = createSitePolicy('custom');
+    const employeeId = 7;
+    policy.customThresholds[employeeId] = { hunger: 70, fatigue: 10, social: 10 };
+
+    const result = getEffectiveThresholds(policy, employeeId);
+
+    expect(result).toEqual({ hunger: 70, fatigue: 10 });
+  });
+
+  // ── Test 3 ──────────────────────────────────────────────────────────────────
+  it('falls back to the policy-level defaults in custom mode when no override exists for the given id', () => {
+    const policy = createSitePolicy('custom');
+    // Only employee 99 has an override — employee 1 does not.
+    policy.customThresholds[99] = { hunger: 70, fatigue: 10, social: 10 };
+
+    const result = getEffectiveThresholds(policy, 1);
+
+    expect(result).toEqual({
+      hunger: policy.hungerRestThreshold,
+      fatigue: policy.fatigueRestThreshold,
+    });
+  });
+
+  // ── Test 4 ──────────────────────────────────────────────────────────────────
+  it('falls back to the policy-level defaults in custom mode when employeeId is omitted', () => {
+    const policy = createSitePolicy('custom');
+    policy.customThresholds[7] = { hunger: 70, fatigue: 10, social: 10 };
+
+    const result = getEffectiveThresholds(policy);
+
+    expect(result).toEqual({
+      hunger: policy.hungerRestThreshold,
+      fatigue: policy.fatigueRestThreshold,
+    });
   });
 });
 

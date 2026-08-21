@@ -23,6 +23,7 @@ import {
 } from './ActionSelection.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction, releaseVehicleOnCompletion } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { shouldForceRest, getEffectiveThresholds } from '../entities/SitePolicy.js';
 
 // ── Config ──
 
@@ -1007,8 +1008,14 @@ function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedK
  *
  * Only owns employees whose restNeedKey identifies a resting need (set at
  * rest-start by the three creators above, or by tickEmployees when it claims
- * a queued autoInsertNeedTasks action) — Bunkhouse Tier 2+ shift-cycle rest
- * leaves restNeedKey null and remains owned by processShiftCycle/completeRestTick.
+ * a queued autoInsertNeedTasks action). Bunkhouse Tier 2+ shift-cycle rest
+ * under the legacy no-policy path leaves restNeedKey null and remains owned
+ * by processShiftCycle/completeRestTick — but once a site policy has been
+ * applied, forceShiftRestIfNeededByPolicy (#678) sets pendingRestNeedKey/
+ * restNeedKey for its own shift-forced rests too, so those ARE owned here,
+ * not by completeRestTick. This function also resets ticksWorked on
+ * completion, but only for rests it can identify as policy-forced (payload's
+ * triggeredBy === 'shift_cycle_policy') — see the check inline below.
  *
  * Injury does not block completion — an employee who becomes injured mid-rest
  * must still have their rest action finished and cleaned up, or activeActionId
@@ -1028,11 +1035,29 @@ export function tickGeneralRestCompletion(state: GameState): GeneralRestCompleti
     if (emp.restTicksRemaining > 0) continue;
 
     const completedActionId = emp.activeActionId;
+    // forceShiftRestIfNeededByPolicy marks its own rest action's payload with
+    // triggeredBy: 'shift_cycle_policy' (checked before completeRestForEmployee
+    // clears activeActionId) — that marker is what distinguishes it here from
+    // the other three rest creators (tickCollapse/tickNeedRestoration/
+    // autoInsertNeedTasks), whose payloads never use that value. Only a
+    // policy-forced shift rest restarts the continuous-work clock; see
+    // forceShiftRestIfNeededByPolicy's doc comment (#678).
+    const completedAction = completedActionId !== null
+      ? state.pendingActions.find(a => a.id === completedActionId)
+      : undefined;
+    const isPolicyShiftRest = completedAction?.payload.triggeredBy === 'shift_cycle_policy';
+
     completeRestForEmployee(state, emp, needKey);
     // tickCollapse/tickNeedRestoration/autoInsertNeedTasks leave the rest
     // action in pendingActions at creation (self-claimed or claimed later via
     // tickEmployees), so nothing else removes it once the rest completes.
     if (completedActionId !== null) completePendingAction(state, completedActionId);
+
+    // Mirrors completeRestTick's unconditional ticksWorked = 0 on completion —
+    // without this, a policy-forced rest never resets the continuous-work
+    // clock (nothing else does), so the very next tick immediately re-trips
+    // shouldForceRest and yanks the employee back into rest (#678).
+    if (isPolicyShiftRest) emp.ticksWorked = 0;
 
     completed.push({ employeeId: emp.id, needKey });
   }
@@ -1052,7 +1077,16 @@ export interface ShiftCycleResult {
 }
 
 /**
- * Process the shift/rest cycle for employees with bunkhouse tier >= 2.
+ * Process the shift/rest cycle for employees. With no site policy ever
+ * applied (state.sitePolicy.revision === 0), this is gated on bunkhouse
+ * tier >= 2 as before (#678) and uses the legacy fatigue-only,
+ * fixed-duration forceShiftRestIfNeeded/completeRestTick path. Once a policy
+ * has been applied, it runs for every alive/non-injured employee regardless
+ * of bunkhouse tier (a tier-1 living_quarters, or no building at all, is a
+ * valid rest destination under a policy) and routes force-rest through the
+ * policy-aware forceShiftRestIfNeededByPolicy, whose completion is owned by
+ * tickGeneralRestCompletion instead of completeRestTick.
+ *
  * Empties restTicksRemaining on completion and transitions employees
  * between working and resting states.
  *
@@ -1060,6 +1094,7 @@ export interface ShiftCycleResult {
  *   1. Complete rests — decrement restTicksRemaining, replenish fatigue on completion
  *   2. Increment ticksWorked — for active employees not currently resting
  *   3. Force shift rest — when ticksWorked reaches the work-duration threshold
+ *      (legacy path), or when SitePolicy.shouldForceRest trips (policy path)
  *
  * @param state - The game state (mutated in place)
  * @param firedEvents - Accumulator for events fired this tick
@@ -1075,7 +1110,16 @@ export function processShiftCycle(
     b => b.type === 'living_quarters' && b.tier >= 2 && b.active,
   );
 
-  if (!hasBunkhouse) {
+  // #678: an applied policy (revision > 0 — see SitePolicy.ts's own doc
+  // comment on `revision` for why this, not a value comparison, is what
+  // "has the player set a policy?" means) runs shift-cycle processing
+  // regardless of bunkhouse tier — a tier-1 living_quarters, or no building
+  // at all, is a valid rest destination under a policy, not a disqualifier.
+  // With no policy ever applied, behaviour is byte-for-byte identical to
+  // before #678: gated on hasBunkhouse alone, same legacy rest path below.
+  const policyApplied = state.sitePolicy.revision > 0;
+
+  if (!policyApplied && !hasBunkhouse) {
     return { restCompleted: [], shiftRested: [], active: false };
   }
 
@@ -1094,7 +1138,11 @@ export function processShiftCycle(
     incrementWorkTick(state, emp);
 
     // Phase 3: Force shift rest when work quota is met
-    forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested, _emitter);
+    if (policyApplied) {
+      forceShiftRestIfNeededByPolicy(state, emp, firedEvents, shiftRested, _emitter);
+    } else {
+      forceShiftRestIfNeeded(state, emp, firedEvents, shiftRested, _emitter);
+    }
   }
 
   return { restCompleted, shiftRested, active: true };
@@ -1217,8 +1265,11 @@ function completeRestTick(
 ): void {
   if (emp.restTicksRemaining === null) return;
   // Rests started by tickCollapse/tickNeedRestoration/autoInsertNeedTasks (hunger,
-  // breakNeed, or Tier-1 living_quarters fatigue) carry a restNeedKey and are owned
-  // by tickGeneralRestCompletion instead — skip them here to avoid double-processing.
+  // breakNeed, or Tier-1 living_quarters fatigue), or — once a site policy has
+  // been applied (#678) — by forceShiftRestIfNeededByPolicy, all carry a
+  // restNeedKey and are owned by tickGeneralRestCompletion instead — skip
+  // them here to avoid double-processing. This function only ever runs the
+  // legacy no-policy path (processShiftCycle only calls it when !policyApplied).
   if (emp.restNeedKey !== null) return;
 
   emp.restTicksRemaining -= 1;
@@ -1302,6 +1353,134 @@ function forceShiftRestIfNeeded(
     targetZ,
     targetEmployeeId: emp.id,
     payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
+  }, emp.id);
+
+  state.pendingActions.push(restAction);
+  emp.activeActionId = restAction.id;
+  emp.destinationX = targetX;
+  emp.destinationZ = targetZ;
+  shiftRested.push(emp.id);
+  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+}
+
+/**
+ * Site-policy-aware variant of forceShiftRestIfNeeded (#678) — consults
+ * SitePolicy.shouldForceRest so an applied policy (state.sitePolicy.revision
+ * > 0) forces rest for real, using any living_quarters tier (tier 1
+ * included) or resting in place if none exists.
+ *
+ * Same guard shape as the legacy function: skip an employee already resting
+ * (restTicksRemaining !== null), already walking to a queued rest
+ * (pendingRestDuration !== null), or currently idle (activeActionId ===
+ * null — shouldForceRest's own `isWorking` gate; an idle employee has
+ * nothing to interrupt and is handled by the other need-restoration paths
+ * instead). shouldForceRest itself then decides, per SitePolicy's rules: a
+ * full shift under a timed mode (shift_8h/shift_12h), or hunger/fatigue at
+ * or below its effective threshold (custom-mode per-employee overrides via
+ * getEffectiveThresholds) for every mode including continuous/custom.
+ *
+ * Unlike the legacy function (fatigue-only, fixed SHIFT_SLEEP_DURATION_TICKS,
+ * tier>=2 only), this routes to the nearest living_quarters of ANY tier
+ * (findNearestLivingQuarters is already tier-unfiltered), replenishes
+ * whichever need actually tripped the threshold (hunger if
+ * emp.hunger <= thresholds.hunger, else fatigue — covers both a
+ * fatigue-threshold trip and a shift-duration trip, matching the legacy
+ * function's fatigue-only shift rest), and sets pendingRestNeedKey so
+ * completion routes through the general tickGeneralRestCompletion /
+ * completeRestForEmployee path (NEED_REST_DURATIONS-based duration,
+ * BUILDING_REPLENISH_RATES-based replenishment, NEED_REST_NO_BUILDING_CAP
+ * when resting in place) instead of processShiftCycle's own completeRestTick.
+ */
+function forceShiftRestIfNeededByPolicy(
+  state: GameState,
+  emp: Employee,
+  firedEvents: FiredEvent[],
+  shiftRested: number[],
+  _emitter?: EventEmitter,
+): void {
+  if (emp.restTicksRemaining !== null) return;
+  // Already walking to a queued rest — see forceShiftRestIfNeeded's own
+  // comment on the same check (#437).
+  if (emp.pendingRestDuration !== null) return;
+  if (emp.activeActionId === null) return;
+
+  const snapshot = { id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked };
+  if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
+
+  // #678 follow-up: release the action this employee was actively working
+  // (a drill_hole, dig_ramp_segment, or any other vehicle-gated task) back to
+  // the pool before handing activeActionId to the rest action below — mirrors
+  // tickCollapse's own interruptActiveAction call for the identical reason.
+  // Without this, overwriting activeActionId directly (as this function used
+  // to) orphans the interrupted action: its record stays 'assigned'/holderId
+  // === emp.id forever, so it is never completed (this employee is now
+  // resting, not ticking it) and never reclaimed (fillIdleEmployeeFromQueueOrPool's
+  // open-pool query only matches 'queued' actions) — the employee goes idle
+  // permanently once the forced rest ends, and the work they were doing never
+  // finishes. interruptActiveAction preserves the in-progress payload
+  // (remaining duration, vehicle reservation released) so the same or another
+  // qualified employee resumes it later instead of restarting from scratch.
+  const priorActionId = emp.activeActionId;
+  interruptActiveAction(state, emp, priorActionId);
+
+  const thresholds = getEffectiveThresholds(state.sitePolicy, emp.id);
+  // Pick whichever gauge is more overdue relative to its OWN threshold, not
+  // always fatigue (#678 follow-up). A flat hunger-first check always resolved
+  // to 'fatigue' for the common shift-duration-triggered rest (fatigue's 2/tick
+  // working drain reliably crosses its threshold first), leaving hunger
+  // unaddressed across multiple shift cycles. Comparing each gauge's distance
+  // below its own threshold — and picking the smaller (more negative / more
+  // overdue) — works uniformly whether the rest was need-triggered (one gauge
+  // already <= its threshold) or shift-duration-triggered (neither has
+  // crossed yet): either way the gauge relatively furthest past due gets
+  // serviced.
+  const hungerDeficit = emp.hunger - thresholds.hunger;
+  const fatigueDeficit = emp.fatigue - thresholds.fatigue;
+  const needKey: NeedKey = hungerDeficit < fatigueDeficit ? 'hunger' : 'fatigue';
+
+  // Find nearest living_quarters of any tier for target coordinates.
+  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  let targetX = emp.x;
+  let targetZ = emp.z;
+  let buildingId: number | undefined;
+  const restDuration = NEED_REST_DURATIONS[needKey];
+
+  if (building) {
+    const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
+    targetX = approach.x;
+    targetZ = approach.z;
+    buildingId = building.id;
+  }
+  // #678 follow-up: unlike tickCollapse/autoInsertNeedTasks (which still
+  // apply NEED_REST_NO_BUILDING_DURATION_MULTIPLIER when resting in place —
+  // that multiplier is calibrated against genuine depletion, encouraging a
+  // living_quarters build), a policy-forced rest never doubles for lacking
+  // one. The policy's whole premise (its own doc comment above: "a tier-1
+  // living_quarters, or no building at all, is a valid rest destination
+  // under a policy, not a disqualifier") is that applying it protects an
+  // employee regardless of site infrastructure — every SitePolicy.shouldForceRest
+  // trigger, need-crossed or shift-duration-elapsed alike, already costs
+  // real, un-doubled ticks against whatever queued work it interrupts
+  // (interruptActiveAction above), which is real leverage for building a
+  // living_quarters (shorter walk, same duration) without also taxing an
+  // early, infrastructure-light site (exactly what tutorial_pit's own
+  // scripted tutorial is — no living_quarters exists there at all) twice
+  // for the one condition the policy exists to make survivable in the
+  // first place. tests/unit/engine/GameLoop.test.ts's own "no living_quarters
+  // at all" case documents this — previously pinned to the doubled value.
+
+  // The rest timer itself does not start until ArrivalGate.tickArrivalGate
+  // confirms the employee has walked to the building (#437).
+  emp.pendingRestDuration = restDuration;
+  emp.pendingRestNeedKey = needKey;
+
+  // Immediately claimed — status/holderId reflect that from creation (#547).
+  const restAction = createRestPendingAction(state, {
+    targetX,
+    targetZ,
+    targetEmployeeId: emp.id,
+    payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId },
   }, emp.id);
 
   state.pendingActions.push(restAction);

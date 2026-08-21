@@ -1026,10 +1026,31 @@ export const SHIFT_DURATIONS_TICKS = {
   shift_12h: 12,
 } as const;
 
-/** Default rest/break thresholds used by createSitePolicy(). All gauges are 0–100. */
+/**
+ * Default rest/break thresholds used by createSitePolicy(). All gauges are 0–100.
+ *
+ * hungerRest/fatigueRest sit above NEED_MORALE_EFFECT_THRESHOLDS.comfortable (50,
+ * see above) rather than below it (#678 follow-up). shouldForceRest only fires
+ * once a gauge crosses its threshold, so any threshold inside the 0-49 penalty
+ * band guarantees the gauge spends real time being penalized by
+ * needsMoraleEffect on every single work/rest cycle — this was harmless while
+ * SITE_POLICY_DEFAULT_THRESHOLDS was dead code, but forceShiftRestIfNeededByPolicy
+ * (#678) made it live. +10 above 50 gives enough margin that a gauge draining
+ * at its normal per-tick rate (fatigue's 2/tick working being the fastest) is
+ * caught before it can fall back below the comfortable line most of the time.
+ * The shipped 300-tick integration test scenario still shows hunger/fatigue
+ * dipping into the 30-49 mild-penalty band (observed minimums: hunger ~46.5,
+ * fatigue ~46.5) — travel time during forced-rest dispatch (the walk to
+ * living_quarters, before restTicksRemaining starts counting down) keeps
+ * draining the gauge and can eat past the +10 buffer. That's tolerated
+ * because needsMoraleEffect's penalty in that band is a gradual -0.5/tick,
+ * not a cliff: wellBeing stays comfortably above 0 for the acceptance
+ * criterion's full run. These thresholds keep gauges out of the *severe*
+ * penalty band, not out of the mild one entirely.
+ */
 export const SITE_POLICY_DEFAULT_THRESHOLDS = {
-  hungerRest:  40,
-  fatigueRest: 25,
+  hungerRest:  60,
+  fatigueRest: 60,
   socialBreak: 20,
 } as const;
 

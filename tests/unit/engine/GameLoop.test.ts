@@ -73,7 +73,11 @@ import {
   BASE_TASK_DURATION_TICKS,
   XP_THRESHOLDS,
   MAX_EMPLOYEE_TASK_QUEUE_DEPTH,
+  // ── #678: forced rest under an applied SitePolicy ──
+  SHIFT_DURATIONS_TICKS,
+  BUILDING_REPLENISH_RATES,
 } from '../../../src/core/config/balance.js';
+import { createSitePolicy } from '../../../src/core/entities/SitePolicy.js';
 
 /**
  * Rest/task timers are arrival-gated (#437): tickEmployees only queues
@@ -3528,6 +3532,508 @@ describe('processShiftCycle (7.9)', () => {
     processShiftCycle(state, firedEvents, mockEmitter);
 
     expect(events).toContain('employee:shift_change');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// processShiftCycle — under an applied policy (#678)
+//
+// SitePolicy.shouldForceRest was dead code until now: processShiftCycle
+// consults it (via forceShiftRestIfNeededByPolicy) so that once a policy is APPLIED
+// (state.sitePolicy.revision > 0), forced rest fires for real — at any
+// living_quarters tier (tier 1 included) or in place if none exists — using
+// the policy's own shift-duration/hunger/fatigue thresholds instead of the
+// legacy WORK_DURATION_TICKS (6) / SHIFT_SLEEP_DURATION_TICKS (8) constants,
+// which stay reserved for the un-opted-in (revision === 0) Tier-2+ Bunkhouse
+// path exercised by the "processShiftCycle (7.9)" suite above — unmodified,
+// still green, and not touched by anything below.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('processShiftCycle — under an applied policy (#678)', () => {
+  const SEED = 42;
+
+  /** Apply a policy the way set_policy does: bump revision, set shiftMode/thresholds. */
+  function applyPolicy(state: GameState, overrides: Partial<SitePolicyLike> = {}): void {
+    Object.assign(state.sitePolicy, overrides);
+    state.sitePolicy.revision = (state.sitePolicy.revision ?? 0) + 1;
+  }
+
+  // Local alias purely for the overrides parameter's shape above — avoids a
+  // second import of SitePolicy's own type under a different name.
+  type SitePolicyLike = ReturnType<typeof createSitePolicy>;
+
+  // ── No policy applied: revision stays 0 ───────────────────────────────────
+  // The whole "processShiftCycle (7.9)" suite above already covers this
+  // (every fixture there leaves state.sitePolicy at its fresh default,
+  // revision 0) and none of its bodies are touched by this change — this
+  // entry exists only to document the invariant, not to re-assert it.
+  it('a fresh game state carries revision 0 by default — the opt-in gate the suite above relies on', () => {
+    const state = createGame({ seed: SEED });
+    expect(state.sitePolicy.revision).toBe(0);
+  });
+
+  // ── Shift-duration boundary (shift_8h) ─────────────────────────────────────
+
+  it('does not fire one tick before the shift_8h boundary', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 111;
+    // One tick before shift_8h - 1: this call's own increment brings
+    // ticksWorked to shift_8h - 1 (7), still below the 8-tick boundary.
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 2;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(employee.ticksWorked).toBe(SHIFT_DURATIONS_TICKS.shift_8h - 1);
+    expect(result.shiftRested).not.toContain(employee.id);
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBe(111);
+  });
+
+  it('fires exactly at the shift_8h boundary, using the policy shift-rest duration (not SHIFT_SLEEP_DURATION_TICKS)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 222;
+    // This call's own increment brings ticksWorked to exactly shift_8h (8).
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(employee.ticksWorked).toBe(SHIFT_DURATIONS_TICKS.shift_8h);
+    expect(result.shiftRested).toContain(employee.id);
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.activeActionId).not.toBe(222);
+  });
+
+  // ── Need-threshold boundaries ───────────────────────────────────────────────
+
+  it('fires on hunger at exactly hungerRestThreshold, and NOT one point above it', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const threshold = state.sitePolicy.hungerRestThreshold;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee: atThreshold } = hireEmployee(state.employees, 'driller', rng);
+    atThreshold.activeActionId = 301;
+    atThreshold.hunger = threshold;
+    atThreshold.fatigue = 100;
+    atThreshold.ticksWorked = 1; // nowhere near the shift boundary
+
+    processShiftCycle(state, []);
+
+    expect(atThreshold.pendingRestNeedKey).toBe('hunger');
+    expect(atThreshold.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
+
+    const { employee: aboveThreshold } = hireEmployee(state.employees, 'driller', rng);
+    aboveThreshold.activeActionId = 302;
+    aboveThreshold.hunger = threshold + 1;
+    aboveThreshold.fatigue = 100;
+    aboveThreshold.ticksWorked = 1;
+
+    processShiftCycle(state, []);
+
+    expect(aboveThreshold.pendingRestDuration).toBeNull();
+    expect(aboveThreshold.activeActionId).toBe(302);
+  });
+
+  it('fires on fatigue at or below fatigueRestThreshold when hunger is healthy', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const threshold = state.sitePolicy.fatigueRestThreshold;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 400;
+    employee.hunger = 100;
+    employee.fatigue = threshold;
+    employee.ticksWorked = 1;
+
+    processShiftCycle(state, []);
+
+    expect(employee.pendingRestNeedKey).toBe('fatigue');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+  });
+
+  // ── No living_quarters at all: not gated on building presence ─────────────
+
+  // #678 follow-up (tutorial-playthrough regression): a policy-forced rest no
+  // longer doubles for lacking a living_quarters — unlike tickCollapse/
+  // autoInsertNeedTasks, whose NEED_REST_NO_BUILDING_DURATION_MULTIPLIER
+  // penalizes genuine depletion to encourage building one. The policy's own
+  // premise (forceShiftRestIfNeededByPolicy's doc comment) is that it
+  // protects an employee regardless of site infrastructure — doubling the
+  // rest on top of the real, already-uncompensated interruption cost
+  // (interruptActiveAction releasing whatever task was in progress) taxed an
+  // infrastructure-light site twice for the one condition the policy exists
+  // to make survivable. tutorial_pit has no living_quarters at all, and its
+  // own tutorial-playthrough.json scenario opts into shift_8h mid-drill —
+  // the doubled duration compounded across repeated forced-rest cycles into
+  // a scenario-breaking amount of lost drilling time.
+  it('still forces rest with no living_quarters at all — rests in place, at the un-multiplied rest duration', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 500;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
+    // No living_quarters placed anywhere.
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents);
+
+    expect(result.active).toBe(true);
+    expect(result.shiftRested).toContain(employee.id);
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+    expect(employee.destinationX).toBe(employee.x);
+    expect(employee.destinationZ).toBe(employee.z);
+  });
+
+  // ── Tier-1 living_quarters: routes to it, un-multiplied duration ──────────
+
+  it('routes to a tier-1 living_quarters when one exists, with the un-multiplied rest duration', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 600;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
+
+    // Placed away from the employee's own position (0,0) so a routed
+    // destination is distinguishable from resting in place.
+    const placed = placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    const result = processShiftCycle(state, []);
+
+    expect(result.shiftRested).toContain(employee.id);
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue); // not multiplied
+    expect(employee.destinationX).not.toBe(employee.x);
+    expect(employee.destinationZ).not.toBe(employee.z);
+  });
+
+  // ── Tier-2+ living_quarters: policy boundary supersedes the legacy one ────
+
+  it('with a tier-2+ living_quarters, uses the policy shift boundary (8), not the legacy WORK_DURATION_TICKS (6)', () => {
+    const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 700;
+    // The legacy Tier-2+ boundary (WORK_DURATION_TICKS = 6) has already been
+    // reached/passed, but the policy's own boundary (8) has not.
+    employee.ticksWorked = WORK_DURATION_TICKS;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    const notYet = processShiftCycle(state, []);
+    expect(notYet.shiftRested).not.toContain(employee.id);
+    expect(employee.pendingRestDuration).toBeNull();
+
+    // Now reach the policy's own boundary.
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1;
+    const result = processShiftCycle(state, []);
+
+    expect(result.shiftRested).toContain(employee.id);
+    // Policy-driven duration, not the legacy SHIFT_SLEEP_DURATION_TICKS constant
+    // (both happen to equal 8 today, but this pins the *source*, not the value).
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
+  });
+
+  // ── Dead/injured employees are still skipped ──────────────────────────────
+
+  it('dead employees are skipped under an applied policy', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.alive = false;
+    employee.activeActionId = 800;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.hunger = 1;
+    employee.fatigue = 1;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const result = processShiftCycle(state, []);
+
+    expect(result.shiftRested).not.toContain(employee.id);
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
+  });
+
+  it('injured employees are skipped under an applied policy', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.injured = true;
+    employee.activeActionId = 801;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.hunger = 1;
+    employee.fatigue = 1;
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const result = processShiftCycle(state, []);
+
+    expect(result.shiftRested).not.toContain(employee.id);
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
+  });
+
+  // ── continuous / custom shift modes under a policy ─────────────────────────
+
+  it("'continuous' mode never force-rests purely from ticksWorked — only from need thresholds", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'continuous' });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 900;
+    employee.ticksWorked = 9999; // massive — continuous has no shift-duration boundary
+    employee.hunger = 100;
+    employee.fatigue = 100;
+
+    processShiftCycle(state, []);
+    expect(employee.pendingRestDuration).toBeNull();
+
+    // Now cross a need threshold — this alone must fire under 'continuous'.
+    employee.hunger = state.sitePolicy.hungerRestThreshold - 1;
+    processShiftCycle(state, []);
+
+    expect(employee.pendingRestNeedKey).toBe('hunger');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
+  });
+
+  it("'custom' mode honours per-employee customThresholds", () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'custom' });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    state.sitePolicy.customThresholds[employee.id] = { hunger: 70, fatigue: 10, social: 10 };
+    employee.activeActionId = 950;
+    employee.ticksWorked = 1;
+    // Below the custom hunger threshold (70) but above the policy-level
+    // default (40) — only the per-employee override explains a fire here.
+    employee.hunger = 60;
+    employee.fatigue = 100;
+
+    processShiftCycle(state, []);
+
+    expect(employee.pendingRestNeedKey).toBe('hunger');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
+  });
+
+  // ── employee_shift_change event still fires under the policy path ─────────
+
+  it('fires employee_shift_change (firedEvents and emitter) under the policy path', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 1000;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1;
+
+    const events: string[] = [];
+    const mockEmitter = { emit: (event: string) => { events.push(event); } } as unknown as EventEmitter;
+    const firedEvents: FiredEvent[] = [];
+
+    processShiftCycle(state, firedEvents, mockEmitter);
+
+    expect(firedEvents.some(e => e.eventId === 'employee_shift_change')).toBe(true);
+    expect(events).toContain('employee:shift_change');
+  });
+
+  // ── Completion: gauge replenishment differs by building tier ──────────────
+
+  it('replenishes the resting gauge per BUILDING_REPLENISH_RATES tier once forced rest completes, then returns to normal dispatch', () => {
+    function runToCompletion(tier: 1 | 2 | 3): { fatigueAfter: number; activeActionId: number | null } {
+      const state = createGame({ seed: SEED });
+      const rng = new Random(SEED);
+      applyPolicy(state, { shiftMode: 'shift_8h' });
+      state.buildings.unlockedTiers.living_quarters = 3;
+      // Co-located with the employee (0,0) so arrival resolves in one step
+      // (mirrors this file's own resolveArrival doc comment).
+      placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, tier);
+
+      const { employee } = hireEmployee(state.employees, 'driller', rng);
+      employee.activeActionId = 1100;
+      employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
+      employee.fatigue = 50;
+
+      processShiftCycle(state, []); // fires forced rest via the applied policy
+      resolveArrival(state); // promotes pendingRestDuration/NeedKey -> restTicksRemaining/restNeedKey
+
+      // Directly collapse the rest to its final tick — permitted per this
+      // feature's own acceptance criteria ("directly set restTicksRemaining/
+      // restNeedKey and invoke the completion path used elsewhere in this file").
+      employee.restTicksRemaining = 1;
+      tickGeneralRestCompletion(state);
+
+      return { fatigueAfter: employee.fatigue, activeActionId: employee.activeActionId };
+    }
+
+    const tier1 = runToCompletion(1);
+    const tier2 = runToCompletion(2);
+
+    expect(tier1.fatigueAfter - 50).toBe(BUILDING_REPLENISH_RATES.fatigue[1]);
+    expect(tier2.fatigueAfter - 50).toBe(BUILDING_REPLENISH_RATES.fatigue[2]);
+    expect(tier1.fatigueAfter).not.toBe(tier2.fatigueAfter);
+    expect(tier1.activeActionId).toBeNull();
+    expect(tier2.activeActionId).toBeNull();
+  });
+
+  // ── Interrupted work is released for reclaim, not orphaned (tutorial-playthrough regression) ──
+
+  // tutorial-playthrough.json (scripts/scenario-defs/) opts into shift_8h
+  // mid-drill: before this fix, forceShiftRestIfNeededByPolicy overwrote
+  // employee.activeActionId with the new rest action's id directly, without
+  // ever releasing the drill_hole action it replaced — unlike tickCollapse,
+  // which calls interruptActiveAction for exactly this reason. The
+  // interrupted action's record stayed 'assigned'/holderId === employee.id
+  // forever: never completed (the employee was now resting, not ticking it)
+  // and never reclaimed (the open-pool query only matches 'queued' actions),
+  // so the employee went idle permanently once the forced rest ended and the
+  // work they were doing never finished — a driller left with 3 of 4 holes
+  // stuck ordered forever, cascading into every step downstream of it. This
+  // test fails on the old code (action stays 'assigned', held by the
+  // employee, activeActionId overwritten with no trace of it) and passes on
+  // the fix (action released to 'queued'/holderId: null, its remaining
+  // duration preserved on the payload for whoever reclaims it next).
+  it('releases the interrupted active action back to the pool instead of orphaning it', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const interrupted: PendingAction = {
+      id: 900,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { note: 'drilling' },
+      targetEmployeeId: null,
+      status: 'in_progress',
+      holderId: employee.id,
+    };
+    state.pendingActions.push(interrupted);
+    employee.activeActionId = interrupted.id;
+    employee.taskTicksRemaining = 4; // work already in progress, not merely claimed
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
+
+    processShiftCycle(state, []);
+
+    // Released back to the pool — 'queued', unheld — not left 'assigned'/
+    // held by an employee who is now resting and will never tick it again.
+    const released = state.pendingActions.find(a => a.id === interrupted.id)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    // Remaining work is preserved on the action itself so whoever reclaims
+    // it resumes instead of restarting from scratch.
+    expect(released.payload['durationTicks']).toBe(4);
+    // The employee's activeActionId now points at the new rest action, not
+    // the interrupted one and not null.
+    expect(employee.activeActionId).not.toBe(interrupted.id);
+    expect(employee.activeActionId).not.toBeNull();
+  });
+
+  // ── Edge cases ──────────────────────────────────────────────────────────────
+
+  it('does not requeue an employee already mid-walk to a queued policy rest', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const CLAIMED_ACTION_ID = 1200;
+    employee.activeActionId = CLAIMED_ACTION_ID;
+    employee.pendingRestDuration = NEED_REST_DURATIONS.hunger;
+    employee.pendingRestNeedKey = 'hunger';
+    // Every trigger condition is also satisfied, to prove the guard — not
+    // the absence of a reason to fire — is what stops a second queue.
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h;
+    employee.hunger = 1;
+    employee.fatigue = 1;
+
+    processShiftCycle(state, []);
+
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.hunger);
+    expect(employee.pendingRestNeedKey).toBe('hunger');
+    expect(employee.activeActionId).toBe(CLAIMED_ACTION_ID);
+  });
+
+  it('skips an employee already resting (restTicksRemaining !== null)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 1300;
+    employee.restTicksRemaining = 5;
+    employee.restNeedKey = 'fatigue'; // owned by tickGeneralRestCompletion, not this pass
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h; // would otherwise refire
+    employee.hunger = 1;
+    employee.fatigue = 1;
+
+    processShiftCycle(state, []);
+
+    // Untouched by this pass — still owned by the general rest-completion path.
+    expect(employee.restTicksRemaining).toBe(5);
+    expect(employee.activeActionId).toBe(1300);
+  });
+
+  it('never force-rests an idle employee (activeActionId === null)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = null;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.hunger = 1;
+    employee.fatigue = 1;
+
+    processShiftCycle(state, []);
+
+    expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.pendingRestDuration).toBeNull();
   });
 });
 

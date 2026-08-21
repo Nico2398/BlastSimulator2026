@@ -7,9 +7,9 @@ export type ShiftMode = 'shift_8h' | 'shift_12h' | 'continuous' | 'custom';
 
 export interface SitePolicy {
   shiftMode: ShiftMode;
-  /** Force rest when hunger drops to or below this value. Default: 40 */
+  /** Force rest when hunger drops to or below this value. Default: 60 */
   hungerRestThreshold: number;
-  /** Force rest when fatigue drops to or below this value. Default: 25 */
+  /** Force rest when fatigue drops to or below this value. Default: 60 */
   fatigueRestThreshold: number;
   /** Trigger a social break when social drops to or below this value. Default: 20 */
   socialBreakThreshold: number;
@@ -83,16 +83,7 @@ export function shouldForceRest(
   }
 
   // Determine effective thresholds
-  let hungerThreshold = policy.hungerRestThreshold;
-  let fatigueThreshold = policy.fatigueRestThreshold;
-
-  if (policy.shiftMode === 'custom' && employee.id !== undefined) {
-    const override = policy.customThresholds[employee.id];
-    if (override !== undefined) {
-      hungerThreshold = override.hunger;
-      fatigueThreshold = override.fatigue;
-    }
-  }
+  const { hunger: hungerThreshold, fatigue: fatigueThreshold } = getEffectiveThresholds(policy, employee.id);
 
   // Need-based rest check
   if (employee.hunger <= hungerThreshold || employee.fatigue <= fatigueThreshold) {
@@ -100,4 +91,24 @@ export function shouldForceRest(
   }
 
   return false;
+}
+
+/**
+ * Returns the effective hunger/fatigue rest thresholds for an employee under
+ * this policy — per-employee `customThresholds` override (in 'custom' mode)
+ * take precedence over the policy-level defaults when present.
+ */
+export function getEffectiveThresholds(policy: SitePolicy, employeeId?: number): { hunger: number; fatigue: number } {
+  let hungerThreshold = policy.hungerRestThreshold;
+  let fatigueThreshold = policy.fatigueRestThreshold;
+
+  if (policy.shiftMode === 'custom' && employeeId !== undefined) {
+    const override = policy.customThresholds[employeeId];
+    if (override !== undefined) {
+      hungerThreshold = override.hunger;
+      fatigueThreshold = override.fatigue;
+    }
+  }
+
+  return { hunger: hungerThreshold, fatigue: fatigueThreshold };
 }
