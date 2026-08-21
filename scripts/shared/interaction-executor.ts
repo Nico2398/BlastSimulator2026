@@ -661,6 +661,7 @@ export async function executeActionOnPage(
       // outer wall-clock safety net against a genuine hang, not the loop's
       // own pacing budget.
       let ticksUsed = 0;
+      let blockedTicks = 0;
       for (;;) {
         const st = await page.evaluate(() => {
           const run = (window as unknown as {
@@ -670,9 +671,19 @@ export async function executeActionOnPage(
           const fn = (window as unknown as {
             __tutorialState?: () => { active: boolean; stepId: string | null; stageTarget: string | null };
           }).__tutorialState;
-          return fn === undefined ? null : fn();
+          const tutorialState = fn === undefined ? null : fn();
+          const getState = (window as unknown as {
+            __gameState?: () => Record<string, unknown> | null;
+          }).__gameState;
+          const gs = getState === undefined ? null : getState();
+          return tutorialState === null ? null : {
+            ...tutorialState,
+            pendingEvent: gs ? Boolean(gs.pendingEvent) : false,
+          };
         });
         ticksUsed++;
+        const blockedThisTick = Boolean(st?.pendingEvent);
+        blockedTicks = blockedThisTick ? blockedTicks + 1 : 0;
         onProgress?.(
           `waitForTutorialStep on "${st?.stepId ?? 'none'}", live control ${st?.stageTarget ?? 'none'}, `
           + `want ${wanted.map(s => `"${s}"`).join(' or ')}, tick ${ticksUsed}/${maxTicks}`,
@@ -683,7 +694,8 @@ export async function executeActionOnPage(
         if (ticksUsed >= maxTicks || Date.now() > deadline) {
           throw new Error(
             `waitForTutorialStep: tutorial never reached ${wanted.map(s => `"${s}"`).join(' or ')}`
-            + ` — it is on "${st.stepId}", live control ${st.stageTarget ?? 'none'}, after ${ticksUsed} tick(s)`,
+            + ` — it is on "${st.stepId}", live control ${st.stageTarget ?? 'none'}, after ${ticksUsed} tick(s)`
+            + (blockedTicks > 0 ? `; blocked by a pending event for ${blockedTicks} tick(s)` : ''),
           );
         }
       }
