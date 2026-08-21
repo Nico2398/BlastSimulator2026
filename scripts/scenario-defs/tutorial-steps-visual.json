@@ -54,10 +54,22 @@
         }
       ],
       "role": "setup",
-      "description": "tutorial_start is registered only in src/main.ts (the browser boot path), not in the shared console command table console-api.ts's createRunner() uses -- command mode reports \"Unknown command\" here and never actually starts the tutorial overlay, while interaction mode's `command` action reaches the real registered handler and does start it (arming TutorialOverlay's rails and setting state.isPaused = true). The added waitForSelector/waitForTutorialStep only run in interaction mode (command mode never starts the overlay to wait on) and gate every real click below on the rail actually being armed, mirroring tutorial-interactive.json.",
+      "description": "issue #585: tutorial_start now has a real command-mode implementation too (createRunner.ts), pausing the game the same way the browser boot path (main.ts) always did -- command mode used to report \"Unknown command\" here and never start anything; now both modes genuinely set state.isPaused = true. The added waitForSelector/waitForTutorialStep only run in interaction mode (command mode has no DOM to wait on) and gate every real click below on the rail actually being armed, mirroring tutorial-interactive.json.",
       "expect": {
         "tutorialStep": "time-speed"
       }
+    },
+    {
+      "command": "time resume",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup",
+      "description": "Command-mode-only unpause (issue #585): with tutorial_start now genuinely pausing (see its own step above), tickCommand's own loop stops after exactly one real tick while paused regardless of the requested count -- every bare `tick N` below (survey wait, training waits, drill/charge waits, haul wait) would silently advance only 1 tick without this. Interaction mode's own waitForTutorialStep-driven steps run their own real clock independent of console pause state, so this resume has no effect there."
     },
     {
       "command": "time speed 2",
@@ -637,7 +649,8 @@
       "interaction": [
         { "type": "resolveEventIfPending" }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -757,7 +770,8 @@
       "description": "#555 tutorial worker-revolt fix (this PR): restored to a real dialog interaction, matching tutorial-interactive.json's own event-choose step -- the `worker_revolt` game-over this used to route around (UIManager.update() defers EventModal while `state.levelEndReason !== null`) no longer fires (see the blast step's own note), so the scripted `tutorial_synergy_consultant` event dialog is genuinely reachable and answerable again, not a permanent dead end.",
       "expect": {
         "tutorialStep": "hire-manager"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 1",
@@ -913,7 +927,7 @@
       }
     },
     {
-      "command": "vehicle driver 2 4",
+      "command": "vehicle driver 3 4",
       "timeout": 30,
       "interaction": [
         {
@@ -927,7 +941,7 @@
         }
       ],
       "role": "player",
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553/#555 (issue #585, confirmed via direct trace): vehicle #3, not #2 -- the drill_rig and rock_digger bought earlier take vehicle slots #1 and #2, both destroyed by the pattern-1 blast, but ids are never reused.",
       "expect": {
         "tutorialStep": "build-storage"
       }
@@ -982,7 +996,7 @@
       }
     },
     {
-      "command": "tick 1",
+      "command": "tick 40",
       "timeout": 30,
       "interaction": [
         {
@@ -996,7 +1010,7 @@
         }
       ],
       "role": "player",
-      "description": "#552 (supersedes the Finding #74/#75 follow-up this step was originally inserted for): the Fleet panel's Haul button is retired, and hauling self-dispatches automatically once the debris_hauler, its licensed driver, and the freight_warehouse are all in place -- there is no click left to make here. The step teaches watching, not clicking: waitForTutorialStep still drives the real clock for the trip, exactly as before, just without a button triggering it. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "#552 (supersedes the Finding #74/#75 follow-up this step was originally inserted for): the Fleet panel's Haul button is retired, and hauling self-dispatches automatically once the debris_hauler, its licensed driver, and the freight_warehouse are all in place -- there is no click left to make here. The step teaches watching, not clicking: waitForTutorialStep still drives the real clock for the trip, exactly as before, just without a button triggering it. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #585: command mode's own tick count raised 1 -> 40 (confirmed via direct trace) -- storedMassKg plateaus around tick 30 once the hauler's first delivery lands, and a single tick left storage empty for the delivery attempt right after.",
       "expect": {
         "tutorialStep": "contract-deliver"
       }

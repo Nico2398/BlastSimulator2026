@@ -55,6 +55,18 @@
       }
     },
     {
+      "command": "time resume",
+      "timeout": 30,
+      "description": "Command-mode-only unpause (issue #585): tutorial_start now genuinely sets isPaused (matches a real player's first view of the tutorial, paused so the card can be read) -- and tickCommand's own loop stops after exactly one real tick while paused regardless of the requested count, so every bare `tick N` below (training waits, haul waits) would silently advance only 1 tick without this. Interaction mode's own waitForTutorialStep steps drive their own real clock independent of console pause state, so this resume has no effect there.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ]
+    },
+    {
       "command": "time speed:2",
       "timeout": 30,
       "description": "time-speed complete: real click on the speed button cycles 1x to 2x, card advances to Hire Surveyor",
@@ -554,7 +566,8 @@
         {
           "type": "resolveEventIfPending"
         }
-      ]
+      ],
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
@@ -601,7 +614,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto",
@@ -709,7 +723,8 @@
       ],
       "expect": {
         "tutorialStep": "hire-manager"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "employee hire role:manager",
@@ -737,7 +752,7 @@
     {
       "command": "contract accept type:rubble_disposal",
       "timeout": 30,
-      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this file's sibling scenarios the accept click is scoped to `[data-contract-type]`/`[data-contract-material]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. #653 review round (Finding 2): this step used to stay unscoped, reasoning that tutorialStages.ts's own 'contract-accept' stage declares its live target as the bare `#bs-contract-panel .bs-contract-accept` and that scoping raced the offer pool's own refresh clock (REFRESH_INTERVAL=20 ticks, Contract.ts) -- but an unscoped click accepts whichever offer leads the DOM, which is only rubble_disposal at some tick landings and a different type at others (replay-verified at varied timing), silently accepting the wrong contract while the later deliver step (scoped to `[data-contract-type=\"rubble_disposal\"]`) then finds nothing to deliver and times out. Scoped now, matching contract-negotiation.json/contract-panel-visual.json's own accept steps: a `waitForSelector` on the scoped selector ahead of the click gives the refresh cycle time to surface the right card instead of assuming it's there instantly, and `expect.equals` on `activeContractCount` proves the right contract landed rather than merely some contract. #653: retargeted from `type:ore_sale material:gloomium` to `type:rubble_disposal` (no `material:` -- rubble_disposal contracts carry `materialId: ''`), because the ore_sale/gloomium contract this step used to accept could never actually be delivered later (see the deliver step's own note below) -- the debris hauler this tutorial buys only ever fills storage with excavation spoil, never an ore-bearing fragment. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg`, which the hauler does fill, making this the first contract type in this run the later deliver step can genuinely complete. Live-verified landing under real render load is ~100 extra ticks reaching this point (tick 332 vs command mode's tick 232), not the 300+ an earlier round of this file assumed.",
+      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this file's sibling scenarios the accept click is scoped to `[data-contract-type]`/`[data-contract-material]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. #653 review round (Finding 2): this step used to stay unscoped, reasoning that tutorialStages.ts's own 'contract-accept' stage declares its live target as the bare `#bs-contract-panel .bs-contract-accept` and that scoping raced the offer pool's own refresh clock (REFRESH_INTERVAL=20 ticks, Contract.ts) -- but an unscoped click accepts whichever offer leads the DOM, which is only rubble_disposal at some tick landings and a different type at others (replay-verified at varied timing), silently accepting the wrong contract while the later deliver step (scoped to `[data-contract-type=\"rubble_disposal\"]`) then finds nothing to deliver and times out. Scoped now, matching contract-negotiation.json/contract-panel-visual.json's own accept steps: a `waitForSelector` on the scoped selector ahead of the click gives the refresh cycle time to surface the right card instead of assuming it's there instantly, and `expect.equals` on `activeContractCount` proves the right contract landed rather than merely some contract. #653: retargeted from `type:ore_sale material:gloomium` to `type:rubble_disposal` (no `material:` -- rubble_disposal contracts carry `materialId: ''`), because the ore_sale/gloomium contract this step used to accept could never actually be delivered later (see the deliver step's own note below) -- the debris hauler this tutorial buys only ever fills storage with excavation spoil, never an ore-bearing fragment. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg`, which the hauler does fill, making this the first contract type in this run the later deliver step can genuinely complete. Live-verified landing under real render load is ~100 extra ticks reaching this point (tick 332 vs command mode's tick 232), not the 300+ an earlier round of this file assumed. issue #585 (merge, agrees independently): a hardcoded id here is exactly as fragile as the DOM-scoped click above and for the same reason -- the contract pool's ids increment off total elapsed ticks (Contract.ts) -- reaching the same `type:rubble_disposal` selector via a separate trace before #653 landed.",
       "role": "player",
       "interaction": [
         {
@@ -828,7 +843,7 @@
     {
       "command": "vehicle driver 3 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1 (destroyed by its own blast, but the id isn't reused). #653: vehicle #3, not #2 -- both vehicles bought earlier in this run (drill_rig #1, rock_digger #2) are destroyed by an earlier blast (vehicleCount 2\u21920, deathCount 0\u21922), so ids are never reused and the debris_hauler bought in the previous step is vehicle #3.",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1 (destroyed by its own blast, but the id isn't reused). #653: vehicle #3, not #2 -- both vehicles bought earlier in this run (drill_rig #1, rock_digger #2) are destroyed by an earlier blast (vehicleCount 2\u21920, deathCount 0\u21922), so ids are never reused and the debris_hauler bought in the previous step is vehicle #3. issue #585 (merge, agrees independently): same #3 conclusion, confirmed via a separate direct trace before #653 landed.",
       "role": "player",
       "interaction": [
         {
@@ -888,9 +903,9 @@
       }
     },
     {
-      "command": "tick 20",
+      "command": "tick 40",
       "timeout": 90,
-      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline (contract #11 checked live via `contract status` right after acceptance: `67 ticks remaining`), so the delivery step right after this one now has real stock to draw on in command mode too, not just interaction mode's own wall-clock-driven wait.",
+      "description": "haul-debris complete (#552): automatic dispatch sends the hauler to a reachable fragment with no player click at all -- the retired Haul button is gone, so there is nothing left for this step to point at. The step teaches watching, not clicking: waitForTutorialStep drives the real clock for the haul exactly as before, just without a click triggering it. #653 follow-up: command mode's own `command` was widened from `tick 1` to `tick 20` -- verified live (command mode) that storedMassKg is still 0 at tick 10, first lands the hauler's full 1050kg load between tick 11 and tick 13 (walk-to-vehicle/board, drive-to-fragment, load, drive-back, unload all cost real simulated ticks that only started counting once this step's own ticks ran), and stays there afterward; tick 20 keeps ~7-9 ticks of margin over that observed landing point without approaching the accepted contract's 67-tick deadline. issue #585 (merge): the accept step above changed independently on both sides of the merge (scoped click instead of unscoped), shifting exactly when the hauler's dispatch clock starts counting relative to before #653's own 10/13/20-tick measurement; kept at 40 (this branch's own pre-merge value) rather than adopting #653's 20 outright, since a full command-mode replay of the merged file (all 43 steps) is a cheaper, equally valid check than re-deriving the exact new landing tick by hand -- confirmed clean end to end with 40, not re-verified at 20.",
       "role": "player",
       "interaction": [
         {
@@ -909,9 +924,9 @@
       }
     },
     {
-      "command": "contract deliver type:rubble_disposal amount:170",
+      "command": "contract deliver type:rubble_disposal amount:200",
       "timeout": 90,
-      "description": "contract-deliver complete, now genuinely in both modes: Deliver clicked on the rubble_disposal contract accepted earlier, using its full remaining quantity (170kg) so it fully completes in one delivery; the finances card then auto-advances. #653: retargeted from `type:ore_sale material:gloomium amount:200` -- confirmed live that field-plan (even after fixing the vehicle-id step) leaves `collectedOre.gloomium` at 0kg for 600+ ticks, because the debris hauler only ever fills storage with excavation spoil (box-cut/ramp-carve debris), never an ore-bearing blast fragment, so that contract could never be fulfilled before its own deadline. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg` instead, which the hauler does fill: verified live, `storedMassKg` reaches 1050kg well within the accepted contract's 67-tick deadline. amount:170 matches the accepted contract's exact quantityKg (confirmed via `contract status`: `[11] Dispose of rubble — 0/170kg`) so the single delivery both fits under the cap and fully completes the contract. Interaction click now scoped to `[data-contract-type=\"rubble_disposal\"]` (unlike the accept step, which stays unscoped against the offer pool's own refresh race) -- safe here because `state.contracts.active` doesn't rotate the way the offer pool does: there is exactly one active contract at this point and no periodic refresh removing it. #653 follow-up: the previous `tick 1` immediately before this step (haul-debris) left command mode's own hauler with 0kg stored, so this command genuinely failed with \"Not enough stored material\" every command-mode run even though the file no longer asserted on it -- widening that step's own tick budget to `tick 20` (its own note has the measurement) gives command mode the same real stock interaction mode's wall-clock wait already produced, so `contract deliver` now succeeds for real in both modes: verified live, command mode output is `Contract #11 COMPLETED! Payment: $127.94 + early bonus: $19.00` and `activeContractCount` drops 1→0.",
+      "description": "contract-deliver complete, now genuinely in both modes: Deliver clicked on the rubble_disposal contract accepted earlier; the finances card then auto-advances. #653: retargeted from `type:ore_sale material:gloomium amount:200` -- confirmed live that field-plan (even after fixing the vehicle-id step) leaves `collectedOre.gloomium` at 0kg for 600+ ticks, because the debris hauler only ever fills storage with excavation spoil (box-cut/ramp-carve debris), never an ore-bearing blast fragment, so that contract could never be fulfilled before its own deadline. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg` instead, which the hauler does fill. Interaction click scoped to `[data-contract-type=\"rubble_disposal\"]` (unlike the accept step, which stays unscoped against the offer pool's own refresh race) -- safe here because `state.contracts.active` doesn't rotate the way the offer pool does: there is exactly one active contract at this point and no periodic refresh removing it. issue #585 (merge): kept amount:200 rather than #653's own exact-quantity 170 -- the merge shifts exactly which tick this contract is offered/accepted at (the accept step above now scopes its own click, and the haul-debris step above needed re-verifying against the combined file), so the contract's own exact remaining quantity is no longer pinned to the 170kg #653 measured against its own, pre-merge version of this file. amount:200 is a cap, not an exact figure -- it exceeds every rubble-disposal offer's own quantity seen in trace (120-170kg), so this caps at whatever the contract still needs and completes it outright regardless of the exact pool-dependent number, the same robustness #585's own original version of this step already had. Whether it reads COMPLETED or a partial \"Delivered to\" is pool-size-dependent and not asserted here.",
       "role": "player",
       "interaction": [
         {

@@ -111,7 +111,8 @@
         "blocked": "#bs-build-panel [data-build-type=\"explosive_warehouse\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not researched"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "build freight_warehouse at:25,5 tier:2",
@@ -133,7 +134,8 @@
         "blocked": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn",
         "note": "rejected: tier 2 not researched"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "build list",

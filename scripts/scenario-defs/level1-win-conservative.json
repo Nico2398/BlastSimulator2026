@@ -64,46 +64,6 @@
       }
     },
     {
-      "command": "build medical_bay at:5,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build medical_bay at:5,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "build office at:8,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build office at:8,5"
-        }
-      ],
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost \u2014 see gameplay-employee-needs for the corrected mapping.",
-      "expect": {
-        "equals": {
-          "cash": 50000,
-          "tickCount": 0,
-          "deathCount": 0,
-          "employeeCount": 0,
-          "activeContractCount": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
       "command": "employee hire role:driller",
       "interaction": [
         {
@@ -533,7 +493,8 @@
         }
       },
       "role": "player",
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -576,7 +537,8 @@
         }
       },
       "role": "player",
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -635,7 +597,7 @@
           "command": "contract deliver type:rubble_disposal amount:300"
         }
       ],
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against this contract -- the single driller this file hires never touches hauling, and no debris_hauler is ever bought. The console command is no better: it returns success:false (\"Not enough rubble in storage: 0.0 kg available, 300.0 kg requested\") and command mode only fails a step on a thrown exception, so this is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. #635: dropped the numeric id for `type:rubble_disposal`, matching the accept step above.",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled at this point. ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace of this file shows 0.0 kg of rubble in storage against this contract -- the single driller this file hires never touches hauling, and no debris_hauler is ever bought. The console command is no better: it returns success:false (\"Not enough rubble in storage: 0.0 kg available, 300.0 kg requested\") and command mode only fails a step on a thrown exception, so this is a silent no-op in BOTH modes today. `expect.blocked` is what now pins it down -- the button must be in the DOM and refused, with `expect.usable` on the panel's own storage link proving the panel is really open, so \"blocked\" cannot pass just because nothing is on screen. #635: dropped the numeric id for `type:rubble_disposal`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- the #585 audit (commit 7162e090) already classified this exact shape, 'contract deliver on an empty warehouse', as a guard step that declares the field with no description change (see tutorial-playthrough.json's own three identically-worded guard steps), but this file's #553/#554/#555 rescue-merge redrifted the contract id/amount here away from whatever numbers that original fix last saw, and the field was lost in the process. The guard's own claim was never wrong -- confirmed via a live `ScenarioCommandOutcomes` replay and a full `run-all-scenarios` run that the refusal text above is still word-for-word what actually happens; only the structural declaration was missing.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -649,7 +611,8 @@
           "tickCount": 0
         }
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "drill_plan grid rows:2 cols:4 spacing:3 depth:6 diameter:0.089 start:77,31",
@@ -902,7 +865,8 @@
         }
       },
       "role": "player",
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -947,7 +911,8 @@
           "tickCount": 0
         }
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1006,7 +971,7 @@
           "command": "contract deliver type:supply material:blingite amount:400"
         }
       ],
-      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (rubble, blingite supply) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 400.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:blingite`, matching the accept step above.",
+      "description": "BLOCKED, same class as the deliver step above: a direct trace shows both active cards (rubble, blingite supply) at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command clamps the request to the contract's own remaining quantity and still refuses (\"Not enough stored material: 0.0 kg available, 400.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:blingite`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the deliver step above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1019,7 +984,8 @@
           "tickCount": 0
         }
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:82,36",
@@ -1307,7 +1273,8 @@
         }
       },
       "role": "player",
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -1352,7 +1319,8 @@
         "note": "#554: re-verified against current code -- no event is pending here at all (\"No pending event or invalid option\"); genuine no-op, cash stays flat at $7,896."
       },
       "role": "player",
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1411,7 +1379,7 @@
           "command": "contract deliver type:supply material:gloomium amount:250"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available, 250.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:gloomium`, matching the accept step above.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. The console command returns success:false (\"Not enough gloomium in storage: 0.0 kg available, 250.0 kg requested\") -- a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:supply material:gloomium`, matching the accept step above. Issue #585 (this session, merge): `commandOutcome: 'refused'` restored -- same retrofit as the two deliver steps above, lost the same way by the #553/#554/#555 rescue-merge redrifting this step's contract id/amount; the guard's own claim was already correct, re-confirmed via the same live replay.",
       "expect": {
         "equals": {
           "deathCount": 1,
@@ -1424,7 +1392,8 @@
           "tickCount": 0
         }
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "drill_plan grid rows:4 cols:4 spacing:3 depth:6 diameter:0.089 start:70,24",
@@ -1682,7 +1651,8 @@
         }
       },
       "role": "player",
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -1728,7 +1698,8 @@
         }
       },
       "role": "player",
-      "timeout": 90
+      "timeout": 90,
+      "commandOutcome": "either"
     },
     {
       "command": "finances",

@@ -80,7 +80,8 @@
           "wellBeing"
         ],
         "note": "real click resolves union_coffee_uprising option 0 -- Lost $8000, wellBeing +12, matching the command-mode consequence text exactly"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -105,7 +106,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "event fire tutorial_synergy_consultant",
@@ -196,7 +198,8 @@
           "safety"
         ],
         "note": "mafia_protection_racket option 0 -- Lost $5000, safety +4 (also Corruption +5, not exposed via serializeGameState so not assertable here)"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event fire lawsuit_wrongful_death",
@@ -241,7 +244,8 @@
           "safety"
         ],
         "note": "lawsuit_wrongful_death option 0 -- Lost $200000, safety +5; drives cash sharply negative (finances.isBankrupt flips true) but the separate bankruptcy-consequence tracker (ticksBelowThreshold) hasn't crossed its grace threshold yet, so levelEnded stays false"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event fire politics_explosive_embargo",
@@ -286,7 +290,8 @@
           "ecology"
         ],
         "note": "politics_explosive_embargo option 0 -- Lost $40000, ecology +3"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "event fire weather_pit_flood",
@@ -332,7 +337,8 @@
           "safety"
         ],
         "note": "weather_pit_flood option 0 -- Lost $20000, ecology +8, safety +5"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -357,7 +363,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "event status",
@@ -392,7 +399,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",

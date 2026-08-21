@@ -403,7 +403,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 5",
@@ -432,7 +433,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",
@@ -541,7 +543,8 @@
         "increased": [
           "wellBeing"
         ]
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 168",
@@ -743,7 +746,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 5",
@@ -774,7 +778,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",
@@ -840,7 +845,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -971,7 +977,8 @@
         ],
         "blocked": ".bs-confirm-overlay [data-action=\"report-close\"]",
         "note": "#553-followup (issue #586 CI): the report-close button this proves against is present but hidden the instant the event fires (still inside BlastReportModal's 3s real-time open delay) -- a stronger, later-timed probe against the same control reads 'covered' once the delay elapses, matching the bankruptcy overlay's own z-index over every z-index:600 modal elsewhere in this file. Either reading proves the same permanent block; 'hidden' is what a probe taken this early and reliably observes."
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1001,7 +1008,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1031,7 +1039,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",
@@ -1096,7 +1105,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No third random event actually fires anywhere for the rest of this file's #553 trajectory (sandbox-confirmed by direct trace through the final tick).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:krackle amount:8 stemming:1",
@@ -1216,7 +1226,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1245,7 +1256,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1274,7 +1286,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",
@@ -1339,7 +1352,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:krackle amount:10 stemming:1",
@@ -1462,7 +1476,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1494,7 +1509,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1526,7 +1542,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1558,7 +1575,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -1590,7 +1608,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "wait_until field:tickCount equals:601 max_ticks:60",
@@ -1623,7 +1642,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. No further random event fires for the rest of this file (sandbox-confirmed).",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",

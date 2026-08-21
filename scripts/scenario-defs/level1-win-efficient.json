@@ -364,7 +364,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -408,7 +409,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -452,7 +454,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 10",
@@ -496,7 +499,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",
@@ -584,7 +588,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -628,7 +633,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -672,7 +678,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -716,7 +723,8 @@
         "changedBy": {
           "cash": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",
@@ -1174,7 +1182,8 @@
           "holeCount": 0,
           "orderedHoleCount": 16
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
@@ -1474,7 +1483,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 5",
@@ -1516,7 +1526,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1547,7 +1558,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "contract accept type:ore_sale",
@@ -1607,7 +1619,7 @@
     },
     {
       "command": "contract deliver type:ore_sale amount:110",
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- a direct trace shows 0.0 kg stored of the accepted ore (dirtite). No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #554: dropped the `material:gloomium` filter (same reasoning as the accept step above -- the active contract is whichever ore_sale offer actually got accepted, dirtite here, not gloomium) and updated the blocked DOM id to the real one now offered (18).",
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled here -- a direct trace shows 0.0 kg stored of the accepted ore (dirtite). No vehicle here ever hauls (both drill_rig fleets are dedicated to drilling, never reassigned), so storage stays empty the whole file -- the same class of guard as every other file in this batch. `expect.blocked` pins the real refusal down instead of faking a click no player could make. #554: dropped the `material:gloomium` filter (same reasoning as the accept step above -- the active contract is whichever ore_sale offer actually got accepted, dirtite here, not gloomium) and updated the blocked DOM id to the real one now offered (18). #585 (this session): declared `commandOutcome: \"refused\"` -- the repo-wide issue #585 audit (tests/unit/lint/ScenarioCommandOutcomes.test.ts) flagged this step as an undeclared command-mode refusal, but this is not the timing bug that audit's other findings are (a hauler that hasn't landed its first delivery yet) -- it is a permanent, by-design guard, re-confirmed via a fresh direct trace (createGameEngine + runCommand, replaying this file's full command sequence in order): storedMassKg and collectedOre sit at 0 from before this contract is even accepted through 200 further probe ticks, well past this contract's own deadline (offered as #12 in that trace, 'Deliver gloomium ore' -- the active ore is gloomium at this tick, not dirtite as the paragraph above still says; the #553/#554/#555 drilling/charging timing changes shifted this checkpoint's real tick count and landed on a different pool draw since that text was written, but which ore is offered is incidental to the guard), expiring unfulfilled at tick 328 for its full $9,519 penalty. `fragments status` confirms all 1,561 mined fragments stay 'On ground' the entire probe, never 'Stored' -- nothing ever hauls them, because no debris_hauler/rock_digger/rock_fragmenter/building_destroyer is ever bought anywhere in this file, only drill_rigs (six, all tier-3, all assigned as drillers). `level1-win-conservative.json`'s own untouched `contract deliver 5 amount:300` guard step documents the identical permanent guard in near-identical words, and `insufficient-funds-guards-visual.json` already establishes `role: 'guard'` + `commandOutcome: 'refused'` as this codebase's own pairing for a genuinely-blocked action. Forcing this delivery to succeed (a hauler purchase, a driver, a wait) would not fix a bug -- it would falsify this level's real trajectory and contradict this step's own pre-existing `expect.blocked`, which already correctly proves the refusal.",
       "interaction": [
         {
           "type": "command",
@@ -1615,6 +1627,7 @@
         }
       ],
       "role": "guard",
+      "commandOutcome": "refused",
       "expect": {
         "equals": {
           "deathCount": 4,
@@ -1631,7 +1644,7 @@
     },
     {
       "command": "contract deliver type:rubble_disposal amount:80",
-      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #554: updated the blocked DOM id to the real one now offered (16).",
+      "description": "BLOCKED, same class as the guard above: 0.0 kg of rubble stored, nothing ever hauls it in. #554: updated the blocked DOM id to the real one now offered (16). #585 (this session): declared `commandOutcome: \"refused\"`, same reasoning as the ore_sale guard step just above -- re-confirmed by the same fresh trace: storedMassKg/collectedOre stay 0 through 200 further probe ticks past this contract's own deadline (offered as #11 in that trace, 'Dispose of rubble'), expiring unfulfilled at tick 353 for its full $51 penalty, with `fragments status` confirming the same 1,561 fragments stuck 'On ground' throughout -- no hauling vehicle is ever bought in this file, so this refusal is permanent by design, not a timing gap to wait out.",
       "interaction": [
         {
           "type": "command",
@@ -1639,6 +1652,7 @@
         }
       ],
       "role": "guard",
+      "commandOutcome": "refused",
       "expect": {
         "equals": {
           "deathCount": 4,
@@ -2075,7 +2089,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2121,7 +2136,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2165,7 +2181,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2209,7 +2226,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2253,7 +2271,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2298,7 +2317,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2344,7 +2364,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2390,7 +2411,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2439,7 +2461,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2482,7 +2505,8 @@
         "changedBy": {
           "tickCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "tick 20",
@@ -2526,7 +2550,8 @@
           "levelEnded": true,
           "levelEndReason": "worker_revolt"
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "wait_until field:ecology equals:50 max_ticks:800",

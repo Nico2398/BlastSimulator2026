@@ -221,7 +221,8 @@
           "chargedCount": 4,
           "orderedChargeCount": 0
         }
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "sequence auto delay_step:25",
@@ -443,7 +444,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "employee hire role:driver",
@@ -573,7 +575,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "fragments",
@@ -693,7 +696,8 @@
           "type": "resolveEventIfPending"
         }
       ],
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 40",

@@ -155,6 +155,20 @@ export function campaignStartCommand(
   };
 }
 
+// ── tutorial start ──
+
+export function tutorialStartCommand(
+  ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  if (!ctx.state) {
+    return { success: false, output: 'No game loaded. Use new_game first.' };
+  }
+  ctx.state.isPaused = true;
+  return { success: true, output: 'Tutorial started' };
+}
+
 // ── stats ──
 
 export function statsCommand(

@@ -161,7 +161,8 @@
           "command": "preview energy"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "commandOutcome": "refused"
     },
     {
       "command": "buy_software tier:1",

@@ -14,7 +14,7 @@ import {
   buildScenarioReport,
   type ReportableStep,
 } from './scenario-utils.js';
-import { checkGoalAgainstState } from './scenario-goal.js';
+import { checkGoalAgainstState, checkCommandOutcome } from './scenario-goal.js';
 
 /**
  * Command-mode side of the `waitUntil` action (issue #590): loop the
@@ -41,7 +41,7 @@ import { checkGoalAgainstState } from './scenario-goal.js';
  * event genuinely pauses it exactly as it would for a real player — a
  * scenario wanting to prove that dwells on it with `resolveEventIfPending`.
  */
-function runWaitUntil(
+export function runWaitUntil(
   engine: RunnerWithContext,
   action: Extract<InteractionStepAction, { type: 'waitUntil' }>,
 ): { output: string; gameState: Record<string, unknown> | null } {
@@ -68,6 +68,24 @@ function runWaitUntil(
   );
 }
 
+/**
+ * Locate a step's `waitUntil` interaction entry, if it has one — the one
+ * authoritative field/target/budget spec both command mode (`runWaitUntil`
+ * above) and interaction mode (`interaction-executor.ts`) read to drive the
+ * tick-loop instead of the step's own `command` string, which is descriptive
+ * only and never executed as-is when this is present (issue #590). Exported
+ * so callers that replay scenario steps outside `runSteps` (e.g. the
+ * command-outcome lint) can detect a `waitUntil` step the same way, rather
+ * than re-declaring this predicate.
+ */
+export function findWaitUntilAction(
+  step: ScenarioStepDef,
+): Extract<InteractionStepAction, { type: 'waitUntil' }> | undefined {
+  return step.interaction?.find(
+    (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
+  );
+}
+
 // Re-export canonical types from scenario-types.ts
 export type { StepResult } from './scenario-types.js';
 
@@ -77,6 +95,9 @@ export interface ScenarioResult {
   failed: boolean;
   error?: string;
   reportPath?: string;
+  /** Set when run-all-scenarios.ts skipped this file via `knownInteractionModeFailure` instead of running it. */
+  skipped?: boolean;
+  skipReason?: string;
 }
 
 export function createGameEngine(): RunnerWithContext {
@@ -97,54 +118,54 @@ export function runSteps(
     const paddedIdx = formatStepIndex(i);
     const cmdSlug = formatCommandSlug(step.command);
     const before = (serializeGameState(ctx) as Record<string, unknown> | null) ?? {};
-    // `waitUntil` drives command mode too (issue #590) — its `interaction`
-    // entry is the one authoritative field/target/budget spec both modes
-    // read, so a step using it runs the tick-loop instead of its own
-    // `command` string (which is descriptive only, never executed as-is).
-    const waitUntilAction = step.interaction?.find(
-      (a): a is Extract<InteractionStepAction, { type: 'waitUntil' }> => a.type === 'waitUntil',
-    );
+    // `waitUntil` drives command mode too (issue #590) — see
+    // `findWaitUntilAction`'s doc comment above for why.
+    const waitUntilAction = findWaitUntilAction(step);
+
+    let error: string | undefined;
+    let result: { success: boolean; output: string } = { success: false, output: '' };
+    let gameState: Record<string, unknown> | null = null;
 
     try {
-      const result = waitUntilAction
-        ? runWaitUntil(engine, waitUntilAction)
-        : runCommand(engine, step.command);
-      const gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+      if (waitUntilAction) {
+        const waited = runWaitUntil(engine, waitUntilAction);
+        result = { success: true, output: waited.output };
+        gameState = waited.gameState;
+      } else {
+        result = runCommand(engine, step.command);
+        gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+      }
+
+      const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
+      if (outcomeViolation !== null) throw new Error(outcomeViolation);
 
       if (step.expect) {
         const violation = checkGoalAgainstState(step.expect, before, gameState);
         if (violation !== null) throw new Error(`expect failed: ${violation}`);
       }
-
-      const stateData = {
-        step: i,
-        command: step.command,
-        commandOutput: result.output,
-        gameState,
-        uiState: null,
-        screenshots: undefined,
-      };
-      const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
-      writeFileSync(statePath, JSON.stringify(stateData, null, 2));
-
-      results.push({
-        step: i,
-        command: step.command,
-        commandOutput: result.output,
-        gameState,
-        statePath,
-      });
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      results.push({
-        step: i,
-        command: step.command,
-        commandOutput: '',
-        gameState: null,
-        statePath: '',
-        error: errorMsg,
-      });
+      error = err instanceof Error ? err.message : String(err);
     }
+
+    const stateData = {
+      step: i,
+      command: step.command,
+      commandOutput: result.output,
+      gameState,
+      uiState: null,
+      screenshots: undefined,
+    };
+    const statePath = resolve(outDir, `step-${paddedIdx}-${cmdSlug}.json`);
+    writeFileSync(statePath, JSON.stringify(stateData, null, 2));
+
+    results.push({
+      step: i,
+      command: step.command,
+      commandOutput: result.output,
+      gameState,
+      statePath,
+      ...(error !== undefined ? { error } : {}),
+    });
   }
 
   // Save report using shared builder

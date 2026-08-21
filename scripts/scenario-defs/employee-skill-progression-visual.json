@@ -279,7 +279,8 @@
         ],
         "note": "seed:42's politics_ev_mandate always fires here (per this file's own checkpoint-3 description) -- option 0 costs $60,000, genuinely applied since Finding #29's fix"
       },
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 96",

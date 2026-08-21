@@ -75,7 +75,8 @@
           "surveyCount": 0
         }
       },
-      "description": "No `cash:` here on purpose: this command fails (tier-3 level, locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it."
+      "description": "No `cash:` here on purpose: this command fails (tier-3 level, locked on a fresh campaign), so the run continues on the new_game world above and any override attached here would be discarded with it.",
+      "commandOutcome": "refused"
     },
     {
       "command": "time resume",
@@ -719,7 +720,8 @@
           "surveyCount": 1
         }
       },
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -763,7 +765,8 @@
           "surveyCount": 2
         }
       },
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -807,7 +810,8 @@
           "surveyCount": 3
         }
       },
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 8",
@@ -851,7 +855,8 @@
           "surveyCount": 3
         }
       },
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode."
+      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
+      "commandOutcome": "either"
     },
     {
       "command": "survey show",
@@ -896,144 +901,6 @@
           "surveyCount": 3
         }
       }
-    },
-    {
-      "command": "build office at:5,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build office at:5,5"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"office\" maps to the real management_office building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost -- see gameplay-employee-needs for the corrected mapping."
-    },
-    {
-      "command": "build storage_depot at:10,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build storage_depot at:10,5"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"storage_depot\" maps to the real freight_warehouse building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost -- see gameplay-employee-needs for the corrected mapping."
-    },
-    {
-      "command": "build canteen at:5,10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build canteen at:5,10"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"canteen\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost -- see gameplay-employee-needs for the corrected mapping."
-    },
-    {
-      "command": "build break_room at:10,10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build break_room at:10,10"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"break_room\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost -- see gameplay-employee-needs for the corrected mapping."
-    },
-    {
-      "command": "build medical_bay at:15,5",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build medical_bay at:15,5"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"medical_bay\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost -- see gameplay-employee-needs for the corrected mapping."
-    },
-    {
-      "command": "build bunkhouse at:15,10",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "build bunkhouse at:15,10"
-        }
-      ],
-      "role": "bootstrap",
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        },
-        "equals": {
-          "tickCount": 32,
-          "deathCount": 0,
-          "employeeCount": 15,
-          "activeContractCount": 0,
-          "surveyCount": 3
-        }
-      },
-      "description": "Left unmarked: not a real building type (commandOutput: \"Unknown subcommand or building type\") -- there is no catalog row to click, this step is a genuine no-op in both modes. Same class as Finding #5 (needs-cycle's `build canteen`). Per #526: \"bunkhouse\" maps to the real living_quarters building; kept as a documented phantom-string no-op here to avoid re-tuning this file's hard-asserted cash totals for a real construction cost -- see gameplay-employee-needs for the corrected mapping."
     },
     {
       "command": "build list",
@@ -1397,7 +1264,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant)."
+      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -1435,7 +1303,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolves a genuine pending EVENT (union_therapist, -$6,000, wellBeing +12) that cut the preceding tick chunk short -- confirmed via direct trace. Every other 'event choose 0' in this drilling wait is a harmless no-op (no event pending at that instant), same convention as the survey-phase tick/event pairs above."
+      "description": "Resolves a genuine pending EVENT (union_therapist, -$6,000, wellBeing +12) that cut the preceding tick chunk short -- confirmed via direct trace. Every other 'event choose 0' in this drilling wait is a harmless no-op (no event pending at that instant), same convention as the survey-phase tick/event pairs above.",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -1470,7 +1339,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant)."
+      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -1505,7 +1375,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant)."
+      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -1540,7 +1411,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant)."
+      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -1575,7 +1447,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant)."
+      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 30",
@@ -1610,7 +1483,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant)."
+      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 50",
@@ -1652,7 +1526,8 @@
           "employeeCount": 15
         }
       },
-      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant)."
+      "description": "Resolved through the event dialog's own buttons, same convention as the survey-phase tick/event pairs above -- a harmless no-op here (nothing pending at this instant).",
+      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:3",
@@ -1856,7 +1731,8 @@
           "surveyCount": 3
         }
       },
-      "description": "Sandbox-measured: a genuine pending EVENT (lucky_strike) is already queued the instant this tick call starts, so it advances 0 of the 6 requested ticks -- tickCount and cash are unchanged here, resolved by the event choose 0 step below."
+      "description": "Sandbox-measured: a genuine pending EVENT (lucky_strike) is already queued the instant this tick call starts, so it advances 0 of the 6 requested ticks -- tickCount and cash are unchanged here, resolved by the event choose 0 step below.",
+      "commandOutcome": "either"
     },
     {
       "command": "event choose 0",
@@ -1880,7 +1756,8 @@
         },
         "blocked": "#bs-event-dialog .bs-event-choice"
       },
-      "description": "Resolves lucky_strike (+$10,000, a fixed cash bonus -- same event type noted in level1-win-efficient.json/level2-playthrough-win.json). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 139 (271 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast steps above, just on a dialog instead of a panel. Every earlier 'event choose 0' step in this drilling wait stays role:player safely because `resolveEventIfPending` no-ops (no click at all) when nothing is genuinely pending; this is the one step in the file where an event (lucky_strike) really is pending at the moment it runs, so it is the one step that actually reaches `resolveEventIfPending`'s bare `page.click('#bs-event-dialog .bs-event-choice')` -- which has no `describeUnclickable` wrapper, so Puppeteer's own unnamed 'Node is either not clickable or not an Element' surfaced instead of a diagnosis. Converted to guard + expect.blocked, command run directly so the $10,000 still lands."
+      "description": "Resolves lucky_strike (+$10,000, a fixed cash bonus -- same event type noted in level1-win-efficient.json/level2-playthrough-win.json). CI finding, this PR (#586): was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 139 (271 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast steps above, just on a dialog instead of a panel. Every earlier 'event choose 0' step in this drilling wait stays role:player safely because `resolveEventIfPending` no-ops (no click at all) when nothing is genuinely pending; this is the one step in the file where an event (lucky_strike) really is pending at the moment it runs, so it is the one step that actually reaches `resolveEventIfPending`'s bare `page.click('#bs-event-dialog .bs-event-choice')` -- which has no `describeUnclickable` wrapper, so Puppeteer's own unnamed 'Node is either not clickable or not an Element' surfaced instead of a diagnosis. Converted to guard + expect.blocked, command run directly so the $10,000 still lands.",
+      "commandOutcome": "either"
     },
     {
       "command": "contract list",
@@ -1950,7 +1827,8 @@
         },
         "blocked": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-deliver"
       },
-      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled -- ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace shows 0.0 kg stored (storedMassKg never leaves 0 anywhere in this file -- both debris_haulers this file buys are destroyed in the blast above, and the free staffed debris_hauler (#2) is never driven either). amount:160 matches the accepted contract's own quantityKg (#20, Dispose of rubble); the console command still caps to whatever's actually owed and returns success:false (\"Not enough stored material: 0.0 kg available, 160.0 kg requested.\") -- command mode only fails a step on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` pins it down instead of asserting something the game correctly forbids. Same `type:rubble_disposal` selector as the accept step above (#597) -- `deliver`'s own resolveContract call matches it against `state.contracts.active`, which holds the same contract #20 accept just put there, so both steps stay pointed at the same contract without hardcoding its id twice. CI finding, this PR (#586): originally also asserted `usable: \"#bs-contract-panel [data-action=\\\"goto-ops\\\"]\"` -- dropped, because that control is covered by the same `#bs-level-end-screen` bankruptcy overlay as everything else on this page from the Charge step onward (see its description); nothing on the page is usable once levelEndReason goes non-null, so that assertion could never have passed and the original 'BLOCKED, deliberately not converted to a click' framing already had the right instinct without knowing why the panel itself was gone too. #554 follow-up (real interaction-mode CI finding): id 20 itself drifted again -- REFRESH_INTERVAL keeps cycling the offer pool and this file now spends more real ticks getting here (the driller/charging changes above), so the hardcoded numeric id from the #597 fix is exactly the moving target that fix already diagnosed for the accept/deliver console commands, just still present in this one CSS selector. Switched to data-contract-type (ContractsPanel.ts, added alongside data-contract-id for exactly this reason) the same way the console commands above already use type:rubble_disposal, instead of renumbering the id again."
+      "description": "BLOCKED, and deliberately not converted to a click: the ACTIVE card's DELIVER button is genuinely disabled -- ContractsPanel disables the amount box, MAX and DELIVER together whenever maxDeliverable = min(contract remaining, stored material) is 0, and a direct trace shows 0.0 kg stored (storedMassKg never leaves 0 anywhere in this file -- both debris_haulers this file buys are destroyed in the blast above, and the free staffed debris_hauler (#2) is never driven either). amount:160 matches the accepted contract's own quantityKg (#20, Dispose of rubble); the console command still caps to whatever's actually owed and returns success:false (\"Not enough stored material: 0.0 kg available, 160.0 kg requested.\") -- command mode only fails a step on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` pins it down instead of asserting something the game correctly forbids. Same `type:rubble_disposal` selector as the accept step above (#597) -- `deliver`'s own resolveContract call matches it against `state.contracts.active`, which holds the same contract #20 accept just put there, so both steps stay pointed at the same contract without hardcoding its id twice. CI finding, this PR (#586): originally also asserted `usable: \"#bs-contract-panel [data-action=\\\"goto-ops\\\"]\"` -- dropped, because that control is covered by the same `#bs-level-end-screen` bankruptcy overlay as everything else on this page from the Charge step onward (see its description); nothing on the page is usable once levelEndReason goes non-null, so that assertion could never have passed and the original 'BLOCKED, deliberately not converted to a click' framing already had the right instinct without knowing why the panel itself was gone too. #554 follow-up (real interaction-mode CI finding): id 20 itself drifted again -- REFRESH_INTERVAL keeps cycling the offer pool and this file now spends more real ticks getting here (the driller/charging changes above), so the hardcoded numeric id from the #597 fix is exactly the moving target that fix already diagnosed for the accept/deliver console commands, just still present in this one CSS selector. Switched to data-contract-type (ContractsPanel.ts, added alongside data-contract-id for exactly this reason) the same way the console commands above already use type:rubble_disposal, instead of renumbering the id again. #585 (this fix): the repo-wide audit (`tests/unit/lint/ScenarioCommandOutcomes.test.ts`) flags this refusal as undeclared. Two sibling files hit the same audit for what looked like the same reason (tutorial-interactive.json, tutorial-steps-visual.json), and the fix there was a timing gap -- their debris_hauler just needed more real ticks before its first delivery landed, so raising a wait step's tick count fixed it. Direct trace here (createGameEngine + runCommand/runWaitUntil, replaying this file's exact command sequence through the accept above, then ticking another 200 ticks -- past the contract's own 87-tick deadline with room to spare) rules that fix out for this file specifically: storedMassKg sampled every tick stays at exactly 0 for the entire 200 ticks, never plateauing at a nonzero figure the way the tutorial files' own trace did. The reason is structural, not timing: HaulingTask.ts's requestHaul refuses to start any haul without `findNearestActiveBuildingOfType(state.buildings, 'freight_warehouse', ...)` resolving to a real building (\"No active freight warehouse available\"), and this file issues no `build` command anywhere across its 78 steps -- buildingCount stays 0 for its entire run, since staffed:true (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) grants employees and vehicles only, never a building. The free staffed debris_hauler (#2) and its licensed driver (employee #3, driving.truck) have a vehicle to board but nowhere to ever deliver to -- permanently, independent of tick count. (Ticking further only costs the contract itself: trace confirms it auto-expires and drops out of `contract status` around tick 548, ~88 ticks after accept.) No amount value escapes this either -- consumeStoredOre (Logistics.ts) refuses any positive amount against 0 available, and amount:0 is its own rejection (\"Invalid amount requested\") -- so no `.command` edit makes this succeed. Declared `commandOutcome: 'refused'` instead: this is not the silencing #585 exists to close, since the step's own claim was never that delivery succeeds -- `role: 'guard'` + `expect.blocked` already committed to proving the delivery is correctly forbidden, well before #585 came along to ask every step to declare it explicitly. Same shape, same fix as the `campaign start level:treranium_depths` guard step earlier in this file. Also note, unrelated to this fix: REFRESH_INTERVAL has drifted the resolved contract again since the #554 follow-up note above -- direct trace now shows #22 (370kg) at accept time, not #20 (160kg) -- left as-is, since `type:rubble_disposal` already selects by shape rather than id and every positive amount fails alike at 0kg stored, so the exact figure carries no more meaning here than #20 vs #22's id did.",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",

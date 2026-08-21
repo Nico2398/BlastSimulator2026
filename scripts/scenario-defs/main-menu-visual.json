@@ -23,7 +23,7 @@
     },
     {
       "command": "state",
-      "description": "Click New Campaign: reveals the world map with 3 level cards. Dusty Hollow (tier 1) is unlocked with a Start button; Grumpstone Ridge and Treranium Depths are locked, showing the lock icon and the profit threshold required on the prior level. No game exists yet, so 'state' is the paired command (it fails gracefully with 'No game loaded' — this step is UI-only, the command exists only to satisfy the command/interaction pairing convention).",
+      "description": "Click New Campaign: reveals the world map with 3 level cards. Dusty Hollow (tier 1) is unlocked with a Start button; Grumpstone Ridge and Treranium Depths are locked, showing the lock icon and the profit threshold required on the prior level. 'state' is the paired command, used here purely to satisfy the command/interaction pairing convention (this step is UI-only) — standalone it fails with 'No game loaded', but this batch's shared command-mode engine (run-all-scenarios.ts) can carry a previous scenario's still-loaded game into this file's first steps depending on run order, so the real outcome is genuinely either (issue #585).",
       "interaction": [
         {
           "type": "clickSelector",
@@ -39,11 +39,12 @@
         "usable": "#bs-world-map-back",
         "blocked": "#bs-main-menu #bs-menu-new-campaign",
         "note": "the world map genuinely replaced the main menu -- Back is now reachable, New Campaign is not"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "state",
-      "description": "Click Back on the world map: returns to the main menu button list, confirming the round trip does not leave stray DOM behind.",
+      "description": "Click Back on the world map: returns to the main menu button list, confirming the round trip does not leave stray DOM behind. 'state' is again just the paired command for this UI-only step; the same cross-file batch-engine nondeterminism as the New Campaign step above (run-all-scenarios.ts, issue #585) makes the real outcome genuinely either.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -59,7 +60,8 @@
         "usable": "#bs-main-menu #bs-menu-new-campaign",
         "blocked": "#bs-world-map-back",
         "note": "the round trip genuinely returns to the main menu, not a leftover world map still in the DOM"
-      }
+      },
+      "commandOutcome": "either"
     },
     {
       "command": "new_game seed:42",
@@ -128,7 +130,8 @@
         }
       ],
       "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player"
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "scores",

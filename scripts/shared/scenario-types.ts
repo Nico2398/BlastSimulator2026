@@ -288,6 +288,21 @@ export interface ScenarioStepDef {
   role?: ScenarioStepRole;
   /** See {@link ScenarioStepGoal}. */
   expect?: ScenarioStepGoal;
+  /**
+   * How this step's command result must be judged, beyond "didn't throw".
+   * Absent (the default) means the console must accept the command —
+   * success:false fails the step, naming the command and the console's
+   * own refusal text. Command-mode only; interaction mode is unchanged.
+   *
+   * - 'refused' — refusal is the assertion (a guard/negative-path step):
+   *   the command succeeding is the failure. Independent of `role` — a
+   *   guard-role step still has to say this explicitly.
+   * - 'either' — genuinely nondeterministic (e.g. `event choose 0` after a
+   *   bare `tick`, where an event may or may not be pending): either
+   *   outcome passes. Reserved for beats that are truly nondeterministic,
+   *   never a blanket silencer.
+   */
+  commandOutcome?: 'refused' | 'either';
 }
 
 /**
@@ -297,6 +312,17 @@ export interface ScenarioDef {
   name: string;
   description: string;
   steps: ScenarioStepDef[];
+  /**
+   * TODO(#674): temporary — remove this field once #674's engine-level fix
+   * for the interaction-mode dispatch-order divergence lands, then delete
+   * the skip branch in run-all-scenarios.ts's runBatchInteraction that reads
+   * it. When set, the interaction-mode batch runner skips this file entirely
+   * (logging the reason, not silently) instead of running its steps;
+   * command mode is untouched and still runs the file in full. Reserved for
+   * a known, already-diagnosed divergence with an open tracking issue — not
+   * a general-purpose escape hatch.
+   */
+  knownInteractionModeFailure?: string;
   shots?: Array<{
     name: string;
     yaw: number;

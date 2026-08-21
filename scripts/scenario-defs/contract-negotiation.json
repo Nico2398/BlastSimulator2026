@@ -156,7 +156,8 @@
         "blocked": "#bs-contract-panel [data-contract-type=\"supply\"][data-contract-material=\"dirtite\"] .bs-contract-deliver",
         "note": "the contract stays active/undelivered -- this file's scope is negotiation and accept/decline, not the full haul-to-storage pipeline"
       },
-      "role": "guard"
+      "role": "guard",
+      "commandOutcome": "refused"
     },
     {
       "command": "finances",

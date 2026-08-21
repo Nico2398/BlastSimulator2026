@@ -74,3 +74,28 @@ export function checkGoalAgainstState(
 
   return null;
 }
+
+/**
+ * Checks a step's `commandOutcome` against the console's own result.
+ * Returns a violation message naming the command and the console's refusal
+ * text, or `null` when the outcome is acceptable.
+ *
+ * - undefined — the command must succeed; `success:false` is a violation.
+ * - 'refused' — the command must fail; `success:true` is a violation.
+ * - 'either' — no check, always `null`.
+ */
+export function checkCommandOutcome(
+  commandOutcome: 'refused' | 'either' | undefined,
+  result: { success: boolean; output: string },
+  command: string,
+): string | null {
+  if (commandOutcome === 'either') return null;
+
+  if (commandOutcome === 'refused') {
+    if (result.success === false) return null;
+    return `command "${command}" was declared commandOutcome:'refused' but succeeded — the guard it was meant to prove no longer blocks it`;
+  }
+
+  if (result.success === true) return null;
+  return `command "${command}" was refused by the console: ${result.output}`;
+}
