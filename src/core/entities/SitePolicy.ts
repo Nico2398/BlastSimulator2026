@@ -7,9 +7,9 @@ export type ShiftMode = 'shift_8h' | 'shift_12h' | 'continuous' | 'custom';
 
 export interface SitePolicy {
   shiftMode: ShiftMode;
-  /** Force rest when hunger drops to or below this value. Default: 40 */
+  /** Force rest when hunger drops to or below this value. Default: 60 */
   hungerRestThreshold: number;
-  /** Force rest when fatigue drops to or below this value. Default: 25 */
+  /** Force rest when fatigue drops to or below this value. Default: 60 */
   fatigueRestThreshold: number;
   /** Trigger a social break when social drops to or below this value. Default: 20 */
   socialBreakThreshold: number;

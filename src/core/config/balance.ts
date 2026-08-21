@@ -1037,8 +1037,16 @@ export const SHIFT_DURATIONS_TICKS = {
  * SITE_POLICY_DEFAULT_THRESHOLDS was dead code, but forceShiftRestIfNeededByPolicy
  * (#678) made it live. +10 above 50 gives enough margin that a gauge draining
  * at its normal per-tick rate (fatigue's 2/tick working being the fastest) is
- * caught before it can fall back below the comfortable line, confirmed by a
- * 3000-tick shift_8h simulation staying at/above 50 for the entire run.
+ * caught before it can fall back below the comfortable line most of the time.
+ * The shipped 300-tick integration test scenario still shows hunger/fatigue
+ * dipping into the 30-49 mild-penalty band (observed minimums: hunger ~46.5,
+ * fatigue ~46.5) — travel time during forced-rest dispatch (the walk to
+ * living_quarters, before restTicksRemaining starts counting down) keeps
+ * draining the gauge and can eat past the +10 buffer. That's tolerated
+ * because needsMoraleEffect's penalty in that band is a gradual -0.5/tick,
+ * not a cliff: wellBeing stays comfortably above 0 for the acceptance
+ * criterion's full run. These thresholds keep gauges out of the *severe*
+ * penalty band, not out of the mild one entirely.
  */
 export const SITE_POLICY_DEFAULT_THRESHOLDS = {
   hungerRest:  60,
