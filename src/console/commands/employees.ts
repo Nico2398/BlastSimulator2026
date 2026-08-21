@@ -130,6 +130,7 @@ export function employeeCommand(
 
       const emp = state.employees.employees.find(e => e.id === id);
       if (!emp) return { success: false, output: `Employee #${id} not found.` };
+      if (!emp.alive) return { success: false, output: `Employee #${id} is dead and cannot be assigned a skill.` };
 
       assignSkill(state.employees, id, skillRaw as SkillCategory, level as 1 | 2 | 3 | 4 | 5);
       return { success: true, output: `Employee #${id} assigned skill: ${skillRaw} (level ${level}).` };
