@@ -13,6 +13,7 @@ import type { Browser, Page, PuppeteerLaunchOptions } from 'puppeteer';
 import { resolve } from 'path';
 import { LAUNCH_ARGS, resolveChromePathOrThrow } from './chrome.js';
 import { executeActionOnPage } from './interaction-executor.js';
+import type { CommandTraceEntry } from './interaction-executor.js';
 import { waitForUiUpdate } from './interaction-driver.js';
 import type { ScenarioStepDef } from './scenario-types.js';
 
@@ -125,6 +126,10 @@ export interface InteractionStepResult {
  *   read the last value through it to name what was actually in flight when
  *   a step's own outer timeout fires, instead of a bare
  *   "Step N timed out after Xms" (PR #616 review round, item 5).
+ * @param onTrace - Optional sink for each concrete command this step's
+ *   actions actually issue (a `command` action, or one entry per tick of a
+ *   `waitUntil` action's internal loop) — diagnostic-only (issue #674);
+ *   omitted by every existing caller, which sees no change.
  * @returns Interaction step result with state and screenshots.
  */
 export async function executeInteractionActions(
@@ -135,6 +140,7 @@ export async function executeInteractionActions(
   paddedIdx: string,
   cmdSlug: string,
   onProgress?: (detail: string) => void,
+  onTrace?: (entry: CommandTraceEntry) => void,
 ): Promise<InteractionStepResult> {
   const screenshotPaths: string[] = [];
   let screenshotIndex = 0;
@@ -155,7 +161,7 @@ export async function executeInteractionActions(
       screenshotIndex++;
     } else if (action.type !== 'screenshot') {
       onProgress?.(`action ${i + 1}/${step.interaction.length} (${action.type})`);
-      await executeActionOnPage(page, action, step, onProgress);
+      await executeActionOnPage(page, action, step, onProgress, onTrace);
       // A click that mutates the DOM — opening a panel, then clicking a control
       // inside it — needs the panel's next-frame `uiManager.update` to run
       // before the following action reads or clicks that control. The
