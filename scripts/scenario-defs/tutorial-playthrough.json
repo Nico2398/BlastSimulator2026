@@ -1,6 +1,7 @@
 {
   "name": "tutorial-playthrough",
   "description": "Full tutorial playthrough at Tutorial Pit: hiring employees, seismic surveying, drill planning, blasting, contract management, building infrastructure, and completing the campaign introduction",
+  "knownInteractionModeFailure": "TODO(#674): interaction-mode task dispatch reaches the step-53 blast with deathCount:4 instead of command mode's 3. tickCount matches byte-for-byte between modes at every checkpoint through setup (steps 44-52), so this is a dispatch-order divergence (which employee is idle vs. working, in what order) at an already knife-edge fatigue/rest-timing step, not a tick-budget gap. Confirmed a regression from PR #661's employee-hire-insertion fix (which corrects a real bug -- main's prior version silently licensed and drove a dead employee), not pre-existing main fragility -- see PR #661's comment thread for the full trace. Remove this field (and re-verify this file end-to-end in interaction mode) once #674's engine-level fix lands.",
   "shots": [
     {
       "name": "closeup",

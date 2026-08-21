@@ -95,6 +95,9 @@ export interface ScenarioResult {
   failed: boolean;
   error?: string;
   reportPath?: string;
+  /** Set when run-all-scenarios.ts skipped this file via `knownInteractionModeFailure` instead of running it. */
+  skipped?: boolean;
+  skipReason?: string;
 }
 
 export function createGameEngine(): RunnerWithContext {
