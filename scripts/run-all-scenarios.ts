@@ -111,11 +111,10 @@ async function runBatchInteraction(
   const startTime = Date.now();
 
   const printProgress = (i: number) => {
-    const passed = results.filter(r => !r.failed && !r.skipped).length;
+    const passed = results.filter(r => !r.failed).length;
     const failed = results.filter(r => r.failed).length;
-    const skipped = results.filter(r => r.skipped).length;
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`  Progress: ${i + 1}/${names.length} (${passed} passed, ${failed} failed, ${skipped} skipped) [${elapsed}s]`);
+    console.log(`  Progress: ${i + 1}/${names.length} (${passed} passed, ${failed} failed) [${elapsed}s]`);
   };
 
   try {
@@ -126,23 +125,6 @@ async function runBatchInteraction(
 
       try {
         const def = loadScenarioDef(name!, SCENARIO_DIR);
-
-        if (def.knownInteractionModeFailure) {
-          console.log(`  [${name}] SKIPPED (interaction mode) — ${def.knownInteractionModeFailure}`);
-          writeFileSync(
-            resolve(outDir, 'skipped.json'),
-            JSON.stringify({ name, reason: def.knownInteractionModeFailure }, null, 2),
-          );
-          results.push({
-            name: name!,
-            totalSteps: def.steps.length,
-            failed: false,
-            skipped: true,
-            skipReason: def.knownInteractionModeFailure,
-          });
-          printProgress(i);
-          continue;
-        }
 
         const steps: ScenarioStepDef[] = def.steps;
         const page = await browser.newPage();
@@ -317,18 +299,10 @@ async function main(): Promise<void> {
   // Summary
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
   const failures = results.filter(r => r.failed);
-  const skips = results.filter(r => r.skipped);
 
   console.log(`\n${'='.repeat(50)}`);
   console.log(`BATCH COMPLETE — ${totalTime}s`);
-  console.log(`Total: ${results.length}, Passed: ${results.length - failures.length - skips.length}, Failed: ${failures.length}, Skipped: ${skips.length}`);
-
-  if (skips.length > 0) {
-    console.log(`\nSkipped scenarios (known issue, not counted as failures):`);
-    for (const s of skips) {
-      console.log(`  ⚠️  ${s.name} — ${s.skipReason}`);
-    }
-  }
+  console.log(`Total: ${results.length}, Passed: ${results.length - failures.length}, Failed: ${failures.length}`);
 
   if (failures.length > 0) {
     console.log(`\nFailed scenarios:`);

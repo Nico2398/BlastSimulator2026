@@ -1,7 +1,6 @@
 {
   "name": "tutorial-playthrough",
   "description": "Full tutorial playthrough at Tutorial Pit: hiring employees, seismic surveying, drill planning, blasting, contract management, building infrastructure, and completing the campaign introduction",
-  "knownInteractionModeFailure": "TODO(#674): interaction-mode task dispatch reaches the step-53 blast with deathCount:4 instead of command mode's 3. tickCount matches byte-for-byte between modes at every checkpoint through setup (steps 44-52), so this is a dispatch-order divergence (which employee is idle vs. working, in what order) at an already knife-edge fatigue/rest-timing step, not a tick-budget gap. Confirmed a regression from PR #661's employee-hire-insertion fix (which corrects a real bug -- main's prior version silently licensed and drove a dead employee), not pre-existing main fragility -- see PR #661's comment thread for the full trace. Remove this field (and re-verify this file end-to-end in interaction mode) once #674's engine-level fix lands.",
   "shots": [
     {
       "name": "closeup",
@@ -851,15 +850,20 @@
       "command": "vehicle driver 3 5",
       "interaction": [
         {
-          "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] select",
+          "value": "5"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"3\"] .bs-vehicle-assign-btn"
         }
       ],
-      "description": "#555: the freshly-hired employee #5 (licensed above, issue #585) is assigned to the rock_digger -- #1 and #2, this section's original licence target, are both dead by this point. Without a driver the digger is a mesh and the queued dig_ramp_segment actions never start.",
+      "description": "#555: the freshly-hired employee #5 (licensed above, issue #585) is assigned to the rock_digger -- #1 and #2, this section's original licence target, are both dead by this point. Without a driver the digger is a mesh and the queued dig_ramp_segment actions never start. #674 (issue #631's mechanism, second occurrence, sandbox-confirmed by a step-by-step `vehicle list`/`needs` trace of both modes): the selectors here were unfiltered -- `#bs-vehicle-panel .bs-vehicle-assign-btn` clicks whichever assign row renders FIRST, and `makeAssignRow` (fleetDetailSections.ts) renders one for every vehicle whose driverId is still null. The debris_hauler (vehicle #2) is that vehicle: employee #4 was assigned to it 8 steps up and is still mid-walk-to-board, so driverId is null and its row sorts first. Interaction mode therefore re-submitted `vehicle driver 2 4`, which the console refused (\"Employee already walking to board a vehicle\"), leaving the rock_digger driverless -- and 6 ticks later auto-dispatch reserved the hauler for employee #5 instead, cancelling employee #4's boarding (\"BOARDING CANCELLED: Gus Dusty\"). From there the two modes ran a different roster on different vehicles (minFatigue 16.0 vs 39.9 at tick 311) and the step-53 blast killed 4 instead of 3. Pinning both the vehicle id and the picker value makes the click resolve to exactly this step's declared command.",
       "role": "player",
       "expect": {
         "changedBy": {

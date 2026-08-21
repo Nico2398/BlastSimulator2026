@@ -460,11 +460,25 @@ async function isPanelVisible(page: Page, panelId: string): Promise<boolean> {
   }, panelId);
 }
 
+/**
+ * One issued command's outcome, as observed from inside the page — sunk by
+ * {@link executeActionOnPage}'s `onTrace` param for the two action shapes
+ * that resolve to a concrete console command (`command` itself, and each
+ * tick of a `waitUntil` loop's own internal `tick 1`). Diagnostic-only
+ * (issue #674): every existing caller omits this param and sees no change.
+ */
+export interface CommandTraceEntry {
+  command: string;
+  success: boolean;
+  tickCountAfter: number | null;
+}
+
 export async function executeActionOnPage(
   page: Page,
   action: InteractionStepAction,
   step: ScenarioStepDef,
   onProgress?: (detail: string) => void,
+  onTrace?: (entry: CommandTraceEntry) => void,
 ): Promise<void> {
   switch (action.type) {
     case 'click': {
@@ -765,12 +779,29 @@ export async function executeActionOnPage(
     case 'command': {
       const violation = checkStepActionAllowed(step, action);
       if (violation !== null) throw new Error(violation);
-      await page.evaluate((cmd: string) => {
-        if (typeof (window as any).__gameConsole === 'function') {
-          return (window as any).__gameConsole(cmd);
-        }
-        return undefined;
-      }, action.command);
+      if (onTrace) {
+        // Same call as the untraced branch below, plus reading back the
+        // command's own success flag and the resulting tick count in the
+        // same round trip — only paid when a caller actually asked to trace
+        // (issue #674's diagnostic tool).
+        const outcome = await page.evaluate((cmd: string) => {
+          const w = window as any;
+          const result = typeof w.__gameConsole === 'function' ? w.__gameConsole(cmd) : undefined;
+          const st = typeof w.__gameState === 'function' ? w.__gameState() : null;
+          return {
+            success: result && typeof result.success === 'boolean' ? result.success : true,
+            tickCountAfter: st && typeof st.tickCount === 'number' ? st.tickCount : null,
+          };
+        }, action.command);
+        onTrace({ command: action.command, success: outcome.success, tickCountAfter: outcome.tickCountAfter });
+      } else {
+        await page.evaluate((cmd: string) => {
+          if (typeof (window as any).__gameConsole === 'function') {
+            return (window as any).__gameConsole(cmd);
+          }
+          return undefined;
+        }, action.command);
+      }
       break;
     }
     case 'cameraFocus':
@@ -835,22 +866,54 @@ export async function executeActionOnPage(
       let lastValue: unknown;
       let ticksUsed = 0;
       for (;;) {
-        const state = await page.evaluate((field: string) => {
-          const run = (window as unknown as {
-            __gameConsole?: (c: string) => { output?: unknown };
-          }).__gameConsole;
-          run?.('tick 1');
-          const getState = (window as unknown as {
-            __gameState?: () => Record<string, unknown> | null;
-          }).__gameState;
-          const st = getState === undefined ? null : getState();
-          // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
-          // regex-matching `event status`'s text output.
-          if (st?.pendingEvent) run?.('event choose 0');
-          return st ? st[field] : undefined;
-        }, action.field);
+        let tickCountAfter: number | null = null;
+        if (onTrace) {
+          // Same call as the untraced branch below, plus reading back the
+          // resulting tick count in the same round trip — only paid when a
+          // caller actually asked to trace (issue #674's diagnostic tool).
+          // Mirrors the 'command' case's own onTrace branch above.
+          const stateResult = await page.evaluate((field: string) => {
+            const run = (window as unknown as {
+              __gameConsole?: (c: string) => { output?: unknown };
+            }).__gameConsole;
+            run?.('tick 1');
+            const getState = (window as unknown as {
+              __gameState?: () => Record<string, unknown> | null;
+            }).__gameState;
+            const st = getState === undefined ? null : getState();
+            // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
+            // regex-matching `event status`'s text output.
+            if (st?.pendingEvent) run?.('event choose 0');
+            return {
+              value: st ? st[field] : undefined,
+              tickCount: st && typeof st.tickCount === 'number' ? st.tickCount : null,
+            };
+          }, action.field);
+          lastValue = stateResult.value;
+          tickCountAfter = stateResult.tickCount;
+        } else {
+          lastValue = await page.evaluate((field: string) => {
+            const run = (window as unknown as {
+              __gameConsole?: (c: string) => { output?: unknown };
+            }).__gameConsole;
+            run?.('tick 1');
+            const getState = (window as unknown as {
+              __gameState?: () => Record<string, unknown> | null;
+            }).__gameState;
+            const st = getState === undefined ? null : getState();
+            // Ask the game, not the DOM: typed `pendingEvent` mirror instead of
+            // regex-matching `event status`'s text output.
+            if (st?.pendingEvent) run?.('event choose 0');
+            return st ? st[field] : undefined;
+          }, action.field);
+        }
         ticksUsed++;
-        lastValue = state;
+        // Diagnostic trace only (issue #674): each internal `tick 1` this
+        // loop issues is itself a concrete command, the same one
+        // command-mode's own `runWaitUntil` issues once per tick — this is
+        // the hook a caller uses to compare the two loops' actual
+        // throughput/ordering.
+        onTrace?.({ command: 'tick 1', success: true, tickCountAfter });
         onProgress?.(
           `waitUntil "${action.field}" = ${JSON.stringify(lastValue)} `
           + `(want ${JSON.stringify(action.equals)}), tick ${ticksUsed}/${action.maxTicks}`,
