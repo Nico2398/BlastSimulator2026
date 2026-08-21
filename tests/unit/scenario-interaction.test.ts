@@ -235,6 +235,72 @@ describe('executeActionOnPage — waitForTutorialStep (issue #601, #631)', () =>
       'waitForTutorialStep on "drill-plan", live control charge-tool, want "drill-plan", tick 2/400',
     ]);
   });
+
+  // Issue #650: a timeout caused by a pending event looks identical to an
+  // ordinary stall today — the thrown message names only the step it's
+  // stuck on, not that a dialog is blocking every tick's `tick 1`. These
+  // cases pin the new cause-naming behavior without touching the pre-#650
+  // cases above, which continue to prove the ordinary-timeout message is
+  // byte-for-byte unchanged when no event was ever pending.
+  it('names a pending event as the timeout cause when every tick was blocked by one', async () => {
+    const evaluate = vi.fn().mockResolvedValue({
+      active: true,
+      stepId: 'grid-select',
+      stageTarget: 'grid-tool',
+      pendingEvent: true,
+    });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 3, timeout: 30000 };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      /tutorial never reached "drill-plan" — it is on "grid-select", live control grid-tool, after 3 tick\(s\); blocked by a pending event for 3 tick\(s\)/,
+    );
+    // Still exactly one page.evaluate() round trip per loop iteration — the
+    // pendingEvent read must fold into the existing call, not add a second.
+    expect(evaluate).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws today\'s exact message, with no pending-event suffix, when no tick was ever blocked', async () => {
+    const evaluate = vi.fn().mockResolvedValue({
+      active: true,
+      stepId: 'grid-select',
+      stageTarget: 'grid-tool',
+      pendingEvent: false,
+    });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 3, timeout: 30000 };
+
+    let thrown: Error | undefined;
+    try {
+      await executeActionOnPage(page, action, step);
+    } catch (err) {
+      thrown = err as Error;
+    }
+
+    expect(thrown).toBeDefined();
+    expect(thrown?.message).toBe(
+      'waitForTutorialStep: tutorial never reached "drill-plan"'
+      + ' — it is on "grid-select", live control grid-tool, after 3 tick(s)',
+    );
+    expect(thrown?.message).not.toContain('blocked by a pending event');
+  });
+
+  it('counts only the trailing consecutive run of blocked ticks, resetting on any clean tick', async () => {
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce({ active: true, stepId: 'grid-select', stageTarget: 'grid-tool', pendingEvent: true })
+      .mockResolvedValueOnce({ active: true, stepId: 'grid-select', stageTarget: 'grid-tool', pendingEvent: true })
+      .mockResolvedValueOnce({ active: true, stepId: 'grid-select', stageTarget: 'grid-tool', pendingEvent: false })
+      .mockResolvedValueOnce({ active: true, stepId: 'grid-select', stageTarget: 'grid-tool', pendingEvent: true });
+    const page = fakePage({ evaluate });
+    const step: ScenarioStepDef = { command: 'wait_for_tutorial_step step:drill-plan', role: 'setup' };
+    const action = { type: 'waitForTutorialStep' as const, stepId: 'drill-plan', maxTicks: 4, timeout: 30000 };
+
+    await expect(executeActionOnPage(page, action, step)).rejects.toThrow(
+      /tutorial never reached "drill-plan" — it is on "grid-select", live control grid-tool, after 4 tick\(s\); blocked by a pending event for 1 tick\(s\)/,
+    );
+  });
 });
 
 describe('executeActionOnPage — ensurePanel (PR #616 review round, item 7)', () => {
