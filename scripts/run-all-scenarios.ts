@@ -18,7 +18,10 @@ import type { ScenarioStepDef } from './shared/scenario-types.js';
 import {
   createGameEngine,
   runScenario,
+  formatDriftReport,
+  writeDriftReportFile,
   type ScenarioResult,
+  type DriftRecord,
 } from './shared/command-runner.js';
 import {
   formatStepIndex,
@@ -67,6 +70,7 @@ function parseArgs(): ParsedArgs {
   let mode = 'command';
   let port = DEV_SERVER_PORT;
   let shard: ShardSpec | undefined;
+  let reportDrift = false;
   const scenarios: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -79,12 +83,14 @@ function parseArgs(): ParsedArgs {
     } else if (args[i] === '--shard' && args[i + 1]) {
       shard = parseShardArg(args[i + 1]!);
       i++;
+    } else if (args[i] === '--report-drift') {
+      reportDrift = true;
     } else if (args[i]) {
       scenarios.push(args[i]!);
     }
   }
 
-  return { mode, scenarios, port, ...(shard ? { shard } : {}), reportDrift: false };
+  return { mode, scenarios, port, ...(shard ? { shard } : {}), reportDrift };
 }
 
 /**
@@ -251,7 +257,7 @@ async function runBatchInteraction(
 }
 
 async function main(): Promise<void> {
-  const { mode, scenarios: filterScenarios, port, shard } = parseArgs();
+  const { mode, scenarios: filterScenarios, port, shard, reportDrift } = parseArgs();
 
   const scenarioFiles = readdirSync(SCENARIO_DIR)
     .filter(f => f.endsWith('.json'))
@@ -282,7 +288,7 @@ async function main(): Promise<void> {
       const name = names[i];
       try {
         const steps = loadScenarioDef(name!, SCENARIO_DIR).steps;
-        const result = runScenario(engine, name!, steps, SCREENSHOT_DIR);
+        const result = runScenario(engine, name!, steps, SCREENSHOT_DIR, reportDrift);
         results.push(result);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -295,6 +301,14 @@ async function main(): Promise<void> {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`  Progress: ${i + 1}/${names.length} (${passed} passed, ${failed} failed) [${elapsed}s]`);
     }
+  }
+
+  if (reportDrift && mode === 'command') {
+    const driftRecords: DriftRecord[] = results.flatMap(r => r.driftRecords ?? []);
+    console.log(`\n${formatDriftReport(driftRecords)}`);
+    const driftPath = resolve(SCREENSHOT_DIR, 'drift-report.json');
+    writeDriftReportFile(driftRecords, driftPath);
+    console.log(`Drift report written to ${driftPath}`);
   }
 
   // Summary

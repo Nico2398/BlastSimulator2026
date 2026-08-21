@@ -44,7 +44,14 @@
 
 import { resolve } from 'path';
 import type { ScenarioStepDef, StepResult } from './shared/scenario-types.js';
-import { createGameEngine, runSteps } from './shared/command-runner.js';
+import {
+  createGameEngine,
+  runSteps,
+  formatDriftReport,
+  writeDriftReportFile,
+  type DriftRecord,
+  type GoalMismatch,
+} from './shared/command-runner.js';
 import {
   formatStepIndex,
 } from './shared/scenario-utils.js';
@@ -56,7 +63,7 @@ const SCREENSHOT_DIR = resolve(process.cwd(), 'screenshots');
 /** Run scenario in command mode (pure Node.js, no browser). */
 async function runScenarioCommand(
   name: string, steps: ScenarioStepDef[], reportDrift = false,
-): Promise<StepResult[]> {
+): Promise<Array<StepResult & { driftMismatches?: GoalMismatch[] }>> {
   const engine = createGameEngine();
   const outDir = resolve(SCREENSHOT_DIR, `scenario-${name}-command`);
 
@@ -84,6 +91,7 @@ async function runScenarioCommand(
     screenshotPath: '',
     statePath: r.statePath,
     ...(r.error !== undefined ? { error: r.error } : {}),
+    ...(r.driftMismatches !== undefined ? { driftMismatches: r.driftMismatches } : {}),
   }));
 }
 
@@ -127,6 +135,18 @@ function exitForResults(results: StepResult[]): never {
 
 if (mode === 'command') {
   runScenarioCommand(name, steps, reportDrift)
+    .then(results => {
+      if (reportDrift) {
+        const driftRecords: DriftRecord[] = results.flatMap(r =>
+          (r.driftMismatches ?? []).map(m => ({ ...m, scenario: name, step: r.step, command: r.command })),
+        );
+        console.log(`\n${formatDriftReport(driftRecords)}`);
+        const driftPath = resolve(SCREENSHOT_DIR, `scenario-${name}-command`, 'drift-report.json');
+        writeDriftReportFile(driftRecords, driftPath);
+        console.log(`Drift report written to ${driftPath}`);
+      }
+      return results;
+    })
     .then(exitForResults)
     .catch(err => {
       console.error('Scenario failed:', err);

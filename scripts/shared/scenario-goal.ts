@@ -41,23 +41,87 @@ export interface GoalCheckResult {
 /**
  * Checks `goal.equals`/`goal.increased`/`goal.decreased`/`goal.changedBy`
  * against `before`/`after` state dumps. Returns a violation message naming
- * the field and the mismatch, or `null` when everything holds.
+ * the field and the mismatch, or `null` when everything holds — identical
+ * text/semantics to the pre-#679 version (first violation found, in
+ * increased→decreased→equals→changedBy order).
+ *
+ * Additionally, for `equals`/`changedBy` goals, collects every mismatching
+ * field (not just the first) into `.mismatches` — the drift-report unit
+ * (issue #679). `increased`/`decreased` never contribute to `.mismatches`.
  * `usable`/`blocked`/`tutorialStep` are silently skipped — command mode has
  * no page to check them against, and that gap is filled by the same
  * scenario running in interaction mode.
- *
- * TODO: implement — stub only during skeleton phase (#679).
  */
 export function checkGoalAgainstState(
   goal: ScenarioStepGoal,
   before: Record<string, unknown>,
   after: Record<string, unknown> | null,
 ): GoalCheckResult {
-  // TODO: implement — stub only during skeleton phase (#679).
-  void goal;
-  void before;
-  void after;
-  throw new Error('not implemented');
+  let violation: string | null = null;
+  let violationIsDrift = false;
+  const mismatches: GoalMismatch[] = [];
+
+  if (goal.increased) {
+    for (const field of goal.increased) {
+      const wasRaw = before[field];
+      const nowRaw = after?.[field];
+      const was = typeof wasRaw === 'number' ? wasRaw : 0;
+      const now = typeof nowRaw === 'number' ? nowRaw : 0;
+      if (!(now > was) && violation === null) {
+        violation = `${field} should have increased but went ${was} → ${now}`;
+        violationIsDrift = false;
+      }
+    }
+  }
+
+  if (goal.decreased) {
+    for (const field of goal.decreased) {
+      const wasRaw = before[field];
+      const nowRaw = after?.[field];
+      const was = typeof wasRaw === 'number' ? wasRaw : 0;
+      const now = typeof nowRaw === 'number' ? nowRaw : 0;
+      if (!(now < was) && violation === null) {
+        violation = `${field} should have decreased but went ${was} → ${now}`;
+        violationIsDrift = false;
+      }
+    }
+  }
+
+  if (goal.equals) {
+    for (const [field, expected] of Object.entries(goal.equals)) {
+      const actual = after?.[field];
+      if (actual !== expected) {
+        mismatches.push({ field, goalType: 'equals', expected, actual });
+        if (violation === null) {
+          violation = `${field} should be ${JSON.stringify(expected)} but is ${JSON.stringify(actual)}`;
+          violationIsDrift = true;
+        }
+      }
+    }
+  }
+
+  if (goal.changedBy) {
+    for (const [field, expectedDelta] of Object.entries(goal.changedBy)) {
+      const wasRaw = before[field];
+      const nowRaw = after?.[field];
+      const was = typeof wasRaw === 'number' ? wasRaw : 0;
+      const now = typeof nowRaw === 'number' ? nowRaw : 0;
+      const actualDelta = now - was;
+      if (actualDelta !== expectedDelta) {
+        mismatches.push({ field, goalType: 'changedBy', expected: expectedDelta, actual: actualDelta });
+        if (violation === null) {
+          violation = `${field} should have changed by ${expectedDelta} but changed by ${actualDelta} (${was} → ${now})`;
+          violationIsDrift = true;
+        }
+      }
+    }
+  }
+
+  return {
+    violation,
+    mismatches,
+    onlyDriftViolations: violation !== null && violationIsDrift,
+  };
 }
 
 /**

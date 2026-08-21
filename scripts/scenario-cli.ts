@@ -48,6 +48,7 @@ export function parseArgs(): ParsedArgs {
   let viewport = { width: 1280, height: 720 };
   let mode = 'command'; // default mode
   let screenshots = false;
+  let reportDrift = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -109,6 +110,8 @@ export function parseArgs(): ParsedArgs {
       i++;
     } else if (args[i] === '--screenshots') {
       screenshots = true;
+    } else if (args[i] === '--report-drift') {
+      reportDrift = true;
     }
   }
 
@@ -123,6 +126,6 @@ export function parseArgs(): ParsedArgs {
     viewport,
     mode,
     screenshots,
-    reportDrift: false,
+    reportDrift,
   };
 }
