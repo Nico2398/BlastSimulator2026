@@ -1409,7 +1409,19 @@ function forceShiftRestIfNeededByPolicy(
   if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
 
   const thresholds = getEffectiveThresholds(state.sitePolicy, emp.id);
-  const needKey: NeedKey = emp.hunger <= thresholds.hunger ? 'hunger' : 'fatigue';
+  // Pick whichever gauge is more overdue relative to its OWN threshold, not
+  // always fatigue (#678 follow-up). A flat hunger-first check always resolved
+  // to 'fatigue' for the common shift-duration-triggered rest (fatigue's 2/tick
+  // working drain reliably crosses its threshold first), leaving hunger
+  // unaddressed across multiple shift cycles. Comparing each gauge's distance
+  // below its own threshold — and picking the smaller (more negative / more
+  // overdue) — works uniformly whether the rest was need-triggered (one gauge
+  // already <= its threshold) or shift-duration-triggered (neither has
+  // crossed yet): either way the gauge relatively furthest past due gets
+  // serviced.
+  const hungerDeficit = emp.hunger - thresholds.hunger;
+  const fatigueDeficit = emp.fatigue - thresholds.fatigue;
+  const needKey: NeedKey = hungerDeficit <= fatigueDeficit ? 'hunger' : 'fatigue';
 
   // Find nearest living_quarters of any tier for target coordinates.
   const building = findNearestLivingQuarters(state, emp.x, emp.z);
