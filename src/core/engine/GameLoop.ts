@@ -1408,6 +1408,22 @@ function forceShiftRestIfNeededByPolicy(
   const snapshot = { id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked };
   if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
 
+  // #678 follow-up: release the action this employee was actively working
+  // (a drill_hole, dig_ramp_segment, or any other vehicle-gated task) back to
+  // the pool before handing activeActionId to the rest action below — mirrors
+  // tickCollapse's own interruptActiveAction call for the identical reason.
+  // Without this, overwriting activeActionId directly (as this function used
+  // to) orphans the interrupted action: its record stays 'assigned'/holderId
+  // === emp.id forever, so it is never completed (this employee is now
+  // resting, not ticking it) and never reclaimed (fillIdleEmployeeFromQueueOrPool's
+  // open-pool query only matches 'queued' actions) — the employee goes idle
+  // permanently once the forced rest ends, and the work they were doing never
+  // finishes. interruptActiveAction preserves the in-progress payload
+  // (remaining duration, vehicle reservation released) so the same or another
+  // qualified employee resumes it later instead of restarting from scratch.
+  const priorActionId = emp.activeActionId;
+  interruptActiveAction(state, emp, priorActionId);
+
   const thresholds = getEffectiveThresholds(state.sitePolicy, emp.id);
   // Pick whichever gauge is more overdue relative to its OWN threshold, not
   // always fatigue (#678 follow-up). A flat hunger-first check always resolved
@@ -1428,17 +1444,31 @@ function forceShiftRestIfNeededByPolicy(
   let targetX = emp.x;
   let targetZ = emp.z;
   let buildingId: number | undefined;
-  let restDuration = NEED_REST_DURATIONS[needKey];
+  const restDuration = NEED_REST_DURATIONS[needKey];
 
   if (building) {
     const approach = resolveBuildingApproach(state, building, emp.x, emp.z);
     targetX = approach.x;
     targetZ = approach.z;
     buildingId = building.id;
-  } else {
-    // No living_quarters at all — the employee rests in place.
-    restDuration *= NEED_REST_NO_BUILDING_DURATION_MULTIPLIER;
   }
+  // #678 follow-up: unlike tickCollapse/autoInsertNeedTasks (which still
+  // apply NEED_REST_NO_BUILDING_DURATION_MULTIPLIER when resting in place —
+  // that multiplier is calibrated against genuine depletion, encouraging a
+  // living_quarters build), a policy-forced rest never doubles for lacking
+  // one. The policy's whole premise (its own doc comment above: "a tier-1
+  // living_quarters, or no building at all, is a valid rest destination
+  // under a policy, not a disqualifier") is that applying it protects an
+  // employee regardless of site infrastructure — every SitePolicy.shouldForceRest
+  // trigger, need-crossed or shift-duration-elapsed alike, already costs
+  // real, un-doubled ticks against whatever queued work it interrupts
+  // (interruptActiveAction above), which is real leverage for building a
+  // living_quarters (shorter walk, same duration) without also taxing an
+  // early, infrastructure-light site (exactly what tutorial_pit's own
+  // scripted tutorial is — no living_quarters exists there at all) twice
+  // for the one condition the policy exists to make survivable in the
+  // first place. tests/unit/engine/GameLoop.test.ts's own "no living_quarters
+  // at all" case documents this — previously pinned to the doubled value.
 
   // The rest timer itself does not start until ArrivalGate.tickArrivalGate
   // confirms the employee has walked to the building (#437).

@@ -3672,7 +3672,20 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
 
   // ── No living_quarters at all: not gated on building presence ─────────────
 
-  it('still forces rest with no living_quarters at all — rests in place, with the no-building duration multiplier', () => {
+  // #678 follow-up (tutorial-playthrough regression): a policy-forced rest no
+  // longer doubles for lacking a living_quarters — unlike tickCollapse/
+  // autoInsertNeedTasks, whose NEED_REST_NO_BUILDING_DURATION_MULTIPLIER
+  // penalizes genuine depletion to encourage building one. The policy's own
+  // premise (forceShiftRestIfNeededByPolicy's doc comment) is that it
+  // protects an employee regardless of site infrastructure — doubling the
+  // rest on top of the real, already-uncompensated interruption cost
+  // (interruptActiveAction releasing whatever task was in progress) taxed an
+  // infrastructure-light site twice for the one condition the policy exists
+  // to make survivable. tutorial_pit has no living_quarters at all, and its
+  // own tutorial-playthrough.json scenario opts into shift_8h mid-drill —
+  // the doubled duration compounded across repeated forced-rest cycles into
+  // a scenario-breaking amount of lost drilling time.
+  it('still forces rest with no living_quarters at all — rests in place, at the un-multiplied rest duration', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
@@ -3687,9 +3700,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
 
     expect(result.active).toBe(true);
     expect(result.shiftRested).toContain(employee.id);
-    expect(employee.pendingRestDuration).toBe(
-      NEED_REST_DURATIONS.fatigue * NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
-    );
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.fatigue);
     expect(employee.destinationX).toBe(employee.x);
     expect(employee.destinationZ).toBe(employee.z);
   });
@@ -3900,6 +3911,61 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     expect(tier1.fatigueAfter).not.toBe(tier2.fatigueAfter);
     expect(tier1.activeActionId).toBeNull();
     expect(tier2.activeActionId).toBeNull();
+  });
+
+  // ── Interrupted work is released for reclaim, not orphaned (tutorial-playthrough regression) ──
+
+  // tutorial-playthrough.json (scripts/scenario-defs/) opts into shift_8h
+  // mid-drill: before this fix, forceShiftRestIfNeededByPolicy overwrote
+  // employee.activeActionId with the new rest action's id directly, without
+  // ever releasing the drill_hole action it replaced — unlike tickCollapse,
+  // which calls interruptActiveAction for exactly this reason. The
+  // interrupted action's record stayed 'assigned'/holderId === employee.id
+  // forever: never completed (the employee was now resting, not ticking it)
+  // and never reclaimed (the open-pool query only matches 'queued' actions),
+  // so the employee went idle permanently once the forced rest ended and the
+  // work they were doing never finished — a driller left with 3 of 4 holes
+  // stuck ordered forever, cascading into every step downstream of it. This
+  // test fails on the old code (action stays 'assigned', held by the
+  // employee, activeActionId overwritten with no trace of it) and passes on
+  // the fix (action released to 'queued'/holderId: null, its remaining
+  // duration preserved on the payload for whoever reclaims it next).
+  it('releases the interrupted active action back to the pool instead of orphaning it', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const interrupted: PendingAction = {
+      id: 900,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { note: 'drilling' },
+      targetEmployeeId: null,
+      status: 'in_progress',
+      holderId: employee.id,
+    };
+    state.pendingActions.push(interrupted);
+    employee.activeActionId = interrupted.id;
+    employee.taskTicksRemaining = 4; // work already in progress, not merely claimed
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
+
+    processShiftCycle(state, []);
+
+    // Released back to the pool — 'queued', unheld — not left 'assigned'/
+    // held by an employee who is now resting and will never tick it again.
+    const released = state.pendingActions.find(a => a.id === interrupted.id)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    // Remaining work is preserved on the action itself so whoever reclaims
+    // it resumes instead of restarting from scratch.
+    expect(released.payload['durationTicks']).toBe(4);
+    // The employee's activeActionId now points at the new rest action, not
+    // the interrupted one and not null.
+    expect(employee.activeActionId).not.toBe(interrupted.id);
+    expect(employee.activeActionId).not.toBeNull();
   });
 
   // ── Edge cases ──────────────────────────────────────────────────────────────
