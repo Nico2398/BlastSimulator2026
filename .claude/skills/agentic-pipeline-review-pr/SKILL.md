@@ -13,7 +13,7 @@ description: >
 | 1 | @security-reviewer + @quality-reviewer + @i18n-reviewer + @duplication-reviewer + @semantic-reviewer | Parallel code review |
 | 2 | [merge-findings] | Orchestrator merges sub-reviewer findings → pass/fail, and gives each one a disposition |
 | 3 | @reviewer | Runtime validation: run tests, post review outcome (report only — no fixes) |
-| 4 | [followup] | Orchestrator files the findings dispositioned `file`, per `agentic-issue-creation` |
+| 4 | [followup] | Orchestrator files the findings dispositioned `file` per `agentic-issue-creation`, then comments on the PR listing them |
 
 ### Rules
 
@@ -41,7 +41,7 @@ Every merged finding gets exactly one disposition, decided at `merge-findings` o
 | Step | Action |
 |------|--------|
 | merge-findings | Deduplicate and merge all reviewer outputs → pass/fail, and disposition each finding `fix` / `file` / `drop` per the table above |
-| followup | File every `file` finding per `agentic-issue-creation` — duplicate check first, labels by its confidence table. Register empty → skip. |
+| followup | File every `file` finding per `agentic-issue-creation` — duplicate check first, labels by its confidence table — then one `gh pr comment` listing what was filed, in the format `agentic-pipeline-finalization` gives. It runs after @reviewer for the same reason it runs last there: the numbers do not exist until the issues are filed, so no earlier comment can carry them. Nothing dispositioned `file` → skip both. |
 
 ### Review Output Format
 

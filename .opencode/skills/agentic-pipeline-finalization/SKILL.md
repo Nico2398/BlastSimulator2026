@@ -45,9 +45,14 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<label>` — `<label>` i
  8. [followup]           → Drain the follow-up register (below): every finding and scope cut
                              reported by a sub-agent this run, plus any decision material to
                              gameplay, economy, or a player-facing default. File each per
-                             `agentic-issue-creation`, carrying the PR link.
-                             Register empty → skip. Filing never reopens an earlier step and
-                             never changes the PR's status.
+                             `agentic-issue-creation`, carrying the PR link, then post **one**
+                             comment on the PR listing what was filed. The issues link to the
+                             PR; the comment is what links the PR back to them, because
+                             `open-pr` composed the body a step earlier and cannot name numbers
+                             that did not exist yet.
+                             Register empty → skip both the filing and the comment.
+                             Filing never reopens an earlier step and never changes the PR's
+                             status.
  9. [git-verify]         → confirm clean state: git status, branch, last commits
 10. [await-ci]           → `npm run ci:await -- --pr <number>`. Blocks until every workflow
                              run on the PR head reports — no deadline, because any deadline
@@ -81,6 +86,22 @@ Instead the orchestrator keeps a register for the run. Every sub-agent report ma
 `[followup]` runs **after** review and validation for one reason: by then every agent has reported, so the register can be deduplicated across all of them at once. The same debt reported by @quality-reviewer and @duplication-reviewer under two names is one issue, and only a pass that sees both can tell.
 
 A register entry is not a blocker. It never holds the PR, never downgrades it to draft, and never delays `[await-ci]`. A run that files four follow-ups still finishes its own issue.
+
+#### The comment `[followup]` posts
+
+```markdown
+## Follow-ups filed
+
+Work this run found outside its own task. None of it blocks this PR.
+
+| Issue | Kind | Labels | What |
+|-------|------|--------|------|
+| #N | finding | `agent-task` `ready` | one line, the summary the issue title carries |
+| #M | scope-cut | `agent-task` `ready` | which slice was cut, and why it did not fit |
+| #P | decision | `decision-review` | the default taken, and the lever that reverses it |
+```
+
+One comment per run, posted only when the register held something. An empty register posts nothing: a comment saying "none" on every pipeline pull request is noise, and it proves nothing anyway — a clean run and a run that dropped its findings write the same word. What separates them is the review output from the same run, which lists every `[pre-existing]` finding the reviewers reported. A reader comparing that list against this comment can see what went unfiled; a reader handed "none" cannot.
 
 ### Failure loops
 
@@ -123,5 +144,5 @@ Do NOT re-run skeleton-writer or test-writer — branches and tests already exis
 | verify-commit | `git log --oneline -1` — auto-commit if dirty, use message `"<agent-name>: <step-context> (#<N>)"` |
 | open-pr | Decide the `full-ci` label **before** calling `gh pr create`, by `agentic-pipeline-pr-management`'s test. `gh pr create --base main --head pipeline/feature-<label> --title "<type>: Resolve #<N>" --body "Closes #<N>\n\n<test_count> tests — all passing\n\n<decisions_block>\n\nREADY TO MERGE"`, adding `--label "full-ci"` to that same call when the test says yes. Determine `<type>` from pipeline: `full → feat`, `fix-bug → fix`, `multi → feat`. Count test cases: `npx vitest list --reporter=json 2>$null | ConvertFrom-Json | ForEach-Object { $_.testModules } | Measure-Object`. `<decisions_block>` is the `## Decisions taken` section, omitted when the run defaulted nothing. For draft: add `--draft`, omit `READY TO MERGE` line. **Never a follow-up `gh pr edit --add-label`** — a label added after `create` raises no `pull_request` event of its own on this repo's older CI trigger shape, and PR #615 merged with its `full-ci` interaction job silently skipped for exactly that reason (`ci.yml` now also re-evaluates on `labeled`, but the label belongs on the opening call regardless — the two are independent fixes for the same incident, not a reason to pick one). |
 | await-ci | `npm run ci:await -- --pr <number>` (or `--head pipeline/feature-<label>` before the number is known). Exit codes: `0` GREEN, `1` RED with the failing jobs and their log URLs printed, `2` TIMEOUT (only reachable if you pass `--timeout-minutes`, which a pipeline run never does), `3` the PR is gone, `4` bad arguments or `gh` could not answer. It listens to the workflow runs on the PR head; it never re-runs a channel, and no verdict it reports depends on a duration. |
-| followup | Drain the register in one pass, newest entry last. Decisions: `gh label create decision-review --description "A default the pipeline chose; revisit when convenient" --color ededed --force` then `gh issue create --label decision-review --title "Decision review: <summary> (from #<N>)" --body "<decisions block + PR link>"`. `--force` makes the label step idempotent — it updates an existing label instead of failing the run on every issue after the first. Findings and scope cuts: duplicate-check, then file per `agentic-issue-creation`, labels by its confidence table. |
+| followup | Drain the register in one pass, newest entry last, then `gh pr comment <pr-url> --body "<the table below>"` — one comment, only when something was filed. Decisions: `gh label create decision-review --description "A default the pipeline chose; revisit when convenient" --color ededed --force` then `gh issue create --label decision-review --title "Decision review: <summary> (from #<N>)" --body "<decisions block + PR link>"`. `--force` makes the label step idempotent — it updates an existing label instead of failing the run on every issue after the first. Findings and scope cuts: duplicate-check, then file per `agentic-issue-creation`, labels by its confidence table. |
 | git-verify | `git status --porcelain` (must be empty) → `git branch --show-current` → `git log --oneline -3` |
