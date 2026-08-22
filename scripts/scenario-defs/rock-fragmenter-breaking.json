@@ -591,7 +591,7 @@
     },
     {
       "command": "time pause",
-      "description": "#697: brackets the two back-to-back freight_warehouse build clicks below against interaction-mode real-time cash drift. new_game runs unpaused, and the per-frame auto-tick loop in main.ts drains cash for every second of real wall-clock time that passes -- headless Chrome costs ~6s/frame with no GPU, and every Puppeteer poll (clickSelector, waitForSelector, pickTile) costs a full frame, so the round trip between the two build clicks can stretch into tens of seconds to minutes of real time. Command mode's cash trace shows a healthy $22,817 cushion at the second build click with no such drift, but interaction mode nondeterministically drained cash below the $15,000 construction cost. Pausing here removes the wall-clock leak for the duration of both builds.",
+      "description": "#697: brackets the two back-to-back freight_warehouse build clicks below against interaction-mode real-time cash drift. new_game runs unpaused, and the per-frame auto-tick loop in main.ts drains cash for every second of real wall-clock time that passes -- headless Chrome costs ~6s/frame with no GPU, and every Puppeteer poll (clickSelector, waitForSelector, pickTile) costs a full frame, so the round trip between the two build clicks can stretch into tens of seconds to minutes of real time. Command mode's cash trace shows a healthy $22,817 cushion at the second build click with no such drift, but interaction mode nondeterministically drained cash below the $15,000 construction cost. Pausing here removes the wall-clock leak for the duration of both builds -- see time-management-visual.json for the same toggle-button precedent.",
       "interaction": [
         {
           "type": "clickSelector",
