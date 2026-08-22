@@ -49,6 +49,31 @@ describe('Worker revolt system (7.7)', () => {
     expect(revolt.revolted).toBe(false); // wellBeing > 0, no countdown
   });
 
+  it('createRevoltState produces a state with no immune field (#681)', () => {
+    const revolt = createRevoltState();
+    expect(Object.keys(revolt)).not.toContain('immune');
+    expect('immune' in revolt).toBe(false);
+  });
+
+  it('sustained 0 well-being triggers revolt regardless of any prior immunity flag (#681)', () => {
+    const state = createGame({ seed: 1 });
+    state.scores.wellBeing = 0;
+    const revolt = createRevoltState();
+    // Simulate a stale/foreign `immune` flag being present on the object —
+    // updateRevolt must not special-case it since RevoltState no longer
+    // declares the field at all.
+    (revolt as unknown as Record<string, unknown>).immune = true;
+    const emitter = new EventEmitter();
+
+    let triggered = false;
+    for (let i = 0; i < REVOLT_TICKS; i++) {
+      triggered = updateRevolt(state, revolt, emitter) || triggered;
+    }
+
+    expect(triggered).toBe(true);
+    expect(revolt.revolted).toBe(true);
+  });
+
   it('strike warning fires at REVOLT_WARNING_TICKS', () => {
     const state = createGame({ seed: 1 });
     state.scores.wellBeing = 0;
