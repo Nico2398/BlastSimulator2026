@@ -25,6 +25,7 @@ import { clearEvents } from '../../src/core/events/EventPool.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { parseCommand } from '../../src/console/ConsoleRunner.js';
 import { makeCampaignCtx } from './full-level/helpers.js';
+import type { DamageState } from '../../src/core/entities/Damage.js';
 import {
   MIN_EVENT_INTERVAL_TICKS,
   MIN_EVENT_INTERVAL_ACTIONS,
@@ -783,6 +784,115 @@ describe('Event system', () => {
 
       expect(ctx.state!.levelEnded).toBe(false);
       expect(ctx.state!.levelEndReason).toBeNull();
+    });
+  });
+
+  // ── 14. Crisis-floor wiring (#698) ──────────────────────────────────────────
+  // Exercises tickCommand's lastDeathTick/crisisActiveCount derivation and
+  // eventCommand's lastSafetyRecoveryTick stamping through the real command
+  // handlers — tests/unit/scores/ScoreManager.test.ts covers the pure
+  // reassertFloorIfCrisisActive(state, crisisActive) function in isolation;
+  // this covers the wiring around it that decides what crisisActive *is*.
+
+  describe('crisis-floor wiring (#698)', () => {
+    /** Record a fatal accident and bump deathCount — mirrors what
+     * processEmployeeHit (Damage.ts) does on a real fatal fragment hit,
+     * without needing a full blast pipeline. Does NOT touch scores.safety
+     * directly — the floor pin is left to tickCommand's own
+     * reassertFloorIfCrisisActive wiring, so the ticks below prove the real
+     * mechanism drives safety to 0, rather than asserting a hand-set value.
+     */
+    function recordDeath(ctx: GameContext): void {
+      const state = ctx.state!;
+      state.damage.accidents.push({
+        tick: state.tickCount,
+        type: 'death',
+        entityId: 999,
+        fragmentId: 1,
+        kineticEnergy: 5000,
+      });
+      state.damage.deathCount++;
+    }
+
+    it('untagged event resolution does not lift the post-death safety floor', () => {
+      recordDeath(ctx);
+      tickCommand(ctx, ['1'], {}); // drives safety to 0 via the crisis floor
+      expect(ctx.state!.scores.safety).toBe(0);
+
+      // lawsuit_osha_hardhats' option 0 (osha_full_overhaul) has a positive
+      // safety delta but carries no resolvesDeathCrisis tag.
+      const fireResult = eventCommand(ctx, ['fire', 'lawsuit_osha_hardhats'], {});
+      expect(fireResult.success).toBe(true);
+      const chooseResult = eventCommand(ctx, ['choose', '0'], {});
+      expect(chooseResult.success).toBe(true);
+      expect(chooseResult.output).toContain('osha_full_overhaul');
+      expect(ctx.state!.scores.safety).toBe(15);
+      expect(ctx.state!.damage.lastSafetyRecoveryTick).toBeNull();
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.scores.safety).toBe(0);
+    });
+
+    it('resolvesDeathCrisis-tagged event resolution lifts the floor and it stays lifted', () => {
+      recordDeath(ctx);
+      // Advance well past updateScores' own 10-tick recentAccidents window so
+      // the assertion below isolates the crisis-floor mechanism from that
+      // unrelated -5 safety penalty (recordDeath's accident would otherwise
+      // still be "recent" and mask the floor lifting with its own penalty).
+      tickCommand(ctx, ['15'], {});
+      expect(ctx.state!.scores.safety).toBe(0);
+
+      // Option 0 (settle_death_suit) is tagged resolvesDeathCrisis: true.
+      const fireResult = eventCommand(ctx, ['fire', 'lawsuit_wrongful_death'], {});
+      expect(fireResult.success).toBe(true);
+      const chooseResult = eventCommand(ctx, ['choose', '0'], {});
+      expect(chooseResult.success).toBe(true);
+      expect(chooseResult.output).toContain('settle_death_suit');
+      expect(ctx.state!.damage.lastSafetyRecoveryTick).toBe(ctx.state!.tickCount);
+
+      tickCommand(ctx, ['1'], {});
+
+      // The resolved +5 safety delta stands — not reset to 0.
+      expect(ctx.state!.scores.safety).toBeGreaterThan(0);
+    });
+
+    it('a second death re-arms the crisis after a recovery', () => {
+      recordDeath(ctx);
+      tickCommand(ctx, ['15'], {});
+      eventCommand(ctx, ['fire', 'lawsuit_wrongful_death'], {});
+      eventCommand(ctx, ['choose', '0'], {});
+      tickCommand(ctx, ['1'], {});
+      expect(ctx.state!.scores.safety).toBeGreaterThan(0); // recovered
+
+      // A second, later death re-arms the crisis regardless of the earlier
+      // recovery already recorded on lastSafetyRecoveryTick.
+      recordDeath(ctx);
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.scores.safety).toBe(0);
+
+      // Stays re-pinned on a subsequent tick too, not just the one right
+      // after the new death.
+      tickCommand(ctx, ['1'], {});
+      expect(ctx.state!.scores.safety).toBe(0);
+    });
+
+    it('treats a legacy save (lastSafetyRecoveryTick deserialized as undefined) as crisis-active', () => {
+      // A save serialized before #698 added the field deserializes it as
+      // `undefined` (key absent), not `null` — construct that shape directly
+      // rather than going through createDamageState(), which always sets it.
+      ctx.state!.damage = {
+        accidents: [{ tick: 0, type: 'death', entityId: 1, fragmentId: 1, kineticEnergy: 5000 }],
+        lawsuitPending: false,
+        deathCount: 1,
+        blastCount: 0,
+      } as unknown as DamageState;
+      expect(ctx.state!.damage.lastSafetyRecoveryTick).toBeUndefined();
+
+      tickCommand(ctx, ['1'], {});
+
+      expect(ctx.state!.scores.safety).toBe(0);
     });
   });
 });
