@@ -1,6 +1,6 @@
 {
   "name": "collapse-recovery",
-  "description": "Chapter 7: Drive an idle employee's need gauges to collapse via nothing but time passing. Finding #11: the original claim (\"verify rest restores them to resume original task\") does not hold at this file's own tick budget — a real run confirms collapse is genuine (collapsedCount 0->1, wellBeing craters) but the employee is STILL collapsing at tick 350, not recovered; extending the run to 2350 ticks shows repeated collapse/rest cycles (hunger, fatigue, and breakNeed each collapse and recover on their own, different-length cycles) draining cash via NEED_REST_COSTS on every cycle, ending in bankruptcy + worker_revolt (LEVEL LOSS) rather than a clean recovery. Whether that's an unbalanced interaction (idle need-drain, tickNeedGauges via events.ts, keeps draining at the idle rate even while a rest action is in progress, so a short/weak rest may net-lose ground) or intended difficulty for a company that hires someone and gives them no work is a design question — filed as a follow-up, not decided here. This file now asserts only what a real run verifies: collapse is real, recovery within 350 ticks is not.",
+  "description": "Chapter 7: Drive an employee's need gauges to genuine collapse purely through unrelieved neglect. #680's rest fix (resting drains at 0, not idle rate) closed the pathway this file used to rely on: a fully idle employee, even with zero reachable living_quarters anywhere on the map, is auto-routed by autoInsertNeedTasks into a self-targeted, zero-distance ground-rest the SAME tick their gauge first dips under its warning threshold, which now holds flat (0 drain) for the rest's whole duration and tops back up — direct probing (GameLoop.ts, tickNeedGauges/autoInsertNeedTasks) confirmed a purely-idle employee stabilizes in a permanent warning-threshold oscillation and cannot reach the collapse floor at any tick budget tested, with or without a living_quarters on the map. Genuine neglect that still bites (per #680's own acceptance framing, 'a site that genuinely neglects its crew still revolts — the mechanism keeps its teeth', its individual-collapse equivalent) instead requires the employee kept continuously BUSY with no living_quarters ever built: while activeActionId is set, autoInsertNeedTasks only queues a rest unclaimed (never self-claims a busy employee), so drain proceeds at the faster 'working' rate uninterrupted by any rest until tickCollapse's own unconditional threshold check fires — confirmed for real via a direct probe (`employee dispatch <id> x:<own x> z:<own z>` twice, matching the pattern #680's own needs.integration.test.ts CONTRAST acceptance case uses to prove the punishing mechanism survives the fix) and re-derived from that run below, not assumed from the file's old, now-false claim.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -70,46 +70,6 @@
       }
     },
     {
-      "command": "build living_quarters at:5,5",
-      "description": "'bunkhouse' was never a valid build type (NEED_REST_BUILDING_TYPES maps every need to 'living_quarters' — dedicated canteen/bunkhouse/break_room types don't exist yet); this file already uses the real type. The employee hires far from this build site (spawn (82,34) vs building (5,5) on this seed's dusty_hollow map, real distance ~82 tiles) — real, not a scenario mistake, and part of why the rest cycle below struggles to keep up.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 5,
-          "z": 5
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -10000
-        },
-        "equals": {
-          "buildingCount": 1
-        },
-        "note": "living_quarters T1 constructionCost = 10000 (balance.ts)"
-      }
-    },
-    {
       "command": "employee list",
       "interaction": [
         {
@@ -122,15 +82,64 @@
         "equals": {
           "collapsedCount": 0
         },
-        "note": "baseline before the idle-drain run below — not yet collapsing, fresh hire's needs start full"
+        "note": "baseline before the forced-work run below — fresh hire's needs start full. No living_quarters is ever built in this file (deliberate, real neglect) — this driller (seed 42, dusty_hollow, spawns at (82,34)) has no rest destination anywhere on the map."
       }
     },
     {
-      "command": "tick 250",
+      "command": "employee dispatch 1 x:82 z:34",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 250"
+          "command": "employee dispatch 1 x:82 z:34"
+        }
+      ],
+      "description": "Left unmarked with role bootstrap like needs-collapse-visual's equivalent dispatch: no console command a player would reach for creates a targeted work order at an employee's own position — this exists purely to keep the driller genuinely, continuously busy (working-rate drain, no idle window autoInsertNeedTasks could route a self-rest into) so neglect is real instead of accidental.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "decreased": ["minFatigue"],
+        "equals": {
+          "collapsedCount": 0
+        },
+        "note": "25 ticks of continuous forced work (working-rate drain) is not yet enough to collapse a fresh hire — real, verified via a direct engine probe"
+      }
+    },
+    {
+      "command": "employee dispatch 1 x:82 z:34",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:82 z:34"
+        }
+      ],
+      "description": "Second dispatch keeps the driller continuously working across the first task's completion, the same handoff needs-collapse-visual's own second Walt dispatch documents — a redispatch issued while still busy is harmless (queues behind the active task) and this one lands right around the first task's own completion, so no idle tick opens up for autoInsertNeedTasks to route a saving rest into before the gauge crosses its collapse floor.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
         }
       ],
       "role": "setup",
@@ -138,8 +147,8 @@
         "equals": {
           "collapsedCount": 1
         },
-        "decreased": ["minFatigue", "wellBeing"],
-        "note": "250 ticks of pure idle need-drain (no drill plan, nothing to do) is enough to collapse a fresh hire — real, verified via a direct engine run, not assumed from the file's own claim"
+        "decreased": ["minFatigue"],
+        "note": "cumulative tick 50: genuine collapse via continuous unrelieved forced work, no living_quarters anywhere on the map — re-derived from a real run, not assumed. wellBeing is NOT asserted decreased here: the same batch that drives the collapse also runs the collapse-rest that immediately follows it (no building involved, so it tops gauges back up per NEED_REST_NO_BUILDING_CAP), and a real run shows wellBeing net INCREASE across this step (58.15 → 62.37) even though the employee is flagged COLLAPSING at the end of it — the gauge recovery outweighs the morale hit within this one batch."
       }
     },
     {
@@ -153,11 +162,44 @@
       "role": "observe"
     },
     {
-      "command": "tick 100",
+      "command": "employee dispatch 1 x:82 z:34",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 100"
+          "command": "employee dispatch 1 x:82 z:34"
+        }
+      ],
+      "description": "The collapse-rest above completes on its own (NEED_REST_DURATIONS.fatigue × NEED_REST_NO_BUILDING_DURATION_MULTIPLIER, no building involved) and frees the driller back to idle with nothing queued to claim — this redispatch, and the one after the next tick batch, put them straight back to genuinely neglected continuous work instead of leaving them to recover into the same permanent idle oscillation the file's own description found unbreakable.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "role": "setup",
+      "note": "cumulative tick 75 — recovers from the first collapse, back to genuinely neglected forced work; no assertion here, this batch's own job is only to set up the second collapse checked below"
+    },
+    {
+      "command": "employee dispatch 1 x:82 z:34",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:82 z:34"
+        }
+      ],
+      "description": "See the dispatch two steps above — same handoff reasoning, second redispatch to keep the run genuinely neglectful through to the second collapse checkpoint below.",
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 25",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
         }
       ],
       "role": "setup",
@@ -166,7 +208,7 @@
           "collapsedCount": 1
         },
         "decreased": ["wellBeing"],
-        "note": "Finding #11: still collapsing at tick 350, not recovered — the original file's claim (\"rest restores them\") does not hold within this budget; wellBeing keeps cratering rather than climbing back"
+        "note": "cumulative tick 100: neglect is not a one-off — sustained forced work with no rest destination collapses this employee again. Real run: fatigue back down near the collapse floor, restTicksRemaining active, matching a fresh collapse rather than the first one's tail"
       }
     },
     {
