@@ -21,17 +21,6 @@
       "description": "#553: cash bumped from $50,000 to $150,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driller/drill_rig it never used to, on top of the four blast-workshop software tiers it already buys. Bumped again to $200,000 (#554): charging is now real work too -- three separate charge orders (Charge All plus two per-hole overrides), each drained by its own wait, add several hundred more ticks of the 3-driller roster's payroll/fuel upkeep before the tier:4 software purchase further down this file (observed short by ~10,400 at $150,000)."
     },
     {
-      "command": "cheat disable_revolt",
-      "description": "#601-followup (issue #631): direct trace confirms `levelEnded:true, levelEndReason:'worker_revolt'` fires deterministically at the same tick in both command and interaction mode, during this file's own queued-charge wait -- a real crew-workload/revolt-margin shortfall, not a scenario-file timing bug. Disables the revolt end-condition for this file only (state.revoltDisabled, cheats.ts) so the file can reach the conclusion its own assertions actually describe, as a tracked stopgap -- issue #631 covers removing this cheat once the underlying crew-sizing/revolt-margin gap is fixed for real.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "cheat disable_revolt"
-        }
-      ],
-      "role": "bootstrap"
-    },
-    {
       "command": "employee hire role:driller",
       "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so this file (which pre-#553 never needed any roster before its drill_plan) now needs one first. Employee #1.",
       "interaction": [
@@ -259,145 +248,19 @@
       }
     },
     {
-      "command": "tick 50",
-      "description": "#553: waits for the two drillers to drive their drill_rigs to all 12 ordered holes and drill them (sandbox-measured: lands around tick 285-300 with two concurrent driller/drill_rig pairs). Six rounds of tick 50 (with a defensive event-resolve after each) cover that -- deliberately not more: with a lone driller this used to run seven rounds (350 ticks), but every extra round past the sixth pushes well-being's already-flat 0 streak (no Living Quarters in this file, see the employee-hire steps above) past the 120-tick WORKER REVOLT threshold (REVOLT_TICKS, balance.ts) with all 12 holes already drilled and nothing left to wait for -- sandbox-confirmed: a seventh round here does trigger the revolt's blocking game-over overlay.",
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:400",
+      "description": "#682: replaces the old fixed 6x tick50 (300-tick) pad -- direct trace (issue #682, command mode) found drilling actually completes around tick~134 with two concurrent driller/drill_rig pairs, but the fixed pad kept ticking all the way to 300 regardless, burning ~166 idle ticks doing nothing but draining wellBeing further before charging even began. That wasted margin, not crew size, was what pushed the charging phase's own wait_until into REVOLT_TICKS (120, balance.ts) -- sandbox-confirmed (issue #682): swapping this pad for an early-exit waitUntil (same convention this file's own charge-drain waits already use, and blast-execution-visual.json's own drilling waits use too) lands the whole drill+charge+blast sequence with wellBeing hitting 0 for only ~25 ticks total (well under the 120-tick threshold) instead of the fixed pad's own ~186+. `orderedHoleCount` is the same field the old pad's own trailing `expect.equals` already asserted, just checked incrementally instead of after a fixed 300-tick sleep.",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 60000
         }
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "description": "Long enough for the two drillers to land the last of the 12 ordered holes.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
         "equals": {
           "orderedHoleCount": 0,
           "holeCount": 12
@@ -406,6 +269,7 @@
     },
     {
       "command": "event choose 0",
+      "description": "#682: defensive resolve -- waitUntil's own loop already resolves any event that fires during its own tick advance (command-runner.ts's runWaitUntil / interaction-executor.ts's waitUntil, #601), but a real-time gap between that wait ending and this step starting can still leave one pending in interaction mode.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1006,7 +870,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "note": "#682: the level must not have ended (e.g. via a silent worker_revolt) by the time the scenario's blasts are all fired"
+      }
     }
   ],
   "shots": [
