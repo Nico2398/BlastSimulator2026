@@ -132,6 +132,10 @@ const REGION = {
   // drilling is now vehicle-gated — the driller needs somewhere to train for
   // and park a drill_rig before drill-plan can ever land a hole).
   drivingCenter: { x1: 10, z1: 8, x2: 10, z2: 8, exact: true },
+  // One tile, same origin-corner convention. Clear of the warehouse (6,6,
+  // footprint 4×4) and the driving center (10,8) — x disjoint from both, so
+  // the exact z bound between them never matters.
+  livingQuarters: { x1: 13, z1: 4, x2: 13, z2: 4, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
@@ -164,6 +168,24 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   ],
 
   'hire-driller': hireStages('driller', 'tutorial.stage.hire_driller'),
+
+  'build-living-quarters': [
+    { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
+    {
+      target: '#bs-build-panel [data-build-type="living_quarters"] .bs-build-buy-btn',
+      hintKey: 'tutorial.stage.build_living_quarters',
+    },
+    ...pickerStages('tutorial.stage.build_site', REGION.livingQuarters),
+  ],
+
+  'set-early-policy': [
+    { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
+    {
+      target: '#bs-policy-apply',
+      hintKey: 'tutorial.stage.policy_apply',
+      also: ['#bs-policy-shift', '#bs-policy-hunger', '#bs-policy-fatigue'],
+    },
+  ],
 
   'build-driving-center': [
     { target: TOOLBAR_TARGET.build, hintKey: 'tutorial.stage.open_build' },
