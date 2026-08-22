@@ -32,6 +32,9 @@ Produce structured implementation plan from issue. Read-only — no code changes
 - [ ] criterion 2
 ### Decisions
 - **Open:** what the issue left unspecified — **Chosen:** the default — **Why:** the spec, convention, or incentive it follows — **Reverse by:** the constant or branch a human would change
+### Scope
+- `fits` — one run can carry this to a merged pull request
+- `oversized` — name the slice that reaches green on its own, and the remainder the orchestrator should file per `agentic-issue-creation`
 ### Edge Cases
 - edge case 1
 ### Architecture Notes

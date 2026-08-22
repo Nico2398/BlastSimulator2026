@@ -72,6 +72,8 @@ Verify semantic coherence between tests and implementation. Every test case must
 
 ## Output Format
 
+Tag every finding with its scope so `merge-findings` can disposition it: `[in-diff]` when it sits inside what this PR changed or broke, `[pre-existing]` when the diff merely revealed it. Report a `[pre-existing]` finding like any other — the orchestrator files it as a follow-up issue rather than widening this PR. Report it rather than filing it: mutating `gh` is blocked for this agent by design.
+
 ```
 ## Semantic Review
 ### Test Coverage

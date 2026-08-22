@@ -228,6 +228,7 @@ const ENTRY_SECTIONS = [
   'Autonomous pipeline sessions',
   'Verification Gate',
   'Capability Gate',
+  'Follow-up Gate',
   'Validation Commands',
 ];
 

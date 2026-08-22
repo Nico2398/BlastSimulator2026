@@ -1,13 +1,23 @@
 ---
 name: agentic-issue-creation
-description: Create or edit GitHub issues for agentic pipeline consumption — context, files, test files, dependencies (setting or reading a blocked_by relationship), labels, and verification criteria. Use when creating an issue for autonomous coding agents, or when editing an existing one's dependencies, labels, or lifecycle state.
+description: Create or edit GitHub issues for agentic pipeline consumption — context, files, test files, dependencies (setting or reading a blocked_by relationship), labels, and verification criteria. Use when filing an issue for autonomous coding agents, when recording technical debt, a codebase gap, an inconsistency or a defect found while working on something else, when cutting a task that turns out to be bigger than one run and filing the remainder, or when editing an already-filed issue's dependencies, labels, or lifecycle state.
 ---
 
 # Skill: agentic-issue-creation
 
 ## When to Use
 
-Use when creating a GitHub issue that an autonomous run will pick up, or when editing an already-filed one's dependencies, labels, or lifecycle state. An issue is the only input the pipeline takes, so it has to stand on its own — the run starts with the issue body and the codebase, and nothing else. Setting a `blocked_by` relationship on an existing issue is this skill's task exactly as much as authoring a new one is — see "Setting a dependency" below.
+Use when creating a GitHub issue that an autonomous run will pick up, when recording something found while working on a different task, when cutting an oversized task and filing the remainder, or when editing an already-filed one's dependencies, labels, or lifecycle state. An issue is the only input the pipeline takes, so it has to stand on its own — the run starts with the issue body and the codebase, and nothing else. Setting a `blocked_by` relationship on an existing issue is this skill's task exactly as much as authoring a new one is — see "Setting a dependency" below.
+
+Three situations put an agent here, and they differ only in what the issue records:
+
+| Situation | What the issue carries |
+|-----------|------------------------|
+| **Planned work** — decomposing a feature, or a human filing a task | The task itself, in one of the two shapes below |
+| **A finding** — technical debt, a codebase gap, an inconsistency, a defect noticed while working on something else | The finding, plus where it was found and why it was not fixed on the spot |
+| **A scope cut** — the assigned task turns out to be bigger than one run can carry | The remainder deliberately left out, and what was landed instead |
+
+A finding and a scope cut become ordinary issues the moment they are filed. They differ from planned work only in provenance, which the template's optional sections carry.
 
 Two shapes are valid, and they differ in how much of the answer is already known:
 
@@ -20,15 +30,50 @@ Both enter the same queue once `ready` lands on the issue — a two-line issue t
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
-1. Pick the shape: complete when you know the file layout, intent when you are describing an outcome
-2. Fill every section that shape carries, using the headings below verbatim
-3. Verify the Rules are satisfied
-4. Run through the Checklist
-5. Create the issue with `gh issue create`, setting labels yourself:
-   - Human gave no instruction about labels → `--label ready,agent-task`. `ready` means eligible, not started: it places the issue in the queue, where it waits until a human dispatches `agentic-trigger.yml` or a merged pipeline PR chains to it. Creating an issue never starts a run.
-   - Human specified labels, or said the issue should wait — `decision-review` for a default to revisit later, or an explicit hold — → follow that instruction instead, and leave `ready` off.
+1. Run the duplicate check below. An open issue that already covers it is updated, not duplicated
+2. Pick the shape: complete when you know the file layout, intent when you are describing an outcome
+3. Fill every section that shape carries, using the headings below verbatim
+4. Verify the Rules are satisfied
+5. Run through the Checklist
+6. Create the issue with `gh issue create`, setting labels per the Labels section below. A human who specified labels, or said the issue should wait, overrides that table
 
-An issue that must **stay out** of the queue is created carrying a lifecycle label of its own instead of `ready` — `decision-review` for a default to revisit later. The issue joins the queue in number order once `ready` is on it, whoever put it there.
+`ready` means eligible, not started: it places the issue in the queue, where it waits until a human dispatches `agentic-trigger.yml` or a merged pipeline pull request chains to it. Creating an issue never starts a run. The issue joins the queue in number order once `ready` is on it, whoever put it there.
+
+## ▶ Duplicate check — run before filing anything
+
+An issue nobody reads twice is cheap; two issues for one problem are not. They split the discussion, and the second run to pick one up rediscovers what the first already fixed.
+
+1. Search open issues for the thing itself rather than for your phrasing of it — the symbol, the file path, the error text, the convention being violated.
+   ```bash
+   gh issue list --state open --search "<symbol or file path>" --limit 20
+   gh issue list --state open --label agent-task --limit 50   # when the term is a concept, not a string
+   ```
+   With no `gh` CLI — Claude Code on the web has none — the same search runs against the REST API with the `GITHUB_TOKEN` already in the environment. Never echo the token; pass it straight from the variable.
+   ```bash
+   curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+     --get --data-urlencode "q=repo:Nico2398/BlastSimulator2026 is:issue is:open <terms>" \
+     "https://api.github.com/search/issues" \
+     | python3 -c "import sys,json; [print(i['number'], i['title']) for i in json.load(sys.stdin)['items']]"
+   ```
+2. **A match that covers your finding → update it.** Add what you learned as a comment when it is evidence (a second occurrence, a reproduction, an exact line number), or edit the body when it is a correction (a wrong path, a missing consumer, a premise that no longer holds). Name the run that found it, so the next reader knows where the addition came from.
+3. **A match that overlaps without covering it** → file, and name the neighbour in your Context section so a human can merge the two if they disagree.
+4. **A closed match** → read how it closed. Closed with a merged pull request means the problem came back and yours is a regression report, which is worth saying in the body. Closed unmerged means it was declined, and refiling needs a reason.
+
+Searching costs one command. Filing a duplicate costs a run.
+
+## ▶ Labels — `ready` is a confidence statement
+
+`agentic-assign` selects on `ready` alone. Putting it on an issue says *this work should be done, and the description is good enough to start from.* Putting it on a hunch spends a whole run discovering the hunch was wrong.
+
+| Confidence | Labels | What follows |
+|-----------|--------|--------------|
+| **High** — a defect you reproduced, a convention you can point at, a gap you verified in the code | `agent-task`, `ready` | The work is real and specified. The issue joins the queue in number order. |
+| **Open** — something looks wrong, and a human should confirm it is worth doing or pick between two directions | `agent-task` | The issue stays out of the queue until a human adds `ready`. |
+| **Already decided by the run** — a default you implemented that a human may want to revisit | `decision-review` | Held by `agentic-decision-autonomy`, which owns that flow end to end. |
+
+An issue held for confirmation carries an `## Open question` section naming exactly what a human must answer and what changes with each answer. Without it the issue is a hunch nobody can act on, and it waits until someone re-derives the question you already knew.
+
+Leave `ready` off while you are uncertain. An issue carrying `agent-task` alone loses nothing — it keeps its number, its body and its place — and gains `ready` the moment a human agrees.
 
 ## Issue Body Template
 
@@ -54,7 +99,18 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 
 ## Verification
 - [Observable outcome that proves the task is done]
+
+## Where found
+[Findings and scope cuts only. Which run, which pull request or review round, what was being worked on at the time.]
+
+## Why not fixed here
+[Findings and scope cuts only. Why filing was right rather than folding it into the work in hand.]
+
+## Open question
+[Issues held at `agent-task` without `ready` only. What a human must answer, and what changes with each answer.]
 ```
+
+The last three sections are provenance and are omitted for planned work. `## Where found` and `## Why not fixed here` are what let the next reader judge a finding without reconstructing the review round that produced it; `## Open question` is what a human answers before adding `ready`.
 
 ## Rules
 
@@ -68,7 +124,9 @@ An issue that must **stay out** of the queue is created carrying a lifecycle lab
 8. **Single task per issue.** A task touching several concerns is several issues. So is a task that is one concern but too large for one run — Sizing below is the test, and Splitting is what to do about it.
 9. **SMART compliance.** Specific (one clear goal), Measurable (verifiable outcome), Achievable (within an agent's capabilities), Relevant (part of the larger feature), Time-bound (a single atomic task).
 10. **`full-ci` is off by default — an issue has to earn it.** The label starts the interaction-mode browser job, which costs the merge path real time, so it goes on an issue only where that job is the only thing that could catch the regression: an interaction-mode scenario clicks its way through the control, panel or flow the issue changes, or the issue touches shared input, picking, camera, rendering or harness machinery every scenario runs through. **Never on a backend-only issue.** A change confined to `src/core/`, `src/console/`, config or pure logic is proven by `static`, `logic` and command-mode `scenario`; replaying browser flows the diff never reaches reports nothing about it. **Never where there is no interaction regression to catch** — a renderer detail no scenario reaches, a control added to an existing panel, copy, a new command parameter. The `visual` channel covers those in-session against the thing that actually changed, which is stronger evidence than a suite that never touches it. When in doubt, leave it off. Full test and cost: `agentic-pipeline-pr-management`.
-11. **Label transfer.** A PR opened from a `full-ci` issue gets the same label, passed on the same `gh pr create` call that opens it (`--label "full-ci"`) — never a follow-up `gh pr edit --add-label`, which raises no `pull_request` event of its own and is how PR #615 merged with its interaction-mode job silently skipped. See `agentic-pipeline-finalization`'s `open-pr` step.
+11. **Search before filing, and update what already exists.** An open issue covering the same problem is updated rather than duplicated — procedure above.
+12. **`ready` states confidence, not hope.** It goes on an issue whose work is verified real and whose description is good enough to start from. Anything short of that is `agent-task` alone, with an `## Open question` section naming what a human must answer.
+13. **Label transfer.** A PR opened from a `full-ci` issue gets the same label, passed on the same `gh pr create` call that opens it (`--label "full-ci"`) — never a follow-up `gh pr edit --add-label`, which raises no `pull_request` event of its own and is how PR #615 merged with its interaction-mode job silently skipped. See `agentic-pipeline-finalization`'s `open-pr` step.
 
 ## ▶ Sizing — one issue is one run, and a run has a ceiling
 
@@ -94,6 +152,22 @@ The obvious split — the mechanic in one issue, the tests it breaks in the next
 3. **Stack the batches on an integration branch.** Sub-issues target the feature branch rather than `main`, and only the final merge has to be green. Last resort: assignability, auto-merge and rescue all assume a PR against `main`, so a human has to shepherd it.
 
 Batch issues are ordinary issues — `Blocked by` the enabler, one slice each, verification of their own.
+
+## ▶ Discovering mid-run that the task is bigger than one run
+
+Sizing above is the test applied *before* filing. The same ceiling exists mid-run, and reaching it is ordinary: the issue was sized on what a reader could see, and the codebase disagreed.
+
+What turns it into a lost run is carrying on regardless. A run that spends its whole budget is not cancelled politely — the job is killed, and what survives is whatever `agentic-rescue` can push: an unreviewed branch, a draft pull request, a `blocked` issue, and a human working out which half is done.
+
+Cut instead:
+
+1. **Pick the slice that reaches a green pull request on its own.** Not the slice already written — the slice that is coherent. A half-migrated call site is worse than an unmigrated one.
+2. **Land it, verified through every channel it owes.** A reduced scope changes nothing about the Verification Gate.
+3. **File the remainder**, one issue per slice, each able to reach green alone. The three splitting strategies above apply unchanged, and splitting the enablers off first is still the best of them.
+4. **Say what was cut**, in the pull request body and on the original issue, naming the new issue numbers. A remainder nobody can find is a remainder nobody does.
+5. **Set `Blocked by` only where a real ordering exists.** Slices touching different files are independent, and marking them blocked on each other serialises work that could run side by side.
+
+The original issue closes on its own merged pull request with its reduced scope stated. It stays open to track nothing — that is what the new issues are for, and an issue held open past its own merge defers every assignment behind it.
 
 ## Setting a dependency
 
@@ -184,4 +258,8 @@ recorded can be picked up in that window.
 - [ ] An issue that must stay out of the queue carries its own lifecycle label
 - [ ] `full-ci` left off unless the interaction-mode job is the only thing that could catch the regression — never on a backend-only issue, never where no interaction regression exists
 - [ ] If the issue has `full-ci`, the PR gets `full-ci` when opened
-- [ ] Labels set on creation: `ready,agent-task` unless the human specified otherwise or the issue must stay out of the queue
+- [ ] Open issues searched for this problem — none covers it, or the existing one was updated instead of a new one filed
+- [ ] Labels set on creation per the Labels table: `ready` only at high confidence, `agent-task` alone otherwise, unless the human specified something else
+- [ ] An issue held for confirmation carries `## Open question`
+- [ ] A finding or a scope cut carries `## Where found` and `## Why not fixed here`
+- [ ] A scope cut names its remainder issues in the pull request body and on the original issue

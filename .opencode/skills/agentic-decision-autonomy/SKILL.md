@@ -85,7 +85,7 @@ An earlier convention held a PR back for "significant churn". It cost a green, f
 
 An issue's title describes where the reporter noticed the problem, not where the problem lives. When the fix reaches deeper than the framing — a visual-coherence issue that turns out to need a simulation fix — implement the fix that is actually correct, say so in the PR body, and continue. A correct fix outside the framing beats an incorrect one inside it.
 
-The limit is relevance, not depth: fix what this issue's own change exposes. Unrelated defects noticed along the way become their own issues.
+The limit is relevance, not depth: fix what this issue's own change exposes. Unrelated defects noticed along the way become their own issues — reported into the run's follow-up register and filed at the end of the pipeline, per `agentic-issue-creation`. Recording one is not escalating: it never holds the PR and never delays the run's own issue.
 
 ## Recording format
 

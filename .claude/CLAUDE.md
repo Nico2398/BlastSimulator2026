@@ -129,6 +129,16 @@ A channel that belongs to CI is **covered**, never pending: an autonomous run ma
 
 Before acting, check whether the task needs a capability you lack (audio playback, binary analysis, a network the sandbox blocks) or asks you to write outside allowed directories. If so, state the gap and the agent or tool that covers it instead of improvising a workaround. Vision, browser automation, and shell are available — those are not gaps.
 
+## ▶ Follow-up Gate — work you found that is not your task
+
+| You found | You file |
+|-----------|----------|
+| A default you chose that a human may want to revisit | The decision — `agentic-decision-autonomy` |
+| Tech debt, a gap, or an inconsistency unrelated to your task | The finding — `agentic-issue-creation` |
+| That your own task is bigger than one run | The scope you cut, so the remainder is not lost — `agentic-issue-creation` |
+
+**Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you — it is filed after review, once every agent's findings are in.
+
 ## Validation Commands
 
 ```bash
