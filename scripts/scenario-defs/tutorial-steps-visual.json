@@ -240,11 +240,11 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "build-driving-center"
+          "stepId": "build-living-quarters"
         }
       ],
       "role": "player",
-      "description": "hire-driller complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553: the tutorial no longer goes straight from here to box-cut -- drilling became queued, vehicle-gated work, so the script now teaches the driving_center, the drill_rig licence and the rig itself first.",
+      "description": "hire-driller complete: Crew panel opened, Hire clicked. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553: the tutorial no longer goes straight from here to box-cut -- drilling became queued, vehicle-gated work, so the script now teaches the driving_center, the drill_rig licence and the rig itself first. #681: nor does it go straight to that grind any more -- build-living-quarters and set-early-policy land first, protecting the crew before the long stretch that used to run them into a revolt (#586's own fix shrank the drill grid to dodge this; this closes the actual gap.",
       "expect": {
         "equals": {
           "employeeCount": 2
@@ -252,7 +252,7 @@
         "changedBy": {
           "cash": -1000
         },
-        "tutorialStep": "build-driving-center"
+        "tutorialStep": "build-living-quarters"
       }
     },
     {
@@ -266,6 +266,78 @@
         }
       ],
       "role": "bootstrap"
+    },
+    {
+      "command": "build living_quarters at:13,4",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 13,
+          "z": 4
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "set-early-policy"
+        }
+      ],
+      "role": "player",
+      "description": "#681: build-living-quarters complete -- the tutorial's new step 3a-i. Placed right after hiring the driller, before the box-cut/drill-plan/charge/sequence stretch that runs this crew unmanaged for ~400 ticks: a tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee, instead of nowhere at all. First building of the scenario, so buildingCount settles at exactly 1.",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        },
+        "tutorialStep": "set-early-policy"
+      }
+    },
+    {
+      "command": "set_policy mode:shift_8h",
+      "timeout": 15,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "build-driving-center"
+        }
+      ],
+      "role": "player",
+      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so the building from the step above needs this policy applied to actually protect the crew through the grind that follows. Applying the default policy unchanged still counts, same as the later set-policy step.",
+      "expect": {
+        "tutorialStep": "build-driving-center"
+      }
     },
     {
       "command": "build driving_center at:10,8",

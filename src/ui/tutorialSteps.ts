@@ -82,6 +82,48 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 3: hire-driller ──
   createHireStep('hire-driller', 'tutorial.step4.title', 'tutorial.step4', 'driller'),
 
+  // ── Step 3a-i: build-living-quarters ──
+  // #681: the box-cut/drill-plan/charge/sequence stretch that follows runs
+  // this same 2-person crew continuously for ~400 ticks with nothing to
+  // protect their well-being. Nothing built this early forces a revolt on
+  // its own, but leaving the gap open does: #680's own survivability model
+  // only holds for a crew with a living_quarters and an applied policy, and
+  // neither existed anywhere in this tutorial's canonical order until here.
+  // Placed before the grind starts, not after well-being already cratered —
+  // by the time a real UI warning could fire, the mitigation these two new
+  // steps teach could no longer land in time to matter.
+  createComparisonStep(
+    'build-living-quarters',
+    'tutorial.step_livingquarters.title',
+    'tutorial.step_livingquarters',
+    (s) => countBuildingsOfType(s, 'living_quarters'),
+    ['build living_quarters at:13,4'],
+    TOOLBAR_TARGET.build,
+  ),
+
+  // ── Step 3a-ii: set-early-policy ──
+  // A living_quarters alone does not force anyone to use it: the modern
+  // rest path (forceShiftRestIfNeededByPolicy, GameLoop.ts) only engages
+  // once a policy has actually been applied (state.sitePolicy.revision > 0)
+  // — the default policy sitting unapplied in state is not enough. Same
+  // completion pattern as 'set-policy' below: applying the policy already
+  // in force still counts, so a player who reaches the later set-policy step
+  // just clicks Apply again.
+  {
+    id: 'set-early-policy',
+    titleKey: 'tutorial.step_earlypolicy.title',
+    textKey: 'tutorial.step_earlypolicy',
+    commands: ['set_policy mode:shift_8h'],
+    highlightTarget: TOOLBAR_TARGET.settings,
+    captureSnapshot: (state: GameState) => ({
+      policyRevision: state.sitePolicy?.revision ?? 0,
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const before = (snapshot.policyRevision as number | undefined) ?? 0;
+      return (state.sitePolicy?.revision ?? 0) > before;
+    },
+  },
+
   // ── Step 3b: build-driving-center ──
   // #553: drill_hole became a queued, vehicle-gated action -- a driller
   // physically drives a drill_rig to each hole -- but hiring only grants the

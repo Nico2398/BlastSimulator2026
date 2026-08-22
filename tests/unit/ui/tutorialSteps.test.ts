@@ -5,8 +5,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 29 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(29);
+  it('has exactly 31 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(31);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 

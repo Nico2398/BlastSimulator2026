@@ -212,6 +212,78 @@
         },
         {
           "type": "waitForTutorialStep",
+          "stepId": "build-living-quarters"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "build-living-quarters"
+      }
+    },
+    {
+      "command": "build living_quarters at:13,4",
+      "timeout": 30,
+      "description": "#681: build-living-quarters complete -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge/sequence stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 13,
+          "z": 4
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "set-early-policy"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        },
+        "tutorialStep": "set-early-policy"
+      }
+    },
+    {
+      "command": "set_policy mode:shift_8h",
+      "timeout": 15,
+      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so this policy application is what actually makes the building above protect the crew through the grind that follows. Applying the default policy unchanged still counts, same as the later set-policy step.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "waitForTutorialStep",
           "stepId": "build-driving-center"
         }
       ],
