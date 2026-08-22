@@ -35,8 +35,9 @@ describe('buildEventContext (#592)', () => {
 
 describe('revolt end-condition is unconditional (#682)', () => {
   it('ends the level with worker_revolt once wellBeing holds at 0 for REVOLT_TICKS, with no disable path left', () => {
-    // #682 removed the "cheat disable_revolt" escape hatch (GameState's
-    // former revoltDisabled flag and events.ts's tick-loop guard around it).
+    // #682 removed the temporary revolt-suppression cheat (issue #631) —
+    // GameState's former revolt-disable flag and events.ts's tick-loop guard
+    // around it.
     // There is no code path left that can suppress this outcome once the
     // condition holds — the tick loop's revolt check
     // (`} else if (revolted) {`) is unconditional. This test drives that
