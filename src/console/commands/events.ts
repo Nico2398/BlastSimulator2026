@@ -40,7 +40,7 @@ import { updateArrest } from '../../core/campaign/CriminalArrest.js';
 import { updateRevolt } from '../../core/campaign/WorkerRevolt.js';
 import { checkLevelComplete } from '../../core/campaign/LevelTransition.js';
 import { snapshotStats } from '../../core/campaign/SuccessTracker.js';
-import { updateScores, type ScoreInputs } from '../../core/scores/ScoreManager.js';
+import { updateScores, reassertFloorIfCrisisActive, type ScoreInputs } from '../../core/scores/ScoreManager.js';
 import { CONTRACT_REFRESH_INTERVAL } from '../../core/config/balance.js';
 import { BASE_TICK_MS } from '../../core/engine/GameLoop.js';
 import {
@@ -168,15 +168,17 @@ export function tickCommand(
 
     // 7. Score updates — decay + building/morale/vibration effects
     const avgMorale = computeAverageMorale(state.employees.employees);
+    const recentAccidents = state.damage.accidents.filter(a => a.tick >= state.tickCount - 10).length;
     const scoreInputs: ScoreInputs = {
       buildings: state.buildings,
       avgMorale,
-      recentAccidents: state.damage.accidents.filter(a => a.tick >= state.tickCount - 10).length,
+      recentAccidents,
       hasSafetyEquipment: state.buildings.buildings.some(b => b.type === 'management_office'),
       maxRecentVibration: 0,
       employeeCount: state.employees.employees.length,
     };
     updateScores(state.scores, scoreInputs);
+    reassertFloorIfCrisisActive(state.scores, recentAccidents);
 
     // 8. Employee needs — drain gauges, update morale, check collapse
     for (const emp of state.employees.employees) {
