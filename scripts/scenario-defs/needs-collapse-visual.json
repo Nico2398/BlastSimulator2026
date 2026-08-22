@@ -1,6 +1,6 @@
 {
   "name": "needs-collapse-visual",
-  "description": "Visual check of collapse state: dispatch an employee to work so need gauges drain at the working rate and no rest can be claimed, drive fatigue below the collapse threshold (≤5), verify the employee is flagged COLLAPSING in state and rendered with the collapsing row style, then build living_quarters and advance ticks to confirm rest recovery and a return to normal task dispatch",
+  "description": "Visual check of collapse state: dispatch an employee to work so need gauges drain at the working rate and no rest can be claimed, drive fatigue below the collapse threshold (\u22645), verify the employee is flagged COLLAPSING in state and rendered with the collapsing row style, then build living_quarters and advance ticks to confirm rest recovery and a return to normal task dispatch",
   "steps": [
     {
       "command": "new_game seed:42 cash:100000",
@@ -118,7 +118,7 @@
           "command": "employee dispatch 2 x:34 z:32"
         }
       ],
-      "description": "#680 follow-up: Stan (id 2, blaster), like Walt, must be genuinely, continuously busy for his own later collapse checkpoint to stay reachable — autoInsertNeedTasks now auto-routes ANY fully idle employee (with or without a living_quarters anywhere on the map) into a same-tick, zero-distance, zero-drain ground-rest the instant a gauge dips under its warning threshold, so an employee left idle the whole file can no longer collapse at all (direct probe, GameLoop.ts). A busy employee's queued rest stays unclaimed instead, so genuine neglect (no idle window, no living_quarters yet) still bites. Repeated ahead of each tick block below to keep him continuously dispatched the same way Walt is, right up to the collapse checkpoint (#593's note, below, on why it's specifically Stan's crossing).",
+      "description": "#680 follow-up: Stan (id 2, blaster), like Walt, must be genuinely, continuously busy for his own later collapse checkpoint to stay reachable \u2014 autoInsertNeedTasks now auto-routes ANY fully idle employee (with or without a living_quarters anywhere on the map) into a same-tick, zero-distance, zero-drain ground-rest the instant a gauge dips under its warning threshold, so an employee left idle the whole file can no longer collapse at all (direct probe, GameLoop.ts). A busy employee's queued rest stays unclaimed instead, so genuine neglect (no idle window, no living_quarters yet) still bites. Repeated ahead of each tick block below to keep him continuously dispatched the same way Walt is, right up to the collapse checkpoint (#593's note, below, on why it's specifically Stan's crossing).",
       "role": "bootstrap",
       "expect": {
         "equals": {
@@ -171,7 +171,7 @@
           "command": "employee dispatch 2 x:34 z:32"
         }
       ],
-      "description": "See the first Stan dispatch above — keeps him continuously busy across this handoff too.",
+      "description": "See the first Stan dispatch above \u2014 keeps him continuously busy across this handoff too.",
       "role": "bootstrap",
       "expect": {
         "equals": {
@@ -254,7 +254,7 @@
           "command": "employee dispatch 2 x:34 z:32"
         }
       ],
-      "description": "See the first Stan dispatch above — keeps him continuously busy across this handoff too.",
+      "description": "See the first Stan dispatch above \u2014 keeps him continuously busy across this handoff too.",
       "role": "bootstrap",
       "expect": {
         "equals": {
@@ -317,7 +317,7 @@
           "command": "employee dispatch 2 x:34 z:32"
         }
       ],
-      "description": "See the first Stan dispatch above — keeps him continuously busy across this handoff too.",
+      "description": "See the first Stan dispatch above \u2014 keeps him continuously busy across this handoff too.",
       "role": "bootstrap",
       "expect": {
         "equals": {
@@ -338,7 +338,7 @@
         "equals": {
           "collapsedCount": 0
         },
-        "note": "still recovered, no new collapse — Stan is kept continuously dispatched (working-rate drain) rather than idling, same as Walt, and stays above the collapse threshold through this batch"
+        "note": "still recovered, no new collapse \u2014 Stan is kept continuously dispatched (working-rate drain) rather than idling, same as Walt, and stays above the collapse threshold through this batch"
       }
     },
     {
@@ -418,7 +418,7 @@
           "command": "employee dispatch 2 x:34 z:32"
         }
       ],
-      "description": "See the first Stan dispatch above — keeps him continuously busy right up to this checkpoint.",
+      "description": "See the first Stan dispatch above \u2014 keeps him continuously busy right up to this checkpoint.",
       "role": "bootstrap",
       "expect": {
         "equals": {
@@ -427,51 +427,19 @@
       }
     },
     {
-      "command": "tick 20",
+      "command": "tick 5",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 20"
+          "command": "tick 5"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
           "collapsedCount": 0
-        },
-        "note": "#680 follow-up (supersedes the old #593 note): the collapse-recovery equivalent for Stan is real, but no longer through idle drain plus LQ proximity, and no longer lands inside this particular batch. #680's resting=0 drain fix means autoInsertNeedTasks now saves ANY idle employee the same tick their gauge dips under warning (self-targeted, zero-distance ground-rest, holds flat for the rest's whole duration), with or without a living_quarters anywhere on the map, so a purely idle Stan could no longer collapse at all (direct probe, GameLoop.ts). He is now kept continuously dispatched instead (see the bootstrap steps above), which drains at the faster working rate uninterrupted by any auto-claimed rest — a queued rest for a busy employee stays unclaimed — so tickCollapse's own unconditional threshold check still fires for real, unrelieved neglect; it just fires two steps later than the old idle-drain timing did (see the tick 30 step below) — re-derived from a real run, not assumed."
+        }
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "employee list",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee list"
-        }
-      ],
-      "role": "observe"
-    },
-    {
-      "command": "needs",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "needs"
-        }
-      ],
-      "role": "observe"
     },
     {
       "command": "employee dispatch 2 x:34 z:32",
@@ -481,15 +449,113 @@
           "command": "employee dispatch 2 x:34 z:32"
         }
       ],
-      "description": "See the first Stan dispatch above — keeps him continuously busy across this final handoff too.",
-      "role": "bootstrap"
+      "description": "See the first Stan dispatch above -- keeps him continuously busy right up to this checkpoint.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
     },
     {
-      "command": "tick 30",
+      "command": "tick 5",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 30"
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 2 x:34 z:32",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:34 z:32"
+        }
+      ],
+      "description": "See the first Stan dispatch above -- keeps him continuously busy right up to this checkpoint.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 2 x:34 z:32",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:34 z:32"
+        }
+      ],
+      "description": "See the first Stan dispatch above -- keeps him continuously busy right up to this checkpoint.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 5",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 5"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 2 x:34 z:32",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:34 z:32"
+        }
+      ],
+      "description": "See the first Stan dispatch above -- keeps him continuously busy right up to this checkpoint.",
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "collapsedCount": 0
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
         }
       ],
       "role": "setup",
@@ -498,7 +564,7 @@
           "collapsedCount": 1,
           "buildingCount": 1
         },
-        "note": "genuine collapse lands here: Stan, kept continuously dispatched (working-rate drain, no idle window for an auto-claimed rest to save him), crosses his collapse threshold partway through this batch (a real run logs 'NEED: employee_collapsed' at cumulative tick 207) — re-derived from that real run, not assumed. This is the collapsing-row visual checkpoint (see 'collapse-state' shot) — it no longer coincides with the old idle-drain-plus-LQ-proximity timing (#593), it lands two batches later under continuous forced work instead."
+        "note": "#700 follow-up: replenishment now applies its rate for a rest's own full duration, so a completed rest recovers much more than before -- keeping Stan continuously re-dispatched every 5 ticks (rather than the old single 20/30-tick gaps) closes the idle window an auto-claimed rest could otherwise slip into and recover him. Under this tighter cadence he still crosses the collapse threshold from continuous working-rate drain with no rest ever claimed (a real run confirms 'NEED: employee_collapsed' fires within this final batch). This is the collapsing-row visual checkpoint (see 'collapse-state' shot)."
       }
     },
     {
