@@ -4658,7 +4658,13 @@
           "command": "tick 1"
         }
       ],
-      "role": "setup"
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 48,
+          "orderedChargeCount": 0
+        }
+      }
     },
     {
       "command": "event choose 0",
