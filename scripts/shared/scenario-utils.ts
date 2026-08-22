@@ -144,8 +144,8 @@ const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], nu
  * is correct by construction, not by remembering to raise a second number to
  * match the first.
  *
- * `tests/unit/scenario-defs.test.ts`'s own outer/inner regression check
- * stays alongside this as a second, independent guard — this derives the
+ * `tests/unit/scenario-defs-interaction-actions.test.ts`'s own outer/inner
+ * regression check stays alongside this as a second, independent guard — this derives the
  * value the runners actually race against; that test catches a scenario
  * file whose *declared* `timeout` reads as misleadingly low to a human
  * editing it, even though the runners themselves no longer act on it alone.
