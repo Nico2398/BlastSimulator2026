@@ -215,14 +215,6 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'weather set',
   'weather',
   'event fire',
-  // TEMPORARY (cheats.ts): unblocks blast-execution-visual.json and
-  // blast-visual-full.json, whose crews are genuinely undersized for their
-  // own workload and hit a deterministic worker revolt before finishing —
-  // not a UI gap a real click could stand in for, since the revolt is a
-  // core-simulation outcome with no control to avert it. Tracked for
-  // removal, alongside a real fix to that crew-sizing/revolt-margin gap, in
-  // issue #631.
-  'cheat disable_revolt',
   // Broader than the others on purpose, for two independent reasons:
   //  1. `corrupt target:X cost:Y` — the scenario overrides the bribe's cost
   //     to hit an exact scripted cash delta; ShadyPanel's real "Make the
