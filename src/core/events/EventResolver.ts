@@ -24,6 +24,8 @@ export interface ResolutionResult {
   scoreChanges: Partial<Record<keyof ScoreState, number>>;
   corruptionChange: number;
   followUpQueued: string | null;
+  /** True when the resolved (post-probability-roll) consequence is tagged `resolvesDeathCrisis` (#698) — see EventConsequence's own doc comment. */
+  resolvesDeathCrisis: boolean;
 }
 
 /**
@@ -182,5 +184,6 @@ function applyConsequence(
     scoreChanges,
     corruptionChange,
     followUpQueued,
+    resolvesDeathCrisis: c.resolvesDeathCrisis === true,
   };
 }

@@ -13,7 +13,8 @@ export function ev(
     canFire?: (ctx: EventContext) => boolean;
     options: Array<{ cashDelta?: number; scoreDelta?: Partial<Record<keyof ScoreState, number>>;
       corruptionDelta?: number; followUp?: string; effectTag?: string;
-      probability?: number; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>; }>;
+      probability?: number; alt?: Omit<EventConsequence, 'probability' | 'altConsequence'>;
+      resolvesDeathCrisis?: boolean; }>;
   },
 ): EventDef {
   return {
@@ -31,6 +32,7 @@ export function ev(
       if (o.effectTag !== undefined) c.effectTag = o.effectTag;
       if (o.probability !== undefined) c.probability = o.probability;
       if (o.alt !== undefined) c.altConsequence = o.alt;
+      if (o.resolvesDeathCrisis !== undefined) c.resolvesDeathCrisis = o.resolvesDeathCrisis;
       return c;
     }),
     weightCoeff: opts.weight,

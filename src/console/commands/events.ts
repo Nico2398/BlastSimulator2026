@@ -181,20 +181,26 @@ export function tickCommand(
     // #698: recentAccidents (above) is windowed to the last 10 ticks, which
     // is right for the sfDelta hit but wrong for deciding whether the
     // post-death safety floor is still active — interaction-mode tick drift
-    // means a positive `safety` delta from an unrelated resolved event (an
-    // EventResolver.applyConsequence write, which bypasses this floor
-    // entirely) can land 36+ ticks after the accident that set the floor,
-    // well outside that window. crisisActiveCount is unbounded in time
-    // instead: a death keeps the floor engaged for as long as no deliberate
-    // recovery (see the 'choose' case above / DamageState.
-    // lastSafetyRecoveryTick) has resolved since, and a later death re-arms
-    // it even after a recovery.
+    // means a resolved consequence tagged `resolvesDeathCrisis` can land
+    // 36+ ticks after the accident that set the floor, well outside that
+    // window. crisisActiveCount is unbounded in time instead: a death keeps
+    // the floor engaged for as long as no deliberate recovery (see the
+    // 'choose' case above / DamageState.lastSafetyRecoveryTick) has resolved
+    // since, and a later death re-arms it even after a recovery.
     const lastDeathTick = state.damage.accidents.reduce(
       (max, a) => (a.type === 'death' && a.tick > max ? a.tick : max), -1,
     );
+    // `== null` (not `===`) deliberately treats a legacy save's missing
+    // lastSafetyRecoveryTick (serialized before #698 added the field —
+    // deserializes as `undefined`, not `null`) the same as "no recovery has
+    // ever happened" — same safe-defaulting precedent as GameState.ts's
+    // `revoltDisabled` field. No SAVE_VERSION bump/migration needed: the
+    // field already defaults to the correct "crisis still active" reading
+    // for a pre-existing save with deathCount > 0, which is what closes the
+    // gap this fix targets rather than reopening it for old saves.
     const recoveryTick = state.damage.lastSafetyRecoveryTick;
     const crisisActiveCount =
-      state.damage.deathCount > 0 && (recoveryTick === null || recoveryTick < lastDeathTick) ? 1 : 0;
+      state.damage.deathCount > 0 && (recoveryTick == null || recoveryTick < lastDeathTick) ? 1 : 0;
     reassertFloorIfCrisisActive(state.scores, crisisActiveCount);
 
     // 8. Employee needs — drain gauges, update morale, check collapse
@@ -563,15 +569,17 @@ export function eventCommand(
       if (result.corruptionChange !== 0) {
         state.corruption.level += result.corruptionChange;
       }
-      // #698: a chosen consequence that both raises `safety` and costs cash
-      // is the only "deliberate recovery" signal the current event data
-      // carries (LawsuitEvents1.ts's settle_death_suit/memorial_fund/
-      // plea_deal/etc. are all shaped this way — see DamageState.
-      // lastSafetyRecoveryTick's own doc comment). Record it so tickCommand's
-      // post-death floor reassertion doesn't re-pin `safety` back to 0 on the
-      // very next tick and silently erase the recovery the player just paid for.
-      const safetyGain = result.scoreChanges['safety'];
-      if (safetyGain !== undefined && safetyGain > 0 && result.cashChange < 0) {
+      // #698: stamp lastSafetyRecoveryTick only for a consequence explicitly
+      // tagged `resolvesDeathCrisis` (EventConsequence's own doc comment) —
+      // NOT inferred from a positive safety delta paired with a cash cost.
+      // That shape is common to many unrelated options (OSHA fines, weather
+      // payouts, bribes) that aren't gated on deathCount at all; stamping on
+      // any of those would wrongly lift the post-death floor for a payout
+      // that has nothing to do with the death. Only options tagged in the
+      // event data itself (e.g. LawsuitEvents1.ts's settle_death_suit/
+      // memorial_fund/plea_deal) count as the deliberate, paid-for
+      // resolution tickCommand's floor reassertion is waiting for.
+      if (result.resolvesDeathCrisis) {
         state.damage.lastSafetyRecoveryTick = state.tickCount;
       }
       // Resume the game after resolving the event (tick pauses on event)

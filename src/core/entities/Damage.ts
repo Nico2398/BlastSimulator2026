@@ -50,12 +50,16 @@ export interface DamageState {
   /** Total number of blasts detonated in this session. */
   blastCount: number;
   /**
-   * Tick of the most recent *deliberate* safety-recovery event consequence —
-   * a chosen ("event choose") outcome that both raises `safety` and costs
-   * cash, the only signal the current event data (LawsuitEvents1.ts's
-   * settle_death_suit/memorial_fund/plea_deal/etc.) carries for "the player
-   * paid to fix this" as opposed to an incidental score nudge. `null` until
-   * the first such resolution. Consumed by tickCommand (src/console/commands/
+   * Tick of the most recent chosen ("event choose") consequence explicitly
+   * tagged `resolvesDeathCrisis` (EventConsequence's own doc comment,
+   * EventPool.ts) — e.g. LawsuitEvents1.ts's settle_death_suit/memorial_fund/
+   * plea_deal. Not inferred from delta shape (a positive `safety` change
+   * paired with a cash cost also matches many unrelated options — OSHA
+   * fines, weather payouts, bribes — that must NOT lift the floor). `null`
+   * until the first such resolution; a legacy save serialized before this
+   * field existed deserializes it as `undefined`, which tickCommand treats
+   * identically to `null` via `== null` (no migration needed — see that
+   * call site's own comment). Consumed by tickCommand (src/console/commands/
    * events.ts) to decide whether the post-death safety floor (#698) is still
    * active: a death after this tick re-arms it, a recovery after the last
    * death lifts it. Time-unbounded by design — not reset or windowed by tick.

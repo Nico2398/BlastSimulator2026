@@ -44,6 +44,17 @@ export interface EventConsequence {
   probability?: number;
   /** Alternative consequence if probability fails. */
   altConsequence?: EventConsequence;
+  /**
+   * Marks this option as the deliberate, paid-for resolution of an active
+   * death-safety crisis (#698) — choosing it is what lifts
+   * `reassertFloorIfCrisisActive`'s post-death safety floor, as opposed to
+   * any other option that merely happens to raise `safety` alongside a cash
+   * cost (a fine, a bribe, an unrelated settlement). Set only on options
+   * genuinely gated on `deathCount` and intended as that gate's payoff —
+   * see LawsuitEvents1.ts's `lawsuit_wrongful_death`/`lawsuit_criminal_negligence`.
+   * Never inferred from delta shape; must be explicit per option.
+   */
+  resolvesDeathCrisis?: boolean;
 }
 
 export interface EventDef {

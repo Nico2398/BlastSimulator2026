@@ -9,9 +9,9 @@ export const LAWSUIT_EVENTS_1: EventDef[] = [
     weight: (s) => 1.5 + 2.0 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.deathCount >= 1,
     options: [
-      { cashDelta: -200000, scoreDelta: { safety: 5 }, effectTag: 'settle_death_suit' },
+      { cashDelta: -200000, scoreDelta: { safety: 5 }, effectTag: 'settle_death_suit', resolvesDeathCrisis: true },
       { cashDelta: -50000, corruptionDelta: 25, effectTag: 'intimidate_family' },
-      { cashDelta: -120000, scoreDelta: { safety: 10, wellBeing: 5 }, effectTag: 'memorial_fund' },
+      { cashDelta: -120000, scoreDelta: { safety: 10, wellBeing: 5 }, effectTag: 'memorial_fund', resolvesDeathCrisis: true },
     ],
   }),
   // 2 — Workers' class action for unsafe conditions
@@ -50,7 +50,7 @@ export const LAWSUIT_EVENTS_1: EventDef[] = [
     weight: (s) => 2.5 + 3.0 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.deathCount >= 3 || (ctx.lawsuitCount >= 5 && ctx.scores.safety < 20),
     options: [
-      { cashDelta: -300000, scoreDelta: { safety: 20 }, effectTag: 'plea_deal' },
+      { cashDelta: -300000, scoreDelta: { safety: 20 }, effectTag: 'plea_deal', resolvesDeathCrisis: true },
       { cashDelta: -50000, probability: 0.3,
         alt: { cashDelta: -500000, effectTag: 'found_guilty' } },
       { cashDelta: -100000, corruptionDelta: 40, effectTag: 'flee_jurisdiction' },
