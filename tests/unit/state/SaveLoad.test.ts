@@ -381,31 +381,32 @@ describe('deserialize — v11→v12 migration for GameState.plannedChargesByHole
   });
 });
 
-// ── v12→v13 migration for ScoreState.decayRate / RevoltState.immune (#555) ──
+// ── v12→v13 migration for ScoreState.decayRate (#555, immune removed #681) ──
 // SAVE_VERSION bumped 12→13 for GameState.plannedRamps/nextPlannedRampId, but
-// the same #555 branch also added ScoreState.decayRate and
-// RevoltState.immune, persisted verbatim with no dedicated version bump. A
-// pre-v13 save has neither field — decayRate must default to the global
-// SCORE_DECAY_RATE constant (matching createScoreState's own default) and
-// immune to false (matching createRevoltState's own default), or a later
-// tick's applyDecay computes `value +/- undefined` and pins the score at NaN
-// forever.
+// the same #555 branch also added ScoreState.decayRate, persisted verbatim
+// with no dedicated version bump. A pre-v13 save has no decayRate field — it
+// must default to the global SCORE_DECAY_RATE constant (matching
+// createScoreState's own default), or a later tick's applyDecay computes
+// `value +/- undefined` and pins the score at NaN forever.
+//
+// #555 also added RevoltState.immune; #681 removed the field entirely (the
+// tutorial's revolt exemption is gone now that #680 rebalanced well-being to
+// be survivable without it). The migration must not touch `immune` in any
+// way — old saves carrying a stray `immune` key are simply left with a
+// `revolt` object that has no such field once deserialized.
 
-describe('deserialize — v12→v13 migration for ScoreState.decayRate / RevoltState.immune (#555)', () => {
-  it('a v12 save missing scores.decayRate and revolt.immune migrates to the createGame defaults', () => {
+describe('deserialize — v12→v13 migration for ScoreState.decayRate (#555)', () => {
+  it('a v12 save missing scores.decayRate migrates to the createGame default', () => {
     const state = createGame({ seed: 42 });
     const json = serialize(state);
     const parsed = JSON.parse(json) as Record<string, unknown>;
     parsed['version'] = 12;
     const scoresRaw = parsed['scores'] as Record<string, unknown>;
-    const revoltRaw = parsed['revolt'] as Record<string, unknown>;
     delete scoresRaw['decayRate'];
-    delete revoltRaw['immune'];
 
     const restored = deserialize(JSON.stringify(parsed));
 
     expect(restored.scores.decayRate).toBe(SCORE_DECAY_RATE);
-    expect(restored.revolt.immune).toBe(false);
   });
 
   it('a tick after migration never drives a score to NaN', () => {
@@ -418,9 +419,7 @@ describe('deserialize — v12→v13 migration for ScoreState.decayRate / RevoltS
     const parsed = JSON.parse(json) as Record<string, unknown>;
     parsed['version'] = 12;
     const scoresRaw = parsed['scores'] as Record<string, unknown>;
-    const revoltRaw = parsed['revolt'] as Record<string, unknown>;
     delete scoresRaw['decayRate'];
-    delete revoltRaw['immune'];
 
     const restored = deserialize(JSON.stringify(parsed));
     updateScores(restored.scores, {
@@ -438,7 +437,7 @@ describe('deserialize — v12→v13 migration for ScoreState.decayRate / RevoltS
     expect(Number.isNaN(restored.scores.nuisance)).toBe(false);
   });
 
-  it('a pre-v12 save (never had decayRate/immune at all) migrates cleanly through the full chain', () => {
+  it('a pre-v12 save (never had decayRate at all) migrates cleanly through the full chain', () => {
     const state = createGame({ seed: 42 });
     const json = serialize(state);
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -448,26 +447,38 @@ describe('deserialize — v12→v13 migration for ScoreState.decayRate / RevoltS
     delete parsed['plannedRamps'];
     delete parsed['nextPlannedRampId'];
     const scoresRaw = parsed['scores'] as Record<string, unknown>;
-    const revoltRaw = parsed['revolt'] as Record<string, unknown>;
     delete scoresRaw['decayRate'];
-    delete revoltRaw['immune'];
 
     const restored = deserialize(JSON.stringify(parsed));
 
     expect(restored.scores.decayRate).toBe(SCORE_DECAY_RATE);
-    expect(restored.revolt.immune).toBe(false);
   });
 
-  it('a v13+ save with decayRate/immune already set is left untouched by the migration (regression)', () => {
+  it('a v13+ save with decayRate already set is left untouched by the migration (regression)', () => {
     const state = createGame({ seed: 42 });
     state.scores.decayRate = 0.01;
-    state.revolt.immune = true;
 
     const json = serialize(state);
     const restored = deserialize(json);
 
     expect(restored.scores.decayRate).toBe(0.01);
-    expect(restored.revolt.immune).toBe(true);
+  });
+
+  it('a save carrying a stray legacy revolt.immune key deserializes to a revolt object with no immune field (#681)', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const revoltRaw = parsed['revolt'] as Record<string, unknown>;
+    revoltRaw['immune'] = false;
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect('immune' in restored.revolt).toBe(false);
+  });
+
+  it('a freshly created GameState.revolt has no immune property (#681)', () => {
+    const state = createGame({ seed: 42 });
+    expect('immune' in state.revolt).toBe(false);
   });
 });
 

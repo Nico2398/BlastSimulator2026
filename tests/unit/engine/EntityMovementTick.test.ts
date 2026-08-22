@@ -353,6 +353,80 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     expect(vehicle.x).toBe(2);
     expect(vehicle.z).toBe(1);
   });
+
+  // #689: an idle, driverless vehicle parked exactly on ANOTHER vehicle's
+  // target cell is the one obstacle no reroute can ever route around — the
+  // destination itself is occupied, so every path (direct or detoured) is
+  // blocked, and the pre-fix code escalated straight to permanently stuck.
+  // Driving a vehicle was never actually licence-gated (only claiming its
+  // role-specific task was — isLicensedForRole/findFreeVehicleForRole), so
+  // the fix relocates an idle, unreserved blocker instead of giving up.
+
+  it('relocates an idle, unreserved blocker parked on the target cell itself instead of escalating to stuck, and the vehicle then reaches its target (#689)', () => {
+    const state = buildCorridorState();
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 2;
+    vehicle.targetZ = 1;
+
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
+    blocker.task = 'idle';
+    blocker.state = 'idle';
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
+
+    const MAX_TICKS = VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 20;
+    let ticks = 0;
+    while (!(vehicle.x === 2 && vehicle.z === 1 && vehicle.task === 'idle') && ticks < MAX_TICKS) {
+      tickVehicle(state, vehicle, emitter);
+      tickVehicle(state, blocker, emitter);
+      ticks++;
+    }
+
+    expect(vehicle.x).toBe(2);
+    expect(vehicle.z).toBe(1);
+    expect(vehicle.task).toBe('idle');
+    expect(vehicle.isMoveStuck).toBe(false);
+    expect(stuckEvents).toEqual([]);
+
+    // The blocker actually moved off the target cell — the vehicle did not
+    // somehow reach it while still occupied.
+    expect(blocker.x === 2 && blocker.z === 1).toBe(false);
+  });
+
+  it('does not relocate a blocker reserved for a pending action, and still escalates to stuck (#689 guard)', () => {
+    const state = buildCorridorState();
+
+    const { vehicle } = purchaseVehicle(state.vehicles, 'rock_digger', 0, 1);
+    vehicle.task = 'moving';
+    vehicle.state = 'moving';
+    vehicle.targetX = 2;
+    vehicle.targetZ = 1;
+
+    // Idle but reserved for a pending action — a driver is about to claim it,
+    // so it must not be shoved aside as if it were free to move.
+    const { vehicle: blocker } = purchaseVehicle(state.vehicles, 'drill_rig', 2, 1);
+    blocker.task = 'idle';
+    blocker.state = 'idle';
+    blocker.reservedForActionId = 1;
+
+    const emitter = new EventEmitter();
+    const stuckEvents: number[] = [];
+    emitter.on('vehicle:stuck', ({ vehicleId }) => stuckEvents.push(vehicleId));
+
+    for (let i = 0; i < 1 + VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 2; i++) {
+      tickVehicle(state, vehicle, emitter);
+    }
+
+    expect(vehicle.isMoveStuck).toBe(true);
+    expect(stuckEvents).toEqual([vehicle.id]);
+    expect(blocker.x).toBe(2); // never relocated
+    expect(blocker.z).toBe(1);
+  });
 });
 
 // ── Task 2.8: Vehicle.waitingTicks tracking ──────────────────────────────────
