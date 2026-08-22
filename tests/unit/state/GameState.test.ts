@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction, ActionType, GhostPreview } from '../../../src/core/state/GameState.js';
@@ -31,6 +33,27 @@ describe('createGame', () => {
   it('uses provided config values', () => {
     const state = createGame({ seed: 99 });
     expect(state.seed).toBe(99);
+  });
+
+  it('GameConfig interface no longer declares revoltImmune (#681)', () => {
+    // GameConfig.revoltImmune is already dead at runtime — createGame never
+    // reads it (createRevoltState() takes no args). The only remaining
+    // trace is the type declaration itself; tests/ is excluded from
+    // tsconfig.json's typecheck scope (`npm run typecheck` only covers
+    // src/ and scripts/), so a source-text scan is the one way to lock in
+    // that the field was actually deleted, not just left unused.
+    const source = readFileSync(
+      join(process.cwd(), 'src/core/state/GameState.ts'),
+      'utf8',
+    );
+    const configInterfaceMatch = source.match(/export interface GameConfig \{[\s\S]*?\n\}/);
+    expect(configInterfaceMatch).not.toBeNull();
+    expect(configInterfaceMatch![0]).not.toMatch(/revoltImmune/);
+  });
+
+  it('a constructed GameState has no immune field on its revolt sub-state (#681)', () => {
+    const state = createGame({ seed: 42 });
+    expect('immune' in state.revolt).toBe(false);
   });
 });
 
