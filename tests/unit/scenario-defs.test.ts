@@ -1273,3 +1273,63 @@ describe('The 3 known un-converted player steps are converted to real UI interac
     });
   }
 });
+
+// ──────────────────────────────────────────────
+// 17. blast-visual-full.json's H1/H2 charge-override steps use clickIfPresent
+// for their per-hole commit button, not clickSelector (issue #694).
+//
+// Both steps' final interaction action targets a specific hole's
+// `[data-action="charge-hole"]` button. Whether that hole was even drilled
+// this run is nondeterministic (mirrors the class of beat already fixed for
+// blast-execution-visual.json's "straggler sweep" steps in #693, resolving
+// #682) — `clickSelector` throws when the selector never appears, while
+// `clickIfPresent` no-ops. The documented convention for this exact class of
+// beat (`.claude/rules/scenario-defs.md`'s interaction-actions table) is
+// `clickIfPresent`.
+// ──────────────────────────────────────────────
+describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole button with clickIfPresent (#694)', () => {
+  const TARGETS = [
+    {
+      command: 'charge hole:H1 explosive:boomite amount:8 stemming:3',
+      selector: '#bs-blast-panel [data-hole="H1"] [data-action="charge-hole"]',
+    },
+    {
+      command: 'charge hole:H2 explosive:boomite amount:3 stemming:1',
+      selector: '#bs-blast-panel [data-hole="H2"] [data-action="charge-hole"]',
+    },
+  ] as const;
+
+  for (const { command, selector } of TARGETS) {
+    it(`step with command "${command}" — final interaction action targeting "${selector}" is type "clickIfPresent"`, () => {
+      const scenario = loadScenarioDef('blast-visual-full', SCENARIO_DIR);
+      const step = scenario.steps.find(s => (s as ScenarioStepDef).command === command) as ScenarioStepDef | undefined;
+      expect(step, `no step found with command "${command}" — has the command string changed?`).toBeDefined();
+      expect(step!.interaction, `step "${command}" must have an interaction array`).toBeDefined();
+      expect(step!.interaction!.length).toBeGreaterThan(0);
+
+      const finalAction = step!.interaction![step!.interaction!.length - 1];
+      expect(
+        'selector' in finalAction && finalAction.selector,
+        `step "${command}"'s final interaction action should target "${selector}", got ${JSON.stringify(finalAction)}`,
+      ).toBe(selector);
+      expect(
+        finalAction.type,
+        `step "${command}"'s final action (selector "${selector}") must be "clickIfPresent", not "${finalAction.type}" — the hole it targets is not guaranteed to exist this run`,
+      ).toBe('clickIfPresent');
+    });
+
+    it(`step with command "${command}" — every OTHER interaction action is unchanged (still clickSelector or assert)`, () => {
+      const scenario = loadScenarioDef('blast-visual-full', SCENARIO_DIR);
+      const step = scenario.steps.find(s => (s as ScenarioStepDef).command === command) as ScenarioStepDef | undefined;
+      expect(step, `no step found with command "${command}"`).toBeDefined();
+      const actions = step!.interaction!;
+      const precedingActions = actions.slice(0, -1);
+      for (const action of precedingActions) {
+        expect(
+          ['clickSelector', 'assert'],
+          `step "${command}" — preceding action ${JSON.stringify(action)} changed type unexpectedly`,
+        ).toContain(action.type);
+      }
+    });
+  }
+});
