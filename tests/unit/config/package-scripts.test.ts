@@ -34,7 +34,7 @@ describe('integration & scenario npm scripts (8.8)', () => {
 
     it('runs the scenario-defs test suite', () => {
       const script = pkg.scripts['test:scenarios'];
-      expect(script).toContain('tests/unit/scenario-defs.test.ts');
+      expect(script).toContain('tests/unit/scenario-defs*.test.ts');
     });
   });
 });
