@@ -8,12 +8,12 @@
 // escalate to stuck if no such route exists.
 
 import type { GameState } from '../state/GameState.js';
-import { getVehicleDefByTier, type Vehicle } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, moveVehicle, type Vehicle } from '../entities/Vehicle.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { findPath, type PathResult } from '../nav/Pathfinding.js';
 import { advanceAlongPath, type AdvanceAlongPathOutcome } from '../nav/AgentAdvance.js';
 import { VEHICLE_OCCUPANCY_REROUTE_THRESHOLD } from '../config/balance.js';
-import { markVehicleWaiting, setVehicleIdle } from './EntityMovementTick.js';
+import { markVehicleWaiting, setVehicleIdle, isCellOccupiedByOtherVehicle } from './EntityMovementTick.js';
 
 /**
  * Applies an advanceAlongPath outcome to a vehicle: position, moving state,
@@ -82,12 +82,86 @@ export function handleVehicleOccupancyBlock(
     return;
   }
 
-  // No route avoids the obstacle either — escalate to stuck, same
-  // rising-edge emit pattern as tickVehicleOnNavGrid's !outcome.pathFound branch.
+  // #689: every route to the target is blocked by a live vehicle, including
+  // the destination cell itself — a permanent deadlock (a driver reassigned
+  // mid-drilling can leave a vehicle idle on exactly the tile a *different*
+  // pending action needs). Driving a vehicle has never actually required its
+  // role licence — isLicensedForRole/findFreeVehicleForRole only gate
+  // *claiming a vehicle-gated task* (drilling, digging, hauling), and
+  // canTickVehicle below moves a vehicle on task alone, no driver required —
+  // so any employee can already move one out of the way. Relocate an idle,
+  // unreserved blocker sitting on the target rather than escalate to stuck:
+  // once it clears, this same reroute attempt succeeds on a later tick. A
+  // blocker that is reserved, mid-task, or has nowhere free to go will never
+  // clear on its own — fall through to the same stuck escalation as any
+  // other deadlock rather than wait on it forever.
+  const blocker = state.vehicles.vehicles.find(
+    v => v.id !== vehicle.id && v.x === vehicle.targetX && v.z === vehicle.targetZ,
+  );
+  if (blocker) {
+    if (blocker.task === 'moving') {
+      // Already relocating — this trigger or a prior tick's — give it time
+      // to clear rather than escalate mid-relocation.
+      return;
+    }
+    if (blocker.task === 'idle' && blocker.reservedForActionId === null) {
+      const freeCell = findNearestFreeCellForVehicle(state, blocker);
+      if (freeCell) {
+        moveVehicle(state.vehicles, blocker.id, freeCell.x, freeCell.z);
+        return;
+      }
+      // No free cell nearby either — nothing left to try, fall through.
+    }
+  }
+
+  // No route avoids the obstacle either, and nothing occupies the target
+  // itself that can be relocated — escalate to stuck, same rising-edge emit
+  // pattern as tickVehicleOnNavGrid's !outcome.pathFound branch.
   vehicle.isMoveStuck = true;
   if (!wasStuckBeforeTick) {
     emitter?.emit('vehicle:stuck', { vehicleId: vehicle.id });
   }
+}
+
+/**
+ * Nearest walkable, unoccupied NavGrid cell adjacent to `blocker`'s current
+ * position (#689) — an expanding ring search (immediate neighbours first,
+ * then two cells out) so a blocker wedged against another obstacle still
+ * finds somewhere to go. Returns null when nothing nearby qualifies (fully
+ * boxed in); the caller leaves the blocker in place and the stuck vehicle
+ * keeps waiting rather than escalating on a relocation that would fail anyway.
+ */
+function findNearestFreeCellForVehicle(state: GameState, blocker: Vehicle): { x: number; z: number } | null {
+  const grid = state.navGrid;
+  if (!grid) return null;
+
+  const bx = Math.floor(blocker.x);
+  const bz = Math.floor(blocker.z);
+  let best: { x: number; z: number } | null = null;
+  let bestDistSq = Infinity;
+
+  for (let radius = 1; radius <= 2; radius++) {
+    for (let x = bx - radius; x <= bx + radius; x++) {
+      for (let z = bz - radius; z <= bz + radius; z++) {
+        if (x === bx && z === bz) continue;
+        const onRing = Math.max(Math.abs(x - bx), Math.abs(z - bz)) === radius;
+        if (!onRing) continue;
+
+        const cell = grid.cellAt(x, z);
+        if (!cell || cell.type === 'blocked' || cell.type === 'void') continue;
+        if (isCellOccupiedByOtherVehicle(state, blocker, x, z)) continue;
+
+        const distSq = (x - bx) ** 2 + (z - bz) ** 2;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          best = { x, z };
+        }
+      }
+    }
+    if (best) return best;
+  }
+
+  return best;
 }
 
 /**
