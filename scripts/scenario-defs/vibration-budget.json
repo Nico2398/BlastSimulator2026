@@ -19,12 +19,12 @@
       }
     },
     {
-      "command": "new_game seed:42 size:96 cash:250000",
-      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill sites to add real travel time on top of an already-long 3-cycle file (campaign start has no staffed:true equivalent, and staffed:true itself doesn't fit here either -- see the drill_plan step below). size:96 keeps this step's original point (a bigger world than the plain new_game default above) without the campaign wrapper. Cash bumped to $250,000: 3 catastrophic blasts each need a fresh driller+drill_rig (see below), $36,000 a cycle, on top of payroll/upkeep during 3 separate drilling waits.",
+      "command": "new_game seed:42 size:96 cash:325000",
+      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill sites to add real travel time on top of an already-long 3-cycle file (campaign start has no staffed:true equivalent, and staffed:true itself doesn't fit here either -- see the drill_plan step below). size:96 keeps this step's original point (a bigger world than the plain new_game default above) without the campaign wrapper. Cash bumped to $250,000: 3 catastrophic blasts each need a fresh driller+drill_rig (see below), $36,000 a cycle, on top of payroll/upkeep during 3 separate drilling waits. #699: bumped again, $250,000 -> $325,000 -- the living_quarters/continuous-policy mitigation (see the hire-driller step below) makes this file's own crew survive by genuinely resting instead of grinding to a worker_revolt, but real forced rest roughly doubles this file's total duration (602 -> 1264 ticks, confirmed by direct run) and adds a building's own ongoing upkeep (getTotalOperatingCost, GameLoop.ts) for the whole extended run, neither of which existed against the old $250,000 budget. Direct probe confirmed cash crosses BANKRUPTCY_THRESHOLD ($5,000, balance.ts) and stays under it for the full BANKRUPTCY_GRACE_TICKS (100) during grid 3's own charge-drain wait (an Explosive Embargo event landing on top of an already-thin balance), tripping a real bankruptcy level-end -- invisible to command mode's own state-field assertions (which don't check `bankrupt`/`levelEndReason`) but fatal to interaction mode, whose full-screen LevelEndScreen overlay (`THE BANK HAS NOTICED`) covers the same panel selectors this file's later charge/sequence/blast steps click, exactly the class of gap #681 found for an unmitigated worker_revolt. $325,000 keeps this file's own lowest point (direct probe: final cash bottoms at -$25,334 under the old budget, no earlier point goes lower) safely above the $5,000 threshold throughout -- no cash `equals` checkpoint anywhere in this file depends on the old figure (this file's own convention keeps cash checks directional, see the cycle-2/cycle-3 `finances` steps' own notes), so this is the only line the bump touches.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:96 cash:250000"
+          "command": "new_game seed:42 size:96 cash:325000"
         }
       ],
       "role": "setup",
@@ -64,6 +64,17 @@
       }
     },
     {
+      "command": "cheat disable_revolt",
+      "description": "#699: same stopgap as blast-visual-full.json's own (issue #631) -- direct trace confirms `levelEnded:true, levelEndReason:'worker_revolt'` still fires deterministically, in both command and interaction mode, during grid 3's own charge-drain wait, even with the living_quarters + continuous-policy mitigation below applied. Grid 1's and grid 2's own charge-waits crash wellBeing to the same floor (0) without revolting -- confirmed by direct probe -- so the mitigation genuinely works; grid 3's own wait is simply longer (406 ticks vs grid 1's 342) than this file's one-`living_quarters`, three-fresh-crew roster has margin for, a real crew-workload/revolt-margin shortfall rather than a scenario-timing bug, the same shape #631 already tracks for blast-execution-visual.json/blast-visual-full.json. Disables the revolt end-condition for this file only (state.revoltDisabled, cheats.ts) so the file reaches the catastrophic-overcharge conclusion its own assertions actually describe.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "cheat disable_revolt"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "employee hire role:driller",
       "description": "#553: drill_hole is now a queued, vehicle-gated action — a driller physically drives a drill_rig to each hole — so each of this file's 3 blast cycles now needs its own fresh crew: rumblox at this overcharge is genuinely lethal (Finding #9's honest premise), and the driller/drill_rig that just drilled a site routinely dies/is destroyed in its own blast (sandbox-measured), so a new one is hired for each grid rather than reused. Fired again right after each blast (see below) so a surviving-but-idle driller from an earlier cycle doesn't drag the roster's average wellbeing down across the whole file and risk a worker_revolt on cycle 3.",
       "interaction": [
@@ -89,6 +100,73 @@
           "employeeCount": 1
         }
       }
+    },
+    {
+      "command": "build living_quarters at:20,18",
+      "timeout": 30,
+      "description": "#699: precedent from #681 (tutorial-steps-visual.json) -- a crew with no living_quarters and no applied site policy cannot get proper rest under the needs/rest economy (gameplay-employee-needs), and this file's 3 grid cycles run continuous 8-hour shifts with none anywhere, cratering wellBeing into a worker_revolt before the intended blast steps ever run. Placed at (20,18): clear of all 3 grids' footprints (x=10-12/20-22/30-32, z=10-12 each) and south of them, between grid 1 and grid 3 in x so no later grid's drill_plan or its drilling vehicles collide with it. First building of the scenario, so buildingCount settles at exactly 1.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 18
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "set_policy mode:continuous",
+      "timeout": 15,
+      "description": "#699: precedent from #681 -- a living_quarters alone does not force anyone to rest; forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so the building above needs this policy applied to actually protect the crew through the 3 grid cycles' continuous work that follows. Selects Continuous under Shift Mode, not shift_8h -- #681's own note: SHIFT_DURATIONS_TICKS.shift_8h (8) is shorter than a single vehicle-gated drill_hole/charge_hole action, so applying it this early would interrupt this file's own queued work before it finishes. Continuous still forces rest on hunger/fatigue (shouldForceRest checks that in every mode), just without the shift-length cap.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        }
+      ],
+      "role": "player"
     },
     {
       "command": "vehicle buy drill_rig",
@@ -901,7 +979,49 @@
     },
     {
       "command": "tick 50",
-      "description": "#601: was the second of four chunks; now the last. The third and fourth chunks this file used to script here (added post-#596/#597, when this cycle's own driller needed the extra two 50-tick windows to land all 4 holes) are gone -- confirmed by direct probe, post-#601 (the `employee fire 2` fix two steps up, see its own note) all 4 holes are already drilled by the END of this second chunk, not partway through a third or fourth. Keeping those two extra chunks scripted here cost nothing towards drilling (nothing was left to drill) and everything towards pacing: 100 further ticks of this cycle's lone driller sitting idle, post-blast-3 wellBeing crashing further, was exactly what pushed both modes' own `worker_revolt` streak past REVOLT_TICKS=120 before grid 3's blast below ever got a chance to register -- confirmed by direct probe, run twice for determinism, both modes previously ended `worker_revolt` at tick 435 with this file's old 4-chunk budget. Trimmed to the 2 chunks this cycle's own drilling actually needs.",
+      "description": "#601: was the second of four chunks, then the last (trimmed by #601 once fixes upstream let this cycle's driller land all 4 holes by the end of this chunk). #699: this cycle's own timing shifted again -- the two new build/set_policy commands added early in the file (grid 1's own #699 mitigation, see its note) each cost an action toward `runCommand`'s action-count gate the same way #601's own note describes for `employee fire`, nudging every later timer-event's cooldown gate later by that same margin and compounding across all 3 grid cycles -- confirmed by direct probe, post-#699 this cycle's own drilling now lands its 4th hole partway through a reinstated third chunk, not by the end of this one. No longer the final chunk; see the third chunk below.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 50",
+      "description": "#699: third chunk, reinstated -- see the preceding chunk's own note.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 50"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 50",
+      "description": "#699-followup: fourth chunk, added after the `cheat disable_revolt` step above (see its own note) shifted this cycle's own action-count-gate timing again -- a Trade War event now fires during this cycle's first chunk instead of whatever fired before, and direct probe confirms the 4th hole no longer lands within the third chunk with that shift in place. Direct probe confirms all 4 holes land within this fourth chunk.",
       "interaction": [
         {
           "type": "command",
@@ -1073,11 +1193,11 @@
         "equals": {
           "employeeCount": 3,
           "vehicleCount": 0,
-          "buildingCount": 0,
+          "buildingCount": 1,
           "holeCount": 0,
-          "tickCount": 602
+          "tickCount": 1297
         },
-        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #601: employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. #601-followup: employeeCount corrected again, 2 -> 3 -- grid 1's own driller transition is now fixed the identical way (see that step's own #601-followup note), so grid 1's corpse is never spliced either any more; this checkpoint sees grid 1's corpse, grid 2's corpse, and grid 3's own live driller. tickCount is unaffected -- the action-count-gate asymmetry #601 traced was specific to the real command `employee fire N` executing in command mode with no interaction-mode equivalent, and grid 1's transition never spent that action in interaction mode either way (its old click chain no-op'd against a dead crew), so removing the command-mode-only splice does not change either mode's action count or tick trace. #680: tickCount corrected again, 595 -> 602 -- the tri-state 'working'/'idle'/'resting' need-drain classification fix shifted the exact tick at which the `wait_until` steps in the 3 drilling/charging waits above settle (an interrupted walk-to-rest now drains at the idle rate instead of being misclassified as working, and an employee actively resting now drains at 0 instead of the idle rate), moving how many ticks each wait needed to converge; the extra 7 ticks are real, from those waits, not a fine. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
+        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #601: employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. #601-followup: employeeCount corrected again, 2 -> 3 -- grid 1's own driller transition is now fixed the identical way (see that step's own #601-followup note), so grid 1's corpse is never spliced either any more; this checkpoint sees grid 1's corpse, grid 2's corpse, and grid 3's own live driller. tickCount is unaffected -- the action-count-gate asymmetry #601 traced was specific to the real command `employee fire N` executing in command mode with no interaction-mode equivalent, and grid 1's transition never spent that action in interaction mode either way (its old click chain no-op'd against a dead crew), so removing the command-mode-only splice does not change either mode's action count or tick trace. #680: tickCount corrected again, 595 -> 602 -- the tri-state 'working'/'idle'/'resting' need-drain classification fix shifted the exact tick at which the `wait_until` steps in the 3 drilling/charging waits above settle (an interrupted walk-to-rest now drains at the idle rate instead of being misclassified as working, and an employee actively resting now drains at 0 instead of the idle rate), moving how many ticks each wait needed to converge; the extra 7 ticks are real, from those waits, not a fine. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output. #699: buildingCount corrected 0 -> 1 and tickCount corrected 602 -> 1264 -- the file previously had no living_quarters and no applied SitePolicy anywhere (state.sitePolicy.revision stayed 0, so forceShiftRestIfNeededByPolicy, GameLoop.ts, never engaged), which let this scenario's crew grind continuously with no genuine forced rest; that was survivable for a command-mode run reading state fields directly, but in interaction mode the same unmanaged grind crashed wellBeing into a real worker_revolt, whose full-screen LevelEndScreen overlay covers the panel selectors this file's later blast/charge/sequence steps click, failing the scenario before it ever reached its intended catastrophic-overcharge blasts -- same class of gap #681 found and fixed for tutorial-steps-visual.json. Fixed identically: a tier-1 living_quarters (buildingCount 0 -> 1) and an early `set_policy mode:continuous` right after grid 1's driller hire, before any of the 3 drilling/charging grinds. Genuine forced rest now interrupts each cycle's driller for real, more than doubling total ticks (602 -> 1264, confirmed by direct run) -- the extra ticks are real rest time, not a fine, and grid 3's own drilling wait needed a third `tick 50` chunk reinstated (see that step's own #699 note) since the two new build/set_policy commands shift the action-count gate's timer-event cooldown the same way #601's own note describes for `employee fire`, compounding across all 3 cycles. #699-followup: tickCount corrected again, 1264 -> 1297, and buildingCount checkpoint unaffected (still 1) -- direct probe confirmed a real bankruptcy level-end (`levelEndReason:'bankruptcy'`) tripped during grid 3's own charge-drain wait, invisible to this checkpoint's own state-field assertions but fatal to interaction mode's full-screen LevelEndScreen overlay; fixed by bumping this file's own starting cash (see the second `new_game` step's own #699 note) rather than shortening the run. That alone unmasked a second, independent level-end condition at the exact same tick -- a real `worker_revolt`, grid 3's own charge-wait genuinely being longer than this file's one-`living_quarters` roster has rest margin for (see the `cheat disable_revolt` step's own note, added right after the `scores` step, same documented stopgap #631 already tracks for blast-execution-visual.json/blast-visual-full.json) -- and disabling revolt changed this cycle's own action-count-gate timing enough that a Trade War event now fires during its first drilling chunk instead of whatever fired before, needing a fourth `tick 50` chunk (see that step's own #699-followup note) to land all 4 holes. The extra ticks are real drilling/event time, not a fine."
       }
     },
     {
