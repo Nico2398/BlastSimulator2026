@@ -17,7 +17,7 @@
     {
       "command": "campaign start level:tutorial_pit cash:320000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
+      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
       "role": "setup",
       "interaction": [
         {
@@ -209,6 +209,82 @@
         {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "build-living-quarters"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "build-living-quarters"
+      }
+    },
+    {
+      "command": "build living_quarters at:18,14",
+      "timeout": 30,
+      "description": "#681: build-living-quarters complete -- the tutorial's new step 3a-i, placed right after hiring the driller and before the box-cut/drill-plan/charge/sequence stretch that used to run this crew unmanaged for ~400 ticks. A tier-1 living_quarters gives that stretch's forced rest somewhere real to send a collapsing employee.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 18,
+          "z": 14
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "set-early-policy"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        },
+        "tutorialStep": "set-early-policy"
+      }
+    },
+    {
+      "command": "set_policy mode:continuous",
+      "timeout": 15,
+      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so this policy application is what actually makes the building above protect the crew through the grind that follows. Selects Continuous under Shift Mode first, then Apply -- shift_8h's own SHIFT_DURATIONS_TICKS (8) is shorter than a single drill_hole action, so applying it this early interrupted the queued vehicle-gated work below before it could finish (confirmed live pre-#700). Continuous still forces rest on hunger/fatigue (shouldForceRest checks that in every mode), just without the shift-length cap. The later set-policy step (unchanged) still teaches shift_8h once the grind is over.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
         },
         {
           "type": "waitForTutorialStep",
@@ -747,6 +823,27 @@
       ],
       "expect": {
         "tutorialStep": "contract-accept"
+      }
+    },
+    {
+      "command": "wait_until field:tickCount equals:400 max_ticks:90",
+      "timeout": 60,
+      "description": "#689-followup: the build-living-quarters relocation (13,4 -> 18,14, this file's own earlier steps) shortens the crew's commute enough to clear the drilling deadlock, but it also shifts every tick landing downstream of it -- this step now lands at tick 340 instead of the pre-relocation value, and the contract offer pool (REFRESH_INTERVAL=20 ticks, Contract.ts) doesn't happen to carry a rubble_disposal offer at that exact tick (8 ore_sale offers, no rubble_disposal, direct trace). rubble_disposal is the one contract type this file can actually deliver later (consumeStoredOre() draws on raw storedMassKg, which the debris hauler fills; ore_sale/supply need specific ore this hauler never produces) -- not a type this step can simply switch away from the way level2-playthrough-win.json's own accept steps do. Direct trace confirms the pool's next rubble_disposal offer surfaces after 60 more ticks (tickCount 400), with no event pending anywhere in that window, so this waits on tickCount itself (deterministic given the fixed seed) rather than the offer directly -- there is no state-dump field for 'a rubble_disposal offer exists' to wait on instead.",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "tickCount",
+          "equals": 400,
+          "maxTicks": 90,
+          "timeoutMs": 60000
+        }
+      ],
+      "expect": {
+        "tutorialStep": "contract-accept",
+        "equals": {
+          "tickCount": 400
+        }
       }
     },
     {

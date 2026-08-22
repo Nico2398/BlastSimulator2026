@@ -173,7 +173,7 @@ export function setVehicleIdle(vehicle: Vehicle): void {
   vehicle.waitingTicks = 0;
 }
 
-function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: number, z: number): boolean {
+export function isCellOccupiedByOtherVehicle(state: GameState, vehicle: Vehicle, x: number, z: number): boolean {
   return state.vehicles.vehicles.some(v => v.id !== vehicle.id && v.x === x && v.z === z);
 }
 

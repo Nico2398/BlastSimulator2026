@@ -986,7 +986,24 @@ function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedK
   const building = findNearestLivingQuarters(state, emp.x, emp.z);
   if (building) {
     const def = getBuildingDef(building.type, building.tier);
-    replenishNeed(emp, needKey, building.tier, def.capacity);
+    // BUILDING_REPLENISH_RATES is a per-tick rate (its own doc comment, and
+    // Employee.test.ts's "per-tick fill rate" framing), but this call site
+    // used to apply it exactly once regardless of how many ticks the rest
+    // actually spent — one tick's worth of gain for the whole visit. Against
+    // any real travel distance to and from the building, that one tick is
+    // smaller than what the round trip alone costs in drain, so an employee
+    // whose work site isn't adjacent to their living_quarters nets negative
+    // every cycle: collapse, rest, walk back barely recovered, collapse
+    // again before finishing (or even starting) the next task — confirmed
+    // live, a solo driller stuck oscillating at ~0-10 fatigue for 5000+
+    // ticks with a tier-1 living_quarters two tiles from the drill grid,
+    // never landing a single hole (#700). Scaling by the rest's own
+    // NEED_REST_DURATIONS[needKey] — the same constant that sets how many
+    // ticks the visit takes — applies the full rate for the full stay,
+    // matching the "per-tick" contract the rate was already documented as.
+    for (let i = 0; i < NEED_REST_DURATIONS[needKey]; i++) {
+      replenishNeed(emp, needKey, building.tier, def.capacity);
+    }
   } else {
     // No building services this need — the employee rests where they stand.
     // That keeps them on their feet but never fully satisfies them: the gauge

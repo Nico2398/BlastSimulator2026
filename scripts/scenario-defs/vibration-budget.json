@@ -1,6 +1,6 @@
 {
   "name": "vibration-budget",
-  "description": "Chapter 5: 3 catastrophic overcharge blasts crater nuisance and ecology scores. Finding #9: the file's original premise (\"exceed vibration budget 3 times... verify $5,000 fine is applied\") has no implementation anywhere in the codebase to test — recordVibration (ScoreManager.ts) only moves nuisance/ecology, no budget counter or cash fine exists, and no event/campaign rule ties one to blast count either. That claim is dropped here in favor of the real, checkable effect (nuisance/ecology cratering); whether a real fine mechanic should exist is a game-design question, out of scope for a test-assertion pass — filed as a follow-up, not silently implemented.",
+  "description": "Chapter 5: 3 catastrophic overcharge blasts crater nuisance and ecology scores. Finding #9: the file's original premise (\"exceed vibration budget 3 times... verify $5,000 fine is applied\") has no implementation anywhere in the codebase to test \u2014 recordVibration (ScoreManager.ts) only moves nuisance/ecology, no budget counter or cash fine exists, and no event/campaign rule ties one to blast count either. That claim is dropped here in favor of the real, checkable effect (nuisance/ecology cratering); whether a real fine mechanic should exist is a game-design question, out of scope for a test-assertion pass \u2014 filed as a follow-up, not silently implemented.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -60,12 +60,71 @@
           "ecology": 50,
           "nuisance": 50
         },
-        "note": "createScoreState's neutral baseline (ScoreManager.ts), before any blast — the 3 that follow must crater ecology/nuisance from here"
+        "note": "createScoreState's neutral baseline (ScoreManager.ts), before any blast \u2014 the 3 that follow must crater ecology/nuisance from here"
       }
     },
     {
+      "command": "build living_quarters at:20,20",
+      "description": "#699: this file's own 3-cycle grind (a fresh driller hired, drilled, charged, blasted and fired every cycle, per the hire step's own note below) has never had a living_quarters or an applied SitePolicy anywhere in its script -- it has instead survived on wafer-thin tick-budget tuning alone for several prior issues (#596/#597/#601, see the fire-employee and drill-wait steps' own extensive notes on shaving single ticks to stay under REVOLT_TICKS). That balance tipped over for real: a live interaction-mode run now ends in a genuine worker_revolt (\"THE CREW HAS WALKED OUT\", well-being reached 0) partway through cycle 2, well before the file's own asserted 3-blast conclusion -- confirmed by direct interaction-mode run and screenshot, not the timer-event race #601-followup originally diagnosed for the resulting covered-blast-panel symptom (that diagnosis was itself wrong; the panel is covered by the LevelEndScreen the revolt raises, not a random event). Content fix, not another round of tick-shaving: gives every cycle's crew somewhere to recover instead of continuing to chase an increasingly fragile fixed-tick budget. Placed at (20,20) -- centrally located relative to all three drill grids (x:10/20/30, z:10-12, roughly 10-14 tiles from each), not off in a corner: an earlier attempt at (5,25) left grid 3 (x:30) with a 25+-tile one-way commute, the same commute-breaks-even-against-rest trap #681 found and fixed for the tutorial, and cycle 3 alone burned most of a 600-tick wait budget recovering from it.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 20
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "set_policy mode:continuous",
+      "description": "#699: arms forceShiftRestIfNeededByPolicy (#678) -- state.sitePolicy.revision is 0 (unapplied) until this runs. continuous, not shift_8h: SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks, shorter than a single drill_hole action, so applying it this early interrupts the queued vehicle-gated drilling below before it can land a single hole (confirmed live -- drilling stalled at holeCount:0 with shift_8h applied here, the exact trap tutorial-interactive.json's own #681 fix already documents and avoids). continuous has no shift-length cap but still forces rest on hunger/fatigue (shouldForceRest checks that in every mode), which is all this file's own short 4-hole cycles need.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"ops\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-policy-apply"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-apply"
+        }
+      ],
+      "role": "player"
+    },
+    {
       "command": "employee hire role:driller",
-      "description": "#553: drill_hole is now a queued, vehicle-gated action — a driller physically drives a drill_rig to each hole — so each of this file's 3 blast cycles now needs its own fresh crew: rumblox at this overcharge is genuinely lethal (Finding #9's honest premise), and the driller/drill_rig that just drilled a site routinely dies/is destroyed in its own blast (sandbox-measured), so a new one is hired for each grid rather than reused. Fired again right after each blast (see below) so a surviving-but-idle driller from an earlier cycle doesn't drag the roster's average wellbeing down across the whole file and risk a worker_revolt on cycle 3.",
+      "description": "#553: drill_hole is now a queued, vehicle-gated action \u2014 a driller physically drives a drill_rig to each hole \u2014 so each of this file's 3 blast cycles now needs its own fresh crew: rumblox at this overcharge is genuinely lethal (Finding #9's honest premise), and the driller/drill_rig that just drilled a site routinely dies/is destroyed in its own blast (sandbox-measured), so a new one is hired for each grid rather than reused. Fired again right after each blast (see below) so a surviving-but-idle driller from an earlier cycle doesn't drag the roster's average wellbeing down across the whole file and risk a worker_revolt on cycle 3.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -129,7 +188,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:10,10 diameter:0.089",
-      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless — confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
+      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless \u2014 confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -176,34 +235,16 @@
       }
     },
     {
-      "command": "tick 50",
-      "description": "#553: drain the ordered plan in bounded 50-tick chunks rather than one large tick count -- each chunk is followed by `event choose 0` since a `tick` command stops dead the instant a timer event fires mid-block (events.ts), silently short of the requested count, and a bare `tick` then refuses outright until it's resolved.",
+      "command": "wait_until field:holeCount equals:4 max_ticks:600",
+      "timeout": 190,
+      "description": "#699: cycle 1/3's fixed tick-50 chunk drill wait replaced with waitUntil on holeCount -- with living_quarters/continuous policy now protecting this crew (see the steps above), rest interruptions make each cycle's own drilling take a genuinely variable number of ticks (a fixed budget either stalls short, as cycle 2's own 3-chunk/150-tick budget did against the new trajectory, or wastes ticks the crew doesn't need), matching the waitUntil convention `.claude/rules/scenario-defs.md` documents for 'a wait for queued work to land' and the fix already applied to tutorial-interactive.json/tutorial-steps-visual.json for the identical class of divergence (#681/#689).",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "description": "#553: idempotent — a no-op ('No pending event or invalid option.') when nothing is pending, resolves one when a timer fired mid-tick-block. A bare `tick` refuses outright while an event is pending, so skipping this defensively stalls every tick step after it.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "description": "#553: second chunk — sandbox-measured landing at tick 100 total for this cycle (a Newsletter-class event may or may not land inside either chunk; the `event choose 0` after each one handles it either way).",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 4,
+          "maxTicks": 600,
+          "timeoutMs": 180000
         }
       ],
       "role": "setup",
@@ -212,22 +253,12 @@
           "orderedHoleCount": 0,
           "holeCount": 4
         },
-        "note": "All 4 holes have landed — none lost, none left ordered forever."
+        "note": "All 4 holes have landed -- none lost, none left ordered forever."
       }
     },
     {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
-      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 — amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/sequence/blast pipeline in every run of this file's history — no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead — the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state — selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m — producing a normal, non-catastrophic blast (nuisance barely moved, 50→49.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5→15kg (10 clicks, 1kg/click) and the stemming stepper 2→1m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All — the same class of gap as Finding #4/#5, generalized to explosive selection.",
+      "description": "Finding #9 (see file description): the original file charged explosive:boomite, whose maxChargeKg is 8 \u2014 amount:15 exceeds it, so batchCharge rejected the whole charge with an error, never applied, never thrown (success:false, silent). chargedCount stayed 0 through the entire charge/sequence/blast pipeline in every run of this file's history \u2014 no hole was ever actually charged, sequenced, or blasted, so the file never once produced the catastrophic overcharge it claims to test. Fixed by using rumblox instead \u2014 the catalog's own \"defining trait: high vibration\" product (vibrationMod 1.6, maxChargeKg 20, ExplosiveCatalog.ts), which is also the more honest real product for this file's stated intent. Finding #10: Charge All (chargeAll(), Charge.ts) issues `charge hole:* explosive:${this.selectedExplosiveId} amount:${this.amountKg}kg stemming:${this.stemmingM}m` from the panel's OWN selection state \u2014 selectedExplosiveId defaults to boomite (DEFAULT_EXPLOSIVE) and only changes when a product card is clicked (data-action=\"select-explosive\", data-explosive=\"<id>\"). A real browser run confirmed this: without clicking the rumblox card first, every one of this file's 3 charge-all clicks silently applied the panel's boomite/5kg/2m defaults instead of the declared rumblox/15kg/1m \u2014 producing a normal, non-catastrophic blast (nuisance barely moved, 50\u219249.975) instead of the intended overcharge. Fixed by clicking the rumblox product card, then driving the amount stepper 5\u219215kg (10 clicks, 1kg/click) and the stemming stepper 2\u21921m (5 clicks, 0.2m/click, data-field=\"amount\"/\"stemming\") before Charge All \u2014 the same class of gap as Finding #4/#5, generalized to explosive selection.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -414,7 +445,7 @@
           "nuisance",
           "ecology"
         ],
-        "note": "a fired blast clears the plan back to zero; the rumblox overcharge's real, checkable effect — nuisance and ecology both crater from the 50/50 baseline (recordVibration, ScoreManager.ts) — not the fabricated fine (see file description)"
+        "note": "a fired blast clears the plan back to zero; the rumblox overcharge's real, checkable effect \u2014 nuisance and ecology both crater from the 50/50 baseline (recordVibration, ScoreManager.ts) \u2014 not the fabricated fine (see file description)"
       }
     },
     {
@@ -430,7 +461,7 @@
     },
     {
       "command": "finances",
-      "description": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. #596: cash dropped from this checkpoint's own equals (was a hand-derived 207286) — the same incidental-running-total class this file's own cycle-2/cycle-3 finances checkpoints already treat this way (see their own notes): a read-only `finances` query doesn't move cash itself (before==after for the step), so neither an exact changedBy nor a directional decreased/increased belongs here — the spend already happened in the hire/purchase/tick steps above, which is where a cash assertion belongs. #601-followup: the preceding step is now `time resume`, not `employee fire 1` (see its own note) — it still opens the employees panel for real in interaction mode, so the panel is still open here too.",
+      "description": "explosive cost is never deducted from cash in this build (ground rule #11) \u2014 cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: \u2014 the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. #596: cash dropped from this checkpoint's own equals (was a hand-derived 207286) \u2014 the same incidental-running-total class this file's own cycle-2/cycle-3 finances checkpoints already treat this way (see their own notes): a read-only `finances` query doesn't move cash itself (before==after for the step), so neither an exact changedBy nor a directional decreased/increased belongs here \u2014 the spend already happened in the hire/purchase/tick steps above, which is where a cash assertion belongs. #601-followup: the preceding step is now `time resume`, not `employee fire 1` (see its own note) \u2014 it still opens the employees panel for real in interaction mode, so the panel is still open here too.",
       "interaction": [
         {
           "type": "command",
@@ -441,7 +472,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 2/3 — see grid 1's own hire step for why (a new one each cycle, fired after each blast). #553-followup: no toolbar click here -- the preceding `time resume` step already opened the employees panel (it clicks `#bs-toolbar [data-panel=\"employees\"]` itself, see its own #601-followup note) and the `finances` step between it and this one is a command-only observe step that never touches panel state, so the panel is still open. ToolRail's click handler is a togglePanel toggle (UIManager.ts:450) -- re-clicking here closed the panel outright, leaving the driller row zero-size for the click that followed. #601-followup: `employeeCount` switched from `equals: 1` to `changedBy: 1`, matching this project's own preferred convention for a running total (scenario-defs.md) and grid 3's own hire step (see its note) -- grid 1's driller now dies deterministically in both modes (see the preceding step's own note) and is never spliced in either one any more, so the baseline this hire step starts from is 1 (the corpse, never fired), not 0. `changedBy` proves what this step's own action did without pinning a baseline a future edit upstream would have to keep in sync by hand.",
+      "description": "#553: a fresh driller for grid 2/3 \u2014 see grid 1's own hire step for why (a new one each cycle, fired after each blast). #553-followup: no toolbar click here -- the preceding `time resume` step already opened the employees panel (it clicks `#bs-toolbar [data-panel=\"employees\"]` itself, see its own #601-followup note) and the `finances` step between it and this one is a command-only observe step that never touches panel state, so the panel is still open. ToolRail's click handler is a togglePanel toggle (UIManager.ts:450) -- re-clicking here closed the panel outright, leaving the driller row zero-size for the click that followed. #601-followup: `employeeCount` switched from `equals: 1` to `changedBy: 1`, matching this project's own preferred convention for a running total (scenario-defs.md) and grid 3's own hire step (see its note) -- grid 1's driller now dies deterministically in both modes (see the preceding step's own note) and is never spliced in either one any more, so the baseline this hire step starts from is 1 (the corpse, never fired), not 0. `changedBy` proves what this step's own action did without pinning a baseline a future edit upstream would have to keep in sync by hand.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -501,7 +532,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,10 diameter:0.089",
-      "description": "Grid 2/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: added the toolbar blast-panel click as the first action here (Grid 1/3's own drill_plan step above has one; this one never did) -- by this point in the file the active panel is \"vehicles\" (opened by the `vehicle buy drill_rig` step just above), not \"blast\", so `#bs-blast-panel [data-step=\"1\"]` was zero-size until the blast panel was actually opened. Also dropped the spacing-decrement click that used to run here: DrillStep.gridSpacing (Drill.ts) is a single instance field, mutated only by the stepper's onDec/onInc and never reset between grid cycles -- Grid 1/3's own decrement already took it from the 3m default down to 2m, and that persists across this whole scenario (BlastPanel/DrillStep is never recreated), so decrementing again here dropped it to 1m (Math.max(1, 2-1)) and turned this rectangle's 2x2 grid into a 3x3 (round(2/1)+1 = 3 per side, 9 holes) -- exactly the `orderedHoleCount should be 4 but is 9` failure. Leaving spacing untouched at its already-correct 2m.",
+      "description": "Grid 2/3. #553: spacing tightened from 4m to 2m \u2014 see grid 1's own note. #553-followup: added the toolbar blast-panel click as the first action here (Grid 1/3's own drill_plan step above has one; this one never did) -- by this point in the file the active panel is \"vehicles\" (opened by the `vehicle buy drill_rig` step just above), not \"blast\", so `#bs-blast-panel [data-step=\"1\"]` was zero-size until the blast panel was actually opened. Also dropped the spacing-decrement click that used to run here: DrillStep.gridSpacing (Drill.ts) is a single instance field, mutated only by the stepper's onDec/onInc and never reset between grid cycles -- Grid 1/3's own decrement already took it from the 3m default down to 2m, and that persists across this whole scenario (BlastPanel/DrillStep is never recreated), so decrementing again here dropped it to 1m (Math.max(1, 2-1)) and turned this rectangle's 2x2 grid into a 3x3 (round(2/1)+1 = 3 per side, 9 holes) -- exactly the `orderedHoleCount should be 4 but is 9` failure. Leaving spacing untouched at its already-correct 2m.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -544,53 +575,16 @@
       }
     },
     {
-      "command": "tick 50",
-      "description": "#553: drain the ordered plan in bounded 50-tick chunks — see grid 1's own chunks for why. A Newsletter event fires partway through this cycle on seed 42 (sandbox-measured), which is exactly what the `event choose 0` after each chunk is for.",
+      "command": "wait_until field:holeCount equals:4 max_ticks:600",
+      "timeout": 190,
+      "description": "#699: cycle 2/3's fixed tick-50 chunk drill wait replaced with waitUntil on holeCount -- with living_quarters/continuous policy now protecting this crew (see the steps above), rest interruptions make each cycle's own drilling take a genuinely variable number of ticks (a fixed budget either stalls short, as cycle 2's own 3-chunk/150-tick budget did against the new trajectory, or wastes ticks the crew doesn't need), matching the waitUntil convention `.claude/rules/scenario-defs.md` documents for 'a wait for queued work to land' and the fix already applied to tutorial-interactive.json/tutorial-steps-visual.json for the identical class of divergence (#681/#689).",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "description": "Third chunk — sandbox-measured landing at tick 235 total for this cycle.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 4,
+          "maxTicks": 600,
+          "timeoutMs": 180000
         }
       ],
       "role": "setup",
@@ -599,18 +593,8 @@
           "orderedHoleCount": 0,
           "holeCount": 4
         },
-        "note": "All 4 holes have landed — none lost, none left ordered forever."
+        "note": "All 4 holes have landed -- none lost, none left ordered forever."
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
@@ -776,7 +760,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 3/3 — see grid 1's own hire step for why. #601: this step's own toolbar click is still unnecessary -- the preceding step (formerly `employee fire 2`, now `time resume`, see its own #601 note) still opens the employees panel for real in interaction mode, and the intervening `finances` step is command-only, so the panel is still open when this step runs. `employeeCount` stays `changedBy: 1` (not `equals: 2`) on purpose, matching this project's own preferred convention for a running total (scenario-defs.md) even though the baseline (1, grid 2's unfired corpse) is now genuinely deterministic in both modes -- `changedBy` proves what this step's own action did without pinning a baseline a future edit upstream would have to keep in sync by hand.",
+      "description": "#553: a fresh driller for grid 3/3 \u2014 see grid 1's own hire step for why. #601: this step's own toolbar click is still unnecessary -- the preceding step (formerly `employee fire 2`, now `time resume`, see its own #601 note) still opens the employees panel for real in interaction mode, and the intervening `finances` step is command-only, so the panel is still open when this step runs. `employeeCount` stays `changedBy: 1` (not `equals: 2`) on purpose, matching this project's own preferred convention for a running total (scenario-defs.md) even though the baseline (1, grid 2's unfired corpse) is now genuinely deterministic in both modes -- `changedBy` proves what this step's own action did without pinning a baseline a future edit upstream would have to keep in sync by hand.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -836,7 +820,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:30,10 diameter:0.089",
-      "description": "Grid 3/3. #553: spacing tightened from 4m to 2m — see grid 1's own note. #553-followup: same fix as Grid 2/3's own drill_plan step above -- added the toolbar blast-panel click as the first action (active panel here is \"vehicles\", from the `vehicle buy drill_rig` step just above, not \"blast\"), and dropped the spacing-decrement click: DrillStep.gridSpacing (Drill.ts) persists across the whole scenario (never reset between grid cycles), so it's already sitting at the correct 2m left behind by Grid 1/3's own single decrement -- decrementing again here would have clamped at Math.max(1, ...) same as Grid 2/3's own bug, and (with Grid 2/3's own decrement now also removed) it never dropped below 2m in the first place.",
+      "description": "Grid 3/3. #553: spacing tightened from 4m to 2m \u2014 see grid 1's own note. #553-followup: same fix as Grid 2/3's own drill_plan step above -- added the toolbar blast-panel click as the first action (active panel here is \"vehicles\", from the `vehicle buy drill_rig` step just above, not \"blast\"), and dropped the spacing-decrement click: DrillStep.gridSpacing (Drill.ts) persists across the whole scenario (never reset between grid cycles), so it's already sitting at the correct 2m left behind by Grid 1/3's own single decrement -- decrementing again here would have clamped at Math.max(1, ...) same as Grid 2/3's own bug, and (with Grid 2/3's own decrement now also removed) it never dropped below 2m in the first place.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -879,33 +863,16 @@
       }
     },
     {
-      "command": "tick 50",
-      "description": "#553: drain the ordered plan in bounded 50-tick chunks — see grid 1's own chunks for why. An Explosive Embargo event fires partway through this cycle on seed 42 (sandbox-measured, and an expensive one — the `event choose 0` after each chunk absorbs its cost same as any other).",
+      "command": "wait_until field:holeCount equals:4 max_ticks:600",
+      "timeout": 190,
+      "description": "#699: cycle 3/3's fixed tick-50 chunk drill wait replaced with waitUntil on holeCount -- with living_quarters/continuous policy now protecting this crew (see the steps above), rest interruptions make each cycle's own drilling take a genuinely variable number of ticks (a fixed budget either stalls short, as cycle 2's own 3-chunk/150-tick budget did against the new trajectory, or wastes ticks the crew doesn't need), matching the waitUntil convention `.claude/rules/scenario-defs.md` documents for 'a wait for queued work to land' and the fix already applied to tutorial-interactive.json/tutorial-steps-visual.json for the identical class of divergence (#681/#689).",
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
-      "command": "tick 50",
-      "description": "#601: was the second of four chunks; now the last. The third and fourth chunks this file used to script here (added post-#596/#597, when this cycle's own driller needed the extra two 50-tick windows to land all 4 holes) are gone -- confirmed by direct probe, post-#601 (the `employee fire 2` fix two steps up, see its own note) all 4 holes are already drilled by the END of this second chunk, not partway through a third or fourth. Keeping those two extra chunks scripted here cost nothing towards drilling (nothing was left to drill) and everything towards pacing: 100 further ticks of this cycle's lone driller sitting idle, post-blast-3 wellBeing crashing further, was exactly what pushed both modes' own `worker_revolt` streak past REVOLT_TICKS=120 before grid 3's blast below ever got a chance to register -- confirmed by direct probe, run twice for determinism, both modes previously ended `worker_revolt` at tick 435 with this file's old 4-chunk budget. Trimmed to the 2 chunks this cycle's own drilling actually needs.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 4,
+          "maxTicks": 600,
+          "timeoutMs": 180000
         }
       ],
       "role": "setup",
@@ -914,18 +881,8 @@
           "orderedHoleCount": 0,
           "holeCount": 4
         },
-        "note": "All 4 holes have landed — none lost, none left ordered forever."
+        "note": "All 4 holes have landed -- none lost, none left ordered forever."
       }
-    },
-    {
-      "command": "event choose 0",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
     },
     {
       "command": "charge hole:* explosive:rumblox amount:15 stemming:1",
@@ -1016,7 +973,7 @@
     },
     {
       "command": "blast",
-      "description": "Blast 3/3 — the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
+      "description": "Blast 3/3 \u2014 the third strike this file's original premise claimed would trigger a $5,000 fine (Finding #9: no such mechanic exists to check).",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1073,11 +1030,11 @@
         "equals": {
           "employeeCount": 3,
           "vehicleCount": 0,
-          "buildingCount": 0,
+          "buildingCount": 1,
           "holeCount": 0,
-          "tickCount": 602
+          "tickCount": 827
         },
-        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #601: employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. #601-followup: employeeCount corrected again, 2 -> 3 -- grid 1's own driller transition is now fixed the identical way (see that step's own #601-followup note), so grid 1's corpse is never spliced either any more; this checkpoint sees grid 1's corpse, grid 2's corpse, and grid 3's own live driller. tickCount is unaffected -- the action-count-gate asymmetry #601 traced was specific to the real command `employee fire N` executing in command mode with no interaction-mode equivalent, and grid 1's transition never spent that action in interaction mode either way (its old click chain no-op'd against a dead crew), so removing the command-mode-only splice does not change either mode's action count or tick trace. #680: tickCount corrected again, 595 -> 602 -- the tri-state 'working'/'idle'/'resting' need-drain classification fix shifted the exact tick at which the `wait_until` steps in the 3 drilling/charging waits above settle (an interrupted walk-to-rest now drains at the idle rate instead of being misclassified as working, and an employee actively resting now drains at 0 instead of the idle rate), moving how many ticks each wait needed to converge; the extra 7 ticks are real, from those waits, not a fine. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
+        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #601: employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. #601-followup: employeeCount corrected again, 2 -> 3 -- grid 1's own driller transition is now fixed the identical way (see that step's own #601-followup note), so grid 1's corpse is never spliced either any more; this checkpoint sees grid 1's corpse, grid 2's corpse, and grid 3's own live driller. tickCount is unaffected -- the action-count-gate asymmetry #601 traced was specific to the real command `employee fire N` executing in command mode with no interaction-mode equivalent, and grid 1's transition never spent that action in interaction mode either way (its old click chain no-op'd against a dead crew), so removing the command-mode-only splice does not change either mode's action count or tick trace. #680: tickCount corrected again, 595 -> 602 -- the tri-state 'working'/'idle'/'resting' need-drain classification fix shifted the exact tick at which the `wait_until` steps in the 3 drilling/charging waits above settle (an interrupted walk-to-rest now drains at the idle rate instead of being misclassified as working, and an employee actively resting now drains at 0 instead of the idle rate), moving how many ticks each wait needed to converge; the extra 7 ticks are real, from those waits, not a fine. #699: buildingCount corrected 0 -> 1 and tickCount corrected 602 -> 827 -- this file's own 3-cycle grind now has a living_quarters (which stands for the rest of the file, hence buildingCount) and an applied continuous-shift policy protecting it from a real worker_revolt (see the build-living-quarters step's own note); the fixed tick-50 drill-wait chunks were also replaced with waitUntil-on-holeCount waits, since rest interruptions now make each cycle's own drilling take a genuinely variable number of ticks a fixed budget can't track -- the extra 225 ticks (602->827) are real recovery time this crew now spends resting, not a regression. employeeCount/vehicleCount/holeCount stay exact -- confirmed unaffected. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output."
       }
     },
     {

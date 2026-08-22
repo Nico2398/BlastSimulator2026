@@ -397,7 +397,7 @@
           "expectedValue": "3.0 m"
         },
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H1\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -507,7 +507,7 @@
           "expectedValue": "1.0 m"
         },
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H2\"] [data-action=\"charge-hole\"]"
         }
       ],

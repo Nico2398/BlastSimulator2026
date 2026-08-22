@@ -48,26 +48,6 @@ export interface LevelDef {
   mixedRockHardness: boolean;
   /** Difficulty tier: 0 (tutorial) – 3 (hardest). Used for display and ordering. */
   difficultyTier: number;
-  /**
-   * When true, WorkerRevolt.ts's permanent-strike check never fires on this
-   * level, however long well-being sits at 0. Real levels leave this false —
-   * a sustained-zero well-being score is meant to end the game. tutorial_pit
-   * is the one exception: pre-#553/#554/#555, drilling/charging/digging
-   * completed in the same tick they were ordered, so a real player could
-   * never keep a crew at critical need levels long enough to matter. Those
-   * three PRs made all three genuinely ticked, multi-hundred-tick work with
-   * a single license-holder driving the only rig of its kind — exactly the
-   * "one employee, no relief, hours of continuous duty" case needs/collapse
-   * math does not make survivable (verified empirically: a Tier 1
-   * living_quarters and every currently-reachable site-policy option each
-   * still crash well-being to a permanent 0 well inside the tutorial's own
-   * fixed drill/dig region). No lever a tutorial player can currently pull
-   * fixes that without changing needs-economy balance for every other level,
-   * so tutorial_pit's own already-established forgiveness (eventFreqMultiplier
-   * 0, scoreDecayRate 0.01) is extended to this one additional lose condition
-   * instead (#555 tutorial worker-revolt fix).
-   */
-  revoltImmune: boolean;
 }
 
 // ── Level catalog ──
@@ -123,7 +103,6 @@ const LEVELS: readonly LevelDef[] = [
     scoreDecayRate: 0.01,
     mixedRockHardness: false,
     difficultyTier: 0,
-    revoltImmune: true,
   },
   {
     // ────────────────────────────────────────────────────────
@@ -149,7 +128,6 @@ const LEVELS: readonly LevelDef[] = [
     scoreDecayRate: 0.03,        // Slow score decay — hard to ruin yourself
     mixedRockHardness: false,
     difficultyTier: 1,
-    revoltImmune: false,
   },
   {
     // ────────────────────────────────────────────────────────
@@ -175,7 +153,6 @@ const LEVELS: readonly LevelDef[] = [
     scoreDecayRate: 0.05,         // Standard decay rate
     mixedRockHardness: false,
     difficultyTier: 2,
-    revoltImmune: false,
   },
   {
     // ────────────────────────────────────────────────────────
@@ -207,7 +184,6 @@ const LEVELS: readonly LevelDef[] = [
     scoreDecayRate: 0.08,          // Harsh — scores fall fast without upkeep
     mixedRockHardness: true,       // Hard+soft interleaved — unpredictable projections
     difficultyTier: 3,
-    revoltImmune: false,
   },
 ];
 

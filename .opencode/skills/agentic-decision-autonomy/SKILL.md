@@ -25,6 +25,8 @@ When a requirement leaves a choice open, resolve it in this order and keep going
    | 3 | The analogous mechanic elsewhere in the game |
    | 4 | The option that preserves existing incentives — the one where the new path stays worse than the path the design already rewards |
 
+   A verification failure that traces to missing or unreachable content is closed by adding that content, never by loosening the check or retuning balance to route around it — the check was reporting the game accurately.
+
 2. **Implement it** and test it like any other behaviour. A defaulted decision is not a lesser decision.
 3. **Write it into the skill that owns the rule**, so the project keeps one source of truth and the next run inherits the answer instead of re-deciding it. A constant belongs in `src/core/config/`, named, alongside the spec entry.
 4. **Record it in the PR body** under `## Decisions taken` — see the format below.
