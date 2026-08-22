@@ -157,6 +157,24 @@ async function waitUsableAndClick(page: Page, selector: string, timeoutMs: numbe
 }
 
 /**
+ * Checks whether an event is genuinely pending in game state and, if so,
+ * resolves its dialog for real (same click path as `case
+ * 'resolveEventIfPending'`) — extracted so `clickSelector`'s covered-by-div
+ * retry (#699) can call the same logic without going through the full
+ * interaction-action dispatch. Returns whether it actually resolved a
+ * pending event dialog.
+ *
+ * TODO(#699): implement — body currently inline in `case
+ * 'resolveEventIfPending'` below; move it here and have that case call this
+ * helper instead.
+ */
+export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000): Promise<boolean> {
+  void page;
+  void timeoutMs;
+  throw new Error('not implemented');
+}
+
+/**
  * Read-only commands an `observe`-marked step may run.
  *
  * These report state rather than changing it, which is how a scenario records
@@ -499,6 +517,10 @@ export async function executeActionOnPage(
       // control allowed only on the guide's next 250ms pass — a machine-speed
       // click in that gap lands on `pointer-events: none` and falls through
       // silently, because page.click does not throw for it (#481).
+      // TODO(#699): wire resolveEventIfPendingOnPage into clickSelector's
+      // covered-by-div retry — when the deadline below is reached with the
+      // last probed reason 'covered', call it once and extend the deadline
+      // on a resolve instead of throwing immediately.
       const deadline = Date.now() + timeoutMs;
       for (;;) {
         const reason = await page.evaluate((sel: string) => {
