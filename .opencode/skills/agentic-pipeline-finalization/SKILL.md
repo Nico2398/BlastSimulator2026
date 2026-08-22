@@ -71,7 +71,7 @@ Runs after qualimetry passes. Branch: `pipeline/feature-<label>` — `<label>` i
 
 ### The follow-up register
 
-A run's sub-agents notice work that is not this run's task: a reviewer finds pre-existing debt, an implementer hits a task bigger than one run, a test-writer finds a convention the codebase contradicts. None of them files an issue — nine agents are blocked from mutating `gh` by a `PreToolUse` hook, and five parallel reviewers filing independently would produce five issues for one finding.
+A run's sub-agents notice work that is not this run's task: a reviewer finds pre-existing debt, an implementer hits a task bigger than one run, a test-writer finds a convention the codebase contradicts. None of them files an issue — every runtime denies its read-only agents the commands that mutate GitHub, and five parallel reviewers filing independently would produce five issues for one finding.
 
 Instead the orchestrator keeps a register for the run. Every sub-agent report may append to it; nothing is filed until `[followup]`.
 

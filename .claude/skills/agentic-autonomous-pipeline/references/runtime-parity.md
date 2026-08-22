@@ -31,6 +31,16 @@ So "invoke the reviewers in parallel" reads as *fan out and await* under OpenCod
 
 **The principle generalises past that one parameter. Where runtimes differ, the shared context states the invariant and each runtime's own configuration layer enforces it.** A body that names one runtime's parameters is a body that is wrong for the other two.
 
+Issue filing splits the same way. The rule — a read-only agent reports a finding, the orchestrator files it — is uniform. What denies the agent the command is not:
+
+| Runtime | Read-only agents denied GitHub writes by |
+|---------|------------------------------------------|
+| OpenCode | `permission.bash` in the agent's own frontmatter: `"git *": "deny"`, `"gh *": "deny"` |
+| Copilot | `tools: ["read", "search"]` — no shell to run `gh` with |
+| Claude Code | A `PreToolUse` hook on `Bash`, `block-git-gh.sh`, registered in the agent's frontmatter |
+
+Three mechanisms, one behaviour: a reviewer that tries to open an issue fails wherever it runs, so a finding reaches GitHub through the orchestrator or not at all. `agentic-pipeline-review-pr` states the rule and names none of them.
+
 ## Claude Code prerequisites
 
 Delegation depends on configuration that is off by default:

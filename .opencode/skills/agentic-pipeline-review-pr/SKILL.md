@@ -22,7 +22,7 @@ description: >
 - @reviewer runs full test suite to validate
 - @reviewer posts pass/fail outcome as PR comment
 - No branch creation, no commits (review is read-only)
-- **A reviewer reports a finding; it never files one.** Nine agents — the five sub-reviewers, plus @ask, @planner, @validator and @visual-tester — carry a `PreToolUse` hook that blocks mutating `gh`, so `gh issue create` fails for them by design. Findings travel up in the reviewer's own output and the orchestrator files them. That is also what keeps five parallel reviewers from filing five issues for one finding.
+- **A reviewer reports a finding; it never files one.** Every runtime denies its read-only agents the commands that mutate GitHub, each by its own mechanism, so a reviewer that tries to file fails wherever it runs. Findings travel up in the reviewer's own output and the orchestrator files them — which is also what keeps five parallel reviewers from filing five issues for one finding.
 
 ### Finding disposition
 
