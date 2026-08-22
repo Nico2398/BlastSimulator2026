@@ -57,7 +57,6 @@ import {
 import { sandboxCommand } from './commands/sandbox.js';
 import { stateCommand } from './commands/state.js';
 import { saveCommand, loadCommand } from './commands/saveload.js';
-import { cheatCommand } from './commands/cheats.js';
 import { setupEvents } from '../core/events/index.js';
 import { EventEmitter } from '../core/state/EventEmitter.js';
 
@@ -276,10 +275,6 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('load', 'Load game from a quick-save slot (slot:name)', (args, named) =>
     loadCommand(ctx, args, named),
-  );
-
-  runner.register('cheat', 'Test-only overrides, tracked for removal (disable_revolt)', (args, named) =>
-    cheatCommand(ctx, args, named),
   );
 
   return { runner, ctx, emitter };

@@ -21,17 +21,6 @@
       "description": " #553: cash bumped from $50,000 to $3,000,000 -- this file drills+blasts 4 separate times, each cycle now needing its own driller+drill_rig ($36,000) on top of payroll/upkeep during 4 drilling waits, and the 4th cycle restores its pre-#553 rows:8 cols:8 (64-hole) grid -- required by tests/unit/scenario-defs-blast-visual-coverage.test.ts to stress the projectile-grouping path (#404) -- which a single driller/drill_rig takes over 1000 ticks to land door-to-door even at tight spacing:1."
     },
     {
-      "command": "cheat disable_revolt",
-      "description": "#601-followup (issue #631): this file's own crew is genuinely undersized for its own workload -- direct trace confirms `levelEnded:true, levelEndReason:'worker_revolt'` fires deterministically at the same tick in both command and interaction mode (the 64-hole cycle 4 marathon plus an accumulating idle-driller roster dragging computeAverageMorale down, Employee.ts), not a scenario-file timing bug. Disables the revolt end-condition for this file only (state.revoltDisabled, cheats.ts) so the file can reach the conclusion its own assertions actually describe, as a tracked stopgap -- issue #631 covers removing this cheat once the underlying crew-sizing/revolt-margin gap is fixed for real.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "cheat disable_revolt"
-        }
-      ],
-      "role": "bootstrap"
-    },
-    {
       "command": "employee hire role:driller",
       "description": "#553: drill_hole is now a queued, vehicle-gated action -- a driller physically drives a drill_rig to each hole -- so each of this file's 4 blast cycles needs its own fresh crew (this employee is fired again right after its blast, see below, so an idle survivor from an earlier cycle never drags the roster's average wellbeing down -- sandbox-measured: leaving prior staffed employees idle for the whole ~400-tick file causes a genuine worker_revolt by cycle 4, regardless of how light any single cycle's own workload is).",
       "interaction": [
