@@ -1,6 +1,6 @@
 {
   "name": "needs-replenishment-visual",
-  "description": "Visual check of building replenishment rates. Finding #26 (same root cause as Finding #11's collapse-recovery.json): a direct engine trace shows fatigue does NOT sustainably recover after living_quarters T1 is built — tickNeedGauges keeps draining the gauge at the idle rate throughout an active rest cycle, so each rest's completion burst (~+8) is mostly offset by the drain accrued during its own duration, leaving the employee oscillating near the collapse floor (0-8) indefinitely rather than climbing back to a healthy baseline. Assertions describe this real, verified behavior rather than the originally-intended \"restores gauge values over time\" claim.",
+  "description": "Visual check of building replenishment rates. Finding #26 (fixed by #700): completeRestForEmployee used to apply BUILDING_REPLENISH_RATES exactly once per rest regardless of how many ticks the rest actually spent, despite the rate's own \"per-tick\" doc comment -- a rest's completion burst (~+8 for a tier-1 fatigue rest) was smaller than the idle/working drain the same employee accrued getting to and from the building, so fatigue oscillated near the collapse floor indefinitely instead of climbing back to a healthy baseline. #700 scales the burst by the rest's own NEED_REST_DURATIONS[needKey] (matching the rate's per-tick contract), so a completed rest now genuinely restores the gauge -- the behaviour this file originally set out to prove.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -181,7 +181,7 @@
           "cash",
           "minFatigue"
         ],
-        "note": "still above the fatigue warning threshold (~25) at this point — no rest cycle has started yet"
+        "note": "still above the fatigue warning threshold (~25) at this point \u2014 no rest cycle has started yet"
       }
     },
     {
@@ -219,7 +219,7 @@
           "cash",
           "minFatigue"
         ],
-        "note": "Finding #26: fatigue has now crossed its warning threshold and auto-rest cycles have begun (confirmed via direct trace), but each rest's completion burst is mostly offset by the idle drain accrued during the rest itself — net still decreasing, not recovering"
+        "note": "Finding #26: fatigue has now crossed its warning threshold and auto-rest cycles have begun (confirmed via direct trace), but each rest's completion burst is mostly offset by the idle drain accrued during the rest itself \u2014 net still decreasing, not recovering"
       }
     },
     {
@@ -253,11 +253,13 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash",
+        "increased": [
           "minFatigue"
         ],
-        "note": "Finding #26: by 210 total ticks, fatigue is still oscillating near the collapse floor rather than having genuinely recovered — this file's original claim that replenishment \"restores gauge values over time\" does not hold within this tick budget; same root cause as Finding #11's collapse-recovery.json"
+        "decreased": [
+          "cash"
+        ],
+        "note": "#700: the rest cycle active by this point now applies its replenish rate for the rest's own full duration, not once -- minFatigue climbs from the collapse floor instead of merely holding near it (confirmed live: 30.05 -> 72.15 over this window)."
       }
     },
     {
