@@ -234,6 +234,17 @@ export function deserialize(json: string): GameState {
     }
   }
 
+  // #681: RevoltState.immune was removed as a field entirely (no dedicated
+  // save-version bump). A save from before the removal — or a hand-edited
+  // one — may still carry a stray revolt.immune key; strip it unconditionally
+  // (not gated on save version, since it can appear on a current-version
+  // save too) so the restored object actually conforms to the RevoltState
+  // type it's cast to below.
+  const revoltRaw = obj['revolt'] as Record<string, unknown> | undefined;
+  if (revoltRaw && 'immune' in revoltRaw) {
+    delete revoltRaw['immune'];
+  }
+
   // v4 → v5: collectedOre field added
   if (typeof obj['collectedOre'] !== 'object' || obj['collectedOre'] === null) {
     (obj as Record<string, unknown>)['collectedOre'] = {};
