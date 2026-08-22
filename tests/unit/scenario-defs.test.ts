@@ -1302,7 +1302,7 @@ describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole 
   for (const { command, selector } of TARGETS) {
     it(`step with command "${command}" — final interaction action targeting "${selector}" is type "clickIfPresent"`, () => {
       const scenario = loadScenarioDef('blast-visual-full', SCENARIO_DIR);
-      const step = scenario.steps.find(s => (s as ScenarioStepDef).command === command) as ScenarioStepDef | undefined;
+      const step = scenario.steps.find(s => s.command === command);
       expect(step, `no step found with command "${command}" — has the command string changed?`).toBeDefined();
       expect(step!.interaction, `step "${command}" must have an interaction array`).toBeDefined();
       expect(step!.interaction!.length).toBeGreaterThan(0);
@@ -1320,7 +1320,7 @@ describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole 
 
     it(`step with command "${command}" — every OTHER interaction action is unchanged (still clickSelector or assert)`, () => {
       const scenario = loadScenarioDef('blast-visual-full', SCENARIO_DIR);
-      const step = scenario.steps.find(s => (s as ScenarioStepDef).command === command) as ScenarioStepDef | undefined;
+      const step = scenario.steps.find(s => s.command === command);
       expect(step, `no step found with command "${command}"`).toBeDefined();
       const actions = step!.interaction!;
       const precedingActions = actions.slice(0, -1);
