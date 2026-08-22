@@ -17,7 +17,7 @@
     {
       "command": "campaign start level:tutorial_pit cash:320000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
+      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
       "role": "setup",
       "interaction": [
         {
@@ -262,9 +262,9 @@
       }
     },
     {
-      "command": "set_policy mode:shift_8h",
+      "command": "set_policy mode:continuous",
       "timeout": 15,
-      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so this policy application is what actually makes the building above protect the crew through the grind that follows. Applying the default policy unchanged still counts, same as the later set-policy step.",
+      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so this policy application is what actually makes the building above protect the crew through the grind that follows. Selects Continuous under Shift Mode first, then Apply -- shift_8h's own SHIFT_DURATIONS_TICKS (8) is shorter than a single drill_hole action, so applying it this early interrupted the queued vehicle-gated work below before it could finish (confirmed live pre-#700). Continuous still forces rest on hunger/fatigue (shouldForceRest checks that in every mode), just without the shift-length cap. The later set-policy step (unchanged) still teaches shift_8h once the grind is over.",
       "role": "player",
       "interaction": [
         {
@@ -277,6 +277,10 @@
         },
         {
           "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
         },
         {
           "type": "clickSelector",

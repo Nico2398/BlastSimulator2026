@@ -310,7 +310,7 @@
       }
     },
     {
-      "command": "set_policy mode:shift_8h",
+      "command": "set_policy mode:continuous",
       "timeout": 15,
       "interaction": [
         {
@@ -326,6 +326,10 @@
         },
         {
           "type": "clickSelector",
+          "selector": "#bs-policy-shift button[data-shift-mode=\"continuous\"]"
+        },
+        {
+          "type": "clickSelector",
           "selector": "#bs-policy-apply"
         },
         {
@@ -334,7 +338,7 @@
         }
       ],
       "role": "player",
-      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so the building from the step above needs this policy applied to actually protect the crew through the grind that follows. Applying the default policy unchanged still counts, same as the later set-policy step.",
+      "description": "#681: set-early-policy complete -- the tutorial's new step 3a-ii. A living_quarters alone does not force anyone to rest: forceShiftRestIfNeededByPolicy (GameLoop.ts) only engages once state.sitePolicy.revision > 0, so the building from the step above needs this policy applied to actually protect the crew through the grind that follows. Selects Continuous under Shift Mode first, then Apply -- shift_8h's own SHIFT_DURATIONS_TICKS (8) is shorter than a single drill_hole action, so applying it this early interrupted the queued vehicle-gated work below before it could finish (confirmed live pre-#700). Continuous still forces rest on hunger/fatigue (shouldForceRest checks that in every mode), just without the shift-length cap. The later set-policy step (unchanged) still teaches shift_8h once the grind is over.",
       "expect": {
         "tutorialStep": "build-driving-center"
       }
@@ -656,9 +660,17 @@
       "command": "tick 50",
       "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 50" },
-        { "type": "wait", "durationMs": 500 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "setup",
       "description": "#681: 1/8 of the original single `tick 400` block below, split after `LevelDef.revoltImmune` was removed -- tutorial_pit no longer skips worker_revolt outright, and one unbroken 400-tick block gave the scheduler (autoInsertNeedTasks/shouldForceRest, GameLoop.ts) no intermediate step boundary to react at, so the two-person crew's wellBeing collapsed to 0 and revolted around tick 352 with only the driller and surveyor on site. Chunked into eight `tick 50` steps (50*8=400, same elapsed simulation time this step always advanced) matching the file's own smaller `tick 10`/`tick 25` chunks elsewhere. See the 8th chunk below for the full original rationale and the complete `expect` this whole block always asserted.",
@@ -672,9 +684,17 @@
       "command": "tick 50",
       "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 50" },
-        { "type": "wait", "durationMs": 500 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "setup",
       "description": "#681: 2/8 of the split `tick 400` block (see 1/8 above).",
@@ -688,9 +708,17 @@
       "command": "tick 50",
       "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 50" },
-        { "type": "wait", "durationMs": 500 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "setup",
       "description": "#681: 3/8 of the split `tick 400` block (see 1/8 above).",
@@ -704,9 +732,17 @@
       "command": "tick 50",
       "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 50" },
-        { "type": "wait", "durationMs": 500 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "setup",
       "description": "#681: 4/8 of the split `tick 400` block (see 1/8 above).",
@@ -720,9 +756,17 @@
       "command": "tick 50",
       "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 50" },
-        { "type": "wait", "durationMs": 500 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "setup",
       "description": "#681: 5/8 of the split `tick 400` block (see 1/8 above).",
@@ -736,9 +780,17 @@
       "command": "tick 50",
       "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 50" },
-        { "type": "wait", "durationMs": 500 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "setup",
       "description": "#681: 6/8 of the split `tick 400` block (see 1/8 above).",
@@ -752,9 +804,17 @@
       "command": "tick 50",
       "timeout": 30,
       "interaction": [
-        { "type": "command", "command": "tick 50" },
-        { "type": "wait", "durationMs": 500 },
-        { "type": "screenshot" }
+        {
+          "type": "command",
+          "command": "tick 50"
+        },
+        {
+          "type": "wait",
+          "durationMs": 500
+        },
+        {
+          "type": "screenshot"
+        }
       ],
       "role": "setup",
       "description": "#681: 7/8 of the split `tick 400` block (see 1/8 above).",
@@ -818,7 +878,10 @@
       "command": "tick 225",
       "description": "#554-followup round 4 (issue #586 CI): rounds 1-3's fix (chunked tick-N/event-choose-0 rounds, 9x25 then consolidated to 3x100/3x75) still stalled intermittently in real interaction-mode CI -- root-caused via local reproduction to a genuine deadlock in the tutorial rail's own clock-hold logic (tutorialGuide.ts's decideClock/workSignature), not a tick-budget sizing problem. `createComparisonStep`'s isComplete (tutorialStepHelpers.ts) fires the instant its tracked count first ticks up past its snapshot, so the 'charge' tutorial stage (tutorialSteps.ts) advances to 'sequence' after the FIRST of 9 holes charges, not after all of them, since charging is real queued work post-#554 (was instant pre-#554) -- the same root cause already found and fixed for the 'drill-plan' stage's own tick-400 step above. Fixed at the source (tutorialSteps.ts): both 'charge' and 'sequence' steps now carry `waitsOnWork: true`, but that alone isn't sufficient -- TutorialOverlay's 250ms-interval tickGuide poll runs on a real setInterval, so ANY chunked-tick pattern that returns control to the JS event loop between ticks gives it a chance to fire mid-charge, and once it holds the clock (state.isPaused=true) the deadlock is permanent: every subsequent scenario `tick N` command is capped to exactly 1 real tick per call (events.ts's tickCommand loop checks `if (state.isPaused) break` at the END of each iteration), so real progress crawls far too slowly for the rail's own WORK_GRACE_TICKS(40)-tick recovery window to ever close before this file's own remaining tick budget runs out. Splitting the budget into fewer, bigger rounds (3x100, 3x75) only reduced the number of vulnerable gaps, it didn't close them -- reproduced the identical permanent stall at chargedCount=7 in two independent local runs regardless of chunk shape. Switched to the exact same single-giant-tick pattern the drill-plan step above already uses successfully: one synchronous `tick 225` call blocks the JS main thread for its entire duration, so the poll's setInterval callback cannot fire until it returns -- by which point all 9 holes are already charged and decideClock never gets a chance to observe a mid-charge gap at all. 225 ticks matches this session's earlier chunked-budget total (comfortable margin over the ~215 measured).",
       "interaction": [
-        { "type": "command", "command": "tick 225" }
+        {
+          "type": "command",
+          "command": "tick 225"
+        }
       ],
       "role": "setup",
       "expect": {
@@ -831,7 +894,9 @@
     {
       "command": "event choose 0",
       "interaction": [
-        { "type": "resolveEventIfPending" }
+        {
+          "type": "resolveEventIfPending"
+        }
       ],
       "role": "player",
       "commandOutcome": "either"
@@ -1033,7 +1098,7 @@
         }
       ],
       "role": "player",
-      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one. #554: `contract accept 23` -> `contract accept type:rubble_disposal`, and the interaction click re-scoped to the new `[data-contract-type]` attribute (ContractsPanel.ts, #554) -- charging is real work now too, shifting tickCount (and so the offered pool) in both modes independently and by different amounts, so even the two-different-fixed-ids workaround above stopped being reliable. `type:rubble_disposal` is exactly the contract kind command mode's own id-23 workaround was fighting to avoid (a random ore this pit never mined) and interaction mode's id-24 workaround already deliberately chose -- unifying both modes onto the same selector removes the divergence entirely rather than re-tuning two more ids.",
+      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` \u2014 `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` \u2014 fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one. #554: `contract accept 23` -> `contract accept type:rubble_disposal`, and the interaction click re-scoped to the new `[data-contract-type]` attribute (ContractsPanel.ts, #554) -- charging is real work now too, shifting tickCount (and so the offered pool) in both modes independently and by different amounts, so even the two-different-fixed-ids workaround above stopped being reliable. `type:rubble_disposal` is exactly the contract kind command mode's own id-23 workaround was fighting to avoid (a random ore this pit never mined) and interaction mode's id-24 workaround already deliberately chose -- unifying both modes onto the same selector removes the divergence entirely rather than re-tuning two more ids.",
       "expect": {
         "equals": {
           "activeContractCount": 1

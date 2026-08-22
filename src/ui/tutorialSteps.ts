@@ -105,15 +105,22 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // A living_quarters alone does not force anyone to use it: the modern
   // rest path (forceShiftRestIfNeededByPolicy, GameLoop.ts) only engages
   // once a policy has actually been applied (state.sitePolicy.revision > 0)
-  // — the default policy sitting unapplied in state is not enough. Same
-  // completion pattern as 'set-policy' below: applying the policy already
-  // in force still counts, so a player who reaches the later set-policy step
-  // just clicks Apply again.
+  // — the default policy sitting unapplied in state is not enough.
+  // 'continuous', not 'shift_8h': SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks,
+  // shorter than a single drill_hole action plus its walk, so applying it
+  // this early forces a shift-end interruption before the queued
+  // vehicle-gated work below could ever finish landing a hole (confirmed
+  // live pre-#700). 'continuous' has no shift-length cap (getShiftDurationTicks
+  // returns Infinity) but shouldForceRest's hunger/fatigue-threshold check
+  // still applies in every mode — exactly the protection this step exists
+  // to add, without capping how long a single queued task may run. The
+  // later set-policy step (unchanged) still teaches shift_8h once the grind
+  // is over.
   {
     id: 'set-early-policy',
     titleKey: 'tutorial.step_earlypolicy.title',
     textKey: 'tutorial.step_earlypolicy',
-    commands: ['set_policy mode:shift_8h'],
+    commands: ['set_policy mode:continuous'],
     highlightTarget: TOOLBAR_TARGET.settings,
     captureSnapshot: (state: GameState) => ({
       policyRevision: state.sitePolicy?.revision ?? 0,

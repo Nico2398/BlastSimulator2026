@@ -181,9 +181,18 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'set-early-policy': [
     { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
     {
+      // Continuous, not the shift_8h default: applying shift_8h this early
+      // interrupts the queued drilling/digging work below before it can
+      // finish (SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks, shorter than a
+      // single drill_hole action). Continuous still forces rest on
+      // hunger/fatigue, just without the shift-length cap.
+      target: '#bs-policy-shift button[data-shift-mode="continuous"]',
+      hintKey: 'tutorial.stage.policy_continuous',
+    },
+    {
       target: '#bs-policy-apply',
       hintKey: 'tutorial.stage.policy_apply',
-      also: ['#bs-policy-shift', '#bs-policy-hunger', '#bs-policy-fatigue'],
+      also: ['#bs-policy-hunger', '#bs-policy-fatigue'],
     },
   ],
 
