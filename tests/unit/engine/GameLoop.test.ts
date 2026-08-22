@@ -3889,7 +3889,7 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
       const { employee } = hireEmployee(state.employees, 'driller', rng);
       employee.activeActionId = 1100;
       employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
-      employee.fatigue = 50;
+      employee.fatigue = 10;
 
       processShiftCycle(state, []); // fires forced rest via the applied policy
       resolveArrival(state); // promotes pendingRestDuration/NeedKey -> restTicksRemaining/restNeedKey
@@ -3906,8 +3906,15 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     const tier1 = runToCompletion(1);
     const tier2 = runToCompletion(2);
 
-    expect(tier1.fatigueAfter - 50).toBe(BUILDING_REPLENISH_RATES.fatigue[1]);
-    expect(tier2.fatigueAfter - 50).toBe(BUILDING_REPLENISH_RATES.fatigue[2]);
+    // The rate applies for the rest's own full duration (#700 fix) — a single
+    // tick's worth used to net negative against any real travel to and from
+    // the building, so this now matches BUILDING_REPLENISH_RATES's own
+    // "per-tick" doc comment instead of a flat one-shot bonus. Starting well
+    // below the ceiling (10) so tier 1's smaller total (8 × 8 ticks = 64)
+    // stays under 100 while tier 2's larger one (14 × 8 = 112) saturates —
+    // still two distinct, tier-differentiated outcomes.
+    expect(tier1.fatigueAfter).toBe(Math.min(100, 10 + BUILDING_REPLENISH_RATES.fatigue[1] * NEED_REST_DURATIONS.fatigue));
+    expect(tier2.fatigueAfter).toBe(Math.min(100, 10 + BUILDING_REPLENISH_RATES.fatigue[2] * NEED_REST_DURATIONS.fatigue));
     expect(tier1.fatigueAfter).not.toBe(tier2.fatigueAfter);
     expect(tier1.activeActionId).toBeNull();
     expect(tier2.activeActionId).toBeNull();

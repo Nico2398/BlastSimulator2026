@@ -115,7 +115,7 @@
     },
     {
       "command": "build living_quarters at:15,15",
-      "description": "Placed away from the (10,10) dispatch target (#437) — building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
+      "description": "Placed away from the (10,10) dispatch target (#437) \u2014 building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -228,16 +228,14 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash"
-        ],
-        "increased": [
+          "cash",
           "minFatigue"
         ],
         "equals": {
           "pendingActionCount": 0,
           "collapsedCount": 0
         },
-        "note": "Recalibrated for #680 (tri-state 'working'/'idle'/'resting' need-drain classification): with a rest now correctly drained at 0 while actually resting (previously idle-rate the whole time it was in progress), the auto-inserted rest queued by the tick-80 checkpoint's dip claims, completes, and recovers fatigue within this batch instead of merely slowing its decline -- minFatigue rises 29.8->31.8 rather than continuing to fall, and pendingActionCount is back to 0 (the rest that was pending is claimed, not a fresh one queued) instead of the old calibration's re-dip. collapsedCount stays 0, well above the collapse floor. tickCollapse/collapsedCount is exercised directly (and correctly) by needs-collapse-visual instead."
+        "note": "#700: the tick-80/tick-120 checkpoints' rest cycle now applies its replenish rate for the rest's own full duration (not once), so fatigue recovered comfortably above the 25 warning threshold (50.9 at tick 120) instead of barely clearing it -- no second rest cycle triggers in this window, so fatigue simply continues its natural working decline (50.9 -> 38.9) instead of the old calibration's own partial re-recovery. pendingActionCount stays 0 (nothing queued, the crew is genuinely resting-free right now) and collapsedCount stays 0."
       }
     },
     {
@@ -286,10 +284,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 0,
+          "pendingActionCount": 1,
           "collapsedCount": 0
         },
-        "note": "Recalibrated for #680 (see the earlier 'tick 20' step's note for root cause): the previous step's rest cycle already claimed and completed, so no rest is pending here -- Walt is back to natural fatigue decline while idle, nowhere near collapse. This batch is interrupted early by an unrelated random event (union_heated_seats) at cumulative tick 145, only 5 of the requested 30 ticks run -- not enough for a fresh dip below the warning threshold to queue another rest, so pendingActionCount stays 0 instead of the old calibration's re-dip."
+        "note": "#700: with the stronger, correctly-scaled replenishment above, fatigue's natural working decline reaches the 25 warning threshold a few ticks later than the old calibration did, landing inside this batch instead of the next one -- a proactive rest is queued (pendingActionCount 1, confirmed via direct trace) but not yet claimed/completed by the point this random-event interruption cuts the batch short at 5 of 30 requested ticks. collapsedCount stays 0, well above the collapse floor."
       }
     },
     {
