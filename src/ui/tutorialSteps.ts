@@ -97,7 +97,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     'tutorial.step_livingquarters.title',
     'tutorial.step_livingquarters',
     (s) => countBuildingsOfType(s, 'living_quarters'),
-    ['build living_quarters at:13,4'],
+    ['build living_quarters at:18,14'],
     TOOLBAR_TARGET.build,
   ),
 

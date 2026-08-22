@@ -138,14 +138,18 @@ describe('en.json / fr.json — key-set parity', () => {
     // manual Break button (fragment_debris/boulder-breaking is self-dispatching
     // since #552, same as hauling) and removed its now-dead ui.vehicles.break
     // key from both locales.
-    // Baseline is now 3277 (up from 3273): #633 added 4 new
+    // Baseline is now 3283 (up from 3277): #681 added 6 new keys for the
+    // build-living-quarters/set-early-policy tutorial steps
+    // (tutorial.step_livingquarters/.title, tutorial.step_earlypolicy/.title,
+    // tutorial.stage.build_living_quarters, tutorial.stage.policy_continuous),
+    // both locales translated. Before that, #633 added 4 new
     // blast.validation.* keys (charge_loading, missing_charge, missing_delay,
     // protected_position) so ValidationError.issue in BlastPlan.ts can carry
     // translation keys instead of raw English prose, both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3277);
+    expect(Object.keys(en).length).toBe(3283);
   });
 });
 

@@ -132,10 +132,16 @@ const REGION = {
   // drilling is now vehicle-gated — the driller needs somewhere to train for
   // and park a drill_rig before drill-plan can ever land a hole).
   drivingCenter: { x1: 10, z1: 8, x2: 10, z2: 8, exact: true },
-  // One tile, same origin-corner convention. Clear of the warehouse (6,6,
-  // footprint 4×4) and the driving center (10,8) — x disjoint from both, so
-  // the exact z bound between them never matters.
-  livingQuarters: { x1: 13, z1: 4, x2: 13, z2: 4, exact: true },
+  // One tile, same origin-corner convention. #689-followup: (13,4) sat far
+  // enough from the drill grid (20-26,20-26) that the crew's own commute
+  // there and back roughly broke even against the rest gained, leaving them
+  // to oscillate near collapse instead of recovering — the mitigation these
+  // steps exist to teach couldn't actually keep up. Moved to (18,14): north
+  // of the box-cut ramp (x=16, z19-31 — 3 tiles of x clearance, well clear on
+  // z) and the drill grid itself (footprint 3×3 lands at x:18-20, z:14-16,
+  // bordering but not overlapping the grid's own x1:20/z1:20), cutting the
+  // round trip enough for a genuine net recovery instead of a near-wash.
+  livingQuarters: { x1: 18, z1: 14, x2: 18, z2: 14, exact: true },
 } as const satisfies Record<string, TileRegion>;
 
 /** Open the Crew panel, then hire one role. */
@@ -180,19 +186,32 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
 
   'set-early-policy': [
     { target: TOOLBAR_TARGET.ops, hintKey: 'tutorial.stage.open_ops' },
+    // #689-followup: one stage, not two sequential ones — resolveStageIndex
+    // (tutorialGuide.ts) picks the LAST reachable stage, and #bs-policy-apply
+    // is unconditionally reachable the instant the panel opens (nothing
+    // disables it before a shift mode is chosen). A separate later stage
+    // targeting it is therefore never actually reached as its own stage: the
+    // rail resolves straight past "click Continuous" to "apply" the moment
+    // Operations opens, so a player (or this file's own interaction-mode
+    // scenario) can click Apply immediately and silently keep the shift_8h
+    // default instead of Continuous -- confirmed live (interaction mode
+    // reported the Continuous button itself as inert/unreachable). Matches
+    // the later 'set-policy' stage's own working shape below: Apply is the
+    // stage's target (so the rail actually reaches it), with the controls
+    // that legitimately need to be clickable alongside it -- shift-mode
+    // included -- allowed via `also`, rather than gated behind a stage of
+    // their own that can never become active.
     {
       // Continuous, not the shift_8h default: applying shift_8h this early
       // interrupts the queued drilling/digging work below before it can
       // finish (SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks, shorter than a
       // single drill_hole action). Continuous still forces rest on
-      // hunger/fatigue, just without the shift-length cap.
+      // hunger/fatigue, just without the shift-length cap. Highlighted
+      // target stays the Continuous button (not Apply) so the glow points at
+      // the one choice this early step actually requires the player to make.
       target: '#bs-policy-shift button[data-shift-mode="continuous"]',
       hintKey: 'tutorial.stage.policy_continuous',
-    },
-    {
-      target: '#bs-policy-apply',
-      hintKey: 'tutorial.stage.policy_apply',
-      also: ['#bs-policy-hunger', '#bs-policy-fatigue'],
+      also: ['#bs-policy-apply', '#bs-policy-hunger', '#bs-policy-fatigue'],
     },
   ],
 

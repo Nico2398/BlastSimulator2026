@@ -92,6 +92,8 @@ describe('tutorialSteps', () => {
       'hire-surveyor',
       'survey',
       'hire-driller',
+      'build-living-quarters',
+      'set-early-policy',
       'build-driving-center',
       'train-driller',
       'buy-drill-rig-assign',
