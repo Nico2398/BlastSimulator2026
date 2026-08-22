@@ -870,7 +870,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "note": "#682: the level must not have ended (e.g. via a silent worker_revolt) by the time the scenario's blasts are all fired"
+      }
     }
   ],
   "shots": [

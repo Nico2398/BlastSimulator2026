@@ -2609,7 +2609,7 @@
       "description": "#682: straggler sweep, seed:42/command-mode-specific. The 24 charge-relief hires above are hired (and the main Charge All above them ordered) once the 8 working drillers' own tick-150 drilling wait plateaus -- but those same 8 drillers still hold a handful of never-completing drill_hole orders (a genuine, permanent pathing deadlock in this tight 8x8/spacing:1 grid, confirmed by direct probe: orderedHoleCount pins at a nonzero floor no matter how long the wait runs, it does not eventually reach 0) -- ALSO still stand ready to pick up any of THEIR OWN drilling successors that do land during the long charge-drain wait above, since a driller idle between rest cycles is still 'blasting'-qualified. On this exact seed, 8 holes (H33/H37/H41/H42/H50/H51/H57/H60) land during that window, after the Charge All snapshot above already fired -- they show as 'Missing charge' at blast time otherwise. Reissuing Charge All wholesale here (not per-hole) was tried and rejected: it re-dispatches a charge_hole action for every ALREADY-loaded hole too, not just new ones (dispatchChargeAction/mining.ts has no already-loaded guard), forcing a full second charging pass that reliably re-crosses REVOLT_TICKS on its own (sandbox-confirmed). Named per-hole overrides here touch only the real stragglers, matching blast-visual-full.json's own H1/H2 override convention. `commandOutcome: either` on each: a hole not in this exact list in a different run/mode either was already charged by the main round (redundant, harmless) or was never drilled at all (refused, harmless) -- either way nothing here is required to succeed for blast to still find its own drilled+charged holes valid.",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H33\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -2620,7 +2620,7 @@
       "command": "charge hole:H37 explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H37\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -2631,7 +2631,7 @@
       "command": "charge hole:H41 explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H41\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -2642,7 +2642,7 @@
       "command": "charge hole:H42 explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H42\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -2653,7 +2653,7 @@
       "command": "charge hole:H50 explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H50\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -2664,7 +2664,7 @@
       "command": "charge hole:H51 explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H51\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -2675,7 +2675,7 @@
       "command": "charge hole:H57 explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H57\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -2686,7 +2686,7 @@
       "command": "charge hole:H60 explosive:boomite amount:8 stemming:0.5",
       "interaction": [
         {
-          "type": "clickSelector",
+          "type": "clickIfPresent",
           "selector": "#bs-blast-panel [data-hole=\"H60\"] [data-action=\"charge-hole\"]"
         }
       ],
@@ -3089,7 +3089,14 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "levelEnded": false,
+          "levelEndReason": null
+        },
+        "note": "#682: the level must not have ended (e.g. via a silent worker_revolt) by the time the scenario's blasts are all fired"
+      }
     },
     {
       "command": "inspect 60,60,0",
