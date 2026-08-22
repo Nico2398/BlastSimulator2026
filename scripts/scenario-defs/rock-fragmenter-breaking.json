@@ -3,18 +3,18 @@
   "description": "Chapter 5/2 (#484), superseded by #552's self-dispatching hauling/fragmenting: an undercharged blast leaves an oversized boulder that auto-dispatch routes to a crewed rock_fragmenter (fragment_debris PendingAction) rather than a debris_hauler (haul_debris) -- no player command or button picks which vehicle goes where any more, and there is no rejection to test either, since an oversized fragment simply never spawns a haul_debris action in the first place. A resulting sub-fragment is then hauled and stored automatically once a freight_warehouse exists. Buy/driver-assign purchases still go through real Vehicles-panel clicks; the break/haul actions themselves are proven by ticking forward and reading the automatic outcome.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000",
-      "description": "#553: cash bumped from $100,000 to $150,000 to cover the driller/drill_rig this file now needs (see below) on top of the original driver/debris_hauler/driver/rock_fragmenter/freight_warehouse shopping list.",
+      "command": "new_game seed:42 cash:165000",
+      "description": "#553: cash bumped from $100,000 to $150,000 to cover the driller/drill_rig this file now needs (see below) on top of the original driver/debris_hauler/driver/rock_fragmenter/freight_warehouse shopping list. #697-followup: bumped again to $165,000 -- the earlier #697 fix (a `time pause`/`time resume` bracket around the two freight_warehouse build clicks) was built on a wrong diagnosis and did not hold in CI (still failed, same disabled-button error, PR #706). The real mechanism: the 'event choose 0' step right after the tick-28 charge block (below) deliberately chains up to three extra `tick 15` rounds in interaction mode only (its own `interaction` array, vs. command mode's single-command `event choose 0` with no ticks) to guarantee charging survives an event interruption -- #554-followup/#680's own fix for that. That makes interaction mode run up to 45 ticks further ahead of command mode by absolute tickCount, and every tick since then reads a different RNG draw (`Random(seed + tickCount)`), so a downstream `tick 30` block that command mode's own trace shows getting cut short by a mid-block event runs to completion instead in interaction mode -- 196 vs. 135 ticks by the freight_warehouse builds, sandbox-confirmed. Pausing around the builds changes nothing because the extra draw already happened during charging, well before the pause bracket starts; isPaused stays true throughout and tickCount is identical entering and leaving both build steps. Fix: a bigger cash cushion instead of a pause that was never the actual leak.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000"
+          "command": "new_game seed:42 cash:165000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000,
+          "cash": 165000,
           "holeCount": 0
         }
       }
@@ -591,6 +591,7 @@
     },
     {
       "command": "build freight_warehouse at:13,13",
+      "description": "#697-followup: no longer bracketed by a `time pause`/`time resume` pair -- that #697 fix addressed real-time wall-clock drift, which this scenario never actually has (`?scenarioMode=1` disables main.ts's auto-tick loop in every interaction-mode harness that runs this file). The real deficit is the tick-count divergence the 'new_game' step's own description now explains; the bigger cash cushion there is the actual fix.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -625,7 +626,7 @@
         "decreased": [
           "cash"
         ],
-        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) — decreased, not an exact value, since this step's baseline already carries the tick 30 step's real-time drift (see that step's note)"
+        "note": "freight_warehouse T1 constructionCost = 15000 (balance.ts) — decreased, not an exact value, since this step's baseline already carries every tick step's own drain, plus interaction mode's larger tick count from the event-retry chain (see the new_game step's description)"
       }
     },
     {
