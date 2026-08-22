@@ -228,14 +228,16 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
+          "cash"
+        ],
+        "increased": [
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1,
+          "pendingActionCount": 0,
           "collapsedCount": 0
         },
-        "note": "Recalibrated for #547 (see the 'tick 80' step's note above for the root cause): with the dispatch-completion leak fixed, Walt now genuinely cycles between finishing work, idling, and being auto-routed to rest well above the collapse floor -- so collapsedCount stays 0 here instead of the old calibration's forced collapse, which only happened because a perpetually-'busy' employee (the pre-#547 bug) could never be idle-claimed for its own proactive rest and so drained straight through it. pendingActionCount 0->1 is a fresh dip below the fatigue warning threshold queuing another auto-inserted rest -- genuine proactive queuing, not collapse recovery. tickCollapse/collapsedCount is exercised directly (and correctly) by needs-collapse-visual instead."
+        "note": "Recalibrated for #680 (tri-state 'working'/'idle'/'resting' need-drain classification): with a rest now correctly drained at 0 while actually resting (previously idle-rate the whole time it was in progress), the auto-inserted rest queued by the tick-80 checkpoint's dip claims, completes, and recovers fatigue within this batch instead of merely slowing its decline -- minFatigue rises 29.8->31.8 rather than continuing to fall, and pendingActionCount is back to 0 (the rest that was pending is claimed, not a fresh one queued) instead of the old calibration's re-dip. collapsedCount stays 0, well above the collapse floor. tickCollapse/collapsedCount is exercised directly (and correctly) by needs-collapse-visual instead."
       }
     },
     {
@@ -284,10 +286,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1,
+          "pendingActionCount": 0,
           "collapsedCount": 0
         },
-        "note": "Recalibrated for #547 (see the 'tick 80' step's note for root cause): there is no collapse-forced rest to recover from -- the previous step's fresh rest cycle (queued -> claimed -> completed) already finished, and Walt is back to natural fatigue decline while idle. pendingActionCount is 1 again: the decline crosses the warning threshold a second time within this batch, auto-inserting (and, once idle, claiming) another proactive rest -- nowhere near collapse. This batch is interrupted early by an unrelated random event (politics_mining_expo) -- the decline is already visible in however many ticks actually ran."
+        "note": "Recalibrated for #680 (see the earlier 'tick 20' step's note for root cause): the previous step's rest cycle already claimed and completed, so no rest is pending here -- Walt is back to natural fatigue decline while idle, nowhere near collapse. This batch is interrupted early by an unrelated random event (union_heated_seats) at cumulative tick 145, only 5 of the requested 30 ticks run -- not enough for a fresh dip below the warning threshold to queue another rest, so pendingActionCount stays 0 instead of the old calibration's re-dip."
       }
     },
     {

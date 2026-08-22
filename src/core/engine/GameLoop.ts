@@ -10,7 +10,7 @@ import type { EventContext } from '../events/EventPool.js';
 import { tickEventSystem, type FiredEvent } from '../events/EventSystem.js';
 import { detectTrafficJam } from '../events/EventEngine.js';
 import { checkCollapse, gainXp, type NeedKey, type Employee, type SkillCategory } from '../entities/Employee.js';
-import { replenishNeed } from '../entities/EmployeeNeeds.js';
+import { replenishNeed, type EmployeeWorkState } from '../entities/EmployeeNeeds.js';
 import { computeTaskXpAwards } from '../entities/EmployeeXpRules.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { addExpense } from '../economy/Finance.js';
@@ -571,6 +571,16 @@ export function tryContinueVehicleGatedAction(
   vehicle.reservedForActionId = claimed.id;
   promoteActionToActive(state, employee, claimed);
   return true;
+}
+
+/**
+ * Work-state classification for NEED_DRAIN_RATES purposes (#680).
+ * See EmployeeWorkState for the three states.
+ */
+export function employeeWorkState(emp: Employee): EmployeeWorkState {
+  if (emp.restTicksRemaining !== null) return 'resting';
+  if (emp.activeActionId !== null && emp.pendingRestDuration === null) return 'working';
+  return 'idle';
 }
 
 // ── Need restoration routing ──

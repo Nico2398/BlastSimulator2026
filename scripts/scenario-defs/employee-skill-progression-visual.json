@@ -234,9 +234,9 @@
           "cash"
         ],
         "equals": {
-          "pendingActionCount": 3
+          "pendingActionCount": 2
         },
-        "note": "employee A's fatigue crosses the collapse threshold around cumulative tick 61 (continuous work, no rest building) -- #549's interruptActiveAction correctly pauses the first dispatch (back to 'queued', its progress preserved on payload.durationTicks) and starts a genuine rest instead of silently losing or double-progressing it. Count is 3, not 1: the interrupted first dispatch (queued) + the still-reserved second dispatch (assigned, holderId unchanged) + the new self-claimed 'rest' PendingAction all count. By the next checkpoint (tick 150) the rest completes, the first dispatch resumes and finishes, and the second dispatch is claimed -- count drops back down."
+        "note": "Recalibrated for #680 (tri-state 'working'/'idle'/'resting' need-drain classification): employee A's fatigue still crosses the collapse threshold at cumulative tick 49 (continuous work, no rest building) -- #549's interruptActiveAction still pauses the first dispatch (back to 'queued') and starts a genuine rest. The rest itself now drains actively-resting need gauges at 0 instead of the idle rate the whole time it's in progress, so it completes sooner -- by cumulative tick 65, well inside this checkpoint's 71-tick window -- instead of still being in progress at tick 71. By this checkpoint's own end the rest has already completed, the first dispatch has resumed (in_progress), and only it plus the still-reserved second dispatch (assigned) remain pending -- count is 2, not 3."
       }
     },
     {

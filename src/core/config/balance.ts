@@ -852,9 +852,13 @@ export function getResearchTaskDef(type: BuildingType, tier: 2 | 3): ResearchTas
 
 /** Drain rates per tick for each need gauge. */
 export const NEED_DRAIN_RATES = {
-  hunger:  { working: 1,   idle: 0.5  },
-  fatigue: { working: 2,   idle: 0.5  },
-  breakNeed: { working: 0.8, idle: 0 },
+  // `resting` tier (#680): drain rate while actively resting
+  // (restTicksRemaining !== null). Needs hold steady during the rest — they
+  // don't keep draining — so the accrued drain can't outpace and undermine
+  // the completion-time replenishment the rest itself delivers.
+  hunger:  { working: 1,   idle: 0.5,  resting: 0 },
+  fatigue: { working: 2,   idle: 0.5,  resting: 0 },
+  breakNeed: { working: 0.8, idle: 0,  resting: 0 },
 } as const;
 
 /** Threshold values for productivity/morale effects. */
