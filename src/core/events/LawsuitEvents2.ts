@@ -189,7 +189,7 @@ export const LAWSUIT_EVENTS_2: EventDef[] = [
     weight: (s) => 0.2 + 0.3 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.deathCount > 0,
     options: [
-      { cashDelta: -10000, scoreDelta: { safety: 10, wellBeing: 8 }, effectTag: 'memorial_shrine' },
+      { cashDelta: -10000, scoreDelta: { safety: 10, wellBeing: 8 }, effectTag: 'memorial_shrine', resolvesDeathCrisis: true },
       { cashDelta: -5000, scoreDelta: { safety: -3 }, effectTag: 'exorcist_hired' },
       { cashDelta: -30000, scoreDelta: { safety: 15, wellBeing: 12 }, effectTag: 'ghost_satisfaction',
         probability: 0.5, alt: { cashDelta: -30000, scoreDelta: { safety: 5 }, effectTag: 'ghost_unsatisfied' } },

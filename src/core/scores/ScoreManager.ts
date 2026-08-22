@@ -147,13 +147,13 @@ function applyDecay(value: number, rate: number): number {
 }
 
 /**
- * Re-pin `safety` to its floor (0) when an active "crisis" (recent
- * accidents) is still ongoing, even after some other code has nudged the
- * score off the floor. No-op once the crisis has ended — the score is left
+ * Re-pin `safety` to its floor (0) when an active "crisis" (an unresolved
+ * death) is still ongoing, even after some other code has nudged the score
+ * off the floor. No-op once the crisis has ended — the score is left
  * untouched, whatever value it holds.
  */
-export function reassertFloorIfCrisisActive(state: ScoreState, recentAccidents: number): void {
-  if (recentAccidents > 0) {
+export function reassertFloorIfCrisisActive(state: ScoreState, crisisActive: number): void {
+  if (crisisActive > 0) {
     state.safety = 0;
   }
 }

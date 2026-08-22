@@ -232,7 +232,7 @@ export const UNION_EVENTS_1: EventDef[] = [
     weight: (s) => 0.15 + 0.3 * (1 - r.sf(s)),
     canFire: (ctx) => ctx.deathCount > 0,
     options: [
-      { cashDelta: -30000, scoreDelta: { wellBeing: 15, safety: 10 }, effectTag: 'ghost_paid' },
+      { cashDelta: -30000, scoreDelta: { wellBeing: 15, safety: 10 }, effectTag: 'ghost_paid', resolvesDeathCrisis: true },
       { cashDelta: 0, scoreDelta: { safety: -15, wellBeing: -10 }, effectTag: 'ghost_angry' },
       { cashDelta: -5000, corruptionDelta: 8, scoreDelta: { wellBeing: 5 }, effectTag: 'ghost_exorcised' },
       { cashDelta: -50000, scoreDelta: { wellBeing: 20, safety: 15 }, effectTag: 'ghost_promoted',
