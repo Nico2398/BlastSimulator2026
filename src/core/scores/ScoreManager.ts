@@ -146,4 +146,14 @@ function applyDecay(value: number, rate: number): number {
   return value;
 }
 
+/**
+ * Re-pin a score to its floor when an active "crisis" (recent accidents) is
+ * still ongoing, even after some other code has nudged the score off the
+ * floor. Precautionary fallback stub for #698 — unused unless the
+ * scenario-JSON fix branch proves insufficient.
+ */
+export function reassertFloorIfCrisisActive(_state: ScoreState, _recentAccidents: number): void {
+  // TODO: implement
+}
+
 export type { ScoreId };
