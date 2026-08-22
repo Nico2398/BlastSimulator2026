@@ -49,10 +49,22 @@ export interface DamageState {
   deathCount: number;
   /** Total number of blasts detonated in this session. */
   blastCount: number;
+  /**
+   * Tick of the most recent *deliberate* safety-recovery event consequence —
+   * a chosen ("event choose") outcome that both raises `safety` and costs
+   * cash, the only signal the current event data (LawsuitEvents1.ts's
+   * settle_death_suit/memorial_fund/plea_deal/etc.) carries for "the player
+   * paid to fix this" as opposed to an incidental score nudge. `null` until
+   * the first such resolution. Consumed by tickCommand (src/console/commands/
+   * events.ts) to decide whether the post-death safety floor (#698) is still
+   * active: a death after this tick re-arms it, a recovery after the last
+   * death lifts it. Time-unbounded by design — not reset or windowed by tick.
+   */
+  lastSafetyRecoveryTick: number | null;
 }
 
 export function createDamageState(): DamageState {
-  return { accidents: [], lawsuitPending: false, deathCount: 0, blastCount: 0 };
+  return { accidents: [], lawsuitPending: false, deathCount: 0, blastCount: 0, lastSafetyRecoveryTick: null };
 }
 
 // ── Processing ──

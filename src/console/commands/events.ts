@@ -178,7 +178,24 @@ export function tickCommand(
       employeeCount: state.employees.employees.length,
     };
     updateScores(state.scores, scoreInputs);
-    reassertFloorIfCrisisActive(state.scores, recentAccidents);
+    // #698: recentAccidents (above) is windowed to the last 10 ticks, which
+    // is right for the sfDelta hit but wrong for deciding whether the
+    // post-death safety floor is still active — interaction-mode tick drift
+    // means a positive `safety` delta from an unrelated resolved event (an
+    // EventResolver.applyConsequence write, which bypasses this floor
+    // entirely) can land 36+ ticks after the accident that set the floor,
+    // well outside that window. crisisActiveCount is unbounded in time
+    // instead: a death keeps the floor engaged for as long as no deliberate
+    // recovery (see the 'choose' case above / DamageState.
+    // lastSafetyRecoveryTick) has resolved since, and a later death re-arms
+    // it even after a recovery.
+    const lastDeathTick = state.damage.accidents.reduce(
+      (max, a) => (a.type === 'death' && a.tick > max ? a.tick : max), -1,
+    );
+    const recoveryTick = state.damage.lastSafetyRecoveryTick;
+    const crisisActiveCount =
+      state.damage.deathCount > 0 && (recoveryTick === null || recoveryTick < lastDeathTick) ? 1 : 0;
+    reassertFloorIfCrisisActive(state.scores, crisisActiveCount);
 
     // 8. Employee needs — drain gauges, update morale, check collapse
     for (const emp of state.employees.employees) {
@@ -545,6 +562,17 @@ export function eventCommand(
       }
       if (result.corruptionChange !== 0) {
         state.corruption.level += result.corruptionChange;
+      }
+      // #698: a chosen consequence that both raises `safety` and costs cash
+      // is the only "deliberate recovery" signal the current event data
+      // carries (LawsuitEvents1.ts's settle_death_suit/memorial_fund/
+      // plea_deal/etc. are all shaped this way — see DamageState.
+      // lastSafetyRecoveryTick's own doc comment). Record it so tickCommand's
+      // post-death floor reassertion doesn't re-pin `safety` back to 0 on the
+      // very next tick and silently erase the recovery the player just paid for.
+      const safetyGain = result.scoreChanges['safety'];
+      if (safetyGain !== undefined && safetyGain > 0 && result.cashChange < 0) {
+        state.damage.lastSafetyRecoveryTick = state.tickCount;
       }
       // Resume the game after resolving the event (tick pauses on event)
       state.isPaused = false;
