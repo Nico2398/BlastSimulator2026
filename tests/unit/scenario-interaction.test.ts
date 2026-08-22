@@ -14,7 +14,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Page } from 'puppeteer';
-import { executeActionOnPage } from '../../scripts/shared/interaction-executor.js';
+import { executeActionOnPage, resolveEventIfPendingOnPage } from '../../scripts/shared/interaction-executor.js';
 import { describeStepFailure } from '../../scripts/scenario-interaction-runner.js';
 import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 
@@ -442,5 +442,125 @@ describe('describeStepFailure', () => {
     expect(describeStepFailure(step, 'raw string throw')).toBe(
       'player step "blast" did not complete: raw string throw',
     );
+  });
+});
+
+// Issue #699 — CI deterministically fails the `vibration-budget` interaction
+// scenario: a `clickSelector` step throws "element is covered by div" because
+// a timer/event overlay (`.bs-confirm-overlay`) can land in the real-time gap
+// between a `resolveEventIfPending` action and the next `clickSelector`
+// action. The fix extracts the pending-check + dialog-resolve logic already
+// inline in `case 'resolveEventIfPending'` into a standalone
+// `resolveEventIfPendingOnPage` helper, then has `clickSelector`'s own poll
+// loop call it once as a last-resort retry when the deadline is reached and
+// the last probed reason was `'covered'`.
+describe('resolveEventIfPendingOnPage (issue #699)', () => {
+  it('returns false promptly, touching the page exactly once, when no event is pending', async () => {
+    const evaluate = vi.fn().mockResolvedValueOnce(false); // __gameState().pendingEvent -> false
+    const page = fakePage({ evaluate });
+
+    const resolved = await resolveEventIfPendingOnPage(page, 1000);
+
+    expect(resolved).toBe(false);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(page.click).not.toHaveBeenCalled();
+  });
+
+  it('clicks the event dialog\'s choice (and dismiss, if present) and returns true when an event is genuinely pending', async () => {
+    const evaluate = vi.fn()
+      // __gameState().pendingEvent -> true
+      .mockResolvedValueOnce(true)
+      // __gameState().levelEndReason -> null (level still running)
+      .mockResolvedValueOnce(false)
+      // waitUsableAndClick's own __probeSelector poll for the choice button: usable immediately
+      .mockResolvedValueOnce(null)
+      // waitUsableAndClick's own __probeSelector poll for the dismiss button: usable immediately
+      .mockResolvedValueOnce(null);
+    const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
+
+    const resolved = await resolveEventIfPendingOnPage(page, 8000);
+
+    expect(resolved).toBe(true);
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-choice');
+    expect(page.click).toHaveBeenCalledWith('#bs-event-dialog .bs-event-dismiss');
+  });
+
+  it('resolves via the console (not a dialog click) and returns true when the level has already ended', async () => {
+    const evaluate = vi.fn()
+      // __gameState().pendingEvent -> true
+      .mockResolvedValueOnce(true)
+      // __gameState().levelEndReason -> non-null (level already over)
+      .mockResolvedValueOnce(true)
+      // __gameConsole('event choose 0')
+      .mockResolvedValueOnce(undefined);
+    const page = fakePage({ evaluate });
+
+    const resolved = await resolveEventIfPendingOnPage(page, 8000);
+
+    expect(resolved).toBe(true);
+    expect(evaluate).toHaveBeenCalledTimes(3);
+    expect(page.click).not.toHaveBeenCalled();
+  });
+});
+
+describe('clickSelector retries once via resolveEventIfPendingOnPage when covered by a pending event (issue #699)', () => {
+  it('resolves the click instead of throwing "element is covered by div" once the covering event dialog clears', async () => {
+    const targetSelector = '#bs-vibration-panel .bs-vibration-confirm-btn';
+    let targetCalls = 0;
+    let zeroArgCalls = 0;
+    let resolved = false;
+
+    const evaluate = vi.fn(async (_fn: unknown, arg?: string) => {
+      if (arg === targetSelector) {
+        targetCalls++;
+        // Once the internal retry has resolved the pending event, the
+        // overlay is gone and the target is usable again.
+        if (resolved) return null;
+        if (targetCalls <= 2) return 'covered'; // still covered while polling
+        // 3rd+ probe while still unresolved: this is inspectSelector's own
+        // full report, read back right before the (today, unretried) throw.
+        return {
+          found: true,
+          pointerEvents: 'auto',
+          display: 'block',
+          visibility: 'visible',
+          disabled: false,
+          width: 120,
+          height: 32,
+          matchCount: 1,
+          covering: 'div.bs-confirm-overlay',
+        };
+      }
+      if (arg === '#bs-event-dialog .bs-event-choice') return null;
+      if (arg === '#bs-event-dialog .bs-event-dismiss') return null;
+      if (arg === undefined) {
+        zeroArgCalls++;
+        // 1st zero-arg call: __gameState().pendingEvent -> true
+        if (zeroArgCalls === 1) return true;
+        // 2nd zero-arg call: __gameState().levelEndReason -> null (not
+        // ended) — this is also the moment the covering overlay clears,
+        // since it only happens once resolveEventIfPendingOnPage actually
+        // ran and resolved the dialog.
+        if (zeroArgCalls === 2) {
+          resolved = true;
+          return false;
+        }
+        return undefined;
+      }
+      return null;
+    });
+    const page = fakePage({ evaluate, click: vi.fn().mockResolvedValue(undefined) });
+    const step: ScenarioStepDef = {
+      command: 'event choose 0',
+      description: 'confirm vibration fine dialog',
+      role: 'player',
+      interaction: [{ type: 'clickSelector', selector: targetSelector }],
+    };
+    // Short poll timeout so the covered-by-div deadline is reached quickly
+    // (the poll loop's own retry interval is a fixed 150ms real-time sleep).
+    const action = { type: 'clickSelector' as const, selector: targetSelector, timeout: 60 };
+
+    await expect(executeActionOnPage(page, action, step)).resolves.toBeUndefined();
+    expect(page.click).toHaveBeenCalledWith(targetSelector, { button: 'left' });
   });
 });
