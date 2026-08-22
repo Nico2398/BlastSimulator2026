@@ -581,12 +581,124 @@
       }
     },
     {
-      "command": "tick 400",
-      "timeout": 120,
+      "command": "tick 50",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "tick 50" },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "screenshot" }
+      ],
+      "role": "setup",
+      "description": "#681: 1/8 of the original single `tick 400` block below, split after `LevelDef.revoltImmune` was removed -- tutorial_pit no longer skips worker_revolt outright, and one unbroken 400-tick block gave the scheduler (autoInsertNeedTasks/shouldForceRest, GameLoop.ts) no intermediate step boundary to react at, so the two-person crew's wellBeing collapsed to 0 and revolted around tick 352 with only the driller and surveyor on site. Chunked into eight `tick 50` steps (50*8=400, same elapsed simulation time this step always advanced) matching the file's own smaller `tick 10`/`tick 25` chunks elsewhere. See the 8th chunk below for the full original rationale and the complete `expect` this whole block always asserted.",
+      "expect": {
+        "equals": {
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "tick 50" },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "screenshot" }
+      ],
+      "role": "setup",
+      "description": "#681: 2/8 of the split `tick 400` block (see 1/8 above).",
+      "expect": {
+        "equals": {
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "tick 50" },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "screenshot" }
+      ],
+      "role": "setup",
+      "description": "#681: 3/8 of the split `tick 400` block (see 1/8 above).",
+      "expect": {
+        "equals": {
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "tick 50" },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "screenshot" }
+      ],
+      "role": "setup",
+      "description": "#681: 4/8 of the split `tick 400` block (see 1/8 above).",
+      "expect": {
+        "equals": {
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "tick 50" },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "screenshot" }
+      ],
+      "role": "setup",
+      "description": "#681: 5/8 of the split `tick 400` block (see 1/8 above).",
+      "expect": {
+        "equals": {
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "tick 50" },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "screenshot" }
+      ],
+      "role": "setup",
+      "description": "#681: 6/8 of the split `tick 400` block (see 1/8 above).",
+      "expect": {
+        "equals": {
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "timeout": 30,
+      "interaction": [
+        { "type": "command", "command": "tick 50" },
+        { "type": "wait", "durationMs": 500 },
+        { "type": "screenshot" }
+      ],
+      "role": "setup",
+      "description": "#681: 7/8 of the split `tick 400` block (see 1/8 above).",
+      "expect": {
+        "equals": {
+          "levelEndReason": null
+        }
+      }
+    },
+    {
+      "command": "tick 50",
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "tick 400"
+          "command": "tick 50"
         },
         {
           "type": "wait",
@@ -597,7 +709,7 @@
         }
       ],
       "role": "setup",
-      "description": "#553: the driller drives the rig to all 9 ordered holes and sinks them one at a time. A lone driller with no living quarters collapses from fatigue partway through and resumes, which is why the pad is this large -- sandbox-measured. #586 CI follow-up: this step used to be role:'player' driving `waitForTutorialStep(stepId:'charge')` to hold the real clock -- but the 'drill-plan' tutorial stage (tutorialSteps.ts/tutorialStepHelpers.ts's createComparisonStep) completes the instant `drillHoles.length` first exceeds its snapshot, i.e. after the FIRST of the 9 holes lands, not after all of them. waitForTutorialStep's own poll loop breaks the moment the rail reaches 'charge', which on a real CI run landed with only 1 of 9 holes drilled (orderedHoleCount dropped, not 0) -- a genuine early-exit in the rail's own gating, not pacing flakiness, so a longer timeout could never have fixed it (the loop does not wait out the timeout, it exits on the very next 200ms poll once the rail flips). Switched to the same hand-measured `tick N`, role:'setup' pattern `.claude/rules/scenario-defs.md` already documents for 'a wait for queued work to land' and that tutorial-playthrough.json/blast-basic.json already use for this identical post-drill_plan wait: the console `tick 400` command runs the full 400 ticks synchronously in one browser-JS turn, landing all 9 holes before the tutorial's own 250ms-interval poll (TutorialOverlay's tickGuide) ever gets a chance to observe the first one and flip the rail early. The `wait 500ms` after it just lets that poll catch up so `expect.tutorialStep` below reads the post-tick rail state rather than a stale pre-tick one. #616 (origin/main) confirmed the drill grid as 3x3/9-hole as part of its own tick-budget fix; #555 (this merge) layers the box-cut/rock-digger steps in front of it on the same real ticked clock, so `holeCount` here reads 9, matching the grid this file actually orders.",
+      "description": "#553: the driller drives the rig to all 9 ordered holes and sinks them one at a time. A lone driller with no living quarters collapses from fatigue partway through and resumes, which is why the pad is this large -- sandbox-measured. #586 CI follow-up: this step used to be role:'player' driving `waitForTutorialStep(stepId:'charge')` to hold the real clock -- but the 'drill-plan' tutorial stage (tutorialSteps.ts/tutorialStepHelpers.ts's createComparisonStep) completes the instant `drillHoles.length` first exceeds its snapshot, i.e. after the FIRST of the 9 holes lands, not after all of them. waitForTutorialStep's own poll loop breaks the moment the rail reaches 'charge', which on a real CI run landed with only 1 of 9 holes drilled (orderedHoleCount dropped, not 0) -- a genuine early-exit in the rail's own gating, not pacing flakiness, so a longer timeout could never have fixed it (the loop does not wait out the timeout, it exits on the very next 200ms poll once the rail flips). Switched to the same hand-measured `tick N`, role:'setup' pattern `.claude/rules/scenario-defs.md` already documents for 'a wait for queued work to land' and that tutorial-playthrough.json/blast-basic.json already use for this identical post-drill_plan wait: the console `tick 400` command runs the full 400 ticks synchronously in one browser-JS turn, landing all 9 holes before the tutorial's own 250ms-interval poll (TutorialOverlay's tickGuide) ever gets a chance to observe the first one and flip the rail early. The `wait 500ms` after it just lets that poll catch up so `expect.tutorialStep` below reads the post-tick rail state rather than a stale pre-tick one. #616 (origin/main) confirmed the drill grid as 3x3/9-hole as part of its own tick-budget fix; #555 (this merge) layers the box-cut/rock-digger steps in front of it on the same real ticked clock, so `holeCount` here reads 9, matching the grid this file actually orders. #681 follow-up: this final chunk is 8/8 of the `tick 400` this step used to run as one unbroken block -- see 1/8 above for why it was split (revoltImmune removal, no intermediate checkpoint for the scheduler otherwise). Same total elapsed ticks (8*50=400), same final assertions below, unchanged.",
       "expect": {
         "equals": {
           "orderedHoleCount": 0,
@@ -605,7 +717,7 @@
           "levelEndReason": null
         },
         "tutorialStep": "charge",
-        "note": "#555 regression guard: the box-cut+drill-plan stretch above is ~250+ ticks of two employees' continuous vehicle-gated work with no living_quarters anywhere in this file's own script -- exactly the pacing that drove wellBeing to a permanent 0 and a worker_revolt game-over here before this fix (ScoreManager.ts's applyDecay had a dead zone at exactly 0: nothing but a strictly positive per-tick delta could ever move a score pinned at the clamped floor, and LevelDef.scoreDecayRate was declared per-level -- tutorial_pit's own 0.01, documented \"player-proof\" -- but never actually reached updateScores, which always ran the hardcoded global 0.05 instead). Asserting levelEndReason stays null right here, before charge/sequence/blast ever run, is what keeps a future pacing stretch from hiding a revolt behind this file's own closing `campaign complete` debug override again."
+        "note": "#555 regression guard: the box-cut+drill-plan stretch above is ~250+ ticks of two employees' continuous vehicle-gated work with no living_quarters anywhere in this file's own script -- exactly the pacing that drove wellBeing to a permanent 0 and a worker_revolt game-over here before this fix (ScoreManager.ts's applyDecay had a dead zone at exactly 0: nothing but a strictly positive per-tick delta could ever move a score pinned at the clamped floor, and LevelDef.scoreDecayRate was declared per-level -- tutorial_pit's own 0.01, documented \"player-proof\" -- but never actually reached updateScores, which always ran the hardcoded global 0.05 instead). Asserting levelEndReason stays null right here, before charge/sequence/blast ever run, is what keeps a future pacing stretch from hiding a revolt behind this file's own closing `campaign complete` debug override again. #681 follow-up: `LevelDef.revoltImmune` (which used to make tutorial_pit immune to worker_revolt outright) is gone -- this block now has to survive the real rules, which is why it is split into eight `tick 50` steps instead of one `tick 400` (see 1/8 above)."
       }
     },
     {

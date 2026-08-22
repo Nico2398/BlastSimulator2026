@@ -55,7 +55,7 @@ describe('tutorial-steps-visual.json descriptions', () => {
         expect(step.description).toContain('26,26');
     });
 
-    it('step 24 (tick 400) description describes 9 holes, not 16', () => {
+    it('step 24 (tick 400, split into 8x tick 50 by #681) description describes 9 holes, not 16', () => {
         const { steps } = loadScenarioDef(SCENARIO_NAME);
         const drillPlanIndex = steps.findIndex((s) =>
             s.command.startsWith('drill_plan grid rows:3 cols:3')
@@ -66,14 +66,25 @@ describe('tutorial-steps-visual.json descriptions', () => {
                     'the scenario file structure changed; update the lookup, do not assume a positional index.'
             );
         }
-        const step = steps[drillPlanIndex + 1];
-        if (!step || step.command !== 'tick 400') {
+
+        // #681: the single `tick 400` step this test used to anchor on was
+        // split into 8 sequential `tick 50` steps (same 400 total ticks) so
+        // the scheduler gets intermediate checkpoints — see that block's own
+        // description in tutorial-steps-visual.json. Collect the run of
+        // `tick 50` steps immediately after drill_plan-grid; the ORIGINAL
+        // step-24 description (9-hole grid, no stale 16-hole/4x4 references)
+        // now lives on the last one of that run.
+        const tickChunk: ScenarioStepDef[] = [];
+        for (let i = drillPlanIndex + 1; i < steps.length && steps[i]!.command === 'tick 50'; i++) {
+            tickChunk.push(steps[i]!);
+        }
+        if (tickChunk.length === 0) {
             throw new Error(
-                `step 24 (tick 400) lookup: step immediately after drill_plan-grid has command ` +
-                    `"${step?.command}", expected "tick 400" — the scenario file structure changed; ` +
-                    'update the lookup, do not assume a positional index.'
+                'step 24 (tick 400) lookup: no `tick 50` steps found immediately after drill_plan-grid — ' +
+                    'the scenario file structure changed; update the lookup, do not assume a positional index.'
             );
         }
+        const step = tickChunk[tickChunk.length - 1]!;
 
         expect(step.description).toMatch(/9 hole/i);
         expect(step.description).not.toMatch(/16 hole/i);
