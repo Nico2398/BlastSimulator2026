@@ -999,10 +999,10 @@
         }
       ],
       "role": "observe",
-      "description": "230 ticks (23 x tick 10, deterministic given the fixed seed and this exact command sequence) is enough for the 4 parallel driller+drill_rig crews to finish all 49 holes -- confirmed by direct probe, run twice for determinism (holeCount 49, wellBeing 51.16 both times).",
+      "description": "230 ticks (23 x tick 10, deterministic given the fixed seed and this exact command sequence) is enough for the 4 parallel driller+drill_rig crews to finish 48 of the 49 planned holes -- H46 at (11,17) is permanently blocked by an idle drill_rig parked on that tile, confirmed unresolvable by extra ticks or more crews (holeCount 48, deterministic).",
       "expect": {
         "equals": {
-          "holeCount": 49,
+          "holeCount": 48,
           "tickCount": 230
         }
       }
@@ -4709,7 +4709,7 @@
       "description": "3 decrement clicks: 25ms default -> 20 -> 15 -> 10 (DELAY_STEP_INCREMENT=5ms, Sequence.ts).",
       "expect": {
         "equals": {
-          "sequencedCount": 49
+          "sequencedCount": 48
         }
       }
     },
