@@ -164,14 +164,65 @@ async function waitUsableAndClick(page: Page, selector: string, timeoutMs: numbe
  * interaction-action dispatch. Returns whether it actually resolved a
  * pending event dialog.
  *
- * TODO(#699): implement — body currently inline in `case
- * 'resolveEventIfPending'` below; move it here and have that case call this
- * helper instead.
+ * Touches the page exactly once when nothing is pending — a single
+ * `__gameState()` read, no loop — so a caller that only wants to check "is
+ * anything in the way right now" never pays for a wait against a dialog that
+ * was never going to appear.
  */
 export async function resolveEventIfPendingOnPage(page: Page, timeoutMs = 8000): Promise<boolean> {
-  void page;
-  void timeoutMs;
-  throw new Error('not implemented');
+  // Ask the game, not the DOM: read the typed `pendingEvent` mirror off
+  // __gameState() (main.ts) rather than regex-matching `event status`'s
+  // text output — this is the harness deciding whether to wait, the
+  // resolution itself is a real click below.
+  const pending = await page.evaluate(() => {
+    const getState = (window as unknown as {
+      __gameState?: () => Record<string, unknown> | null;
+    }).__gameState;
+    const st = getState === undefined ? null : getState();
+    return st ? Boolean(st.pendingEvent) : false;
+  });
+  if (!pending) return false;
+
+  // An event can be genuinely pending in state while the level has already
+  // ended (bankruptcy/revolt/ecological shutdown) — the event system keeps
+  // scheduling regardless. Once that happens the dialog is permanently
+  // unreachable by design, not a rendering race: LevelEndScreen owns the
+  // whole screen from the moment state.levelEndReason goes non-null
+  // (UIManager.update defers eventModal for exactly this reason, mirroring
+  // the same deferral BlastReportModal already needed). A real player has
+  // no click left to make here either — the level is over — so resolve the
+  // same way command mode already does (a direct console call) rather than
+  // hanging waiting on a control that will never show.
+  const levelEnded = await page.evaluate(() => {
+    const getState = (window as unknown as {
+      __gameState?: () => { levelEndReason: string | null } | null;
+    }).__gameState;
+    return getState?.()?.levelEndReason != null;
+  });
+  if (levelEnded) {
+    await page.evaluate(() => {
+      const run = (window as unknown as {
+        __gameConsole?: (c: string) => unknown;
+      }).__gameConsole;
+      run?.('event choose 0');
+    });
+    return true;
+  }
+
+  // Something IS pending, so the dialog must appear — wait for it to be
+  // genuinely usable (see `waitUsableAndClick`'s own doc comment for why a
+  // bare `page.waitForSelector` is the wrong primitive here) rather than
+  // probing briefly, and fail loudly if it never becomes usable at all.
+  await waitUsableAndClick(page, '#bs-event-dialog .bs-event-choice', timeoutMs);
+  // The outcome panel replaces the choices; dismiss it if it appears. Its
+  // own budget is short, not `timeoutMs` — plenty of events resolve with no
+  // outcome panel at all.
+  try {
+    await waitUsableAndClick(page, '#bs-event-dialog .bs-event-dismiss', 3000);
+  } catch {
+    // Some events resolve without an outcome panel — not a failure.
+  }
+  return true;
 }
 
 /**
@@ -517,11 +568,16 @@ export async function executeActionOnPage(
       // control allowed only on the guide's next 250ms pass — a machine-speed
       // click in that gap lands on `pointer-events: none` and falls through
       // silently, because page.click does not throw for it (#481).
-      // TODO(#699): wire resolveEventIfPendingOnPage into clickSelector's
-      // covered-by-div retry — when the deadline below is reached with the
-      // last probed reason 'covered', call it once and extend the deadline
-      // on a resolve instead of throwing immediately.
-      const deadline = Date.now() + timeoutMs;
+      // A timer/event dialog can appear in the real-time gap between a
+      // preceding step and this one — if the deadline below is reached with
+      // the last probed reason 'covered' (something else is on top of the
+      // target, not "not found"/"disabled"/etc.), try resolving a pending
+      // event once and give the poll one extended chance rather than failing
+      // immediately (#699). Bounded to exactly one retry so a selector
+      // genuinely covered by something else (a tutorial rail, a real layout
+      // bug) still fails loudly with today's exact error.
+      let deadline = Date.now() + timeoutMs;
+      let retriedCoveredOnce = false;
       for (;;) {
         const reason = await page.evaluate((sel: string) => {
           const probe = (window as unknown as {
@@ -536,6 +592,14 @@ export async function executeActionOnPage(
         }, action.selector);
         if (reason === null) break;
         if (Date.now() > deadline) {
+          if (!retriedCoveredOnce && reason === 'covered') {
+            retriedCoveredOnce = true;
+            const resolved = await resolveEventIfPendingOnPage(page, 8000);
+            if (resolved) {
+              deadline += 5000;
+              continue;
+            }
+          }
           throw new Error(
             `clickSelector "${action.selector}" failed: ${describeUnclickable(await inspectSelector(page, action.selector))}`,
           );
@@ -616,68 +680,11 @@ export async function executeActionOnPage(
       await page.waitForSelector(action.selector, { timeout: action.timeout ?? 10000 });
       break;
     case 'resolveEventIfPending': {
-      // Ask the game, not the DOM: read the typed `pendingEvent` mirror off
-      // __gameState() (main.ts) rather than regex-matching `event status`'s
-      // text output — this is the harness deciding whether to wait, the
-      // resolution itself is a real click below.
-      const pending = await page.evaluate(() => {
-        const getState = (window as unknown as {
-          __gameState?: () => Record<string, unknown> | null;
-        }).__gameState;
-        const st = getState === undefined ? null : getState();
-        return st ? Boolean(st.pendingEvent) : false;
-      });
-      if (!pending) break;
-
-      // An event can be genuinely pending in state while the level has
-      // already ended (bankruptcy/revolt/ecological shutdown) — the event
-      // system keeps scheduling regardless. Once that happens the dialog is
-      // permanently unreachable by design, not a rendering race:
-      // LevelEndScreen owns the whole screen from the moment
-      // state.levelEndReason goes non-null (UIManager.update defers
-      // eventModal for exactly this reason, mirroring the same deferral
-      // BlastReportModal already needed). A real player has no click left to
-      // make here either — the level is over — so resolve the same way
-      // command mode already does (a direct console call) rather than
-      // hanging `evTimeout` waiting on a control that will never show.
-      const levelEnded = await page.evaluate(() => {
-        const getState = (window as unknown as {
-          __gameState?: () => { levelEndReason: string | null } | null;
-        }).__gameState;
-        return getState?.()?.levelEndReason != null;
-      });
-      if (levelEnded) {
-        await page.evaluate(() => {
-          const run = (window as unknown as {
-            __gameConsole?: (c: string) => unknown;
-          }).__gameConsole;
-          run?.('event choose 0');
-        });
-        break;
-      }
-
-      // Something IS pending, so the dialog must appear — wait for it to be
-      // genuinely usable (see `waitUsableAndClick`'s own doc comment for why
-      // a bare `page.waitForSelector` is the wrong primitive here: the panel
-      // pre-exists hidden and swaps its content, so a presence-only wait can
-      // resolve instantly against the previous event's stale, invisible
-      // buttons) rather than probing briefly, and fail loudly if it never
-      // becomes usable at all.
+      // Thin wrapper: the actual pending-check + resolve logic lives in
+      // resolveEventIfPendingOnPage so clickSelector's covered-by-div retry
+      // (#699) can share it without going through the full action dispatch.
       const evTimeout = action.timeoutMs ?? 30000;
-      await waitUsableAndClick(page, '#bs-event-dialog .bs-event-choice', evTimeout);
-      // The outcome panel replaces the choices; dismiss it if it appears. Its
-      // own budget is short, not `evTimeout` — plenty of events resolve with
-      // no outcome panel at all, and `waitUsableAndClick`'s probe (unlike the
-      // old presence-only `page.waitForSelector` it replaced) correctly does
-      // NOT resolve early against stale content, so this case now genuinely
-      // waits out its full budget every time it fires; 30s of that per
-      // no-outcome event across this file's several dozen resolutions would
-      // dominate the run.
-      try {
-        await waitUsableAndClick(page, '#bs-event-dialog .bs-event-dismiss', 3000);
-      } catch {
-        // Some events resolve without an outcome panel — not a failure.
-      }
+      await resolveEventIfPendingOnPage(page, evTimeout);
       break;
     }
     case 'clickIfPresent': {
