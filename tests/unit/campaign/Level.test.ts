@@ -112,6 +112,14 @@ describe('Level definition system (7.1)', () => {
     expect(getLevel('tutorial_pit')!.eventFreqMultiplier).toBe(0);
   });
 
+  it('no LevelDef carries a revoltImmune field (#681)', () => {
+    const levels = getAllLevels();
+    expect(levels.length).toBeGreaterThan(0);
+    for (const level of levels) {
+      expect('revoltImmune' in level).toBe(false);
+    }
+  });
+
   it('tutorial_pit only has basic explosives', () => {
     const level = getLevel('tutorial_pit')!;
     expect(level.availableExplosives).toContain('pop_rock');
