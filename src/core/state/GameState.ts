@@ -93,13 +93,6 @@ export interface GameConfig {
    * regardless (#555 tutorial worker-revolt fix).
    */
   scoreDecayRate?: number;
-  /**
-   * When true, a permanent worker revolt (WorkerRevolt.ts) can never end this
-   * level, however long well-being sits at 0. Sourced from the level's own
-   * `LevelDef.revoltImmune` — true only for tutorial_pit (#555 tutorial
-   * worker-revolt fix).
-   */
-  revoltImmune?: boolean;
   /** Opt-in: opens the site with a pre-hired roster and pre-purchased vehicle fleet (#551). */
   staffed?: boolean;
 }
@@ -398,7 +391,6 @@ export function createGame(config: GameConfig): GameState {
     bankruptcy: createBankruptcyState(),
     arrest: createArrestState(),
     ecological: createEcologicalState(),
-    // TODO: implement — revoltImmune removal (#681); createRevoltState() narrowed, GameConfig.revoltImmune field drop pending
     revolt: createRevoltState(),
     revoltDisabled: false,
     levelStats: createLevelStats(),
