@@ -2695,7 +2695,7 @@
     },
     {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
-      "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it.",
+      "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some.",
       "interaction": [
         {
           "type": "waitUntil",
@@ -2709,7 +2709,10 @@
       "expect": {
         "equals": {
           "orderedChargeCount": 0
-        }
+        },
+        "increased": [
+          "chargedCount"
+        ]
       }
     },
     {
