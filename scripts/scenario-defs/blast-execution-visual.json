@@ -667,11 +667,12 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 4",
+      "command": "tick 20",
+      "description": "#680: bumped from tick 4 -- fixing the needs-drain misclassification (idle rate while walking toward a queued rest, not the working rate) shifts a forced-rest cycle earlier into this charging window, so the old 44-tick budget (10+10+10+10+4) left one hole (H4) still loading. Extra margin added here rather than re-pinning an exact count, matching this file's other charging blocks.",
       "interaction": [
         {
           "type": "command",
-          "command": "tick 4"
+          "command": "tick 20"
         }
       ],
       "role": "setup",

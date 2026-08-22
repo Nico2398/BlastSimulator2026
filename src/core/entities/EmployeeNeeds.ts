@@ -180,8 +180,12 @@ export function checkCollapse(employee: Employee): NeedKey | null {
  *   NEED_DRAIN_RATES tier — 'working' | 'idle' | 'resting'.
  */
 export function tickNeedGauges(employee: Employee, workState: EmployeeWorkState): void {
-  // TODO: implement tri-state drain-rate selection (#680); currently a stub.
-  void employee;
-  void workState;
-  void getMoraleDrainMultiplier;
+  const multiplier = getMoraleDrainMultiplier(employee.morale);
+
+  const gauges: NeedKey[] = ['hunger', 'fatigue', 'breakNeed'];
+  for (const gauge of gauges) {
+    const baseRate = NEED_DRAIN_RATES[gauge][workState];
+    const actualDrain = baseRate * multiplier;
+    employee[gauge] = Math.max(0, employee[gauge] - actualDrain);
+  }
 }

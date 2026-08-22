@@ -241,10 +241,10 @@
       }
     },
     {
-      "command": "tick 15",
-      "description": "#554-followup (issue #586 CI, revised for the #554-followup grid trim): a real-time waitUntil here let real interaction-mode CI reach a genuine worker_revolt before the sequence step below (the level-end screen covered the whole panel) even though command mode's own deterministic trace never revolts -- same real-time-vs-deterministic-convergence mismatch already found and fixed this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json, scores-display-visual.json, survey-overlay-lifecycle.json). Deterministic tick-N/event-choose-0 chunked pattern, re-measured after the drill-plan grid trim (9 holes -> 4): with the drilling budget above also trimmed from a padded 220 ticks down to the 65 actually needed, the single driller now charges all 4 holes by ~tick 96-110 (measured from a fresh tick65 baseline) instead of the old plan's ~288 -- 3 rounds of tick 15 (45 ticks) give comfortable margin without re-introducing the dead-tick padding that was driving wellBeing toward its sticky-zero floor for no reason.",
+      "command": "tick 25",
+      "description": "#554-followup (issue #586 CI, revised for the #554-followup grid trim): a real-time waitUntil here let real interaction-mode CI reach a genuine worker_revolt before the sequence step below (the level-end screen covered the whole panel) even though command mode's own deterministic trace never revolts -- same real-time-vs-deterministic-convergence mismatch already found and fixed this session (survey-then-blast.json, core-loop-visual.json, level1-win-efficient.json, scores-display-visual.json, survey-overlay-lifecycle.json). Deterministic tick-N/event-choose-0 chunked pattern, re-measured after the drill-plan grid trim (9 holes -> 4): with the drilling budget above also trimmed from a padded 220 ticks down to the 65 actually needed, the single driller now charges all 4 holes by ~tick 96-110 (measured from a fresh tick65 baseline) instead of the old plan's ~288 -- 3 rounds of tick 15 (45 ticks) gave comfortable margin without re-introducing the dead-tick padding that was driving wellBeing toward its sticky-zero floor for no reason. #680 re-measured: fixing the needs-drain misclassification (idle rate while walking toward a queued rest, not the working rate) shifts a forced-rest cycle earlier into this charging window, so all 4 holes now land by ~tick 128 -- bumped to 3 rounds of tick 25 (75 ticks) for comfortable margin.",
       "interaction": [
-        { "type": "command", "command": "tick 15" }
+        { "type": "command", "command": "tick 25" }
       ],
       "role": "setup"
     },
@@ -257,9 +257,9 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 15",
+      "command": "tick 25",
       "interaction": [
-        { "type": "command", "command": "tick 15" }
+        { "type": "command", "command": "tick 25" }
       ],
       "role": "setup"
     },
@@ -272,9 +272,9 @@
       "commandOutcome": "either"
     },
     {
-      "command": "tick 15",
+      "command": "tick 25",
       "interaction": [
-        { "type": "command", "command": "tick 15" }
+        { "type": "command", "command": "tick 25" }
       ],
       "role": "setup",
       "expect": {
@@ -367,11 +367,11 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "tickCount": 110,
+          "tickCount": 140,
           "holeCount": 0,
           "weather": "heavy_rain"
         },
-        "note": "#554-followup: tickCount down from 295 after the grid trim (9 holes -> 4) and the drilling budget trim (220 ticks of mostly-idle padding -> the 60 actually needed) -- charging is still real work (the 4-hole charge order above, drained by 3 rounds of tick 15 = 45 ticks), but the driller no longer sits idle for ~170 dead ticks between landing the last hole and the charge order being issued, which is what was pinning wellBeing at its intentional sticky-zero floor (ScoreManager.ts's applyDecay) long enough to cross REVOLT_TICKS=120 in both modes. Sandbox-verified revolted:false throughout with this grid/budget."
+        "note": "#554-followup: tickCount down from 295 after the grid trim (9 holes -> 4) and the drilling budget trim (220 ticks of mostly-idle padding -> the 60 actually needed) -- charging is still real work (the 4-hole charge order above, drained by 3 rounds of tick 15 = 45 ticks), but the driller no longer sits idle for ~170 dead ticks between landing the last hole and the charge order being issued, which is what was pinning wellBeing at its intentional sticky-zero floor (ScoreManager.ts's applyDecay) long enough to cross REVOLT_TICKS=120 in both modes. #680: tickCount up from 110 -- the needs-drain misclassification fix shifts a forced-rest cycle earlier into the charging window, so the 3 charging rounds were bumped from tick 15 to tick 25 each (45 -> 75 ticks) to keep comfortable margin; sandbox-verified revolted:false throughout with this grid/budget."
       }
     }
   ]

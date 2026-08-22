@@ -578,9 +578,9 @@ export function tryContinueVehicleGatedAction(
  * See EmployeeWorkState for the three states.
  */
 export function employeeWorkState(emp: Employee): EmployeeWorkState {
-  // TODO: implemented by @implementer
-  void emp;
-  throw new Error('not implemented');
+  if (emp.restTicksRemaining !== null) return 'resting';
+  if (emp.activeActionId !== null && emp.pendingRestDuration === null) return 'working';
+  return 'idle';
 }
 
 // ── Need restoration routing ──

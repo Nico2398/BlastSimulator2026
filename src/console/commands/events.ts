@@ -23,7 +23,7 @@ import { tickResearch, getTotalOperatingCost } from '../../core/entities/Buildin
 import { getVehicleCostsPerTick } from '../../core/entities/Vehicle.js';
 import { tickNeedGauges, needsMoraleEffect } from '../../core/entities/EmployeeNeeds.js';
 import type { FiredEvent } from '../../core/events/EventSystem.js';
-import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate, tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable } from '../../core/engine/GameLoop.js';
+import { tickCollapse, autoInsertNeedTasks, processShiftCycle, tickEmployees, tickGeneralRestCompletion, tickTaskProgress, tickVehicle, tickVehicleTaskState, tickEmployeeMovement, tickArrivalGate, tryContinueVehicleGatedAction, completeVehicleGatedActionIfApplicable, employeeWorkState } from '../../core/engine/GameLoop.js';
 import { syncHaulDispatch } from '../../core/economy/HaulDispatch.js';
 import { completePendingAction } from '../../core/engine/TaskDispatch.js';
 import { releaseVehicleOnCompletion } from '../../core/engine/VehicleReservation.js';
@@ -181,10 +181,7 @@ export function tickCommand(
     // 8. Employee needs — drain gauges, update morale, check collapse
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
-      const isWorking = emp.activeActionId !== null && emp.restTicksRemaining === null;
-      // TODO(#680): replace with employeeWorkState(emp) once implemented —
-      // placeholder keeps the tri-state signature compiling for skeleton phase.
-      tickNeedGauges(emp, isWorking ? 'working' : 'idle');
+      tickNeedGauges(emp, employeeWorkState(emp));
       emp.morale = Math.max(0, Math.min(100, emp.morale + needsMoraleEffect(emp)));
     }
     const firedEvents: FiredEvent[] = [];
