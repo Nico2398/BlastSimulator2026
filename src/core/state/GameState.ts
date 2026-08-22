@@ -398,7 +398,8 @@ export function createGame(config: GameConfig): GameState {
     bankruptcy: createBankruptcyState(),
     arrest: createArrestState(),
     ecological: createEcologicalState(),
-    revolt: createRevoltState(config.revoltImmune ?? false),
+    // TODO: implement — revoltImmune removal (#681); createRevoltState() narrowed, GameConfig.revoltImmune field drop pending
+    revolt: createRevoltState(),
     revoltDisabled: false,
     levelStats: createLevelStats(),
     sitePolicy: createSitePolicy('shift_8h'),

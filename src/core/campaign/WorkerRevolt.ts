@@ -30,8 +30,8 @@ export interface RevoltState {
   immune: boolean;
 }
 
-export function createRevoltState(immune: boolean = false): RevoltState {
-  return { ticksAtZero: 0, warningFired: false, revolted: false, immune };
+export function createRevoltState(): RevoltState {
+  return { ticksAtZero: 0, warningFired: false, revolted: false, immune: false };
 }
 
 // ── Tick update ──
