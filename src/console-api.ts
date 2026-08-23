@@ -6,6 +6,7 @@ import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
+import { totalCollectedOreKg } from './core/economy/Logistics.js';
 
 export { createRunner };
 export type { RunnerWithContext, CommandResult, MiningContext };
@@ -146,6 +147,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     storedMassKg: s.logistics.storedMassKg,
-    collectedOreTotal: Object.values(s.collectedOre).reduce((sum, kg) => sum + kg, 0),
+    collectedOreTotal: totalCollectedOreKg(s.collectedOre),
   };
 }

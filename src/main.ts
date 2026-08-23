@@ -30,6 +30,7 @@ import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
+import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
 import { ScenePicking } from './ui/scene/ScenePicking.js';
@@ -668,7 +669,7 @@ window.__gameState = () => {
     // orderedHoleCount above: a scenario asserting ore was actually
     // delivered (not just spoil) needs a single numeric field to check
     // increased/decreased/changedBy against (#671).
-    collectedOreTotal: Object.values(s.collectedOre).reduce((sum, kg) => sum + kg, 0),
+    collectedOreTotal: totalCollectedOreKg(s.collectedOre),
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
