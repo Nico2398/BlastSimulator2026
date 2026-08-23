@@ -28,14 +28,10 @@ function forEachActionOfType<T extends InteractionStepAction['type']>(
   actionType: T,
   check: (action: Extract<InteractionStepAction, { type: T }>, stepIndex: number) => void,
 ): void {
-  for (let i = 0; i < scenario.steps.length; i++) {
-    const step = scenario.steps[i];
-    if (typeof step === 'string') continue;
-    const stepObj = step as ScenarioStepDef;
-    if (!stepObj.interaction) continue;
-    for (const action of stepObj.interaction) {
+  for (const { stepIndex, interaction } of stepsWithInteraction(scenario)) {
+    for (const action of interaction) {
       if (action.type === actionType) {
-        check(action as Extract<InteractionStepAction, { type: T }>, i);
+        check(action as Extract<InteractionStepAction, { type: T }>, stepIndex);
       }
     }
   }
@@ -193,13 +189,9 @@ describe('Dual-play scenario steps — data-driven validation', () => {
       // mismatch undetected. `resolveEventIfPending.timeoutMs` defaults to
       // 30000 (interaction-executor.ts) when absent, same default used here.
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
+      for (const { stepObj, interaction } of stepsWithInteraction(scenario)) {
         const outerMs = (stepObj.timeout ?? 60) * 1000;
-        for (const action of stepObj.interaction) {
+        for (const action of interaction) {
           if (action.type === 'waitUntil') {
             expect(action.timeoutMs).toBeLessThanOrEqual(outerMs);
           } else if (action.type === 'resolveEventIfPending') {
