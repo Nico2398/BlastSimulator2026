@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
-import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
-import { getAllVehicleRoles } from '../../src/core/entities/Vehicle.js';
-import { ALL_SCENARIO_NAMES, KNOWN_COMMANDS } from './scenario-defs-fixtures.js';
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { getAllVehicleRoles } from '../../../src/core/entities/Vehicle.js';
+import { ALL_SCENARIO_NAMES, KNOWN_COMMANDS } from './fixtures.js';
 
 // Command-string legality checks (unknown commands, contract id format,
 // vehicle role validity) — split out of the former scenario-defs.test.ts (#703).

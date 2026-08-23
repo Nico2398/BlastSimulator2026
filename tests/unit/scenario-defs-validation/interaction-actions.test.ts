@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
-import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
-import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './scenario-defs-fixtures.js';
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
 
 // Dual-play scenario steps — interaction array validation (data-driven) —
 // split out of the former scenario-defs.test.ts (#703).

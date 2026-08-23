@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
-import type { ScenarioDef, ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
-import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
+import type { ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 import {
   ALL_SCENARIO_NAMES,
   PLAYTHROUGH_SCENARIO_NAMES,
   VISUAL_SCENARIO_NAMES,
   INSPECTION_COMMANDS,
-} from './scenario-defs-fixtures.js';
+} from './fixtures.js';
 
 // Generic existence/shape checks (scenario JSON parses, required fields,
 // step shape, etc.) — split out of the former scenario-defs.test.ts (#703).
