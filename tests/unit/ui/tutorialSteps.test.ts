@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 
@@ -377,6 +377,58 @@ describe('tutorialSteps', () => {
       const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
       const snap = blastStep.captureSnapshot!(before);
       expect(blastStep.isComplete(before, snap)).toBe(false);
+    });
+
+    // #707: the count going up is not enough on its own — BlastReportModal
+    // (src/ui/panels/BlastReportModal.ts) stamps `data-outstanding` on its
+    // own overlay (`data-blast-report-modal`) for the whole arm/open-delay/
+    // dismiss lifecycle of a report (#545). The 'blast' step must stay open
+    // for that whole window so its own CLOSE button never goes inert under
+    // the tutorial rail (`visibleModalControls`, tutorialGuide.ts).
+    describe('gated on the Blast Report modal (#707)', () => {
+      afterEach(() => {
+        document.querySelectorAll('[data-blast-report-modal]').forEach((el) => el.remove());
+      });
+
+      function stampModal(outstanding: boolean): void {
+        const overlay = document.createElement('div');
+        overlay.dataset['blastReportModal'] = '';
+        overlay.dataset['outstanding'] = String(outstanding);
+        document.body.appendChild(overlay);
+      }
+
+      it('does not complete while the report is armed but not yet open (#545 delay window)', () => {
+        stampModal(true);
+        const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+        const snap = blastStep.captureSnapshot!(before);
+        const after = { levelStats: { blastsPerformed: 1 }, collectedOre: {} } as unknown as GameState;
+        expect(blastStep.isComplete(after, snap)).toBe(false);
+      });
+
+      it('does not complete while the report is open on screen', () => {
+        stampModal(true);
+        const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+        const snap = blastStep.captureSnapshot!(before);
+        const after = { levelStats: { blastsPerformed: 1 }, collectedOre: {} } as unknown as GameState;
+        expect(blastStep.isComplete(after, snap)).toBe(false);
+      });
+
+      it('completes once the count increased and the report is no longer outstanding', () => {
+        stampModal(false);
+        const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+        const snap = blastStep.captureSnapshot!(before);
+        const after = { levelStats: { blastsPerformed: 1 }, collectedOre: {} } as unknown as GameState;
+        expect(blastStep.isComplete(after, snap)).toBe(true);
+      });
+
+      it('completes when no modal marker exists at all (non-browser / test harness state)', () => {
+        // No stampModal() call: mirrors console-mode / headless-state harnesses
+        // that never construct BlastReportModal at all.
+        const before = { levelStats: { blastsPerformed: 0 }, collectedOre: {} } as unknown as GameState;
+        const snap = blastStep.captureSnapshot!(before);
+        const after = { levelStats: { blastsPerformed: 1 }, collectedOre: {} } as unknown as GameState;
+        expect(blastStep.isComplete(after, snap)).toBe(true);
+      });
     });
   });
 
