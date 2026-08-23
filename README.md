@@ -79,7 +79,7 @@ Four independent channels prove a change works, and each catches what the others
 | `npm run test:watch` | `vitest` | Same as `test` but in watch mode — re-runs on file changes | Iterative TDD |
 | `npm run test:coverage` | `vitest run --coverage` | Tests + per-file coverage report (v8 provider) | Check coverage before PR |
 | `npm run test:integration` | `vitest run tests/integration` | Integration tests only (small suites + full-level) | Validate cross-module behavior |
-| `npm run test:scenarios` | `vitest run tests/unit/scenario-defs.test.ts` | Validates all scenario JSON files parse correctly | Ensure scenario definitions are valid |
+| `npm run test:scenarios` | `vitest run scenario-defs-` | Validates all scenario JSON files parse correctly | Ensure scenario definitions are valid |
 | `npm run typecheck` | `tsc --noEmit` on `src/` and `scripts/` | TypeScript across both projects | Fastest check after an edit |
 | `npm run validate` | `tsc --noEmit && npm run test:coverage && npm run test:integration && npm run test:scenarios && vite build` | TypeScript type-check → tests with coverage → integration tests → scenario defs validation → production build | **Full PR gate** — must pass before merging |
 | `npm run verify:env` | `tsx scripts/verify-env.ts` | Reports each verification channel READY or BLOCKED, with remedies | Before relying on a channel |
@@ -324,7 +324,7 @@ src/
 tests/
   unit/                 Layer 1: Pure logic tests (run in Node.js, no browser)
     benchmarks/         Performance benchmark suite
-    scenario-defs.test.ts  Validates all scenario JSON files
+    scenario-defs-*.test.ts  Validates all scenario JSON files
   integration/          Layers 2–3: Small integration suites (≥8 scenarios each)
     full-level/         Layer 3: Full-level playthrough tests (win/loss per level)
       helpers.ts        Shared test utilities

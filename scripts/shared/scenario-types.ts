@@ -5,7 +5,7 @@
  * and scenario definitions. Used by:
  *   - scripts/scenario-test.ts
  *   - scripts/convert-scenarios.ts
- *   - tests/unit/scenario-defs.test.ts
+ *   - tests/unit/scenario-defs-*.test.ts
  *
  * @module shared/scenario-types
  */
