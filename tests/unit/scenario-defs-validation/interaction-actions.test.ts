@@ -47,31 +47,48 @@ interface ActionTypeCheck<T extends InteractionStepAction['type'] = InteractionS
   check: (action: Extract<InteractionStepAction, { type: T }>, stepIndex: number) => void;
 }
 
+/**
+ * Builds one `ACTION_TYPE_CHECKS` entry. `T` is inferred per call from the
+ * literal `actionType` argument passed in — the same narrowing a function
+ * call always gets — so `check`'s `action` parameter is the one variant
+ * named by `actionType` while the body is being written. The array literal
+ * below can't do this itself: with the element type fixed to `ActionTypeCheck`
+ * (defaulting `T` to the full union), each object-literal element is checked
+ * against that default shape rather than inferring a narrower `T`, so a bare
+ * literal entry loses the narrowing `forEachActionOfType` promises. The cast
+ * here confines the erasure back to `ActionTypeCheck['check']` to this one
+ * spot, mirroring `forEachActionOfType`'s own cast.
+ */
+function defineActionCheck<T extends InteractionStepAction['type']>(
+  actionType: T,
+  description: string,
+  check: (action: Extract<InteractionStepAction, { type: T }>, stepIndex: number) => void,
+): ActionTypeCheck {
+  return { actionType, description, check: check as ActionTypeCheck['check'] };
+}
+
 const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
-  {
-    actionType: 'click', description: 'click actions have x and y coordinates',
-    check: (a) => { expect(typeof a.x).toBe('number'); expect(typeof a.y).toBe('number'); },
-  },
-  {
-    actionType: 'type', description: 'type actions have selector and text',
-    check: (a) => {
-      expect(typeof a.selector).toBe('string');
-      expect(a.selector.length).toBeGreaterThan(0);
-      expect(typeof a.text).toBe('string');
-    },
-  },
-  {
-    actionType: 'wait', description: 'wait actions have durationMs',
-    check: (a) => { expect(typeof a.durationMs).toBe('number'); expect(a.durationMs).toBeGreaterThan(0); },
-  },
-  {
-    actionType: 'waitForSelector', description: 'waitForSelector actions have selector',
-    check: (a) => { expect(typeof a.selector).toBe('string'); expect(a.selector.length).toBeGreaterThan(0); },
-  },
-  {
-    actionType: 'waitForTutorialStep',
-    description: 'waitForTutorialStep actions name at least one step id',
-    check: (a, i) => {
+  defineActionCheck('click', 'click actions have x and y coordinates', (a) => {
+    expect(typeof a.x).toBe('number');
+    expect(typeof a.y).toBe('number');
+  }),
+  defineActionCheck('type', 'type actions have selector and text', (a) => {
+    expect(typeof a.selector).toBe('string');
+    expect(a.selector.length).toBeGreaterThan(0);
+    expect(typeof a.text).toBe('string');
+  }),
+  defineActionCheck('wait', 'wait actions have durationMs', (a) => {
+    expect(typeof a.durationMs).toBe('number');
+    expect(a.durationMs).toBeGreaterThan(0);
+  }),
+  defineActionCheck('waitForSelector', 'waitForSelector actions have selector', (a) => {
+    expect(typeof a.selector).toBe('string');
+    expect(a.selector.length).toBeGreaterThan(0);
+  }),
+  defineActionCheck(
+    'waitForTutorialStep',
+    'waitForTutorialStep actions name at least one step id',
+    (a, i) => {
       const ids = Array.isArray(a.stepId) ? a.stepId : [a.stepId];
       expect(ids.length, `step[${i}] stepId must not be empty`).toBeGreaterThan(0);
       for (const id of ids) {
@@ -79,24 +96,27 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
         expect(id.length, `step[${i}] stepId entries must be non-empty`).toBeGreaterThan(0);
       }
     },
-  },
-  {
-    actionType: 'viewport', description: 'viewport actions have width and height',
-    check: (a) => { expect(typeof a.width).toBe('number'); expect(typeof a.height).toBe('number'); },
-  },
-  {
-    actionType: 'wheel', description: 'wheel actions have deltaX and deltaY',
-    check: (a) => { expect(typeof a.deltaX).toBe('number'); expect(typeof a.deltaY).toBe('number'); },
-  },
-  {
-    actionType: 'command',
-    description: 'command actions within interaction arrays have a command field',
-    check: (a) => { expect(typeof a.command).toBe('string'); expect(a.command.length).toBeGreaterThan(0); },
-  },
-  {
-    actionType: 'waitUntil',
-    description: 'waitUntil actions have field, equals, maxTicks, and timeoutMs',
-    check: (a) => {
+  ),
+  defineActionCheck('viewport', 'viewport actions have width and height', (a) => {
+    expect(typeof a.width).toBe('number');
+    expect(typeof a.height).toBe('number');
+  }),
+  defineActionCheck('wheel', 'wheel actions have deltaX and deltaY', (a) => {
+    expect(typeof a.deltaX).toBe('number');
+    expect(typeof a.deltaY).toBe('number');
+  }),
+  defineActionCheck(
+    'command',
+    'command actions within interaction arrays have a command field',
+    (a) => {
+      expect(typeof a.command).toBe('string');
+      expect(a.command.length).toBeGreaterThan(0);
+    },
+  ),
+  defineActionCheck(
+    'waitUntil',
+    'waitUntil actions have field, equals, maxTicks, and timeoutMs',
+    (a) => {
       expect(typeof a.field).toBe('string');
       expect(a.field.length).toBeGreaterThan(0);
       expect(a.equals).not.toBeUndefined();
@@ -105,16 +125,13 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
       expect(Number.isInteger(a.timeoutMs)).toBe(true);
       expect(a.timeoutMs).toBeGreaterThan(0);
     },
-  },
-  {
-    actionType: 'cameraFocus', description: 'cameraFocus actions have x, z, and distance',
-    check: (a) => {
-      expect(typeof a.x).toBe('number');
-      expect(typeof a.z).toBe('number');
-      expect(typeof a.distance).toBe('number');
-      expect(a.distance).toBeGreaterThan(0);
-    },
-  },
+  ),
+  defineActionCheck('cameraFocus', 'cameraFocus actions have x, z, and distance', (a) => {
+    expect(typeof a.x).toBe('number');
+    expect(typeof a.z).toBe('number');
+    expect(typeof a.distance).toBe('number');
+    expect(a.distance).toBeGreaterThan(0);
+  }),
 ];
 
 describe('Dual-play scenario steps — data-driven validation', () => {
