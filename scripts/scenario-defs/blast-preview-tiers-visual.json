@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 staffed:true cash:90000",
-      "timeout": 10,
+      "timeout": 30,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole. cash:90000, up from the 50000 default (#554): charging is real work now, and the staffed roster's payroll/fuel upkeep during the extra ticks the charge order below takes to land left too little for the tier:4 software purchase further down this file (observed short by ~1400 at the default).",
       "interaction": [
         {

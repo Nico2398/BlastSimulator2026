@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
-      "timeout": 15,
+      "timeout": 20,
       "interaction": [
         {
           "type": "command",

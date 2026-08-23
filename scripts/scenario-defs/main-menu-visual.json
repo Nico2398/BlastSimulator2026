@@ -65,7 +65,7 @@
     },
     {
       "command": "new_game seed:42",
-      "timeout": 15,
+      "timeout": 40,
       "interaction": [
         {
           "type": "command",

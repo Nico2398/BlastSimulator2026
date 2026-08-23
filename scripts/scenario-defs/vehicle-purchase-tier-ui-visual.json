@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:300000",
-      "timeout": 10,
+      "timeout": 30,
       "description": "Bumped cash from 100k to 300k: the file's 4 purchases (25k+50k+50k+140k=265k) overdraw command mode past 100k before the tier:2/tier:3 buys, which would leave those buy buttons disabled for a real click -- exactly what this file's own name (tier UI) needs to demonstrate.",
       "interaction": [
         {

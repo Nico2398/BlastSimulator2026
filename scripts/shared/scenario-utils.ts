@@ -164,10 +164,6 @@ export function effectiveStepTimeoutMs(
   defaultOuterSeconds: number,
   capture?: { enabled: boolean; shotsCount: number },
 ): number {
-  // TODO: implement — capture-cost floor. Skeleton phase only: signature
-  // extended, param accepted but not yet folded into the return value.
-  void capture;
-
   const declaredMs = (step.timeout ?? defaultOuterSeconds) * 1000;
 
   let maxInnerMs = 0;
@@ -185,5 +181,13 @@ export function effectiveStepTimeoutMs(
     maxInnerMs = Math.max(maxInnerMs, explicit ?? fallback ?? 0);
   }
 
-  return maxInnerMs === 0 ? declaredMs : Math.max(declaredMs, maxInnerMs + TIMEOUT_MARGIN_MS);
+  const base = maxInnerMs === 0 ? declaredMs : Math.max(declaredMs, maxInnerMs + TIMEOUT_MARGIN_MS);
+
+  if (!capture?.enabled) return base;
+
+  const screenshotActionCount = (step.interaction ?? []).filter(a => a.type === 'screenshot').length;
+  const captureFloorMs =
+    (1 + screenshotActionCount + capture.shotsCount + (step.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
+
+  return Math.max(base, captureFloorMs);
 }

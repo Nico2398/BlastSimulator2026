@@ -21,7 +21,7 @@
   "steps": [
     {
       "command": "campaign start level:tutorial_pit cash:300176",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -61,7 +61,7 @@
     },
     {
       "command": "time resume",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -73,7 +73,7 @@
     },
     {
       "command": "time speed 2",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "awaitUsable",
@@ -100,7 +100,7 @@
     },
     {
       "command": "employee hire role:surveyor",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -129,7 +129,7 @@
     },
     {
       "command": "employee assign_skill 1 skill:geology level:3",
-      "timeout": 15,
+      "timeout": 30,
       "description": "Test-only bootstrap, not a tutorial stage: hiring already grants Rookie geology (ROLE_STARTING_QUALIFICATION in Employee.ts), this only raises the level for tighter survey estimates. No role tag -- there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building, which this scenario does not need.",
       "interaction": [
         {
@@ -202,7 +202,7 @@
     },
     {
       "command": "employee hire role:driller",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -231,7 +231,7 @@
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
-      "timeout": 15,
+      "timeout": 30,
       "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
       "interaction": [
         {
@@ -285,7 +285,7 @@
     },
     {
       "command": "set_policy mode:continuous",
-      "timeout": 15,
+      "timeout": 40,
       "interaction": [
         {
           "type": "clickSelector",
@@ -589,7 +589,7 @@
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:20,20 diameter:0.089",
-      "timeout": 15,
+      "timeout": 40,
       "interaction": [
         {
           "type": "clickSelector",
@@ -852,7 +852,7 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -912,7 +912,7 @@
     },
     {
       "command": "sequence auto delay_step:25",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -934,7 +934,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 40,
       "interaction": [
         {
           "type": "clickSelector",
@@ -986,7 +986,7 @@
     },
     {
       "command": "scores",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -1050,7 +1050,7 @@
     },
     {
       "command": "employee hire role:manager",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -1079,7 +1079,7 @@
     },
     {
       "command": "employee assign_skill 3 skill:management level:3",
-      "timeout": 15,
+      "timeout": 30,
       "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above.",
       "interaction": [
         {
@@ -1112,7 +1112,7 @@
     },
     {
       "command": "contract accept type:rubble_disposal",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -1138,7 +1138,7 @@
     },
     {
       "command": "employee hire role:driver",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -1167,7 +1167,7 @@
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
-      "timeout": 15,
+      "timeout": 30,
       "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above; kept for command mode, which needs it for the explicit `vehicle driver 1 4` below to succeed identically.",
       "interaction": [
         {
@@ -1179,7 +1179,7 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "clickSelector",
@@ -1329,7 +1329,7 @@
     },
     {
       "command": "finances",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -1340,7 +1340,7 @@
     },
     {
       "command": "build_ramp start:10,15 end:10,25",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -1352,7 +1352,7 @@
     },
     {
       "command": "needs",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -1363,7 +1363,7 @@
     },
     {
       "command": "set_policy mode:shift_8h",
-      "timeout": 15,
+      "timeout": 40,
       "interaction": [
         {
           "type": "waitForTutorialStep",
@@ -1409,7 +1409,7 @@
     },
     {
       "command": "campaign complete",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",
@@ -1431,7 +1431,7 @@
     },
     {
       "command": "tick 1",
-      "timeout": 15,
+      "timeout": 30,
       "interaction": [
         {
           "type": "command",

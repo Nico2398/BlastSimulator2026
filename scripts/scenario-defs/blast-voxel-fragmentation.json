@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:400000 staffed:true",
-      "timeout": 10,
+      "timeout": 40,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped to $400,000: this file's 16-hole grid is a heavier workload than most (a single driller/drill_rig lands roughly one hole every 15 ticks door-to-door at this tight spacing), and every hole must actually land before charging — a partially-drilled 4x4 pattern would corrupt the crater/island physics this file exists to visualize — so headroom matters more than usual (no income anywhere in this file).",
       "interaction": [
         {
