@@ -13,20 +13,26 @@
 // every step, flag any step whose `expect` contains a state-dependent goal but
 // has no non-empty `interaction` array.
 //
-// SKELETON PHASE (#738): stub only. @test-writer fills in the real
-// assertions; @implementer edits scripts/scenario-defs/ore-haul-dispatch.json
-// to satisfy them.
+// Two exclusions, confirmed against interaction-executor.ts/interaction-driver.ts:
+//  - `guard`-role steps prove a control unreachable via `expect.blocked`, which
+//    checkGoal reads through a live-DOM probe (`requireUsable`/its blocked
+//    counterpart), not the stale-state fallback `equals`/`increased`/
+//    `decreased`/`changedBy` go through — so a guard step legitimately carries
+//    no click-driven `interaction` array and is never flagged here.
+//  - An `expect` containing only `usable`/`blocked`/`tutorialStep`/`note` (none
+//    of the four state-dependent keys) is not flagged either — those need a
+//    live page and go through the same DOM-probe path checkGoal uses for
+//    `blocked` above, not the stale-state read.
+// A step whose `interaction` array's only action is `{ type: 'command', ... }`
+// (a bootstrap/observe/setup step driving the console instead of a click)
+// counts as HAVING an interaction array — only a missing or empty array is a
+// violation, regardless of what the array's actions are.
 
-import { describe, it } from 'vitest';
-import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { describe, it, expect } from 'vitest';
+import type { ScenarioStepDef, ScenarioStepGoal } from '../../../scripts/shared/scenario-types.js';
 import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 
-// Re-exported for @test-writer: the real suite walks scenarioFiles(SCENARIO_DIR)
-// and loads each via loadScenarioDef, the same pattern ScenarioStepsHaveRole.test.ts
-// uses. Referenced here (not just imported) so the skeleton stays type-valid
-// under noUnusedLocals until the real test body lands.
-export const ALL_SCENARIO_NAMES: string[] = scenarioFiles(SCENARIO_DIR);
-export const loadScenario = loadScenarioDef;
+const ALL_SCENARIO_NAMES: string[] = scenarioFiles(SCENARIO_DIR);
 
 interface InteractionViolation {
   file: string;
@@ -34,25 +40,64 @@ interface InteractionViolation {
   command: string;
 }
 
-// TODO: implement — format a violation list for a failure message, mirroring
-// ScenarioStepsHaveRole.test.ts's formatViolations.
-export function formatViolations(_violations: InteractionViolation[]): string {
-  return undefined as unknown as string;
+function formatViolations(violations: InteractionViolation[]): string {
+  return violations
+    .map((v) => `  ${v.file}.json step[${v.stepIndex}] ("${v.command}")`)
+    .join('\n');
 }
 
-// TODO: implement — walk every scenario file's every step, collecting the
-// ones for which `isViolation` returns true, mirroring
+/** True when `expect` asserts a state-dependent goal `checkGoal`'s stale-state fallback checks. */
+function hasStateDependentGoal(goal: ScenarioStepGoal | undefined): boolean {
+  if (goal === undefined) return false;
+  return (
+    goal.equals !== undefined
+    || goal.increased !== undefined
+    || goal.decreased !== undefined
+    || goal.changedBy !== undefined
+  );
+}
+
+// Shared enumeration: walk every scenario file's every step, collecting the
+// ones for which `isViolation` returns true — same shape as
 // ScenarioStepsHaveRole.test.ts's collectViolations.
-export function collectViolations(
-  _isViolation: (step: ScenarioStepDef) => boolean,
+function collectViolations(
+  isViolation: (step: ScenarioStepDef) => boolean,
 ): InteractionViolation[] {
-  return undefined as unknown as InteractionViolation[];
+  const violations: InteractionViolation[] = [];
+  for (const file of ALL_SCENARIO_NAMES) {
+    const scenario = loadScenarioDef(file, SCENARIO_DIR);
+    scenario.steps.forEach((rawStep, stepIndex) => {
+      const step = rawStep as ScenarioStepDef;
+      if (isViolation(step)) {
+        violations.push({ file, stepIndex, command: step.command });
+      }
+    });
+  }
+  return violations;
 }
 
-describe.skip('repo-wide — every state-dependent scenario goal has an interaction (issue #738)', () => {
-  it.todo('sanity: the scenario directory is non-empty (guards against a silently broken glob)');
+describe('repo-wide — every state-dependent scenario goal has an interaction (issue #738)', () => {
+  it('sanity: the scenario directory is non-empty (guards against a silently broken glob)', () => {
+    expect(ALL_SCENARIO_NAMES.length).toBeGreaterThan(0);
+  });
 
-  it.todo(
+  it(
     'every step whose expect has equals/increased/decreased/changedBy has a non-empty interaction array',
+    () => {
+      const violations = collectViolations((step) => {
+        if (step.role === 'guard') return false;
+        if (!hasStateDependentGoal(step.expect)) return false;
+        return step.interaction === undefined || step.interaction.length === 0;
+      });
+      expect(
+        violations,
+        `${violations.length} scenario step(s) assert state-dependent goals `
+        + `(equals/increased/decreased/changedBy) with no interaction array — `
+        + `executeInteractionActions (scripts/shared/puppeteer-utils.ts) silently `
+        + `no-ops a step with no interaction, so checkGoal then asserts against `
+        + `stale/live state instead of state these actions actually produced:\n`
+        + `${formatViolations(violations)}`,
+      ).toEqual([]);
+    },
   );
 });
