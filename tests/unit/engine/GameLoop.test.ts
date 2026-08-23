@@ -3533,6 +3533,64 @@ describe('processShiftCycle (7.9)', () => {
 
     expect(events).toContain('employee:shift_change');
   });
+
+  // ── Interrupted work is released for reclaim, not orphaned (#684) ─────────
+
+  // forceShiftRestIfNeeded (the legacy, no-policy path exercised throughout
+  // this suite — state.sitePolicy.revision stays 0, the default for every
+  // fixture above) overwrites employee.activeActionId with the new rest
+  // action's id directly, without ever releasing the action it replaces —
+  // unlike its sibling forceShiftRestIfNeededByPolicy (#678, see the suite
+  // below) and tickCollapse, both of which call interruptActiveAction first.
+  // The interrupted action's record stays 'assigned' (or whatever in-flight
+  // status it had)/holderId === employee.id forever: never completed (the
+  // employee is resting, not ticking it) and never reclaimed (open-pool
+  // dispatch only matches 'queued' actions), so the employee goes idle
+  // permanently once the forced rest ends. This test fails on the old code
+  // (action stays held by the employee, activeActionId overwritten with no
+  // trace of it) and passes on the fix (action released to 'queued'/
+  // holderId: null, its remaining duration preserved for whoever reclaims it
+  // next).
+  it('releases the interrupted active action back to the pool instead of orphaning it (#684)', () => {
+    const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const rng = new Random(SEED);
+    expect(state.sitePolicy.revision).toBe(0); // no set_policy — the legacy path
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    const interrupted: PendingAction = {
+      id: 950,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { note: 'drilling' },
+      targetEmployeeId: null,
+      status: 'in_progress',
+      holderId: employee.id,
+    };
+    state.pendingActions.push(interrupted);
+    employee.activeActionId = interrupted.id;
+    employee.taskTicksRemaining = 4; // work already in progress, not merely claimed
+    employee.ticksWorked = WORK_DURATION_TICKS - 1; // fires this call
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 2);
+
+    processShiftCycle(state, []);
+
+    // Released back to the pool — 'queued', unheld — not left 'assigned'/
+    // held by an employee who is now resting and will never tick it again.
+    const released = state.pendingActions.find(a => a.id === interrupted.id)!;
+    expect(released.status).toBe('queued');
+    expect(released.holderId).toBeNull();
+    // Remaining work is preserved on the action itself so whoever reclaims
+    // it resumes instead of restarting from scratch.
+    expect(released.payload['durationTicks']).toBe(4);
+    // The employee's activeActionId now points at the new rest action, not
+    // the interrupted one and not null.
+    expect(employee.activeActionId).not.toBe(interrupted.id);
+    expect(employee.activeActionId).not.toBeNull();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
