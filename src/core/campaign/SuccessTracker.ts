@@ -5,6 +5,7 @@
 import type { GameState } from '../state/GameState.js';
 import type { FragmentData } from '../mining/BlastExecution.js';
 import { getFinancialReport } from '../economy/Finance.js';
+import { fragmentHasOre } from '../mining/BlastOreReport.js';
 
 // ── Types ──
 
@@ -79,6 +80,7 @@ export function snapshotStats(stats: LevelStats, state: GameState): void {
 export function recordBlastResult(stats: LevelStats, fragments: FragmentData[]): void {
   for (const f of fragments) {
     stats.totalVolumeBlasted += f.volume;
+    if (!fragmentHasOre(f.oreDensities)) continue;
     for (const oreId of Object.keys(f.oreDensities)) {
       if (f.oreDensities[oreId]! > 0) {
         stats.uniqueOresExtracted.add(oreId);

@@ -811,6 +811,98 @@ describe('Economy', () => {
     expect(ctx.state!.contracts.completedHistory.length).toBeGreaterThan(completedBefore);
   });
 
+  // #671's own stated verification criterion: an ore_sale contract with a
+  // realistic deadline is fulfillable from automatic dispatch alone — no
+  // manual `vehicle haul` (or any other dispatch-bypassing command) needed
+  // to get the ore into storage. Only `contract deliver` is called by hand
+  // below, and that's the economy step (turning already-stored ore into
+  // payment), not the logistics step the #671 fix covers.
+  it('ore_sale contract with a realistic deadline is fulfilled by self-dispatch alone, no manual haul', () => {
+    ctx.state!.cash = 200_000;
+
+    // 1. Crew a debris_hauler.
+    const hireDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
+    expect(hireDriver.success).toBe(true);
+    const driverId = ctx.state!.employees.employees.find(e => e.role === 'driver')!.id;
+    employeeCommand(ctx, ['assign_skill', String(driverId)], {
+      skill: 'driving.truck',
+      level: '5',
+    });
+
+    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(buyResult.success).toBe(true);
+    const vehicleId = ctx.state!.vehicles.vehicles.find(v => v.type === 'debris_hauler')!.id;
+
+    const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
+    expect(assignResult.success).toBe(true);
+
+    // Let the driver walk to and board the vehicle before any haul_debris
+    // action exists to claim — mirrors the full-economy-loop test above:
+    // no depot and no ground fragment yet, so self-dispatch has nothing to
+    // start and can't race the setup below.
+    for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
+
+    // 2. Active depot, on the same bench as the vehicle spawn (#458/#586
+    // reachability notes above apply equally here — (13,13) is proven
+    // reachable from this exact seed/size fixture).
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    expect(buildResult.success).toBe(true);
+
+    // 3. A real, ore-bearing on_ground fragment — 430 kg of gloomium,
+    // matching #671's own reproduction numbers (~33 ticks observed) —
+    // injected directly rather than driven off a real blast: the blast is
+    // RNG-driven and doesn't guarantee any given ore lands in a given hole,
+    // which is exactly why the full-economy-loop test above had to fall
+    // back to a rubble_disposal contract instead. (18,19) matches that same
+    // test's proven-reachable landing column for this seed/size fixture.
+    const fragment: FragmentData = {
+      id: 9001,
+      position: { x: 18, y: 0, z: 19 },
+      volume: 0.43,
+      mass: 1075,
+      rockId: 'sandite',
+      oreDensities: { gloomium: 0.4 },
+      initialVelocity: { x: 0, y: 0, z: 0 },
+      isProjection: false,
+    };
+    ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null });
+
+    // 4. Accept an ore_sale contract for exactly what the fragment yields
+    // (volume × density × ORE_DENSITY_KG_M3 = 0.43 × 0.4 × 2500 = 430 kg),
+    // with a realistic deadline comfortably above the issue's own ~33-tick
+    // repro number.
+    const contract = insertOreSaleContract(ctx.state!.contracts, 430, 80, {
+      materialId: 'gloomium',
+      deadlineTicks: 45,
+      description: '[test fixture] deliver 430 kg gloomium @ $80/kg',
+    });
+    const acceptResult = contractCommand(ctx, ['accept', String(contract.id)], {});
+    expect(acceptResult.success).toBe(true);
+
+    // 5. Tick forward with NO manual `vehicle haul` call anywhere — only
+    // self-dispatch (syncHaulDispatch, run every tick inside tickCommand)
+    // claims, drives, loads, and delivers the fragment.
+    let ticks = 0;
+    while (ctx.state!.logistics.storedMassKg === 0 && ticks < contract.deadlineTicks) {
+      tickCommand(ctx, ['1'], {});
+      ticks++;
+    }
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
+    expect(ticks).toBeLessThan(contract.deadlineTicks);
+    expect(ctx.state!.collectedOre['gloomium'] ?? 0).toBeGreaterThanOrEqual(430);
+
+    // 6. Deliver — the economy step, not the logistics step: turns ore
+    // already sitting in the warehouse (put there by automatic dispatch
+    // alone, above) into contract fulfillment.
+    const deliverResult = contractCommand(ctx, ['deliver', String(contract.id)], {
+      amount: '430',
+    });
+    expect(deliverResult.success).toBe(true);
+    expect(contract.completed).toBe(true);
+    expect(ctx.state!.tickCount - contract.acceptedAtTick).toBeLessThanOrEqual(contract.deadlineTicks);
+    expect(ctx.state!.contracts.completedHistory).toContain(contract);
+  });
+
   // ── 15. Ore-priority haul dispatch on a warehouse smaller than the blast ──
   //         (#671) — regression: collectedOre.<material> never rose via
   //         automatic haul dispatch because estimateActionCost/

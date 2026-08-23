@@ -9,6 +9,8 @@
 import type { GameState, PendingAction } from '../state/GameState.js';
 import { isOversized } from '../mining/BlastCalc.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
+import type { TrackedFragment } from './Logistics.js';
+import { fragmentHasOre } from '../mining/BlastOreReport.js';
 
 /** Payload carried by a haul_debris/fragment_debris PendingAction. */
 export interface HaulActionPayload {
@@ -71,6 +73,20 @@ export function syncHaulDispatch(state: GameState): void {
 }
 
 /**
+ * Resolve the TrackedFragment a haul_debris/fragment_debris action's
+ * payload.fragmentId refers to, or undefined when the payload carries no
+ * numeric fragmentId or nothing in logistics.fragments matches it. Shared by
+ * every consumer that needs to look up an action's fragment (claim-time
+ * gating, ore-priority ranking) so the lookup lives in exactly one place.
+ */
+function resolveTrackedFragment(state: GameState, action: PendingAction): TrackedFragment | undefined {
+  const fragmentId = action.payload['fragmentId'];
+  return typeof fragmentId === 'number'
+    ? state.logistics.fragments.find(f => f.fragment.id === fragmentId)
+    : undefined;
+}
+
+/**
  * Claim-time eligibility gate. Pass-through (true) for any action that is not
  * haul_debris/fragment_debris. For haul_debris: true iff the fragment is
  * still on_ground and there is enough free storage room for its mass. For
@@ -80,10 +96,7 @@ export function syncHaulDispatch(state: GameState): void {
 export function isHaulOrFragmentActionClaimable(state: GameState, action: PendingAction): boolean {
   if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return true;
 
-  const fragmentId = action.payload['fragmentId'];
-  const tracked = typeof fragmentId === 'number'
-    ? state.logistics.fragments.find(f => f.fragment.id === fragmentId)
-    : undefined;
+  const tracked = resolveTrackedFragment(state, action);
   if (!tracked || tracked.state !== 'on_ground') return false;
 
   if (action.type === 'fragment_debris') {
@@ -107,11 +120,8 @@ export function isHaulOrFragmentActionClaimable(state: GameState, action: Pendin
 export function haulActionCarriesOre(state: GameState, action: PendingAction): boolean {
   if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return false;
 
-  const fragmentId = action.payload['fragmentId'];
-  const tracked = typeof fragmentId === 'number'
-    ? state.logistics.fragments.find(f => f.fragment.id === fragmentId)
-    : undefined;
+  const tracked = resolveTrackedFragment(state, action);
   if (!tracked) return false;
 
-  return Object.values(tracked.fragment.oreDensities).some(density => density > 0);
+  return fragmentHasOre(tracked.fragment.oreDensities);
 }
