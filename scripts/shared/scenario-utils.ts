@@ -139,6 +139,20 @@ const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], nu
 };
 
 /**
+ * Capture-cost floor (ms) for interaction-mode `--screenshots`: the base
+ * step-end capture plus every inline `screenshot` action plus the scenario's
+ * own `shots` count plus `step.frames`, each at `SOFTWARE_RASTER_FRAME_COST_MS`
+ * under software rasterization (#725). Exported so
+ * `tests/unit/scenario-defs-validation/interaction-actions.test.ts`'s #725
+ * regression check calls the real formula instead of reimplementing it by
+ * hand, which would otherwise silently drift out of sync with this file.
+ */
+export function captureCostFloorMs(step: ScenarioStepDef, shotsCount: number): number {
+  const screenshotActionCount = (step.interaction ?? []).filter(a => a.type === 'screenshot').length;
+  return (1 + screenshotActionCount + shotsCount + (step.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
+}
+
+/**
  * A step's own outer `timeout` (seconds) and an inner action's `timeoutMs`
  * (ms) are raced independently by `scenario-interaction-runner.ts` /
  * `run-all-scenarios.ts` / `bench-scenarios.ts`, each against a fresh
@@ -158,6 +172,13 @@ const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], nu
  * value the runners actually race against; that test catches a scenario
  * file whose *declared* `timeout` reads as misleadingly low to a human
  * editing it, even though the runners themselves no longer act on it alone.
+ *
+ * @param capture When provided with `enabled: true`, the returned deadline is
+ * also raised to cover interaction-mode `--screenshots` capture cost — base
+ * capture plus inline `screenshot` actions plus `capture.shotsCount` plus
+ * `step.frames`, at `SOFTWARE_RASTER_FRAME_COST_MS` per unit, via
+ * `captureCostFloorMs` (#725). Omitted or `enabled: false` leaves the return
+ * value unchanged from the pre-#725 behavior.
  */
 export function effectiveStepTimeoutMs(
   step: ScenarioStepDef,
@@ -185,9 +206,5 @@ export function effectiveStepTimeoutMs(
 
   if (!capture?.enabled) return base;
 
-  const screenshotActionCount = (step.interaction ?? []).filter(a => a.type === 'screenshot').length;
-  const captureFloorMs =
-    (1 + screenshotActionCount + capture.shotsCount + (step.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
-
-  return Math.max(base, captureFloorMs);
+  return Math.max(base, captureCostFloorMs(step, capture.shotsCount));
 }

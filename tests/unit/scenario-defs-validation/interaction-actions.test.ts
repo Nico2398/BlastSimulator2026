@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
-import { loadScenarioDef, SCENARIO_DIR, SOFTWARE_RASTER_FRAME_COST_MS } from '../../../scripts/shared/scenario-utils.js';
+import { captureCostFloorMs, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
 
 // Dual-play scenario steps — interaction array validation (data-driven) —
@@ -211,8 +211,7 @@ describe('Dual-play scenario steps — data-driven validation', () => {
         const step = scenario.steps[i];
         if (typeof step === 'string') continue;
         const stepObj = step as ScenarioStepDef;
-        const screenshotActions = (stepObj.interaction ?? []).filter(a => a.type === 'screenshot').length;
-        const floorMs = (1 + screenshotActions + shotsCount + (stepObj.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
+        const floorMs = captureCostFloorMs(stepObj, shotsCount);
         const declaredMs = (stepObj.timeout ?? 60) * 1000;
         expect(
           declaredMs,
