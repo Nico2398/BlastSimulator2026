@@ -6,7 +6,7 @@
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["./**/*.ts", "../src/main.ts"],
+  "include": ["./**/*.ts", "../src/types/global.d.ts"],
   "exclude": [
     "node_modules",
     "../dist",
