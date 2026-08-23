@@ -64,7 +64,14 @@ import { killEmployee } from '../../src/core/entities/Employee.js';
  * the same gap for a charge order still in flight (#554) — `charge` now
  * queues one charge_hole action per hole instead of writing it straight into
  * state.chargesByHole, so a scenario proving a charge was ordered but not
- * yet loaded had no field to check before this.
+ * yet loaded had no field to check before this. collectedOreTotal (sum of
+ * every material key in state.collectedOre) closes the same gap for ore
+ * actually delivered to a depot — a scenario proving a haul delivered ore
+ * (not just spoil) had no field to check before this; a single summed
+ * number rather than the raw per-material record because expect's
+ * increased/decreased/equals/changedBy only compare flat numeric fields, and
+ * a scenario can't pin which material id a real blast's RNG happened to
+ * expose (#671).
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
@@ -75,7 +82,7 @@ const SERIALIZED_FIELDS = [
   'stuckEmployeeCount', 'activeContractCount', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
-  'storedMassKg',
+  'storedMassKg', 'collectedOreTotal',
 ] as const;
 
 describe('console-api', () => {
@@ -402,6 +409,21 @@ describe('console-api', () => {
       const state = serializeGameState(runner.ctx as MiningContext)!;
 
       expect(state.storedMassKg).toBe(0);
+    });
+
+    it('reports zero collectedOreTotal for a fresh game with nothing delivered', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.collectedOreTotal).toBe(0);
+    });
+
+    it('sums every material key in state.collectedOre into collectedOreTotal', () => {
+      runner.runner.run('new_game mine_type:desert seed:42');
+      runner.ctx.state!.collectedOre = { dirtite: 30, blingite: 12.5 };
+      const state = serializeGameState(runner.ctx as MiningContext)!;
+
+      expect(state.collectedOreTotal).toBe(42.5);
     });
 
     it('starts all four scores at 50 (createScoreState) for a fresh game', () => {

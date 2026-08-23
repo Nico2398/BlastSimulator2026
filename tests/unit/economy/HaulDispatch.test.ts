@@ -18,7 +18,7 @@ import { addBlastFragments } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 import { OVERSIZED_FRAGMENT_THRESHOLD } from '../../../src/core/mining/BlastCalc.js';
 import { fragmentApproachCell } from '../../../src/core/economy/FragmentApproach.js';
-import { syncHaulDispatch, isHaulOrFragmentActionClaimable } from '../../../src/core/economy/HaulDispatch.js';
+import { syncHaulDispatch, isHaulOrFragmentActionClaimable, haulActionCarriesOre } from '../../../src/core/economy/HaulDispatch.js';
 
 const SEED = 42;
 
@@ -389,6 +389,120 @@ describe('isHaulOrFragmentActionClaimable — fragment_debris oversized gate', (
     const action = makeFragmentDebrisAction({ id: 1, payload: { fragmentId: 1 } });
 
     expect(isHaulOrFragmentActionClaimable(state, action)).toBe(true);
+  });
+});
+
+// ── haulActionCarriesOre (#671) ─────────────────────────────────────────────
+//
+// Red phase: haulActionCarriesOre is still a throwing stub
+// (src/core/economy/HaulDispatch.ts), so every test below is expected to
+// fail until #671 is implemented. Once wired into ActionSelection.ts's
+// estimateActionCost, this is the predicate that decides whether a
+// haul_debris/fragment_debris candidate gets the ORE_HAUL_PRIORITY_BONUS_TICKS
+// ranking discount.
+
+describe('haulActionCarriesOre', () => {
+  it('is true for a haul_debris action whose fragment carries ore (happy path)', () => {
+    const state = createGame({ seed: SEED });
+    const fragment = makeFragment(1, 5, 5);
+    fragment.oreDensities = { gloomium: 0.1 };
+    addBlastFragments(state.logistics, [fragment]);
+    const action = makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
+
+    expect(haulActionCarriesOre(state, action)).toBe(true);
+  });
+
+  it('is false for a haul_debris action whose fragment carries no ore (empty oreDensities)', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [makeFragment(1, 5, 5)]); // default oreDensities: {}
+    const action = makeHaulAction({ id: 1, payload: { fragmentId: 1 } });
+
+    expect(haulActionCarriesOre(state, action)).toBe(false);
+  });
+
+  it('is false for a general_work action even when its payload happens to reference an ore-bearing fragment id', () => {
+    const state = createGame({ seed: SEED });
+    const fragment = makeFragment(1, 5, 5);
+    fragment.oreDensities = { gloomium: 0.1 };
+    addBlastFragments(state.logistics, [fragment]);
+    const action: PendingAction = {
+      id: 1,
+      type: 'general_work',
+      requiredSkill: null,
+      requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { fragmentId: 1 },
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+    };
+
+    expect(haulActionCarriesOre(state, action)).toBe(false);
+  });
+
+  it('is false for a survey action (another non-haul type) referencing an ore-bearing fragment id', () => {
+    const state = createGame({ seed: SEED });
+    const fragment = makeFragment(1, 5, 5);
+    fragment.oreDensities = { gloomium: 0.1 };
+    addBlastFragments(state.logistics, [fragment]);
+    const action: PendingAction = {
+      id: 1,
+      type: 'survey',
+      requiredSkill: 'geology',
+      requiredVehicleRole: null,
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { fragmentId: 1 },
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+    };
+
+    expect(haulActionCarriesOre(state, action)).toBe(false);
+  });
+
+  it('is false when the fragment id the action references no longer resolves in state.logistics.fragments (rejection)', () => {
+    const state = createGame({ seed: SEED });
+    const action = makeHaulAction({ id: 1, payload: { fragmentId: 999 } });
+
+    expect(haulActionCarriesOre(state, action)).toBe(false);
+  });
+
+  it('is true for a fragment_debris action too (oversized ore-bearing fragment — breaking work is also ore-aware)', () => {
+    const state = createGame({ seed: SEED });
+    const fragment = makeOversizedFragment(1, 5, 5);
+    fragment.oreDensities = { treranium: 0.15 };
+    addBlastFragments(state.logistics, [fragment]);
+    const action: PendingAction = {
+      id: 1,
+      type: 'fragment_debris',
+      requiredSkill: null,
+      requiredVehicleRole: 'rock_fragmenter',
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { fragmentId: 1 },
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+    };
+
+    expect(haulActionCarriesOre(state, action)).toBe(true);
+  });
+
+  it('is false for a fragment_debris action whose oversized fragment carries no ore', () => {
+    const state = createGame({ seed: SEED });
+    addBlastFragments(state.logistics, [makeOversizedFragment(1, 5, 5)]); // default oreDensities: {}
+    const action: PendingAction = {
+      id: 1,
+      type: 'fragment_debris',
+      requiredSkill: null,
+      requiredVehicleRole: 'rock_fragmenter',
+      targetX: 0, targetZ: 0, targetY: 0,
+      payload: { fragmentId: 1 },
+      targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
+    };
+
+    expect(haulActionCarriesOre(state, action)).toBe(false);
   });
 });
 

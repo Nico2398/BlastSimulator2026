@@ -663,6 +663,12 @@ window.__gameState = () => {
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     storedMassKg: s.logistics.storedMassKg,
+    // Sum across every material key in state.collectedOre (kg) -- mirrors
+    // serializeGameState's own field (console-api.ts), same rationale as
+    // orderedHoleCount above: a scenario asserting ore was actually
+    // delivered (not just spoil) needs a single numeric field to check
+    // increased/decreased/changedBy against (#671).
+    collectedOreTotal: Object.values(s.collectedOre).reduce((sum, kg) => sum + kg, 0),
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,

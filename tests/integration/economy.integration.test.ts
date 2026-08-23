@@ -810,4 +810,101 @@ describe('Economy', () => {
     expect(deliverResult.success).toBe(true);
     expect(ctx.state!.contracts.completedHistory.length).toBeGreaterThan(completedBefore);
   });
+
+  // ── 15. Ore-priority haul dispatch on a warehouse smaller than the blast ──
+  //         (#671) — regression: collectedOre.<material> never rose via
+  //         automatic haul dispatch because estimateActionCost/
+  //         selectBestActionForEmployee (ActionSelection.ts) ranked
+  //         haul_debris candidates purely by travel-time cost. A small Tier 1
+  //         freight_warehouse (2000kg, BuildingDefs.ts) fills from the
+  //         first cheapest (nearest, ore-agnostic) fragments and permanently
+  //         excludes remaining ones — including ore-bearing ones, since
+  //         nothing frees warehouse room except a player's own contract sale.
+  //
+  // Seed 20's 3x3 grid at (18,19) deterministically exposes ~355 ore-bearing
+  // fragments alongside plenty of plain rock (sandbox-confirmed against the
+  // real terrain/blast pipeline, no fixture injection needed, driven through
+  // this file's own driveDrillPlanToCompletion/driveChargePlanToCompletion
+  // helpers): under today's pure-travel-time ranking, the warehouse fills
+  // solid from plain spoil alone within the 200-tick window below and
+  // collectedOre stays permanently {} — still {} 300+ ticks past that.
+  // Once ActionSelection.ts's estimateActionCost subtracts
+  // ORE_HAUL_PRIORITY_BONUS_TICKS for ore-bearing candidates
+  // (haulActionCarriesOre, HaulDispatch.ts), an ore fragment should outrank
+  // at least some nearby plain ones and get delivered before the warehouse
+  // fills solid.
+  //
+  // Fails against today's code (haulActionCarriesOre/ORE_HAUL_PRIORITY_BONUS_TICKS
+  // stubs — see src/core/economy/HaulDispatch.ts and src/core/config/balance.ts):
+  // collectedOre stays {} for the whole tick window below.
+
+  it('collects ore automatically once ore-priority ranking lets ore-bearing fragments jump a full warehouse queue (#671)', () => {
+    newGameCommand(ctx, [], { mine_type: 'desert', seed: '20', size: '64', staffed: 'true', cash: '200000' });
+
+    const drillResult = drillPlanCommand(ctx as any, ['grid'], {
+      origin: '18,19', rows: '3', cols: '3', spacing: '3', depth: '8',
+    });
+    expect(drillResult.success).toBe(true);
+    driveDrillPlanToCompletion(ctx);
+
+    const chargeResult = chargeCommand(ctx as any, [], {
+      hole: '*', explosive: 'boomite', amount: '5kg', stemming: '2m',
+    });
+    expect(chargeResult.success).toBe(true);
+    driveChargePlanToCompletion(ctx);
+
+    const seqResult = sequenceCommand(ctx as any, ['auto'], {});
+    expect(seqResult.success).toBe(true);
+
+    const blastResult = blastCommand(ctx as any, [], {});
+    expect(blastResult.success).toBe(true);
+
+    // Sanity: the blast genuinely exposed ore-bearing ground fragments — a
+    // regression that later lost this natural exposure would invalidate the
+    // whole test, not just this fix.
+    const oreBearingFragments = ctx.state!.logistics.fragments.filter(
+      f => Object.values(f.fragment.oreDensities).some(density => density > 0),
+    );
+    expect(oreBearingFragments.length).toBeGreaterThan(0);
+
+    // Staff a fresh driver/debris_hauler pair. Explicit ids (6/5), not
+    // `.find(...)`, because staffed:true's own composition
+    // (STARTING_SITE_STAFFED_COMPOSITION, balance.ts) already seeds three
+    // drivers (one already driving.truck-licensed) and one debris_hauler
+    // (ids 1-5) — `.find(e => e.role === 'driver')` would silently resolve
+    // to one of those pre-existing entities instead of the one this test
+    // means to staff.
+    const hireDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
+    expect(hireDriver.success).toBe(true);
+    const driverId = 6;
+    employeeCommand(ctx, ['assign_skill', String(driverId)], {
+      skill: 'driving.truck',
+      level: '5',
+    });
+    const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
+    expect(buyResult.success).toBe(true);
+    const vehicleId = 5;
+    const assignResult = vehicleCommand(ctx, ['driver', String(vehicleId), String(driverId)], {});
+    expect(assignResult.success).toBe(true);
+
+    // Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) — small
+    // relative to the blast's total haulable mass, which is the whole point.
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    expect(buildResult.success).toBe(true);
+    expect(ctx.state!.logistics.storageCapacityKg).toBe(2000);
+
+    // Bounded window: sandbox-measured convergence (warehouse permanently
+    // full at storedMassKg 1861/2000, no more deliveries possible, still
+    // unchanged 300+ ticks past this point) well inside 200 ticks on today's
+    // code.
+    for (let i = 0; i < 200; i++) tickCommand(ctx, ['1'], {});
+
+    const collectedOreTotal = Object.values(ctx.state!.collectedOre).reduce((sum, kg) => sum + kg, 0);
+    expect(collectedOreTotal).toBeGreaterThan(0);
+
+    // Regression check: the new ore-priority ranking must not starve out
+    // generic spoil delivery entirely — some non-ore mass should still make
+    // it into storage.
+    expect(ctx.state!.logistics.storedMassKg).toBeGreaterThan(0);
+  });
 });

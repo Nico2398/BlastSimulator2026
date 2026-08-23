@@ -82,6 +82,8 @@ export interface SerializableGameState {
   muckPile: MuckPileSummary | null;
   /** Mass (kg) currently held in warehouse storage (LogisticsState.storedMassKg). */
   storedMassKg: number;
+  /** Sum across every material key in state.collectedOre (kg) — proves a delivery actually landed ore, not just spoil, without pinning to one material id a scenario's own RNG/terrain didn't guarantee (#671). */
+  collectedOreTotal: number;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -144,5 +146,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     storedMassKg: s.logistics.storedMassKg,
+    collectedOreTotal: Object.values(s.collectedOre).reduce((sum, kg) => sum + kg, 0),
   };
 }
