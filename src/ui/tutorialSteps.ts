@@ -11,6 +11,7 @@ import {
   getEmployees,
   getVehicles,
   countBuildingsOfType,
+  isBlastReportOutstanding,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
 
@@ -320,7 +321,36 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // Counts blasts fired as well as ore types collected. Keying only on ore
   // dead-ends the tutorial when a legitimate blast comes up barren — the player
   // did exactly what was asked and the card would never move on.
-  createComparisonStep('blast', 'tutorial.step8.title', 'tutorial.step8', (s) => (s.levelStats?.blastsPerformed ?? 0) + Object.keys(s.collectedOre ?? {}).length, ['blast'], TOOLBAR_TARGET.blast),
+  //
+  // #707: not a plain createComparisonStep — the count alone goes up the
+  // instant the simulation effect lands (blastCommand, synchronous), well
+  // before BlastReportModal ever opens (its own 3s real-time delay, #545).
+  // The very next step ('scores') is a createAutoAdvanceStep whose isComplete
+  // is unconditionally true, so the rail advanced blast -> scores ->
+  // event-fire-resolve within one guide poll (250ms) of the count changing —
+  // long before the report was even on screen, let alone closed. A click on
+  // the report's own CLOSE button then landed after the rail had already
+  // moved on, against a control the guide no longer kept live. Gating
+  // completion on `!isBlastReportOutstanding()` as well keeps this step (and
+  // the rail) on 'blast' for the whole arm-delay-open-dismiss lifecycle of
+  // the report, so CLOSE stays reachable (`visibleModalControls`,
+  // tutorialGuide.ts, keeps any open modal's own controls live regardless of
+  // stage) until the player actually clicks it.
+  {
+    id: 'blast',
+    titleKey: 'tutorial.step8.title',
+    textKey: 'tutorial.step8',
+    commands: ['blast'],
+    highlightTarget: TOOLBAR_TARGET.blast,
+    captureSnapshot: (state: GameState) => ({
+      prevValue: (state.levelStats?.blastsPerformed ?? 0) + Object.keys(state.collectedOre ?? {}).length,
+    }),
+    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
+      const prev = snapshot.prevValue as number;
+      const value = (state.levelStats?.blastsPerformed ?? 0) + Object.keys(state.collectedOre ?? {}).length;
+      return value > prev && !isBlastReportOutstanding();
+    },
+  },
 
   // ── Step 8: scores ──
   createAutoAdvanceStep('scores', 'tutorial.step9.title', 'tutorial.step9', (state: GameState) => ({

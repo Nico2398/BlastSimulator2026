@@ -181,50 +181,24 @@
       }
     },
     {
-      "command": "tick 10",
+      "command": "wait_until field:surveyCount equals:1 max_ticks:30",
       "timeout": 30,
       "interaction": [
         {
-          "type": "command",
-          "command": "tick 10"
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 1,
+          "maxTicks": 30,
+          "timeoutMs": 20000
         }
       ],
       "role": "setup",
-      "description": "#553-followup (issue #586 CI): relaxed `cash: 197804` to `decreased` -- a real interaction-mode run (2/6 local reps) read 196164 instead, inheriting real-time payroll drift from the survey step's own player clicks/waits above (same real-time-accrual class documented throughout this PR), which this purely tick-driven step can't undo. #555 (this merge)-followup (real CI): dropped `decreased` entirely -- the survey's own $3,000 is already charged at order time (the survey step's own `changedBy` above), there is no continuous per-tick payroll/upkeep drain anywhere in this codebase (only discrete costs: hires, training, purchases, event fines, rest deductions), and the surveyor's task needs no vehicle, so a real run can land this 10-tick block with nothing left to spend and cash genuinely flat -- exactly what a real CI run read (293516 -> 293516). `decreased` was never a mode-invariant claim here."
-    },
-    {
-      "command": "tick 10",
-      "timeout": 30,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
+      "description": "Issue #716: replaces the four hand-measured `tick 10` blocks (40 ticks total) this step used to be. The seismic survey ordered above actually completes at tick 14 (direct trace: 'Advanced 10 tick(s). Now at tick 10' then '[tick 14] seismic survey complete'), so 26 of those 40 ticks were pure idle padding with nothing left to wait on -- and idle ticks are not free: the surveyor (employee #1) is the same employee who later becomes the box-cut/drill-plan digger (trained driving.excavator further down), and every idle tick between finishing the survey and being handed a real task drains their hunger/fatigue against SitePolicy's own continuous-mode thresholds (60/60, applied at the set-early-policy step below) with nothing to show for it. Direct trace confirmed this padding was the root cause of #716's box-cut deadlock: with it in place, employee #1 starts the walk to board the rock_digger already below both thresholds, SitePolicy's shouldForceRest fires almost immediately (activeActionId gates it while idle, so this only bites once they're finally given real work), interrupts the walk, and each interruption releases the vehicle reservation (interruptActiveAction, GameLoop.ts) -- forcing a full walk back to re-board on top of the rest itself. The cycle compounds (repeated interruptions crash morale to 0 and fatigue to 100 before a single ramp segment is ever dug), so the box-cut stage's own isComplete (a ramp nav-cell count increasing) never fires within the wait's budget. `waitUntil` on `surveyCount` (mirrors `createComparisonStep`'s own `surveyResults.length` check, tutorialSteps.ts) stops the instant the survey actually lands instead of guessing a fixed tick budget -- matching this file's own #689-followup precedent for the drill/charge waits further down.",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
         }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "tick 10",
-      "timeout": 30,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup"
-    },
-    {
-      "command": "tick 10",
-      "timeout": 30,
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 10"
-        }
-      ],
-      "role": "setup",
-      "description": "#553-followup (issue #586 CI): relaxed `cash: 195344` to `decreased` -- same real-time-accrual drift as the tick-10 checkpoint above, inherited from the survey step's own real clicks. #555 (this merge)-followup (real CI): dropped `decreased` entirely -- same reasoning as the tick-10 checkpoint two steps above: no continuous per-tick cash drain exists in this codebase, so a real run can land this block with cash genuinely unchanged."
+      }
     },
     {
       "command": "employee hire role:driller",
@@ -1116,17 +1090,17 @@
       "role": "bootstrap"
     },
     {
-      "command": "wait_until field:tickCount equals:400 max_ticks:60",
-      "timeout": 40,
-      "description": "#689-followup: same fragility as tutorial-interactive.json's own contract-accept step (see its note) -- the drill/charge waitUntil fixes above shortened this file's own trajectory enough to shift where it lands relative to the contract offer pool's refresh cycle (REFRESH_INTERVAL=20 ticks, Contract.ts). Direct trace confirms this step now lands at tick 364 with 8 ore_sale offers and no rubble_disposal -- the one type this file can actually deliver later (consumeStoredOre() draws on raw storedMassKg, which the debris hauler fills; ore_sale/supply need specific ore this hauler never produces). The pool's next rubble_disposal offer surfaces after 36 more ticks (tickCount 400), no event pending anywhere in that window, so this waits on tickCount itself (deterministic given the fixed seed) rather than the offer directly -- there is no state-dump field for 'a rubble_disposal offer exists' to wait on instead.",
+      "command": "wait_until field:tickCount equals:400 max_ticks:80",
+      "timeout": 50,
+      "description": "#689-followup: same fragility as tutorial-interactive.json's own contract-accept step (see its note) -- the drill/charge waitUntil fixes above shortened this file's own trajectory enough to shift where it lands relative to the contract offer pool's refresh cycle (REFRESH_INTERVAL=20 ticks, Contract.ts). Direct trace confirms this step now lands at tick 364 with 8 ore_sale offers and no rubble_disposal -- the one type this file can actually deliver later (consumeStoredOre() draws on raw storedMassKg, which the debris hauler fills; ore_sale/supply need specific ore this hauler never produces). The pool's next rubble_disposal offer surfaces after 36 more ticks (tickCount 400), no event pending anywhere in that window, so this waits on tickCount itself (deterministic given the fixed seed) rather than the offer directly -- there is no state-dump field for 'a rubble_disposal offer exists' to wait on instead. Issue #716 follow-up: the survey-wait fix earlier in this file (the `wait_until field:surveyCount` step, replacing four hand-measured `tick 10` blocks) shortened the box-cut/drill-plan employee's pre-work idle time and, with it, this step's own landing tick -- direct trace now lands at tick 338, not 364. The target itself is untouched (`tickCount` is reseeded fresh per tick, `new Random(state.seed + state.tickCount)`, so which contracts the pool holds at absolute tick 400 does not depend on the path taken to get there), but reaching 400 from 338 takes 62 ticks, 2 more than the old 60-tick budget ever needed to cover -- `maxTicks`/`timeoutMs`/the step's own outer `timeout` are widened with margin, matching this file's own convention elsewhere of budgeting past what a direct trace measures rather than pinning the exact figure.",
       "role": "setup",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "tickCount",
           "equals": 400,
-          "maxTicks": 60,
-          "timeoutMs": 40000
+          "maxTicks": 80,
+          "timeoutMs": 50000
         }
       ],
       "expect": {

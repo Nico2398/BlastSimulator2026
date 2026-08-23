@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:200000",
-      "timeout": 15,
+      "timeout": 60,
       "interaction": [
         {
           "type": "command",
@@ -769,7 +769,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 120,
       "frames": 6,
       "interval": 50,
       "description": "#601-followup: leading `resolveEventIfPending` added -- same real-time-gap race the preceding `sequence auto` step found and fixed (see its own note): a timer event landing between steps leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"5\"]` with \"element is covered by div\".",

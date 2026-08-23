@@ -221,3 +221,24 @@ export function countBuildingsOfType(state: GameState, buildingType: string): nu
 export function countVehiclesWithDriver(state: GameState): number {
   return getVehicles(state).filter(v => v.driverId !== null).length;
 }
+
+/**
+ * Whether the Blast Report modal (`BlastReportModal.ts`) has a report armed
+ * or on screen right now.
+ *
+ * True from the instant a blast arms a report through its real-time open
+ * delay (#545, `BLAST_REPORT_DELAY_MS`) and until the player dismisses it —
+ * read off a DOM marker the modal stamps on its own overlay rather than
+ * GameState, the same reason `isReachable` (tutorialGuide.ts) reads the DOM
+ * instead of threading a UI reference through TutorialStep: opening and
+ * dismissal are UI-only state, invisible to GameState. The overlay node
+ * itself stays in the DOM the whole time — only its `display` toggles — so
+ * this reads correctly even while the report is armed but the overlay is
+ * still `display:none` during the open delay, which a display-only check
+ * would miss (#707: that miss is exactly what let the 'blast' tutorial step
+ * complete, and the rail advance past it, before the report ever opened).
+ */
+export function isBlastReportOutstanding(): boolean {
+  const overlay = document.querySelector('[data-blast-report-modal]') as HTMLElement | null;
+  return overlay?.dataset['outstanding'] === 'true';
+}

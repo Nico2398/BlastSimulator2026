@@ -54,6 +54,16 @@ export class BlastReportModal {
   constructor(container: HTMLElement, private readonly now: () => number = () => performance.now()) {
     this.overlay = el('div', { className: 'bs-confirm-overlay' });
     this.overlay.style.display = 'none';
+    // Stable marker for TutorialOverlay (#707): a report is "outstanding"
+    // from the instant a blast arms one (pendingReport set) through the
+    // real-time open delay (#545) and until the player dismisses it. The
+    // overlay itself stays in the DOM the whole time — only its display
+    // toggles — so this dataset flag is readable even while `pending` is
+    // true and the overlay is still `display:none`, which is exactly the
+    // window a display-only check would miss. See
+    // `isBlastReportOutstanding` (tutorialStepHelpers.ts).
+    this.overlay.dataset['blastReportModal'] = '';
+    this.overlay.dataset['outstanding'] = 'false';
 
     const box = el('div');
     box.style.cssText = 'width:640px;max-width:92vw;max-height:86vh;display:flex;flex-direction:column;border-radius:9px;background:var(--bsx-panel);border:1px solid var(--bsx-hairline-strong);box-shadow:0 30px 80px rgba(0,0,0,.7);overflow:hidden';
@@ -97,8 +107,17 @@ export class BlastReportModal {
 
   get root(): HTMLElement { return this.overlay; }
 
-  hide(): void { this.open = false; this.overlay.style.display = 'none'; }
+  hide(): void {
+    this.open = false;
+    this.overlay.style.display = 'none';
+    this.syncOutstandingMarker();
+  }
   get visible(): boolean { return this.open; }
+
+  /** Keeps `data-outstanding` (#707) in sync with `pending || open`. */
+  private syncOutstandingMarker(): void {
+    this.overlay.dataset['outstanding'] = String(this.pendingReport !== null || this.open);
+  }
 
   /** Whether a report has arrived but is still waiting out its open delay (#545). */
   get pending(): boolean { return this.pendingReport !== null; }
@@ -142,6 +161,7 @@ export class BlastReportModal {
       if (report) this.lastShownReport = report;
       this.pendingReport = null;
       this.pendingDeadlineMs = null;
+      this.syncOutstandingMarker();
       return;
     }
 
@@ -171,6 +191,8 @@ export class BlastReportModal {
       this.open = true;
       this.overlay.style.display = '';
     }
+
+    this.syncOutstandingMarker();
   }
 
   refreshLocale(): void { this.locale.refresh(); }
