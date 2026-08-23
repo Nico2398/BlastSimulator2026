@@ -85,6 +85,17 @@ export function accumulateOreMass(
   }
 }
 
+/**
+ * True iff any entry in `oreDensities` is > 0 — i.e. the fragment carries
+ * some amount of at least one ore type. Shared "does this fragment have any
+ * ore at all" primitive: HaulDispatch.ts uses it to rank ore-bearing haul
+ * candidates, SuccessTracker.ts uses it to short-circuit before iterating
+ * individual ore ids for uniqueOresExtracted.
+ */
+export function fragmentHasOre(oreDensities: Record<string, number>): boolean {
+  return Object.values(oreDensities).some(density => density > 0);
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**

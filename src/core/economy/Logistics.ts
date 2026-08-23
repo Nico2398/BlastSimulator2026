@@ -227,3 +227,8 @@ export function getFragmentCounts(state: LogisticsState): FragmentCounts {
 export function hasStorageRoom(state: LogisticsState, massKg: number): boolean {
   return state.storedMassKg + massKg <= state.storageCapacityKg;
 }
+
+/** Total ore mass across all materials in `collectedOre`, in kg. */
+export function totalCollectedOreKg(collectedOre: Record<string, number>): number {
+  return Object.values(collectedOre).reduce((sum, kg) => sum + kg, 0);
+}

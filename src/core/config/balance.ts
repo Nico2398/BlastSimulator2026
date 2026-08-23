@@ -559,6 +559,22 @@ export const MAX_EMPLOYEE_TASK_QUEUE_DEPTH = 3;
  */
 export const ACTION_SELECTION_MAX_PATH_ATTEMPTS = 5;
 
+/**
+ * Ranking-priority bonus (ticks) subtracted from a haul_debris/fragment_debris
+ * candidate's estimated cost in `estimateActionCost` when its fragment
+ * carries ore, so ore-bearing fragments get hauled before storage fills up
+ * with plain spoil. Does not affect the real duration used for ETA/display —
+ * ranking-only. To be derived from site scale / AGENT_WALK_SPEED.
+ */
+// Derived as half the tick-cost of crossing DEFAULT_GRID_SIZE (64 cells) at
+// AGENT_WALK_SPEED (2 cells/tick) one-way — i.e. (64 / 2) / 2 = 16 ticks.
+// That gives an ore-bearing candidate up to ~32 extra grid cells of
+// travel-cost tolerance over a same-role non-ore candidate (tens of cells, as
+// required), while staying well under the ~32-45 tick cost of crossing an
+// entire default site, so a very distant ore fragment still loses to a truly
+// nearby plain one rather than winning unconditionally regardless of distance.
+export const ORE_HAUL_PRIORITY_BONUS_TICKS: number = 16;
+
 /** Morale penalty applied per tick to an employee stuck with no walkable path (see NEED_MORALE_PENALTIES for the analogous need-driven table). */
 export const STUCK_MORALE_PENALTY = 2;
 

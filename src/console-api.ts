@@ -6,6 +6,7 @@ import type { CommandResult } from './console/ConsoleRunner.js';
 import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
+import { totalCollectedOreKg } from './core/economy/Logistics.js';
 
 export { createRunner };
 export type { RunnerWithContext, CommandResult, MiningContext };
@@ -82,6 +83,8 @@ export interface SerializableGameState {
   muckPile: MuckPileSummary | null;
   /** Mass (kg) currently held in warehouse storage (LogisticsState.storedMassKg). */
   storedMassKg: number;
+  /** Sum across every material key in state.collectedOre (kg) — proves a delivery actually landed ore, not just spoil, without pinning to one material id a scenario's own RNG/terrain didn't guarantee (#671). */
+  collectedOreTotal: number;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -144,5 +147,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
       ? summariseMuckPile(s.logistics.fragments.map(f => f.fragment), ctx.grid)
       : null,
     storedMassKg: s.logistics.storedMassKg,
+    collectedOreTotal: totalCollectedOreKg(s.collectedOre),
   };
 }

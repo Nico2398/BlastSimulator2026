@@ -1,0 +1,202 @@
+{
+  "name": "ore-haul-dispatch",
+  "description": "Regression scenario for #671: collectedOre.<material> never rose via automatic haul dispatch because estimateActionCost/selectBestActionForEmployee (ActionSelection.ts) ranked haul_debris/fragment_debris candidates purely by travel-time cost, with zero ore-awareness. A small Tier 1 freight_warehouse (2000kg, BuildingDefs.ts) fills solid from the first cheapest (nearest, ore-agnostic) fragments and permanently excludes remaining ones -- including ore-bearing ones, since nothing frees warehouse room except a player's own contract sale. Seed 10's 3x3 drill grid at (18,19) deterministically exposes ~250 ore-bearing ground fragments alongside plenty of plain rock (sandbox-confirmed end to end against the real, un-cheated console pipeline -- no fixture injection, no forced needs gauges, exact ids/commands below reproduced verbatim): under today's pure-travel-time ranking, the warehouse fills solid from plain spoil alone (stuck permanently at storedMassKg 2125/2000, confirmed unchanged 500+ ticks past the build) and collectedOreTotal never rises off zero. Once ActionSelection.ts's estimateActionCost subtracts ORE_HAUL_PRIORITY_BONUS_TICKS for ore-bearing candidates (haulActionCarriesOre, HaulDispatch.ts), an ore fragment should outrank at least some nearby plain ones and get delivered before the warehouse fills solid. Command-mode only (issue #671 is a dispatch-ranking/economy fix with no player-facing UI surface) -- no interaction arrays on the mutating steps below, so interaction mode no-ops them rather than asserting on clicks this bug has none of.",
+  "steps": [
+    {
+      "command": "new_game mine_type:desert seed:10 size:64 staffed:true cash:200000",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game mine_type:desert seed:10 size:64 staffed:true cash:200000"
+        }
+      ],
+      "expect": {
+        "equals": {
+          "cash": 200000,
+          "buildingCount": 0,
+          "collectedOreTotal": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:18,19",
+      "description": "9-hole grid, deterministic under seed 10 -- sandbox-confirmed to expose ~250 ore-bearing ground fragments alongside plenty of plain rock once blasted.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:9 max_ticks:220",
+      "description": "#553: drain the ordered plan -- the staffed driller/drill_rig lands all 9 holes well inside this budget (sandbox-measured landing at tick 166 under real, un-cheated needs gauges).",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 220,
+          "timeoutMs": 60000
+        }
+      ],
+      "timeout": 90,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3000",
+      "description": "#554: drain the charge order(s) queued by the step above (charging is real work, not instant) before continuing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3000,
+          "timeoutMs": 120000
+        }
+      ],
+      "timeout": 125,
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "timeout": 30,
+      "role": "player",
+      "expect": {
+        "equals": {
+          "holeCount": 0,
+          "chargedCount": 0,
+          "sequencedCount": 0,
+          "collectedOreTotal": 0
+        },
+        "note": "a fired blast clears the plan back to zero -- nothing has been hauled anywhere yet, so collectedOreTotal is still 0 at this point"
+      }
+    },
+    {
+      "command": "fragments",
+      "role": "observe"
+    },
+    {
+      "command": "employee hire role:driver",
+      "description": "#553: staffed:true's roster (driller/blaster/driver/driver/driver, ids 1-5 -- STARTING_SITE_STAFFED_COMPOSITION, balance.ts) means this hire is the roster's 6th employee, not its 1st. It also means employees 3-5 already hold driving licences (one driving.truck, two driving.excavator) and vehicle #2 is already a debris_hauler -- this scenario deliberately hires/buys a fresh driver+hauler and addresses both by their explicit new ids (6/5) below rather than \"the first driver\"/\"the first debris_hauler\", which would instead resolve to one of the pre-existing staffed ones.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 6
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 6 skill:driving.truck level:5",
+      "description": "Left unmarked: hiring already grants the Rookie driving.truck qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Bootstrap-only primitive (BOOTSTRAP_COMMAND_ALLOWLIST), no UI equivalent by design.",
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "vehicle buy debris_hauler",
+      "description": "#553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st -- and the blast above destroyed the drill_rig (vehicle #1, sitting inside its own hole's blast radius), so vehicleCount goes 3 -> 4, not 0 -> 1.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "vehicleCount": 4
+        }
+      }
+    },
+    {
+      "command": "vehicle driver 5 6",
+      "description": "Vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5.",
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "build freight_warehouse at:13,13",
+      "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "buildingCount": 1,
+          "storedMassKg": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:tickCount equals:428 max_ticks:260",
+      "description": "The real wait for automatic haul dispatch to run its course, expressed as a tickCount target (rather than a plain `tick 200`) so waitUntil's own internal event-auto-resolution (issue #590) carries this step through any spontaneous event instead of a bare `tick` refusing outright the instant one fires mid-window -- sandbox-confirmed against this exact seed/setup: tickCount reads 228 immediately before this step, so 428 is 200 real ticks of dispatch beyond that, with max_ticks:260 leaving slack for a handful of event-resolution iterations along the way. Sandbox-confirmed on today's (buggy) code: the warehouse is already permanently full (storedMassKg 2125/2000, unchanged 300+ ticks past this window) by the time this step ends, with collectedOreTotal stuck at 0 the whole way. This is the fix's own acceptance check: collectedOreTotal must rise off zero once ore-bearing candidates can jump the queue ahead of plain spoil while the warehouse still has room.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "tickCount",
+          "equals": 428,
+          "maxTicks": 260,
+          "timeoutMs": 120000
+        }
+      ],
+      "timeout": 125,
+      "role": "setup",
+      "expect": {
+        "increased": [
+          "collectedOreTotal",
+          "storedMassKg"
+        ],
+        "note": "collectedOreTotal is this fix's own acceptance check (#671). storedMassKg is the regression check alongside it -- the new ore-priority ranking must not starve out generic spoil delivery entirely; some non-ore mass should still make it into storage alongside the ore."
+      }
+    },
+    {
+      "command": "fragments",
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "role": "observe"
+    }
+  ]
+}

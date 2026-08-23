@@ -11,9 +11,10 @@ import { octileHeuristic, findPath } from '../nav/Pathfinding.js';
 import { computeTaskDuration } from '../entities/EmployeeTaskDuration.js';
 import { getNeedMultiplier } from '../entities/EmployeeNeeds.js';
 import { getLivingQuartersWellbeingMultiplier } from '../entities/BuildingWellbeing.js';
-import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, ACTION_SELECTION_MAX_PATH_ATTEMPTS, BASE_TASK_DURATION_TICKS, NEED_REST_DURATIONS, ORE_HAUL_PRIORITY_BONUS_TICKS } from '../config/balance.js';
 import { computeRampSegmentDurationTicks } from '../mining/Ramp.js';
 import type { VehicleTier } from '../entities/Vehicle.js';
+import { haulActionCarriesOre } from '../economy/HaulDispatch.js';
 
 /**
  * Determine which need gauge a 'rest' PendingAction's payload is restoring,
@@ -113,9 +114,20 @@ function estimateTravelTicks(employee: Employee, action: PendingAction): number 
  * The octile distance is itself the direct-line estimate
  * `tickEmployeeMovement` (EntityMovementTick.ts) falls back to when
  * `state.navGrid` is null, so no separate null-navGrid branch is needed here.
+ *
+ * Ore-bearing haul_debris/fragment_debris candidates (`haulActionCarriesOre`)
+ * get ORE_HAUL_PRIORITY_BONUS_TICKS subtracted here so they outrank a
+ * same-role plain-spoil candidate at realistic intra-site distances (#671) —
+ * ore fragments would otherwise starve behind whichever fragment is nearest,
+ * filling a small warehouse with rock before any ore is ever hauled in. This
+ * is ranking-only: resolveActionCost's real totalTicks (used for
+ * ETA/duration seeding) never applies the bonus. Clamped at 0 since this
+ * value only ever feeds a sort comparison.
  */
 export function estimateActionCost(state: GameState, employee: Employee, action: PendingAction): number {
-  return estimateTravelTicks(employee, action) + computeActionWorkTicks(state, employee, action);
+  const rawCost = estimateTravelTicks(employee, action) + computeActionWorkTicks(state, employee, action);
+  const bonus = haulActionCarriesOre(state, action) ? ORE_HAUL_PRIORITY_BONUS_TICKS : 0;
+  return Math.max(0, rawCost - bonus);
 }
 
 /**
