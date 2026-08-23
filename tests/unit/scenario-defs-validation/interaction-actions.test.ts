@@ -219,20 +219,12 @@ describe('Dual-play scenario steps — data-driven validation', () => {
 describe('tutorial-interactive.json — outer step timeout covers every inner waitForTutorialStep timeout', () => {
   const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
 
-  for (let i = 0; i < scenario.steps.length; i++) {
-    const step = scenario.steps[i];
-    if (typeof step === 'string') continue;
-    const stepObj = step as ScenarioStepDef;
-    if (!stepObj.interaction) continue;
-
-    for (const action of stepObj.interaction) {
-      if (action.type !== 'waitForTutorialStep') continue;
-
-      it(`step[${i}] (${stepObj.description ?? stepObj.command}) — outer timeout covers waitForTutorialStep's inner timeout`, () => {
-        const outerMs = (stepObj.timeout ?? 60) * 1000;
-        const innerMs = action.timeout ?? 30000;
-        expect(outerMs).toBeGreaterThanOrEqual(innerMs);
-      });
-    }
-  }
+  forEachActionOfType(scenario, 'waitForTutorialStep', (action, i) => {
+    const stepObj = scenario.steps[i] as ScenarioStepDef;
+    it(`step[${i}] (${stepObj.description ?? stepObj.command}) — outer timeout covers waitForTutorialStep's inner timeout`, () => {
+      const outerMs = (stepObj.timeout ?? 60) * 1000;
+      const innerMs = action.timeout ?? 30000;
+      expect(outerMs).toBeGreaterThanOrEqual(innerMs);
+    });
+  });
 });
