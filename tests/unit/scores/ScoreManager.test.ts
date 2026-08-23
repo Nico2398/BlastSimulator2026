@@ -5,6 +5,7 @@ import {
   recordAccident,
   recordVibration,
   recordSafetyInvestment,
+  clampScore,
   type ScoreInputs,
 } from '../../../src/core/scores/ScoreManager.js';
 import {
@@ -78,5 +79,36 @@ describe('Score system', () => {
     // Drive safety high
     for (let i = 0; i < 30; i++) recordSafetyInvestment(state, 5000);
     expect(state.safety).toBe(100);
+  });
+});
+
+// ── clampScore (#710) ─────────────────────────────────────────────────────
+// Shared 0-100 clamp helper. EventResolver.applyConsequence is expected to
+// call this same symbol instead of its own inline
+// `Math.max(0, Math.min(100, ...))`, so this is the single place the clamp's
+// boundary behavior is pinned.
+describe('clampScore', () => {
+  it('clamps a value below the floor to 0', () => {
+    expect(clampScore(-5)).toBe(0);
+  });
+
+  it('clamps a value above the ceiling to 100', () => {
+    expect(clampScore(150)).toBe(100);
+  });
+
+  it('leaves the exact floor (0) unchanged', () => {
+    expect(clampScore(0)).toBe(0);
+  });
+
+  it('leaves the exact ceiling (100) unchanged', () => {
+    expect(clampScore(100)).toBe(100);
+  });
+
+  it('passes a mid-range value through unchanged', () => {
+    expect(clampScore(45)).toBe(45);
+  });
+
+  it('clamps a fractional value just above the ceiling to 100', () => {
+    expect(clampScore(100.0001)).toBe(100);
   });
 });
