@@ -98,3 +98,14 @@ export function isHaulOrFragmentActionClaimable(state: GameState, action: Pendin
   const roomKg = state.logistics.storageCapacityKg - state.logistics.storedMassKg;
   return tracked.fragment.mass <= roomKg;
 }
+
+/**
+ * True iff `action` is haul_debris/fragment_debris and its referenced
+ * fragment carries any ore (some oreDensities entry > 0). False for any
+ * other action type or a fragment id that no longer resolves.
+ */
+export function haulActionCarriesOre(state: GameState, action: PendingAction): boolean {
+  void state;
+  void action;
+  throw new Error('not implemented');
+}
