@@ -195,3 +195,44 @@ describe('Dual-play scenario steps — data-driven validation', () => {
     });
   }
 });
+
+// ──────────────────────────────────────────────
+// 12. tutorial-interactive.json — outer step timeout covers every inner
+// waitForTutorialStep deadline (issue #730)
+//
+// Deliberately scoped to this one file rather than folded into the shared
+// cross-file check above (which only covers waitUntil/resolveEventIfPending):
+// tutorial-steps-visual.json has 14 pre-existing waitForTutorialStep steps
+// whose outer timeout does not cover the 30000ms inner default, and pulling
+// them into scope here is out of scope for #730 (tracked separately). This
+// check exists to catch step 11 (`set-early-policy`, `set_policy
+// mode:continuous`), which declares `"timeout": 15` while its
+// waitForTutorialStep action falls back to the 30000ms default
+// (interaction-executor.ts's `action.timeout ?? 30000`) — the 5 preceding
+// DOM round-trip actions in that step's own interaction array eat into the
+// 15s outer budget before the wait loop gets a real chance, stalling
+// interaction-mode scenario runs at that step. Every other
+// waitForTutorialStep-gated step in this file uses the file's own
+// established `"timeout": 30` convention (e.g. `build-living-quarters`,
+// step 10) — step 11's `15` is the lone outlier.
+// ──────────────────────────────────────────────
+describe('tutorial-interactive.json — outer step timeout covers every inner waitForTutorialStep timeout', () => {
+  const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
+
+  for (let i = 0; i < scenario.steps.length; i++) {
+    const step = scenario.steps[i];
+    if (typeof step === 'string') continue;
+    const stepObj = step as ScenarioStepDef;
+    if (!stepObj.interaction) continue;
+
+    for (const action of stepObj.interaction) {
+      if (action.type !== 'waitForTutorialStep') continue;
+
+      it(`step[${i}] (${stepObj.description ?? stepObj.command}) — outer timeout covers waitForTutorialStep's inner timeout`, () => {
+        const outerMs = (stepObj.timeout ?? 60) * 1000;
+        const innerMs = action.timeout ?? 30000;
+        expect(outerMs).toBeGreaterThanOrEqual(innerMs);
+      });
+    }
+  }
+});
