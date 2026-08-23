@@ -1357,6 +1357,14 @@ function forceShiftRestIfNeeded(
   if (emp.activeActionId === null) return;
   if (emp.ticksWorked < WORK_DURATION_TICKS) return;
 
+  // Release the action this employee was actively working back to the pool
+  // before handing activeActionId to the rest action below — mirrors
+  // tickCollapse's and forceShiftRestIfNeededByPolicy's own interruptActiveAction
+  // call for the identical reason (#684): without this, overwriting
+  // activeActionId directly orphans the interrupted action permanently.
+  const priorActionId = emp.activeActionId;
+  interruptActiveAction(state, emp, priorActionId);
+
   // Find nearest living_quarters for target coordinates
   const building = findNearestLivingQuarters(state, emp.x, emp.z);
   let targetX = emp.x;
