@@ -21,9 +21,10 @@ function readGlobalTypesSource(): string {
 }
 
 describe('Tutorial Bridge — window.__startTutorial', () => {
-  it('src/types/global.d.ts has a declare global block with __startTutorial type', () => {
+  it('src/types/global.d.ts declares the __startTutorial type on Window (#744)', () => {
+    // The declare global block moved from main.ts to a dedicated ambient
+    // declarations file (#744) — the type augmentation must live there now.
     const src = readGlobalTypesSource();
-    // The global augmentation must declare __startTutorial on Window
     expect(src).toMatch(/__startTutorial\s*:\s*\(\)\s*=>\s*void/);
   });
 
