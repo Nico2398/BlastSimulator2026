@@ -105,7 +105,13 @@ export function isHaulOrFragmentActionClaimable(state: GameState, action: Pendin
  * other action type or a fragment id that no longer resolves.
  */
 export function haulActionCarriesOre(state: GameState, action: PendingAction): boolean {
-  void state;
-  void action;
-  throw new Error('not implemented');
+  if (action.type !== 'haul_debris' && action.type !== 'fragment_debris') return false;
+
+  const fragmentId = action.payload['fragmentId'];
+  const tracked = typeof fragmentId === 'number'
+    ? state.logistics.fragments.find(f => f.fragment.id === fragmentId)
+    : undefined;
+  if (!tracked) return false;
+
+  return Object.values(tracked.fragment.oreDensities).some(density => density > 0);
 }
