@@ -120,32 +120,36 @@ export interface ScenarioViolation {
  * Shared traversal: walk every scenario file's every step (optionally
  * restricted to `scenarioNames`), collecting the ones for which
  * `isViolation` returns true.
- *
- * TODO: implement — currently a stub for the skeleton phase.
  */
 export function collectScenarioViolations(
   isViolation: (step: ScenarioStepDef) => boolean,
-  scenarioNames?: string[],
+  scenarioNames: string[] = scenarioFiles(SCENARIO_DIR),
 ): ScenarioViolation[] {
-  void isViolation;
-  void scenarioNames;
-  throw new Error('not implemented');
+  const violations: ScenarioViolation[] = [];
+  for (const file of scenarioNames) {
+    const scenario = loadScenarioDef(file, SCENARIO_DIR);
+    scenario.steps.forEach((rawStep, stepIndex) => {
+      const step = rawStep as ScenarioStepDef;
+      if (isViolation(step)) {
+        violations.push({ file, stepIndex, command: step.command });
+      }
+    });
+  }
+  return violations;
 }
 
 /**
  * Format a list of scenario violations for a test failure message, one line
  * per violation. `describeExtra` lets a caller append lint-specific detail
  * beyond the shared file/stepIndex/command fields.
- *
- * TODO: implement — currently a stub for the skeleton phase.
  */
 export function formatScenarioViolations<V extends ScenarioViolation>(
   violations: V[],
   describeExtra?: (v: V) => string,
 ): string {
-  void violations;
-  void describeExtra;
-  throw new Error('not implemented');
+  return violations
+    .map((v) => `  ${v.file}.json step[${v.stepIndex}] ("${v.command}")${describeExtra ? describeExtra(v) : ''}`)
+    .join('\n');
 }
 
 /**
