@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
 
@@ -14,8 +14,114 @@ import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.j
 // types are added to scenarios in the future.
 // ──────────────────────────────────────────────
 
+/**
+ * Shared scaffold behind the per-action-type checks below (issue #722): skip
+ * plain-string steps, skip steps with no `interaction` array, then run
+ * `check` against every action in the array matching `actionType`.
+ * `Extract<InteractionStepAction, { type: T }>` narrows the union to the one
+ * variant `actionType` names; TypeScript can't carry that narrowing through a
+ * runtime-supplied literal on its own, so the cast is confined to this one
+ * helper rather than repeated at each call site.
+ */
+function forEachActionOfType<T extends InteractionStepAction['type']>(
+  scenario: ScenarioDef,
+  actionType: T,
+  check: (action: Extract<InteractionStepAction, { type: T }>, stepIndex: number) => void,
+): void {
+  for (let i = 0; i < scenario.steps.length; i++) {
+    const step = scenario.steps[i];
+    if (typeof step === 'string') continue;
+    const stepObj = step as ScenarioStepDef;
+    if (!stepObj.interaction) continue;
+    for (const action of stepObj.interaction) {
+      if (action.type === actionType) {
+        check(action as Extract<InteractionStepAction, { type: T }>, i);
+      }
+    }
+  }
+}
+
+interface ActionTypeCheck<T extends InteractionStepAction['type'] = InteractionStepAction['type']> {
+  actionType: T;
+  description: string;
+  check: (action: Extract<InteractionStepAction, { type: T }>, stepIndex: number) => void;
+}
+
+const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
+  {
+    actionType: 'click', description: 'click actions have x and y coordinates',
+    check: (a) => { expect(typeof a.x).toBe('number'); expect(typeof a.y).toBe('number'); },
+  },
+  {
+    actionType: 'type', description: 'type actions have selector and text',
+    check: (a) => {
+      expect(typeof a.selector).toBe('string');
+      expect(a.selector.length).toBeGreaterThan(0);
+      expect(typeof a.text).toBe('string');
+    },
+  },
+  {
+    actionType: 'wait', description: 'wait actions have durationMs',
+    check: (a) => { expect(typeof a.durationMs).toBe('number'); expect(a.durationMs).toBeGreaterThan(0); },
+  },
+  {
+    actionType: 'waitForSelector', description: 'waitForSelector actions have selector',
+    check: (a) => { expect(typeof a.selector).toBe('string'); expect(a.selector.length).toBeGreaterThan(0); },
+  },
+  {
+    actionType: 'waitForTutorialStep',
+    description: 'waitForTutorialStep actions name at least one step id',
+    check: (a, i) => {
+      const ids = Array.isArray(a.stepId) ? a.stepId : [a.stepId];
+      expect(ids.length, `step[${i}] stepId must not be empty`).toBeGreaterThan(0);
+      for (const id of ids) {
+        expect(typeof id, `step[${i}] stepId entries must be strings`).toBe('string');
+        expect(id.length, `step[${i}] stepId entries must be non-empty`).toBeGreaterThan(0);
+      }
+    },
+  },
+  {
+    actionType: 'viewport', description: 'viewport actions have width and height',
+    check: (a) => { expect(typeof a.width).toBe('number'); expect(typeof a.height).toBe('number'); },
+  },
+  {
+    actionType: 'wheel', description: 'wheel actions have deltaX and deltaY',
+    check: (a) => { expect(typeof a.deltaX).toBe('number'); expect(typeof a.deltaY).toBe('number'); },
+  },
+  {
+    actionType: 'command',
+    description: 'command actions within interaction arrays have a command field',
+    check: (a) => { expect(typeof a.command).toBe('string'); expect(a.command.length).toBeGreaterThan(0); },
+  },
+  {
+    actionType: 'waitUntil',
+    description: 'waitUntil actions have field, equals, maxTicks, and timeoutMs',
+    check: (a) => {
+      expect(typeof a.field).toBe('string');
+      expect(a.field.length).toBeGreaterThan(0);
+      expect(a.equals).not.toBeUndefined();
+      expect(Number.isInteger(a.maxTicks)).toBe(true);
+      expect(a.maxTicks).toBeGreaterThan(0);
+      expect(Number.isInteger(a.timeoutMs)).toBe(true);
+      expect(a.timeoutMs).toBeGreaterThan(0);
+    },
+  },
+  {
+    actionType: 'cameraFocus', description: 'cameraFocus actions have x, z, and distance',
+    check: (a) => {
+      expect(typeof a.x).toBe('number');
+      expect(typeof a.z).toBe('number');
+      expect(typeof a.distance).toBe('number');
+      expect(a.distance).toBeGreaterThan(0);
+    },
+  },
+];
+
 describe('Dual-play scenario steps — data-driven validation', () => {
   for (const name of ALL_SCENARIO_NAMES) {
+    // Not table-driven: no type filter — scans every action of every step and
+    // throws (rather than skips) on a plain-string step, unlike the shared
+    // scaffold below.
     it(`${name} — all interaction action types are in the known set`, () => {
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
       for (let i = 0; i < scenario.steps.length; i++) {
@@ -34,160 +140,16 @@ describe('Dual-play scenario steps — data-driven validation', () => {
       }
     });
 
-    it(`${name} — click actions have x and y coordinates`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'click') {
-            expect(typeof action.x).toBe('number');
-            expect(typeof action.y).toBe('number');
-          }
-        }
-      }
-    });
+    for (const entry of ACTION_TYPE_CHECKS) {
+      it(`${name} — ${entry.description}`, () => {
+        const scenario = loadScenarioDef(name, SCENARIO_DIR);
+        forEachActionOfType(scenario, entry.actionType, entry.check);
+      });
+    }
 
-    it(`${name} — type actions have selector and text`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'type') {
-            expect(typeof action.selector).toBe('string');
-            expect(action.selector.length).toBeGreaterThan(0);
-            expect(typeof action.text).toBe('string');
-          }
-        }
-      }
-    });
-
-    it(`${name} — wait actions have durationMs`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'wait') {
-            expect(typeof action.durationMs).toBe('number');
-            expect(action.durationMs).toBeGreaterThan(0);
-          }
-        }
-      }
-    });
-
-    it(`${name} — waitForSelector actions have selector`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'waitForSelector') {
-            expect(typeof action.selector).toBe('string');
-            expect(action.selector.length).toBeGreaterThan(0);
-          }
-        }
-      }
-    });
-
-    it(`${name} — waitForTutorialStep actions name at least one step id`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'waitForTutorialStep') {
-            const ids = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
-            expect(ids.length, `step[${i}] stepId must not be empty`).toBeGreaterThan(0);
-            for (const id of ids) {
-              expect(typeof id, `step[${i}] stepId entries must be strings`).toBe('string');
-              expect(id.length, `step[${i}] stepId entries must be non-empty`).toBeGreaterThan(0);
-            }
-          }
-        }
-      }
-    });
-
-    it(`${name} — viewport actions have width and height`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'viewport') {
-            expect(typeof action.width).toBe('number');
-            expect(typeof action.height).toBe('number');
-          }
-        }
-      }
-    });
-
-    it(`${name} — wheel actions have deltaX and deltaY`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'wheel') {
-            expect(typeof action.deltaX).toBe('number');
-            expect(typeof action.deltaY).toBe('number');
-          }
-        }
-      }
-    });
-
-    it(`${name} — command actions within interaction arrays have a command field`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'command') {
-            expect(typeof action.command).toBe('string');
-            expect(action.command.length).toBeGreaterThan(0);
-          }
-        }
-      }
-    });
-
-    it(`${name} — waitUntil actions have field, equals, maxTicks, and timeoutMs`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'waitUntil') {
-            expect(typeof action.field).toBe('string');
-            expect(action.field.length).toBeGreaterThan(0);
-            expect(action.equals).not.toBeUndefined();
-            expect(Number.isInteger(action.maxTicks)).toBe(true);
-            expect(action.maxTicks).toBeGreaterThan(0);
-            expect(Number.isInteger(action.timeoutMs)).toBe(true);
-            expect(action.timeoutMs).toBeGreaterThan(0);
-          }
-        }
-      }
-    });
-
+    // Not table-driven: spans two action types (waitUntil, resolveEventIfPending)
+    // and computes one value per step rather than per action, unlike the
+    // shared scaffold above.
     it(`${name} — outer step timeout covers every inner waitUntil/resolveEventIfPending timeoutMs`, () => {
       // Regression for PR #616's headline bug: interaction-executor.ts and
       // the step runner race a step's own outer `timeout` (seconds,
@@ -210,24 +172,6 @@ describe('Dual-play scenario steps — data-driven validation', () => {
           } else if (action.type === 'resolveEventIfPending') {
             const innerMs = action.timeoutMs ?? 30000;
             expect(innerMs).toBeLessThanOrEqual(outerMs);
-          }
-        }
-      }
-    });
-
-    it(`${name} — cameraFocus actions have x, z, and distance`, () => {
-      const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
-        for (const action of stepObj.interaction) {
-          if (action.type === 'cameraFocus') {
-            expect(typeof action.x).toBe('number');
-            expect(typeof action.z).toBe('number');
-            expect(typeof action.distance).toBe('number');
-            expect(action.distance).toBeGreaterThan(0);
           }
         }
       }
