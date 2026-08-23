@@ -10,7 +10,7 @@
   "exclude": [
     "node_modules",
     "../dist",
-    // Pre-existing type errors as of 2026-08-23 (317 errors across 131 files) --
+    // Pre-existing type errors as of 2026-08-23 (314 errors across 118 files) --
     // tracked in a follow-up issue (filed alongside this PR). These are a mix of
     // mechanical unused-locals/params (TS6133/6192/6196) and real fixture-vs-interface
     // drift (test object literals built against Employee/Vehicle/GameState/etc. that
