@@ -120,7 +120,7 @@ export function recordSafetyInvestment(state: ScoreState, amount: number): void 
 
 // ── Helpers ──
 
-function clampScore(value: number): number {
+export function clampScore(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 

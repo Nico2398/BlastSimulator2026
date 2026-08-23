@@ -30,6 +30,11 @@ function makeTestEvent(): EventDef {
       // even though a probability + altConsequence is present (chance(1) is
       // always true since Random.next() never returns exactly 1).
       { labelKey: 'event.test.opt4', resultKey: 'event.test_resolve.res4' },
+      // Option 5/6 — large score deltas driving a score past its 0-100
+      // bounds, to pin the clamp's boundary behavior through resolveEvent
+      // (#710 — shared clampScore helper).
+      { labelKey: 'event.test.opt5', resultKey: 'event.test_resolve.res5' },
+      { labelKey: 'event.test.opt6', resultKey: 'event.test_resolve.res6' },
     ],
     consequences: [
       { cashDelta: -5000, scoreDelta: { wellBeing: 10 } },
@@ -49,6 +54,10 @@ function makeTestEvent(): EventDef {
         probability: 1.0,
         altConsequence: { cashDelta: -1 },
       },
+      // Option 5 — wellBeing starts at 50; -999 must clamp to exactly 0.
+      { cashDelta: 0, scoreDelta: { wellBeing: -999 } },
+      // Option 6 — safety starts at 50; +999 must clamp to exactly 100.
+      { cashDelta: 0, scoreDelta: { safety: 999 } },
     ],
     weightCoeff: () => 1,
     canFire: () => true,
@@ -215,5 +224,29 @@ describe('Event resolution system', () => {
 
     expect(eventSystem.pendingEvent).toBeNull();
     expect(eventSystem.lastOutcome).not.toBeNull();
+  });
+
+  // ── score clamp boundaries (#710 — shared clampScore helper) ────────────
+  // applyConsequence's score-effect branch must clamp to [0, 100] the same
+  // way ScoreManager's own mutators do — pinning this here so a future
+  // swap to the shared `clampScore` symbol cannot silently change the
+  // observable boundary behavior.
+
+  it('a large negative scoreDelta clamps the score to exactly 0, not below', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState(); // wellBeing starts at 50
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 5, 10, rng);
+    expect(scores.wellBeing).toBe(0);
+  });
+
+  it('a large positive scoreDelta clamps the score to exactly 100, not above', () => {
+    const finances = createFinanceState(50000);
+    const scores = createScoreState(); // safety starts at 50
+    const rng = new Random(42);
+
+    resolveEvent(eventSystem, finances, scores, 6, 10, rng);
+    expect(scores.safety).toBe(100);
   });
 });
