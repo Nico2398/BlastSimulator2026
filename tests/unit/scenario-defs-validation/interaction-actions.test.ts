@@ -48,9 +48,13 @@ function forEachActionOfType<T extends InteractionStepAction['type']>(
 export function* stepsWithInteraction(
   scenario: ScenarioDef,
 ): Generator<{ stepIndex: number; stepObj: ScenarioStepDef; interaction: InteractionStepAction[] }> {
-  // TODO(#736): implementer fills this in — not implemented yet
-  void scenario;
-  throw new Error('not implemented');
+  for (let i = 0; i < scenario.steps.length; i++) {
+    const step = scenario.steps[i];
+    if (typeof step === 'string') continue;
+    const stepObj = step as ScenarioStepDef;
+    if (!stepObj.interaction) continue;
+    yield { stepIndex: i, stepObj, interaction: stepObj.interaction };
+  }
 }
 
 interface ActionTypeCheck<T extends InteractionStepAction['type'] = InteractionStepAction['type']> {
