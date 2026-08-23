@@ -171,9 +171,7 @@ describe('blast-visual-full.json step timeouts cover screenshot capture cost (#7
   const shotsCount = scenario.shots?.length ?? 0;
 
   it('step 0 timeout covers base + shots capture cost under software rasterization', () => {
-    const step = scenario.steps.find(
-      (s): s is ScenarioStepDef => typeof s !== 'string' && s.command === 'new_game seed:42 cash:200000',
-    );
+    const step = scenario.steps.find(s => s.command === 'new_game seed:42 cash:200000');
     expect(step, 'expected step 0 to be "new_game seed:42 cash:200000"').toBeDefined();
 
     // floor = (1 base capture + shots.length + step.frames) * per-frame cost
@@ -184,14 +182,11 @@ describe('blast-visual-full.json step timeouts cover screenshot capture cost (#7
   });
 
   it('step 36 (blast) timeout covers base + frames + shots capture cost', () => {
-    const blastStep = scenario.steps.find(
-      (s): s is ScenarioStepDef => typeof s !== 'string' && s.command === 'blast',
-    );
+    const blastStep = scenario.steps.find(s => s.command === 'blast');
     expect(blastStep, 'expected a step with command "blast" in blast-visual-full.json').toBeDefined();
-    const step = blastStep as ScenarioStepDef;
 
-    const floorMs = (1 + shotsCount + (step.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
-    const declaredMs = (step.timeout ?? 60) * 1000;
+    const floorMs = (1 + shotsCount + (blastStep!.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
+    const declaredMs = (blastStep!.timeout ?? 60) * 1000;
 
     expect(declaredMs).toBeGreaterThanOrEqual(floorMs);
   });
