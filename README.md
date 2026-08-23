@@ -324,7 +324,7 @@ src/
 tests/
   unit/                 Layer 1: Pure logic tests (run in Node.js, no browser)
     benchmarks/         Performance benchmark suite
-    scenario-defs.test.ts  Validates all scenario JSON files
+    scenario-defs-*.test.ts  Validates all scenario JSON files
   integration/          Layers 2–3: Small integration suites (≥8 scenarios each)
     full-level/         Layer 3: Full-level playthrough tests (win/loss per level)
       helpers.ts        Shared test utilities
