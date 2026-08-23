@@ -113,6 +113,15 @@ export function loadScenarioDef(name: string, dir?: string): ScenarioDef {
 const TIMEOUT_MARGIN_MS = 5000;
 
 /**
+ * Per-frame cost of screenshot/frame capture under software rasterization
+ * (no GPU), documented in `.claude/CLAUDE.md`. Used by `effectiveStepTimeoutMs`
+ * to raise a step's effective floor when `--screenshots` is active, so a step
+ * with a low declared `timeout` doesn't false-timeout purely from capture
+ * overhead the runners themselves impose.
+ */
+export const SOFTWARE_RASTER_FRAME_COST_MS = 6000;
+
+/**
  * Effective inner deadline when an action's own `timeoutMs` is absent. Must
  * match what each executor actually applies — `waitUntil` has none (the
  * field is required); `resolveEventIfPending` defaults to 30000
@@ -150,7 +159,15 @@ const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], nu
  * file whose *declared* `timeout` reads as misleadingly low to a human
  * editing it, even though the runners themselves no longer act on it alone.
  */
-export function effectiveStepTimeoutMs(step: ScenarioStepDef, defaultOuterSeconds: number): number {
+export function effectiveStepTimeoutMs(
+  step: ScenarioStepDef,
+  defaultOuterSeconds: number,
+  capture?: { enabled: boolean; shotsCount: number },
+): number {
+  // TODO: implement — capture-cost floor. Skeleton phase only: signature
+  // extended, param accepted but not yet folded into the return value.
+  void capture;
+
   const declaredMs = (step.timeout ?? defaultOuterSeconds) * 1000;
 
   let maxInnerMs = 0;
