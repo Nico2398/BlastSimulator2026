@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
-import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
-import { checkStepActionAllowed } from '../../scripts/shared/interaction-executor.js';
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { checkStepActionAllowed } from '../../../scripts/shared/interaction-executor.js';
 
 // Narrow per-scenario regression locks (#514, #694) — split out of
 // the former scenario-defs.test.ts (#703).

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
-import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
-import { ALL_SCENARIO_NAMES, UI_DRIVEN_SCENARIO_NAMES } from './scenario-defs-fixtures.js';
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { ALL_SCENARIO_NAMES, UI_DRIVEN_SCENARIO_NAMES } from './fixtures.js';
 
 // Step metadata tagging checks (interaction array presence, UI-driven
 // scenarios, role/commandOutcome field validity) — split out of

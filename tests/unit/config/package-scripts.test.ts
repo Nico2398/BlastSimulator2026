@@ -32,9 +32,19 @@ describe('integration & scenario npm scripts (8.8)', () => {
       expect(script).toContain('vitest run');
     });
 
-    it('runs the scenario-defs test suite', () => {
+    it('runs the scenario-defs-validation test suite via a directory-path filter', () => {
       const script = pkg.scripts['test:scenarios'];
-      expect(script).toContain('scenario-defs-');
+      expect(script).toContain('tests/unit/scenario-defs-validation');
+    });
+
+    it('does not sweep in the unrelated scenario-defs-blast-visual-coverage test', () => {
+      const script = pkg.scripts['test:scenarios'];
+      expect(script).not.toContain('scenario-defs-blast-visual-coverage');
+    });
+
+    it('is not the old bare substring filter that matched any scenario-defs- prefixed file', () => {
+      const script = pkg.scripts['test:scenarios'];
+      expect(script.trim()).not.toBe('vitest run scenario-defs-');
     });
   });
 });
