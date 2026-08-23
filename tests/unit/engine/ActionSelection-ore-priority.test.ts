@@ -147,7 +147,11 @@ describe('selectBestActionForEmployee — ore-priority ranking (#671)', () => {
     const plain = makeHaulAction({ id: 1, targetX: baseDistance, targetZ: 0, payload: { fragmentId: 1 } });
     const ore = makeHaulAction({ id: 2, targetX: baseDistance + extraDistance, targetZ: 0, payload: { fragmentId: 2 } });
 
-    expect(estimateActionCost(state, emp, ore)).toBeGreaterThan(estimateActionCost(state, emp, plain));
+    // Lower estimateActionCost wins selection (selectBestActionForEmployee
+    // sorts ascending and picks the cheapest) — the bonus must make the
+    // farther ore candidate's cost come in *below* the plain one's for it to
+    // win, not above it.
+    expect(estimateActionCost(state, emp, ore)).toBeLessThan(estimateActionCost(state, emp, plain));
 
     const result = selectBestActionForEmployee(state, emp, [plain, ore]);
 
