@@ -45,7 +45,7 @@ function forEachActionOfType<T extends InteractionStepAction['type']>(
  * and its already-non-optional `interaction` array for every step that has
  * one.
  */
-export function* stepsWithInteraction(
+function* stepsWithInteraction(
   scenario: ScenarioDef,
 ): Generator<{ stepIndex: number; stepObj: ScenarioStepDef; interaction: InteractionStepAction[] }> {
   for (let i = 0; i < scenario.steps.length; i++) {
