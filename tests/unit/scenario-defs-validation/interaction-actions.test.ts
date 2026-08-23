@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
-import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { loadScenarioDef, SCENARIO_DIR, SOFTWARE_RASTER_FRAME_COST_MS } from '../../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
 
 // Dual-play scenario steps — interaction array validation (data-driven) —
@@ -191,6 +191,33 @@ describe('Dual-play scenario steps — data-driven validation', () => {
             expect(innerMs).toBeLessThanOrEqual(outerMs);
           }
         }
+      }
+    });
+
+    // Generalizes issue #704's narrow, single-file lock (blast-visual-full.json
+    // only) to every scenario file, per issue #725: in interaction mode with
+    // `--screenshots`, each step also pays a capture cost
+    // (SOFTWARE_RASTER_FRAME_COST_MS per frame, software rasterization, no
+    // GPU, #475) for 1 base capture, each inline `{type:'screenshot'}`
+    // interaction action, the scenario-level `shots.length` (orbit angles
+    // captured every step when the scenario declares `shots`), and
+    // `step.frames`. A step whose declared `timeout` sits below this floor
+    // false-timeouts the instant `--screenshots` is used, regardless of
+    // whether the step's own work would have finished in time.
+    it(`${name} — declared step timeout covers interaction-mode --screenshots capture-cost floor (#725)`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      const shotsCount = scenario.shots?.length ?? 0;
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'string') continue;
+        const stepObj = step as ScenarioStepDef;
+        const screenshotActions = (stepObj.interaction ?? []).filter(a => a.type === 'screenshot').length;
+        const floorMs = (1 + screenshotActions + shotsCount + (stepObj.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
+        const declaredMs = (stepObj.timeout ?? 60) * 1000;
+        expect(
+          declaredMs,
+          `step[${i}] "${stepObj.command}" declared timeout ${declaredMs}ms is below the --screenshots capture-cost floor ${floorMs}ms`,
+        ).toBeGreaterThanOrEqual(floorMs);
       }
     });
   }

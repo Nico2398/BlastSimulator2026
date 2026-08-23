@@ -13,7 +13,7 @@
 // `timeoutMs` and no `timeout` of its own is correct by construction.
 
 import { describe, it, expect } from 'vitest';
-import { effectiveStepTimeoutMs } from '../../../../scripts/shared/scenario-utils.js';
+import { effectiveStepTimeoutMs, SOFTWARE_RASTER_FRAME_COST_MS } from '../../../../scripts/shared/scenario-utils.js';
 import type { ScenarioStepDef } from '../../../../scripts/shared/scenario-types.js';
 
 const DEFAULT_OUTER_SECONDS = 60;
@@ -99,4 +99,87 @@ describe('effectiveStepTimeoutMs', () => {
       expect(effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS)).toBe(6000 + 5000);
     },
   );
+});
+
+// ──────────────────────────────────────────────
+// #725 — capture-cost floor. In interaction mode with `--screenshots`, every
+// step also pays a per-frame capture cost (SOFTWARE_RASTER_FRAME_COST_MS,
+// software rasterization, no GPU, #475) for: 1 base capture, each inline
+// `{type:'screenshot'}` interaction action, the scenario-level `shots.length`
+// (orbit angles captured every step when the scenario declares `shots`), and
+// `step.frames`. #704 fixed this by hand for blast-visual-full.json alone;
+// #725 folds the same floor into effectiveStepTimeoutMs itself via a new
+// optional 3rd `capture` param, so every scenario file benefits structurally
+// instead of one file being patched by hand.
+// ──────────────────────────────────────────────
+describe('effectiveStepTimeoutMs — capture-cost floor (#725)', () => {
+  it('is a no-op when capture is omitted entirely (backward compatibility)', () => {
+    const s = step({ timeout: 10 });
+    const withoutCapture = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS);
+    expect(withoutCapture).toBe(10000);
+  });
+
+  it('is a no-op when capture.enabled is false, regardless of shotsCount', () => {
+    const s = step({ timeout: 10 });
+    const omitted = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS);
+    const disabledZero = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS, { enabled: false, shotsCount: 0 });
+    const disabledMany = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS, { enabled: false, shotsCount: 50 });
+    expect(disabledZero).toBe(omitted);
+    expect(disabledMany).toBe(omitted);
+    expect(disabledMany).toBe(10000);
+  });
+
+  it('raises a low declared timeout to the capture-cost floor when shots are captured (floor wins)', () => {
+    // base = 10000 (declared timeout, no interaction actions to derive past).
+    // floor = (1 base capture + 0 screenshot actions + 3 shots + 0 frames) * SOFTWARE_RASTER_FRAME_COST_MS.
+    const s = step({ timeout: 10 });
+    const result = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS, { enabled: true, shotsCount: 3 });
+    const floorMs = (1 + 0 + 3 + 0) * SOFTWARE_RASTER_FRAME_COST_MS;
+    expect(floorMs).toBe(24000);
+    expect(result).toBe(floorMs);
+  });
+
+  it('keeps the declared/derived base when it already exceeds the capture-cost floor (base wins)', () => {
+    // base = 120000 (declared timeout). floor = (1 + 0 + 0 + 0) * 6000 = 6000, well under base.
+    const s = step({ timeout: 120 });
+    const result = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS, { enabled: true, shotsCount: 0 });
+    const floorMs = (1 + 0 + 0 + 0) * SOFTWARE_RASTER_FRAME_COST_MS;
+    expect(floorMs).toBe(6000);
+    expect(result).toBe(120000);
+  });
+
+  it('folds step.frames into the capture-cost floor', () => {
+    // base = 10000 (declared timeout). floor = (1 + 0 + 0 + 5) * 6000 = 36000.
+    const s = step({ timeout: 10, frames: 5 });
+    const result = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS, { enabled: true, shotsCount: 0 });
+    const floorMs = (1 + 0 + 0 + 5) * SOFTWARE_RASTER_FRAME_COST_MS;
+    expect(floorMs).toBe(36000);
+    expect(result).toBe(floorMs);
+  });
+
+  it('counts inline {type: "screenshot"} interaction actions into the capture-cost floor', () => {
+    // base = 10000 (declared timeout). floor = (1 + 2 + 0 + 0) * 6000 = 18000.
+    const s = step({
+      timeout: 10,
+      interaction: [{ type: 'screenshot' }, { type: 'screenshot' }],
+    });
+    const result = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS, { enabled: true, shotsCount: 0 });
+    const floorMs = (1 + 2 + 0 + 0) * SOFTWARE_RASTER_FRAME_COST_MS;
+    expect(floorMs).toBe(18000);
+    expect(result).toBe(floorMs);
+  });
+
+  it('folds shotsCount + step.frames + inline screenshot actions together into one floor (combined shape)', () => {
+    // base = 10000 (declared timeout).
+    // floor = (1 base + 1 inline screenshot action + 2 shots + 3 frames) * 6000 = 42000.
+    const s = step({
+      timeout: 10,
+      frames: 3,
+      interaction: [{ type: 'screenshot' }],
+    });
+    const result = effectiveStepTimeoutMs(s, DEFAULT_OUTER_SECONDS, { enabled: true, shotsCount: 2 });
+    const floorMs = (1 + 1 + 2 + 3) * SOFTWARE_RASTER_FRAME_COST_MS;
+    expect(floorMs).toBe(42000);
+    expect(result).toBe(floorMs);
+  });
 });
