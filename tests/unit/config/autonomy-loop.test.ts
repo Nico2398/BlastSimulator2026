@@ -145,8 +145,18 @@ describe('chaining past a run that ended blocked', () => {
   // Without the guard, a human labelling a backlog issue `blocked` — filing a
   // note, not ending a run — would start a session.
   it('chains only from an issue a run actually held', () => {
-    expect(failure).toContain('guard: after_blocked_run');
+    expect(failure).toContain('after_blocked_run');
     expect(failure).toContain('completed_issue: ${{ github.event.issue.number }}');
+  });
+
+  // `paused` is the other terminal-without-merging outcome: the run stopped on a
+  // dependency it filed, put the issue back at `ready` behind that dependency,
+  // and ended. It releases the queue exactly as `blocked` does, and if this
+  // workflow did not fire on it the queue would simply stop — nothing else
+  // starts the next session.
+  it('chains past a paused run too, under its own guard', () => {
+    expect(failure).toContain("github.event.label.name == 'paused'");
+    expect(failure).toContain('after_paused_run');
   });
 
   // The reason this path did not exist before. A systemic failure — expired
@@ -155,7 +165,7 @@ describe('chaining past a run that ended blocked', () => {
   it('bounds the cascade a failure chain could cause', () => {
     expect(failure).toContain('blocked_chain_limit:');
     const rules = readFileSync(join(ROOT, '.github/scripts/assignability.cjs'), 'utf8');
-    expect(rules).toContain('consecutiveBlockedRuns');
+    expect(rules).toContain('consecutiveHaltedRuns');
     expect(rules).toContain('latestPipelineMergeAt');
   });
 
@@ -167,7 +177,19 @@ describe('chaining past a run that ended blocked', () => {
   // The notification must survive a chain step that threw, or a failure whose
   // assignment could not run becomes a failure nobody is told about.
   it('reports even when the chain step failed', () => {
-    expect(failure).toMatch(/if:\s*always\(\) && github\.event\.label\.name == 'blocked'/);
+    expect(failure).toMatch(/if:\s*always\(\) &&.*github\.event\.label\.name == 'blocked'/);
+  });
+
+  // A pause asks nothing of a human — the issue is already requeued behind its
+  // dependency and comes back on its own. Printing the `blocked` notice's
+  // "add the clarification this issue is missing" would send someone looking
+  // for a question that was never asked.
+  it('does not ask a human for a clarification when the run only paused', () => {
+    const notify = failure.slice(failure.indexOf('  notify:'));
+    expect(notify).toContain("HALT_LABEL: ${{ github.event.label.name }}");
+    expect(notify).toContain('paused');
+    // The two notices are chosen from, not concatenated.
+    expect(notify).toMatch(/paused\s*\n?\s*\?/);
   });
 
   // Under the PAT every pipeline comment is authored by a real user, and the

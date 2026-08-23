@@ -81,6 +81,22 @@ const isPipelineHead = (ref, number) => pipelineHeadPattern(number).test(ref || 
 const labelNames = (issue) =>
   (issue.labels || []).map((label) => (typeof label === 'string' ? label : label.name));
 
+/**
+ * One deliverable pull request, as the rules reason about it.
+ *
+ * `labels` and `head` are what let `assessCandidate` tell a run in flight from a
+ * paused run's handover: a `paused` pull request is the branch the next run
+ * continues, not a collision to refuse. Both fail closed — a read that cannot
+ * produce the labels yields `[]`, which reads as "not paused" and blocks, and a
+ * missing `head` costs the assignment comment a branch name, never a wrong one.
+ */
+const deliverablePr = (number, merged, labels = [], head = null) => ({
+  number,
+  merged: Boolean(merged),
+  labels,
+  head: head || null,
+});
+
 /** The shape `assignability.cjs` reasons about, from a REST issue payload. */
 const normalise = (issue) => ({
   number: issue.number,
@@ -244,7 +260,10 @@ function createIssueApi(
       const merged = Boolean(source.pull_request.merged_at);
       if (!merged && source.state !== 'open') continue; // `includeClosedPrs: false`
       if (!keyword.test(source.body || '')) continue; // a mention is not a link
-      found.set(source.number, { number: source.number, merged });
+      // No head ref on a timeline payload. The resume carve-out survives it —
+      // labels are what it tests, and a comment can name the pull request
+      // without naming its branch.
+      found.set(source.number, deliverablePr(source.number, merged, labelNames(source)));
     }
     log(`#${number}: closing pull requests read off the timeline instead — ${found.size} found.`);
     return { closers: [...found.values()], unknown: false };
@@ -313,8 +332,12 @@ function createIssueApi(
      * fail closed on it — a 500 must never read as "this issue has no pull
      * request".
      *
-     * @returns {Promise<{pipeline: {number: number, merged: boolean}|null,
-     *                    closers: {number: number, merged: boolean}[],
+     * Each entry carries its `labels` and `head` as well as its number, because
+     * an open pull request no longer means one thing: a `paused` one is a run's
+     * saved handover and the next run continues it, where any other open one is
+     * a run in flight to keep clear of. `assessCandidate` draws that line.
+     *
+     * @returns {Promise<{pipeline: DeliverablePr|null, closers: DeliverablePr[],
      *                    unknown: boolean}>}
      */
     async deliverableFor(number) {
@@ -329,7 +352,12 @@ function createIssueApi(
         const fromPipeline =
           headPrs.find((pr) => pr.state === 'open') ?? headPrs.find((pr) => pr.merged_at);
         pipeline = fromPipeline
-          ? { number: fromPipeline.number, merged: Boolean(fromPipeline.merged_at) }
+          ? deliverablePr(
+              fromPipeline.number,
+              fromPipeline.merged_at,
+              labelNames(fromPipeline),
+              fromPipeline.head?.ref
+            )
           : null;
       } catch (error) {
         log(
@@ -346,7 +374,12 @@ function createIssueApi(
                repository(owner: $owner, name: $repo) {
                  issue(number: $number) {
                    closedByPullRequestsReferences(first: 50, includeClosedPrs: false) {
-                     nodes { number merged }
+                     nodes {
+                       number
+                       merged
+                       headRefName
+                       labels(first: 20) { nodes { name } }
+                     }
                    }
                  }
                }
@@ -357,7 +390,14 @@ function createIssueApi(
         closing = {
           closers: (linked?.repository?.issue?.closedByPullRequestsReferences?.nodes ?? [])
             .filter((node) => node && Number.isInteger(node.number))
-            .map((node) => ({ number: node.number, merged: Boolean(node.merged) })),
+            .map((node) =>
+              deliverablePr(
+                node.number,
+                node.merged,
+                (node.labels?.nodes ?? []).map((label) => label?.name).filter(Boolean),
+                node.headRefName
+              )
+            ),
           unknown: false,
         };
       } catch (error) {
@@ -378,16 +418,22 @@ function createIssueApi(
     },
 
     /**
-     * When `blocked` was last applied, in epoch ms. `null` when it never was.
+     * When a lifecycle label was last applied, in epoch ms. `null` when it never
+     * was.
      *
-     * An incomplete timeline reports `now` rather than `null`: the cascade brake
-     * counts these, so an undated failure has to count as a recent one. Guessing
-     * the other way would let a truncated history quietly reopen the chain.
+     * Takes the label because the cascade brake counts two of them: a run that
+     * ended `blocked` and a run that ended `paused` both finished without
+     * merging, and a systemic failure produces whichever the runs happen to
+     * choose. Counting only one would leave the brake open to the other.
+     *
+     * An incomplete timeline reports `now` rather than `null`: the brake counts
+     * these, so an undated halt has to count as a recent one. Guessing the other
+     * way would let a truncated history quietly reopen the chain.
      */
-    async blockedLabelledAt(number, now = Date.now()) {
+    async labelAppliedAt(number, label, now = Date.now()) {
       const { items, complete } = await timeline(number);
       const stamps = items
-        .filter((event) => event.event === 'labeled' && event.label?.name === 'blocked')
+        .filter((event) => event.event === 'labeled' && event.label?.name === label)
         .map((event) => Date.parse(event.created_at))
         .filter((value) => !Number.isNaN(value));
       if (stamps.length > 0) return Math.max(...stamps);
@@ -486,9 +532,18 @@ function createIssueApi(
   };
 }
 
+/**
+ * @typedef {object} DeliverablePr
+ * @property {number} number
+ * @property {boolean} merged
+ * @property {string[]} labels  Empty when the read could not produce them, which reads as "not paused" and blocks.
+ * @property {string|null} head Branch the pull request sits on; null off the timeline fallback.
+ */
+
 module.exports = {
   createIssueApi,
   closingKeyword,
+  deliverablePr,
   isPipelineHead,
   pipelineHeadPattern,
   isTransient,
