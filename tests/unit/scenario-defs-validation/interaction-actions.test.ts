@@ -41,6 +41,22 @@ function forEachActionOfType<T extends InteractionStepAction['type']>(
   }
 }
 
+/**
+ * Shared scaffold behind `forEachActionOfType` and the outer-timeout test
+ * below (#736, factored out of #722's own new duplication): walks
+ * `scenario.steps`, skipping plain-string steps and steps with no
+ * `.interaction` array, and yields the step index, the narrowed step object,
+ * and its already-non-optional `interaction` array for every step that has
+ * one.
+ */
+export function* stepsWithInteraction(
+  scenario: ScenarioDef,
+): Generator<{ stepIndex: number; stepObj: ScenarioStepDef; interaction: InteractionStepAction[] }> {
+  // TODO(#736): implementer fills this in — not implemented yet
+  void scenario;
+  throw new Error('not implemented');
+}
+
 interface ActionTypeCheck<T extends InteractionStepAction['type'] = InteractionStepAction['type']> {
   actionType: T;
   description: string;
