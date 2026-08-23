@@ -4,7 +4,7 @@ import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-uti
 import { checkStepActionAllowed } from '../../scripts/shared/interaction-executor.js';
 
 // Narrow per-scenario regression locks (#514, #694) — split out of
-// tests/unit/scenario-defs.test.ts (#703).
+// the former scenario-defs.test.ts (#703).
 
 // ──────────────────────────────────────────────
 // 16. The 3 remaining un-converted, non-exempt player steps (issue #514).

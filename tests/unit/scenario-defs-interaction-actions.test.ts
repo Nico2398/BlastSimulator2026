@@ -4,7 +4,7 @@ import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-uti
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './scenario-defs-fixtures.js';
 
 // Dual-play scenario steps — interaction array validation (data-driven) —
-// split out of tests/unit/scenario-defs.test.ts (#703).
+// split out of the former scenario-defs.test.ts (#703).
 
 // ──────────────────────────────────────────────
 // 11. Dual-play scenario steps — interaction array validation (data-driven)

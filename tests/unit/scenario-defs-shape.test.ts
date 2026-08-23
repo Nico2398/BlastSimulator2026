@@ -11,7 +11,7 @@ import {
 } from './scenario-defs-fixtures.js';
 
 // Generic existence/shape checks (scenario JSON parses, required fields,
-// step shape, etc.) — split out of tests/unit/scenario-defs.test.ts (#703).
+// step shape, etc.) — split out of the former scenario-defs.test.ts (#703).
 
 // ──────────────────────────────────────────────
 // 1. File existence & valid JSON

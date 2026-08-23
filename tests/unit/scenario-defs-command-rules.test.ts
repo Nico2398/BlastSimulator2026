@@ -5,7 +5,7 @@ import { getAllVehicleRoles } from '../../src/core/entities/Vehicle.js';
 import { ALL_SCENARIO_NAMES, KNOWN_COMMANDS } from './scenario-defs-fixtures.js';
 
 // Command-string legality checks (unknown commands, contract id format,
-// vehicle role validity) — split out of tests/unit/scenario-defs.test.ts (#703).
+// vehicle role validity) — split out of the former scenario-defs.test.ts (#703).
 
 // ──────────────────────────────────────────────
 // 8. No steps use unknown / unregistered commands

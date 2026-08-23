@@ -1,6 +1,6 @@
 // Shared constant fixtures for the scenario-defs-*.test.ts split (issue #703).
 // Not a test file — no `describe`/`it`, so vitest's test-file glob never
-// collects it. Moved verbatim out of the original tests/unit/scenario-defs.test.ts.
+// collects it. Moved verbatim out of the original scenario-defs.test.ts.
 
 // ── Dual-play interaction action types ──
 

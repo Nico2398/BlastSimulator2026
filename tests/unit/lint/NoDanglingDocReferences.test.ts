@@ -88,6 +88,16 @@ const DANGLING_REFERENCE_ALLOWLIST: readonly string[] = [
   'docs/plans/issue-479-interaction-conversion.md:65',
   'docs/plans/scenario-assertions-and-playtest-removal.md:705',
   'docs/plans/scenario-assertions-and-playtest-removal.md:2938',
+  // Issue #703 split the original scenario-defs.test.ts into 7 focused files
+  // plus a shared fixtures module. The entries below are this plan's own
+  // how-to instructions and dated execution-log entries naming the single
+  // monolithic file *as it existed when each passage was written* — same
+  // historical-record reasoning as the two blocks above, not a live
+  // citation to repoint.
+  'docs/plans/issue-479-interaction-conversion.md:45',
+  'docs/plans/issue-479-interaction-conversion.md:78',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:320',
+  'docs/plans/scenario-assertions-and-playtest-removal.md:738',
 ];
 
 interface DanglingReference {

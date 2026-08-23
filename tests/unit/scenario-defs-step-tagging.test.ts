@@ -5,7 +5,7 @@ import { ALL_SCENARIO_NAMES, UI_DRIVEN_SCENARIO_NAMES } from './scenario-defs-fi
 
 // Step metadata tagging checks (interaction array presence, UI-driven
 // scenarios, role/commandOutcome field validity) — split out of
-// tests/unit/scenario-defs.test.ts (#703).
+// the former scenario-defs.test.ts (#703).
 
 // ──────────────────────────────────────────────
 // 12. Every scenario step has dual-play interaction array

@@ -3,7 +3,7 @@ import type { ScenarioStepDef } from '../../scripts/shared/scenario-types.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES } from './scenario-defs-fixtures.js';
 
-// `expect` field shape checks — split out of tests/unit/scenario-defs.test.ts
+// `expect` field shape checks — split out of the former scenario-defs.test.ts
 // (#703).
 
 // ──────────────────────────────────────────────

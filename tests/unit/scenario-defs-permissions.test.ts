@@ -5,7 +5,7 @@ import { checkStepActionAllowed, isAllowedBootstrapCommand } from '../../scripts
 import { ALL_SCENARIO_NAMES } from './scenario-defs-fixtures.js';
 
 // checkStepActionAllowed / bootstrap-guard rule checks — split out of
-// tests/unit/scenario-defs.test.ts (#703).
+// the former scenario-defs.test.ts (#703).
 
 // ──────────────────────────────────────────────
 // 14. Role-marked steps never reach the console for anything but an
