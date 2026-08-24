@@ -106,6 +106,20 @@ A paused run leaves its work on a draft PR labelled `paused`, and `agentic-assig
 
 A red CI on an existing open PR is the other task shape that works this way, and `agentic-pipeline-ci-fix` describes it. The difference is only what is being finished: there, a green CI; here, the remaining task.
 
+## ▶ Before ending: verify the issue, branch and PR agree
+
+Binds every session that touches a numbered issue, not only ones dispatched through `/agentic-run` or `/resolve-issue`. A human pointing Claude Code at an issue directly — from the web, the CLI, or the issue page itself — gets no exemption: whatever the platform hands that session can still close the issue on merge, through either of two independent, real failure modes:
+
+- **The branch carries the close, not the words.** PR #750's branch (`claude/issue-707-blocker-cnjbpo`) held #707's auto-close link from the moment the platform created it — GitHub's issue-linked-branch feature closes the issue when any PR from that branch merges, independent of the PR's body or commits. PR #750's body said outright "this PR does not close #707"; #707 closed anyway.
+- **The fix answers the investigation, not the issue.** PR #641 genuinely wrote `Closes #572`, and #572's own root defect — an unbounded `drill_plan grid`/`build_ramp` loop, still unguarded in `src/console/commands/mining.ts` — was never touched. The session fixed a pipeline concurrency bug found while investigating why #572's *run* had been lost, and closed the ticket on the strength of that unrelated, genuinely-merged fix. A human reviewed and merged it; the mismatch survived review too.
+
+Before your last message, if your work could close a numbered issue:
+
+1. **Check what your branch carries**, not just what you wrote. The platform's own issue page shows whether a branch is linked to that issue's auto-close, independent of your PR body. If your work does not fully resolve the issue, unlink the branch or move your commits to one that was never associated with it — omitting the keyword is not enough.
+2. **Re-read the issue's own body, Files and Verification sections against your actual diff — not just its comment thread.** A long investigation history accumulates tangents; the issue's original ask is still the bar a closing PR has to clear. If your diff answers something the thread raised rather than what the issue itself describes, say so and leave the issue open.
+3. **Labels match the terminal state you're leaving.** A closed issue carries `done` and nothing left over from `ready`/`blocked`/`in-progress`/`paused`.
+4. **Passing human review is not proof either check above happened** — #641 had it and still closed #572 wrongly. Do the check yourself.
+
 ## Where the rest lives
 
 | Subject | Where |
