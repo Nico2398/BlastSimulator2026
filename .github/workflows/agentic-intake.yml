@@ -46,6 +46,16 @@ jobs:
             };
             await ensureLabel('agent-task', '0e8a16', 'Atomic task for the autonomous pipeline');
             await ensureLabel('ready', '1d76db', 'Waiting in the assignment queue');
+            // `paused` is applied by a run, not by a human picking it from the
+            // UI — but it has to *exist* before the first run reaches for it,
+            // and it is the one lifecycle label that also goes on pull requests,
+            // where `assignability.cjs` reads it as a handover rather than a
+            // collision. Defined here for the same reason as the other two.
+            await ensureLabel(
+              'paused',
+              'fbca04',
+              'A run stopped here on a dependency; the queue returns to it when that dependency lands'
+            );
 
             // Reopening is a human saying the work is not finished after all.
             // `done` no longer reflects reality, but re-entering the queue is

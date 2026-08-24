@@ -108,17 +108,12 @@ A red CI on an existing open PR is the other task shape that works this way, and
 
 ## ▶ Before ending: verify the issue, branch and PR agree
 
-Binds every session that touches a numbered issue, not only ones dispatched through `/agentic-run` or `/resolve-issue`. A human pointing Claude Code at an issue directly — from the web, the CLI, or the issue page itself — gets no exemption: whatever the platform hands that session can still close the issue on merge, through either of two independent, real failure modes:
+Binds every session that touches a numbered issue, not only ones dispatched through `/agentic-run` or `/resolve-issue`. Before your last message, if your PR body discusses a numbered issue at all:
 
-- **The branch carries the close, not the words.** PR #750's branch (`claude/issue-707-blocker-cnjbpo`) held #707's auto-close link from the moment the platform created it — GitHub's issue-linked-branch feature closes the issue when any PR from that branch merges, independent of the PR's body or commits. PR #750's body said outright "this PR does not close #707"; #707 closed anyway.
-- **The fix answers the investigation, not the issue.** PR #641 genuinely wrote `Closes #572`, and #572's own root defect — an unbounded `drill_plan grid`/`build_ramp` loop, still unguarded in `src/console/commands/mining.ts` — was never touched. The session fixed a pipeline concurrency bug found while investigating why #572's *run* had been lost, and closed the ticket on the strength of that unrelated, genuinely-merged fix. A human reviewed and merged it; the mismatch survived review too.
-
-Before your last message, if your work could close a numbered issue:
-
-1. **Check what your branch carries**, not just what you wrote. The platform's own issue page shows whether a branch is linked to that issue's auto-close, independent of your PR body. If your work does not fully resolve the issue, unlink the branch or move your commits to one that was never associated with it — omitting the keyword is not enough.
+1. **Never let a closing keyword sit immediately before a bare issue number in prose** — negation, quotation, and past tense do not protect you; GitHub's merge-time parser matches the substring, not the sentence, and skips only code spans and fenced blocks. `references/keyword-closing-postmortem.md` has the real incident this was learned from — read it once before you next write a PR body that mentions an issue you are not closing.
 2. **Re-read the issue's own body, Files and Verification sections against your actual diff — not just its comment thread.** A long investigation history accumulates tangents; the issue's original ask is still the bar a closing PR has to clear. If your diff answers something the thread raised rather than what the issue itself describes, say so and leave the issue open.
 3. **Labels match the terminal state you're leaving.** A closed issue carries `done` and nothing left over from `ready`/`blocked`/`in-progress`/`paused`.
-4. **Passing human review is not proof either check above happened** — #641 had it and still closed #572 wrongly. Do the check yourself.
+4. **Passing human review is not proof either check above happened.**
 
 ## Where the rest lives
 
@@ -126,6 +121,7 @@ Before your last message, if your work could close a numbered issue:
 |---------|-------|
 | Issue in, pull request out — intake, assignment, single flight, rescue, watchdog, the tokens the loop depends on | `references/github-loop.md` |
 | Runtime parity — the three config trees, per-runtime delegation defaults, Claude Code prerequisites | `references/runtime-parity.md` |
+| GitHub's closing-keyword parser, and the real incident it caused | `references/keyword-closing-postmortem.md` |
 | Per-pipeline step sequences | `agentic-pipeline-full`, `agentic-pipeline-fix-bug`, `agentic-pipeline-multi`, `agentic-pipeline-review-pr`, `agentic-pipeline-ask`, `agentic-pipeline-executor`, `agentic-pipeline-ci-fix` |
 | TDD cycle, finalization, PR status | `agentic-pipeline-tdd`, `agentic-pipeline-finalization`, `agentic-pipeline-pr-management` |
 | Writing an issue the pipeline can consume | `agentic-issue-creation` |

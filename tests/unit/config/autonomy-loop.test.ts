@@ -65,6 +65,17 @@ describe('entry points into the assignment queue', () => {
     expect(intake).not.toMatch(/\n {2}assign:/);
   });
 
+  // Every lifecycle label a run reaches for has to exist before it reaches for
+  // it. `paused` is the one that also goes on pull requests, where
+  // `assignability.cjs` reads it as a handover rather than a collision — an
+  // undefined label there means a paused run's issue is unassignable to
+  // everyone until somebody notices.
+  it('keeps every lifecycle label a run applies defined', () => {
+    const intake = workflow('agentic-intake.yml');
+    const defined = [...intake.matchAll(/ensureLabel\(\s*'([a-z-]+)'/g)].map((m) => m[1]);
+    expect(defined).toEqual(expect.arrayContaining(['agent-task', 'ready', 'paused']));
+  });
+
   it('starts a run from a human dispatching the trigger', () => {
     const trigger = workflow('agentic-trigger.yml');
     const triggers = trigger.slice(trigger.indexOf('\non:'), trigger.indexOf('\npermissions:'));
