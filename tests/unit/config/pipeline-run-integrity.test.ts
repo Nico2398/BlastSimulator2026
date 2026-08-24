@@ -271,9 +271,43 @@ describe('an unfinished run releases the assignment chain', () => {
     expect(rescue.slice(0, finished)).not.toMatch(/^\s+escalate$/m);
   });
 
+  // Three ways a run settles its own issue, and none of them may be overwritten
+  // here: closed (an answer or a command, not a diff), `blocked` (a human has to
+  // act), `paused` (a dependency it filed has to land). Re-labelling a paused
+  // issue would be worse than a duplicate notification — `blocked` would take it
+  // back out of the queue the pause had just returned it to.
   it('does not escalate an issue the run already settled itself', () => {
-    expect(rescue).toContain('is already closed');
-    expect(rescue).toContain('Not escalating twice');
+    expect(rescue).toContain('already_settled');
+    expect(rescue).toContain("!= \"OPEN\"");
+    expect(rescue).toMatch(/grep -qxE 'blocked\|paused'/);
+  });
+
+  // The check gates what is *said*, not only what is labelled. Issue #707's run
+  // escalated exactly as the skill asks, and the no-branch path still commented
+  // that it had "concluded that no code change was needed without saying so" —
+  // one comment under where it said so. Both no-deliverable paths exit before
+  // their comment when the issue is already settled.
+  it('stays silent rather than contradicting a run that settled its issue', () => {
+    const exits = rescue.match(/if already_settled; then\n\s+echo "Nothing to report/g) ?? [];
+    expect(exits.length).toBe(2);
+    for (const marker of ['No ${BRANCH} on disk', 'has no commits beyond main']) {
+      const at = rescue.indexOf(marker);
+      expect(at, marker).toBeGreaterThan(-1);
+      const after = rescue.slice(at);
+      // The settled check comes before the comment that path would post.
+      expect(after.indexOf('already_settled'), marker).toBeLessThan(
+        after.indexOf('gh issue comment')
+      );
+    }
+  });
+
+  // A run that paused itself and died before opening its handover PR would
+  // otherwise be rescued into a trap: the issue is back at `ready` waiting for
+  // its dependency, and an unlabelled draft PR makes it unassignable forever.
+  it('labels a rescued branch `paused` when the issue is paused', () => {
+    expect(rescue).toMatch(/grep -qx 'paused'/);
+    expect(rescue).toContain('RESCUE_LABEL=(--label paused)');
+    expect(rescue).toContain('"${RESCUE_LABEL[@]}"');
   });
 
   it('runs after the retry, so it judges the last attempt', () => {

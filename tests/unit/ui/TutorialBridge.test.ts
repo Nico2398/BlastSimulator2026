@@ -10,16 +10,27 @@ import { fileURLToPath } from 'url';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const MAIN_TS = resolve(currentDir, '../../../src/main.ts');
+const GLOBAL_D_TS = resolve(currentDir, '../../../src/types/global.d.ts');
 
 function readMainSource(): string {
   return readFileSync(MAIN_TS, 'utf-8');
 }
 
+function readGlobalTypesSource(): string {
+  return readFileSync(GLOBAL_D_TS, 'utf-8');
+}
+
 describe('Tutorial Bridge — window.__startTutorial', () => {
-  it('main.ts has a declare global block with __startTutorial type', () => {
-    const src = readMainSource();
-    // The global augmentation must declare __startTutorial on Window
+  it('src/types/global.d.ts declares the __startTutorial type on Window (#744)', () => {
+    // The declare global block moved from main.ts to a dedicated ambient
+    // declarations file (#744) — the type augmentation must live there now.
+    const src = readGlobalTypesSource();
     expect(src).toMatch(/__startTutorial\s*:\s*\(\)\s*=>\s*void/);
+  });
+
+  it('main.ts no longer duplicates the declare global block (moved to src/types/global.d.ts, #744)', () => {
+    const src = readMainSource();
+    expect(src).not.toMatch(/declare\s+global\s*\{/);
   });
 
   it('main.ts contains a runtime assignment of window.__startTutorial (not a skeleton comment)', () => {

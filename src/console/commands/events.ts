@@ -40,7 +40,7 @@ import { updateArrest } from '../../core/campaign/CriminalArrest.js';
 import { updateRevolt } from '../../core/campaign/WorkerRevolt.js';
 import { checkLevelComplete } from '../../core/campaign/LevelTransition.js';
 import { snapshotStats } from '../../core/campaign/SuccessTracker.js';
-import { updateScores, type ScoreInputs } from '../../core/scores/ScoreManager.js';
+import { updateScores, clampScore, type ScoreInputs } from '../../core/scores/ScoreManager.js';
 import { CONTRACT_REFRESH_INTERVAL } from '../../core/config/balance.js';
 import { BASE_TICK_MS } from '../../core/engine/GameLoop.js';
 import {
@@ -182,7 +182,7 @@ export function tickCommand(
     for (const emp of state.employees.employees) {
       if (!emp.alive) continue;
       tickNeedGauges(emp, employeeWorkState(emp));
-      emp.morale = Math.max(0, Math.min(100, emp.morale + needsMoraleEffect(emp)));
+      emp.morale = clampScore(emp.morale + needsMoraleEffect(emp));
     }
     const firedEvents: FiredEvent[] = [];
     // Complete rests started on a prior tick before creating any new ones —

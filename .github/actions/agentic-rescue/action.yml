@@ -8,13 +8,17 @@ description: >
   work survives and the failure is visible immediately instead of surfacing
   hours later as a watchdog sweep over branches that no longer exist.
 
-  It also settles the issue. A run that reaches this action did not finish, and
-  by the time it runs the session is over — so there is nothing left to wait for,
-  and leaving `in-progress` on the issue defers every later assignment behind a
-  run that no longer exists. Every unfinished outcome here ends `blocked`, which
-  is a terminal state and an entry point at once: handle-failure.yml notifies on
-  that label and chains to the next assignable issue, and agentic-assign skips
-  the blocked one. Only a run that already opened its own PR is left alone.
+  It also settles the issue — but only an issue the run did not settle itself.
+  A session that closed its issue, said `blocked`, or `paused` itself behind a
+  dependency it filed has already accounted for itself, and this action stays
+  silent on all three: re-labelling would fire a duplicate notification, and on a
+  `paused` issue it would take the issue back out of the queue the pause had just
+  returned it to. What is left is a session that ended saying nothing, where
+  leaving `in-progress` defers every later assignment behind a run that no longer
+  exists. Those end `blocked`, which is a terminal state and an entry point at
+  once: handle-failure.yml notifies on that label and chains to the next
+  assignable issue, and agentic-assign skips the blocked one. A run that already
+  opened its own PR is left alone.
 
   The chain is why the label has to be applied with the PAT and why it must not
   be applied twice: a second `blocked` on the same issue re-enters the chain.
@@ -56,21 +60,44 @@ runs:
           exit 0
         fi
 
-        # Hand the issue to a human and release the queue behind it. Idempotent
-        # and quiet about it: an issue that is already closed was settled by the
-        # run itself (an answer or a command, not a diff), and one that is already
-        # `blocked` has been reported — re-labelling it would fire a second
-        # handle-failure notification for the same failure.
-        escalate() {
+        # Whether the run already settled this issue itself.
+        #
+        # Three ways it can have: closed it (an answer or a command, not a diff),
+        # said `blocked` (a human has to act), or said `paused` (a dependency it
+        # filed has to land, and the issue is back at `ready` behind it). All
+        # three are terminal, all three release the queue, and in all three the
+        # session has already explained itself on the issue.
+        #
+        # This is checked before anything is *said*, not only before the label is
+        # applied. Issue #707's run did exactly what the skill asks — reported an
+        # unrunnable verification channel, filed #730 for it, escalated — and the
+        # no-branch path below still commented that it had "concluded that no code
+        # change was needed without saying so", one comment under where it said
+        # so. The label was correctly left alone; only the alarm was wrong.
+        already_settled() {
           local state labels
           state="$(gh issue view "${ISSUE}" --json state --jq .state)"
           if [ "${state}" != "OPEN" ]; then
-            echo "Issue #${ISSUE} is already closed — the run settled it. Not escalating."
+            echo "Issue #${ISSUE} is closed — the run settled it."
             return 0
           fi
           labels="$(gh issue view "${ISSUE}" --json labels --jq '.labels[].name')"
-          if printf '%s\n' "${labels}" | grep -qx 'blocked'; then
-            echo "Issue #${ISSUE} already carries \`blocked\`. Not escalating twice."
+          if printf '%s\n' "${labels}" | grep -qxE 'blocked|paused'; then
+            echo "Issue #${ISSUE} already carries a terminal label — the run stated its own outcome."
+            return 0
+          fi
+          return 1
+        }
+
+        # Hand the issue to a human and release the queue behind it. Idempotent:
+        # re-labelling an already-settled issue would fire a second
+        # handle-failure notification for the same halt, and on a `paused` issue
+        # it would be worse than duplicate — `blocked` would take the issue back
+        # out of the queue the pause had just returned it to, stranding it and
+        # its resume branch until somebody noticed.
+        escalate() {
+          if already_settled; then
+            echo "Not escalating."
             return 0
           fi
           # `blocked` first: the issue is never left holding neither label, and
@@ -119,12 +146,19 @@ runs:
           exit 0
         fi
 
-        # No feature branch at all: the run died before the cherry-pick, or it
-        # legitimately concluded no code change was needed. Say so on the issue
-        # either way — a silent death is what this action exists to prevent.
+        # No feature branch at all. Two very different runs land here and the
+        # difference is whether the issue was settled: a run that died before the
+        # cherry-pick left the issue open and unlabelled and needs the alarm,
+        # while a run that closed, blocked or paused the issue already said what
+        # happened and needs silence. A silent death is what this action exists to
+        # prevent; contradicting a run that spoke is not the same service.
         # The comment mentions no agent handle, so it cannot re-trigger a runner.
         if ! git rev-parse --verify --quiet "${BRANCH}" >/dev/null; then
           echo "No ${BRANCH} on disk — nothing to push."
+          if already_settled; then
+            echo "Nothing to report: the run produced no branch because it did not need one."
+            exit 0
+          fi
           cat > /tmp/agentic-rescue-body.md <<EOF
         🧯 **The agent run ended without producing \`${BRANCH}\`.**
 
@@ -139,10 +173,16 @@ runs:
           exit 0
         fi
 
-        # The branch exists but carries nothing. Same outcome as no branch at all:
-        # the run produced no deliverable, and the issue still holds the queue.
+        # The branch exists but carries nothing. Same outcome as no branch at all,
+        # and the same distinction: a run that produced no deliverable and settled
+        # nothing still holds the queue, and a run that settled its issue has
+        # already accounted for itself.
         if [ "$(git rev-list --count "main..${BRANCH}")" = "0" ]; then
           echo "${BRANCH} has no commits beyond main — nothing to rescue."
+          if already_settled; then
+            echo "Nothing to report: the run produced no commits because it did not need any."
+            exit 0
+          fi
           cat > /tmp/agentic-rescue-body.md <<EOF
         🧯 **The agent run created \`${BRANCH}\` and committed nothing to it.**
 
@@ -251,11 +291,27 @@ runs:
         It stays a draft and carries no \`READY TO MERGE\` line, so auto-merge will not pick it up. The issue is labelled \`blocked\`, so the pipeline moves on to the next one instead of waiting on this: resuming it is a human decision — finish this branch, or drop it and add \`ready\` back to the issue.
         EOF
 
+        # A run that paused itself and then died before opening its own resume
+        # pull request would otherwise be rescued into a trap: the issue is back
+        # at `ready` waiting for its dependency, and this unlabelled pull request
+        # would make it unassignable to everyone forever, because `assessCandidate`
+        # reads any open deliverable PR without `paused` as a run in flight. The
+        # label is what turns this PR from a collision into the handover the pause
+        # intended.
+        RESCUE_LABEL=()
+        if gh issue view "${ISSUE}" --json labels --jq '.labels[].name' | grep -qx 'paused'; then
+          gh label create paused --color fbca04 --force \
+            --description "A run stopped here on a dependency; the queue returns to it when that dependency lands" || true
+          RESCUE_LABEL=(--label paused)
+          echo "Issue #${ISSUE} is paused — labelling the rescued pull request \`paused\` so the next run resumes from it."
+        fi
+
         gh pr create \
           --draft \
           --base main \
           --head "${BRANCH}" \
           --title "wip: unfinished pipeline run for #${ISSUE}" \
+          "${RESCUE_LABEL[@]}" \
           --body-file /tmp/agentic-rescue-body.md
 
         # The branch is safe, but the run still did not finish the issue. Left

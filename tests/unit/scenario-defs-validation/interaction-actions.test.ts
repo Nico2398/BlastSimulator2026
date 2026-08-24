@@ -28,16 +28,32 @@ function forEachActionOfType<T extends InteractionStepAction['type']>(
   actionType: T,
   check: (action: Extract<InteractionStepAction, { type: T }>, stepIndex: number) => void,
 ): void {
+  for (const { stepIndex, interaction } of stepsWithInteraction(scenario)) {
+    for (const action of interaction) {
+      if (action.type === actionType) {
+        check(action as Extract<InteractionStepAction, { type: T }>, stepIndex);
+      }
+    }
+  }
+}
+
+/**
+ * Shared scaffold behind `forEachActionOfType` and the outer-timeout test
+ * below (#736, factored out of #722's own new duplication): walks
+ * `scenario.steps`, skipping plain-string steps and steps with no
+ * `.interaction` array, and yields the step index, the narrowed step object,
+ * and its already-non-optional `interaction` array for every step that has
+ * one.
+ */
+function* stepsWithInteraction(
+  scenario: ScenarioDef,
+): Generator<{ stepIndex: number; stepObj: ScenarioStepDef; interaction: InteractionStepAction[] }> {
   for (let i = 0; i < scenario.steps.length; i++) {
     const step = scenario.steps[i];
     if (typeof step === 'string') continue;
     const stepObj = step as ScenarioStepDef;
     if (!stepObj.interaction) continue;
-    for (const action of stepObj.interaction) {
-      if (action.type === actionType) {
-        check(action as Extract<InteractionStepAction, { type: T }>, i);
-      }
-    }
+    yield { stepIndex: i, stepObj, interaction: stepObj.interaction };
   }
 }
 
@@ -177,13 +193,9 @@ describe('Dual-play scenario steps — data-driven validation', () => {
       // mismatch undetected. `resolveEventIfPending.timeoutMs` defaults to
       // 30000 (interaction-executor.ts) when absent, same default used here.
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
+      for (const { stepObj, interaction } of stepsWithInteraction(scenario)) {
         const outerMs = (stepObj.timeout ?? 60) * 1000;
-        for (const action of stepObj.interaction) {
+        for (const action of interaction) {
           if (action.type === 'waitUntil') {
             expect(action.timeoutMs).toBeLessThanOrEqual(outerMs);
           } else if (action.type === 'resolveEventIfPending') {

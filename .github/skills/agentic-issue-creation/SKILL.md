@@ -9,15 +9,18 @@ description: Create or edit GitHub issues for agentic pipeline consumption — c
 
 Use when creating a GitHub issue that an autonomous run will pick up, when recording something found while working on a different task, when cutting an oversized task and filing the remainder, or when editing an already-filed one's dependencies, labels, or lifecycle state. An issue is the only input the pipeline takes, so it has to stand on its own — the run starts with the issue body and the codebase, and nothing else. Setting a `blocked_by` relationship on an existing issue is this skill's task exactly as much as authoring a new one is — see "Setting a dependency" below.
 
-Three situations put an agent here, and they differ only in what the issue records:
+Four situations put an agent here, and they differ only in what the issue records:
 
 | Situation | What the issue carries |
 |-----------|------------------------|
 | **Planned work** — decomposing a feature, or a human filing a task | The task itself, in one of the two shapes below |
 | **A finding** — technical debt, a codebase gap, an inconsistency, a defect noticed while working on something else | The finding, plus where it was found and why it was not fixed on the spot |
+| **A blocker you routed around** — something in your task's way that you bypassed with a `TODO(#N)` | The finding, plus the bypass to remove and the file it is in |
 | **A scope cut** — the assigned task turns out to be bigger than one run can carry | The remainder deliberately left out, and what was landed instead |
 
-A finding and a scope cut become ordinary issues the moment they are filed. They differ from planned work only in provenance, which the template's optional sections carry.
+All three of the latter become ordinary issues the moment they are filed. They differ from planned work only in provenance, which the template's optional sections carry.
+
+**Not everything you find belongs here.** The Follow-up Gate in `CLAUDE.md` sorts that, and `agentic-decision-autonomy` holds the procedures: something small enough to fix where you stand is fixed, not filed. Filing is for work that is genuinely its own task. An issue per two-minute fix costs a whole run to deliver two minutes of work.
 
 Two shapes are valid, and they differ in how much of the answer is already known:
 
@@ -26,7 +29,7 @@ Two shapes are valid, and they differ in how much of the answer is already known
 | **Intent** | A human filing from the issue form or free-form | Context, Task, Verification, and any Blocked by. The planner derives the files and the tests. |
 | **Complete** | An agent decomposing a feature into atomic tasks | Every section below. The decomposition already knows the file layout, so it states it. |
 
-Both enter the same queue once `ready` lands on the issue — a two-line issue typed from a phone is still a valid input, and where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back. Entering the queue is not being picked up: runs start only on a manual dispatch of `agentic-trigger.yml`, from a merged pipeline pull request, or from a run that ended `blocked`.
+Both enter the same queue once `ready` lands on the issue — a two-line issue typed from a phone is still a valid input, and where it leaves a choice open, the run defaults it under `agentic-decision-autonomy` rather than bouncing it back. Entering the queue is not being picked up: runs start only on a manual dispatch of `agentic-trigger.yml`, from a merged pipeline pull request, or from a run that halted — `blocked` or `paused` — chaining past itself.
 
 ## ▶ PROCEDURE — EXECUTE IN ORDER
 
@@ -70,6 +73,9 @@ Searching costs one command. Filing a duplicate costs a run.
 | **High** — a defect you reproduced, a convention you can point at, a gap you verified in the code | `agent-task`, `ready` | The work is real and specified. The issue joins the queue in number order. |
 | **Open** — something looks wrong, and a human should confirm it is worth doing or pick between two directions | `agent-task` | The issue stays out of the queue until a human adds `ready`. |
 | **Already decided by the run** — a default you implemented that a human may want to revisit | `decision-review` | Held by `agentic-decision-autonomy`, which owns that flow end to end. |
+| **In the way of a run right now** — you bypassed it with a `TODO(#N)`, or you paused behind it | `agent-task`, `ready` | Highest confidence there is: you hit it head-on. Another issue is queued behind this one, so it earns its place at the front. |
+
+**`paused` is not a label you put on an issue you file.** It goes on the issue whose *run* stopped — alongside `ready`, with this new issue as its `Blocked by` — and `agentic-assign` strips it when that issue is picked up again. `agentic-decision-autonomy` holds the procedure.
 
 An issue held for confirmation carries an `## Open question` section naming exactly what a human must answer and what changes with each answer. Without it the issue is a hunch nobody can act on, and it waits until someone re-derives the question you already knew.
 
@@ -106,11 +112,16 @@ Leave `ready` off while you are uncertain. An issue carrying `agent-task` alone 
 ## Why not fixed here
 [Findings and scope cuts only. Why filing was right rather than folding it into the work in hand.]
 
+## Bypass to remove
+[Bypassed blockers only. The exact `TODO(#N)` comment and the file and function it sits in,
+what the workaround currently does, and what should replace it. Closing this issue means
+deleting that comment and the workaround with it.]
+
 ## Open question
 [Issues held at `agent-task` without `ready` only. What a human must answer, and what changes with each answer.]
 ```
 
-The last three sections are provenance and are omitted for planned work. `## Where found` and `## Why not fixed here` are what let the next reader judge a finding without reconstructing the review round that produced it; `## Open question` is what a human answers before adding `ready`.
+The last four sections are provenance and are omitted for planned work. `## Where found` and `## Why not fixed here` are what let the next reader judge a finding without reconstructing the review round that produced it; `## Bypass to remove` is what stops a `TODO(#N)` outliving the issue that owns it; `## Open question` is what a human answers before adding `ready`.
 
 ## Rules
 
@@ -127,6 +138,8 @@ The last three sections are provenance and are omitted for planned work. `## Whe
 11. **Search before filing, and update what already exists.** An open issue covering the same problem is updated rather than duplicated — procedure above.
 12. **`ready` states confidence, not hope.** It goes on an issue whose work is verified real and whose description is good enough to start from. Anything short of that is `agent-task` alone, with an `## Open question` section naming what a human must answer.
 13. **Label transfer.** A PR opened from a `full-ci` issue gets the same label, passed on the same `gh pr create` call that opens it (`--label "full-ci"`) — never a follow-up `gh pr edit --add-label`, which raises no `pull_request` event of its own and is how PR #615 merged with its interaction-mode job silently skipped. See `agentic-pipeline-finalization`'s `open-pr` step.
+14. **An issue that owns a bypass says so, and says where.** A `TODO(#N)` in the codebase and issue #N are one unit: the comment points at the issue, and the issue's `## Bypass to remove` and `## Files` point back at the comment. Either half alone rots — a bare `TODO` nobody can queue, or an issue that lands and leaves its workaround in place. Closing the issue deletes the comment.
+15. **A blocker filed from inside a run comes first.** Something that stopped or diverted a live run is reproduced, specified and urgent by construction — another issue is queued behind it. File it `ready` unless you genuinely could not characterise it.
 
 ## ▶ Sizing — one issue is one run, and a run has a ceiling
 
@@ -263,3 +276,6 @@ recorded can be picked up in that window.
 - [ ] An issue held for confirmation carries `## Open question`
 - [ ] A finding or a scope cut carries `## Where found` and `## Why not fixed here`
 - [ ] A scope cut names its remainder issues in the pull request body and on the original issue
+- [ ] The finding was too big to fix on the spot — anything small enough was fixed, not filed
+- [ ] A bypassed blocker carries `## Bypass to remove`, and its `## Files` names the file the `TODO(#N)` sits in
+- [ ] A blocker a run paused behind is set as that issue's `blocked_by` relationship **and** written under its `Blocked by` heading, and read back to confirm

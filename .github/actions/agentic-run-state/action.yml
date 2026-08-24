@@ -2,9 +2,10 @@ name: "Autonomous run state"
 description: >
   Answers one question after an agent session ends: did this run leave its issue
   in a terminal state? A run is terminal when it produced a pull request, said it
-  was blocked, or closed the issue. Anything else means the session stopped with
-  the work unfinished and nobody told — the failure mode that cost issue #404
-  three hours and killed issue #406 fifty-eight seconds in.
+  was blocked, paused itself behind a dependency it filed, or closed the issue.
+  Anything else means the session stopped with the work unfinished and nobody
+  told — the failure mode that cost issue #404 three hours and killed issue #406
+  fifty-eight seconds in.
 
   It also reports whether a retry is worth attempting inside the remaining job
   budget, and what the previous attempt left on the runner's disk, so the retry
@@ -127,6 +128,18 @@ runs:
             settle(true, false, `Issue #${number} is labelled \`blocked\` — the run stated what is missing.`);
             return;
           }
+          // A paused run is terminal for the same reason a blocked one is: the
+          // session decided, said so, and left the issue in a state the queue
+          // acts on by itself. Retrying it would be worse than pointless — the
+          // retry would rediscover the same dependency, and on the way there it
+          // would rebuild from `main` the branch the pause deliberately saved.
+          if (labels.has('paused')) {
+            settle(
+              true, false,
+              `Issue #${number} is labelled \`paused\` — the run filed the dependency in its way and requeued itself behind it.`
+            );
+            return;
+          }
 
           // A linked PR is the deliverable. Its own CI and review carry it from
           // here, however long that takes, so the run is done either way. But
@@ -207,7 +220,7 @@ runs:
           if (!Number.isInteger(startedAt)) {
             settle(
               false, false,
-              `Issue #${number} has no PR, no \`blocked\` label and is still open — the run did not settle it. ` +
+              `Issue #${number} has no PR, no \`blocked\` or \`paused\` label and is still open — the run did not settle it. ` +
               'No start time was supplied, so no retry is scheduled.'
             );
             return;
@@ -219,7 +232,7 @@ runs:
 
           settle(
             false, worthRetrying,
-            `Issue #${number} has no PR, no \`blocked\` label and is still open — the run did not settle it. ` +
+            `Issue #${number} has no PR, no \`blocked\` or \`paused\` label and is still open — the run did not settle it. ` +
             `${elapsed}m of the ${budget}m budget spent, ${remaining}m left; ` +
             (worthRetrying
               ? `at least ${floor}m is needed for an attempt, so one more will run.`

@@ -106,6 +106,53 @@ export function loadScenarioDef(name: string, dir?: string): ScenarioDef {
 }
 
 /**
+ * Violation entry shared by the structural lints under tests/unit/lint/ —
+ * every lint walks the same file/step traversal and reports the same three
+ * fields; individual lints add their own extra fields on top via generics.
+ */
+export interface ScenarioViolation {
+  file: string;
+  stepIndex: number;
+  command: string;
+}
+
+/**
+ * Shared traversal: walk every scenario file's every step (optionally
+ * restricted to `scenarioNames`), collecting the ones for which
+ * `isViolation` returns true.
+ */
+export function collectScenarioViolations(
+  isViolation: (step: ScenarioStepDef) => boolean,
+  scenarioNames: string[] = scenarioFiles(SCENARIO_DIR),
+): ScenarioViolation[] {
+  const violations: ScenarioViolation[] = [];
+  for (const file of scenarioNames) {
+    const scenario = loadScenarioDef(file, SCENARIO_DIR);
+    scenario.steps.forEach((rawStep, stepIndex) => {
+      const step = rawStep as ScenarioStepDef;
+      if (isViolation(step)) {
+        violations.push({ file, stepIndex, command: step.command });
+      }
+    });
+  }
+  return violations;
+}
+
+/**
+ * Format a list of scenario violations for a test failure message, one line
+ * per violation. `describeExtra` lets a caller append lint-specific detail
+ * beyond the shared file/stepIndex/command fields.
+ */
+export function formatScenarioViolations<V extends ScenarioViolation>(
+  violations: V[],
+  describeExtra?: (v: V) => string,
+): string {
+  return violations
+    .map((v) => `  ${v.file}.json step[${v.stepIndex}] ("${v.command}")${describeExtra ? describeExtra(v) : ''}`)
+    .join('\n');
+}
+
+/**
  * Safety margin added on top of the slowest inner `timeoutMs` below, so the
  * outer race (setTimeout vs. the inner action's own deadline check) cannot
  * land close enough for scheduling jitter to flip which one fires first.
