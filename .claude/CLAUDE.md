@@ -51,6 +51,8 @@ What may be assigned is decided in one place, `.github/scripts/assignability.cjs
 
 A session started by the autonomous pipeline — a GitHub Actions run woken by the `@claude` mention in a pipeline assignment comment — is not an ordinary session. Its first action is to hand the task to the `orchestrator` agent, which classifies it and delegates every step to specialists. Never implement a pipeline-assigned task in the main session, and never explore the codebase before the orchestrator has classified it. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
 
+That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point. PR #750 and PR #641 each closed an issue (#707, #572) that PR's own diff did not resolve, through two different mechanisms, and neither ran through the orchestrator — load that skill before your last message whenever your work could close one.
+
 ## ▶ Verification Gate — RUN BEFORE CLAIMING ANY WORK DONE
 
 Four independent channels prove a change works. Each catches what the others miss. Never report a task complete on a single channel when a second one applies.
