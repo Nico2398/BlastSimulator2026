@@ -32,6 +32,9 @@ inputs:
       "closed_without_pr" — only chain when completed_issue closed without a linked PR.
       "after_blocked_run" — only chain when completed_issue is a run that ended `blocked`,
       and only while the cascade brake is open.
+      "after_paused_run" — only chain when completed_issue is a run that ended `paused`:
+      it stopped on a dependency it filed, put itself back in the queue behind that
+      dependency, and the queue still has to move past it. Same cascade brake.
       "none" — no extra precondition. Single-flight is enforced either way.
     required: false
     default: "none"
@@ -41,10 +44,10 @@ inputs:
     default: ""
   blocked_chain_limit:
     description: >
-      Consecutive runs that may end `blocked` since the last merged pipeline PR
-      before the `after_blocked_run` guard stops chaining. From
-      AGENTIC_BLOCKED_CHAIN_LIMIT; a non-positive or unparseable value falls back
-      to 3 rather than disabling the brake.
+      Consecutive runs that may halt without merging — `blocked` or `paused` —
+      since the last merged pipeline PR before the chain guards stop chaining.
+      From AGENTIC_BLOCKED_CHAIN_LIMIT; a non-positive or unparseable value falls
+      back to 3 rather than disabling the brake.
     required: false
     default: ""
 
@@ -137,24 +140,33 @@ runs:
             core.info(`Issue #${completed} closed without a PR — chaining directly.`);
           }
 
-          // --- Guard: chain past a run that ended `blocked` ---
-          // A blocked run is a terminal outcome like a merge is, and the queue
-          // has to keep moving through it: nothing else starts the next session,
-          // and a fully autonomous pipeline cannot wait for somebody to notice.
-          // What it must not do is keep chaining while every run fails.
-          if (guard === 'after_blocked_run') {
+          // --- Guard: chain past a run that halted without merging ---
+          // `blocked` and `paused` are both terminal outcomes like a merge is,
+          // and the queue has to keep moving through either: nothing else starts
+          // the next session, and a fully autonomous pipeline cannot wait for
+          // somebody to notice. They differ only in who acts next — `blocked`
+          // waits on a human, `paused` waits on an issue the pipeline will work
+          // itself — and neither difference changes what happens to the queue.
+          // What it must not do is keep chaining while every run halts.
+          const HALT_GUARDS = {
+            after_blocked_run: { label: rules.BLOCKED, noun: 'blocked' },
+            after_paused_run: { label: rules.PAUSED, noun: 'paused' },
+          };
+          if (HALT_GUARDS[guard]) {
+            const { label, noun } = HALT_GUARDS[guard];
+
             if (!completed) {
-              core.info('No blocked issue supplied — nothing to chain from.');
+              core.info(`No ${noun} issue supplied — nothing to chain from.`);
               return;
             }
 
-            const failed = await api.getIssue(completed);
-            if (!failed) {
+            const halted = await api.getIssue(completed);
+            if (!halted) {
               core.setFailed(`Issue #${completed} could not be read — not chaining on an unknown state.`);
               return;
             }
-            if (!failed.labels.includes(rules.BLOCKED)) {
-              core.info(`Issue #${completed} no longer carries \`blocked\` — nothing to chain from.`);
+            if (!halted.labels.includes(label)) {
+              core.info(`Issue #${completed} no longer carries \`${label}\` — nothing to chain from.`);
               return;
             }
 
@@ -168,29 +180,29 @@ runs:
               return;
             }
 
-            // `blocked` means the run is over, so the two labels cannot both be
-            // true. Left on, `in-progress` would defer this assignment against a
-            // session that no longer exists and hold the queue until the watchdog.
-            if (failed.labels.includes(rules.IN_PROGRESS)) {
+            // The run is over, so `in-progress` cannot still be true. Left on, it
+            // would defer this assignment against a session that no longer exists
+            // and hold the queue until the watchdog.
+            if (halted.labels.includes(rules.IN_PROGRESS)) {
               await github.rest.issues
                 .removeLabel({ owner, repo, issue_number: completed, name: rules.IN_PROGRESS })
                 .catch(() => {});
-              core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it ended blocked.`);
+              core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it ended ${noun}.`);
             }
 
             const limit = rules.blockedChainLimit(process.env.BLOCKED_CHAIN_LIMIT);
-            const failures = await rules.consecutiveBlockedRuns(api);
+            const failures = await rules.consecutiveHaltedRuns(api);
             if (failures >= limit) {
               core.setOutput('halted', 'true');
               core.warning(
-                `${failures} runs have ended \`blocked\` since the last pipeline merge (limit ${limit}). ` +
+                `${failures} runs have halted without merging since the last pipeline merge (limit ${limit}). ` +
                 'Not chaining — this is a systemic failure, not a task-specific one.'
               );
               await announceHalt(failures, limit);
               return;
             }
             core.info(
-              `${failures} blocked run(s) since the last pipeline merge, under the limit of ${limit}. Chaining.`
+              `${failures} halted run(s) since the last pipeline merge, under the limit of ${limit}. Chaining.`
             );
           }
 
@@ -221,9 +233,45 @@ runs:
           await github.rest.issues.removeLabel({
             owner, repo, issue_number: n, name: rules.READY
           }).catch(() => {});
+          // `paused` said "a run stopped here and put the issue back in the
+          // queue". It has just been picked up, so the statement is no longer
+          // true — and left on, it would be counted a second time by the cascade
+          // brake and chained from a second time by handle-failure.yml.
+          await github.rest.issues.removeLabel({
+            owner, repo, issue_number: n, name: rules.PAUSED
+          }).catch(() => {});
           await github.rest.issues.addLabels({
             owner, repo, issue_number: n, labels: [rules.IN_PROGRESS]
           });
+
+          // Cached from `assessCandidate`, which already read it to decide the
+          // issue was assignable at all. A paused pull request means a previous
+          // run left finished work on a branch, and this assignment has to send
+          // the new run to that branch — the default instructions below would
+          // have it build a fresh one from `main` and silently abandon the work.
+          const resume = rules.resumeTargetFor(await api.deliverableFor(n));
+          if (resume) {
+            core.info(
+              `#${n} resumes from pull request #${resume.number}` +
+              (resume.head ? ` on \`${resume.head}\`` : '') + '.'
+            );
+          }
+
+          const resumeBlock = resume
+            ? [
+                '',
+                `**▶ THIS RUN RESUMES PULL REQUEST #${resume.number} — DO NOT START OVER.**`,
+                '',
+                `A previous run on this issue stopped on a dependency, saved what it had finished, and left it on ${resume.head ? `\`${resume.head}\`` : `pull request #${resume.number}'s head branch`}. That dependency has since landed, which is why this issue is assignable again.`,
+                '',
+                `1. Read pull request #${resume.number} first — its body states what is already done and what remains. Read the issue thread too, but the pull request is the authority on where the work stopped.`,
+                `2. Check out that pull request's head branch and continue on it. Create no \`pipeline/tests-*\`, \`pipeline/impl-*\` or \`pipeline/feature-*\` branch for this issue: the branch already exists, its commits are the work, and building a new one from \`main\` throws that work away.`,
+                `3. Finish only what the pull request says remains, plus whatever the landed dependency now makes possible. Re-verify every channel at the end — the earlier run's results were recorded against an older \`main\`.`,
+                `4. When it is done, push to that same branch, mark pull request #${resume.number} ready for review, remove its \`paused\` label, and add \`READY TO MERGE\` on a line of its own as a new comment **and** in the body. Do not open a second pull request.`,
+                '',
+                'If the remaining work turns out to be unrelated to what that branch holds, say so on the pull request and continue on the branch anyway — a second pull request against one issue makes the issue unassignable to everyone.',
+              ]
+            : [];
 
           // The comment IS the trigger. It must carry the whole assignment:
           // which agent answers, what to build, and how the pipeline runs it.
@@ -232,6 +280,7 @@ runs:
             `${mention} — autonomous pipeline assignment for issue #${n} (${reason}).`,
             '',
             `**Task:** resolve issue #${n} end to end and open the pull request that closes it.`,
+            ...resumeBlock,
             '',
             '**▶ FIRST ACTION — hand this task to the `orchestrator` agent.**',
             'Classification, planning, TDD, code review and PR creation are the orchestrator\'s job,',
@@ -248,9 +297,18 @@ runs:
             '',
             'Do not use `[skip ci]` on pipeline branches — it suppresses the auto-merge workflow.',
             '',
-            `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule and for the five blockers that genuinely stop a run. On one of those, label this issue \`blocked\`, comment what is missing, and stop.`,
+            `Where this issue leaves a requirement open, choose the default the spec and surrounding code already imply, record it in the PR body under \`## Decisions taken\`, and finish the run — see the \`agentic-decision-autonomy\` skill for the rule, for what to fix on the fly rather than file, and for the blockers that genuinely stop a run.`,
             '',
-            `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state: a merged-ready PR that closes it, \`blocked\` naming what is missing, or — when the deliverable is an answer or a command rather than a diff — issue #${n} closed and labelled \`done\`. An issue left holding \`in-progress\` defers every later assignment until the watchdog sweeps it.`
+            `Something you find that is in the way of this task is not automatically a halt: fix it on the spot when it is small, and when it is not, file it and work around it behind a \`TODO(#<new issue>)\` bypass so this run still lands. Only a finding that makes the task impossible ends the run early — and then it \`pause\`s rather than blocks. Both procedures are in \`agentic-decision-autonomy\`.`,
+            '',
+            `This issue now carries \`in-progress\`, and the queue reads that label as a live run. End the run with it in a terminal state, and there are four:`,
+            '',
+            `- a merged-ready PR that closes it;`,
+            `- \`paused\` — a dependency you filed is in the way, so the issue goes back to \`ready\` with that issue as its \`Blocked by\` and the \`paused\` label on top, and any partial work is saved on a draft PR labelled \`paused\`. The queue re-picks it on its own once the dependency lands;`,
+            `- \`blocked\` — a human has to answer something before the work can proceed at all. Comment what is missing;`,
+            `- or — when the deliverable is an answer or a command rather than a diff — issue #${n} closed and labelled \`done\`.`,
+            '',
+            `An issue left holding \`in-progress\` defers every later assignment until the watchdog sweeps it.`
           ].join('\n');
 
           await github.rest.issues.createComment({ owner, repo, issue_number: n, body });
@@ -276,11 +334,11 @@ runs:
               owner, repo, issue_number: completed,
               body: [
                 marker,
-                '🛑 **Pipeline paused — the failures are not task-specific.**',
+                '🛑 **Pipeline halted — the failures are not task-specific.**',
                 '',
-                `${failures} runs have ended \`blocked\` since the pipeline last merged one of its own pull requests, which is at or over the limit of ${limit} (\`AGENTIC_BLOCKED_CHAIN_LIMIT\`).`,
+                `${failures} runs have ended \`blocked\` or \`paused\` since the pipeline last merged one of its own pull requests, which is at or over the limit of ${limit} (\`AGENTIC_BLOCKED_CHAIN_LIMIT\`).`,
                 '',
-                'A blocked run normally chains straight to the next issue, so the queue keeps moving without anyone watching. Several in a row is a different signal: an expired token, a broken `main`, a runner image that no longer builds. Chaining on would march through the rest of the backlog labelling every issue `blocked` in minutes.',
+                'A run that halts normally chains straight to the next issue, so the queue keeps moving without anyone watching. Several in a row is a different signal: an expired token, a broken `main`, a runner image that no longer builds. Chaining on would march through the rest of the backlog halting every issue in minutes.',
                 '',
                 'The queue is parked until a human looks. Nothing is lost — every issue involved keeps its labels and its branches.',
                 '',

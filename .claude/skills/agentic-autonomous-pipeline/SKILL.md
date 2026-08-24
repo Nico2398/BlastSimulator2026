@@ -32,7 +32,7 @@ Both runners are single-shot: the harness sends one message, the agent works unt
 Two rules follow, and they hold under every runtime:
 
 1. **Parallel means several delegations issued in one message and awaited together in that same turn.** Never work launched now and collected later, whatever background or notify-me-when-done mode the runtime offers.
-2. **A turn ends on a pull request whose CI has reported green, an `ESCALATED:` line, or the `blocked` label** — never on outstanding work.
+2. **A turn ends on a pull request whose CI has reported green, a `PAUSED:` line, an `ESCALATED:` line, or the `blocked` label** — never on outstanding work.
 
 The single turn is also why the CI verdict has to be read inside it. The channels CI owns report minutes after the pull request opens, and a red one is announced to nobody: `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked pull request. So the run waits for the report — `agentic-pipeline-finalization`'s `[await-ci]` step, which blocks in-turn and returns to the session that called it. Waiting on an event that returns to you is not the outstanding work rule 1 forbids; it is the last verification channel being read. `agentic-ci-failure.yml` covers the session that dies before it returns, and `references/github-loop.md` holds how.
 
@@ -82,7 +82,29 @@ main
 
 ## What the loop stops for
 
-Autonomy is measured by what the pipeline can finish without a human, and every halt costs more than its own run: an issue holds `in-progress` until its run produces a merged PR or releases it, so a stopped run defers every later assignment behind it. A halt has to earn that. Which open questions are decisions to take and which five are genuine blockers: `agentic-decision-autonomy`.
+Autonomy is measured by what the pipeline can finish without a human, and every halt costs more than its own run: an issue holds `in-progress` until its run produces a merged PR or releases it, so a stopped run defers every later assignment behind it. A halt has to earn that.
+
+Most things that get in a run's way do not. `agentic-decision-autonomy` holds the order to try them in — fix it, bypass it behind a `TODO(#N)`, pause behind it, block — and the narrow list of what genuinely reaches the last one. Two of those four leave the issue in a terminal state that still needs no human:
+
+| Outcome | Issue ends | Queue behaviour |
+|---------|-----------|-----------------|
+| Merged-ready PR | closed by the merge | `auto-assign-next.yml` chains on the merge |
+| `done` + closed | closed, `done` | `handle-failure.yml` does not fire; the merge path does |
+| `paused` | `ready` + `paused`, `Blocked by` the filed dependency | `handle-failure.yml` chains on; `assignability.cjs` holds this issue until the dependency lands, then re-picks it |
+| `blocked` | `blocked` | `handle-failure.yml` chains on; the issue waits for a human |
+
+## ▶ Resuming a paused run
+
+A paused run leaves its work on a draft PR labelled `paused`, and `agentic-assign` detects that when the issue comes back round: the assignment comment names the PR and its head branch, and says to continue there.
+
+**That instruction overrides branch isolation for this run.** The three-branch cycle below builds a deliverable from nothing; a resumed run already has one. So:
+
+- **Create no `pipeline/tests-*`, `pipeline/impl-*` or `pipeline/feature-*` branch.** Check out the PR's head and work on it. Building a fresh feature branch from `main` silently discards every commit the pause saved.
+- **Push to that branch and finish that PR.** Never open a second PR against the issue — an issue with a second open PR is unassignable to everyone, which is exactly the deadlock the `paused` label exists to avoid.
+- **Re-run every verification channel.** The earlier run's results were recorded against an older `main`.
+- **Finishing means:** mark the PR ready for review, remove its `paused` label, and add `READY TO MERGE` per `agentic-pipeline-pr-management`.
+
+A red CI on an existing open PR is the other task shape that works this way, and `agentic-pipeline-ci-fix` describes it. The difference is only what is being finished: there, a green CI; here, the remaining task.
 
 ## Where the rest lives
 

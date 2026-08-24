@@ -12,13 +12,14 @@ Before open-pr step, evaluate: **is this PR ready to merge or should it be a dra
 
 **Verification decides, and nothing else.** A PR is `ready` when every verification channel the change owes reports PASS. Ask one question per channel the change touches — static, logic, scenario, visual — and one question about the issue's own verification list. All PASS → `ready`.
 
-A PR is `draft` in exactly three cases:
+A PR is `draft` in exactly four cases:
 
 | Draft because | Shape |
 |---------------|-------|
 | A required channel could not run | `VISUAL: BLOCKED` — no browser, dev server unreachable, screenshots never written. The work may be right; nothing can prove it. |
 | A required channel is red and stayed red | The pipeline exhausted its retries against a genuine failure |
 | A genuine blocker was hit | One of the five in `agentic-decision-autonomy` — contradictory requirements, missing external dependency, capability gap, unrunnable channel, irreversible action |
+| **The run paused behind a dependency it filed** | The task cannot be finished until another issue lands. This PR is a handover, not a deliverable — see below. |
 
 | Evaluation | Behavior |
 |------------|----------|
@@ -66,7 +67,24 @@ Two things this does not change:
 
 If the session dies before the wait returns, `agentic-ci-failure.yml` posts the failure back to the agent on the same PR, bounded by `AGENTIC_CI_FIX_ATTEMPT_LIMIT`, and parks the PR as a draft with the issue `blocked` when the limit is spent. That net exists for a crashed session and a dropped webhook. It is not the plan.
 
-**There is no third state.** Every pipeline PR leaves the run either marked or `--draft`. A non-draft PR carrying no marker is invisible to the entire loop: `agentic-auto-merge` skips it, `auto-assign-next` chains from a merge that never happens, and the watchdog skips any issue that has a linked PR — so the issue holds `in-progress` and every assignment behind it waits until a human notices. PRs #507 and #508 both ended exactly there, both promising the marker "will follow once those jobs report". Nothing comes back to add it; the only session that could have is over. `agentic-auto-merge` now fails its step on a non-draft `pipeline/feature-*` PR with no marker, so the state is loud instead of silent — but the run must not create it in the first place.
+**There is no third state.** Every pipeline PR leaves the run either marked or `--draft` (a paused handover being one kind of draft). A non-draft PR carrying no marker is invisible to the entire loop: `agentic-auto-merge` skips it, `auto-assign-next` chains from a merge that never happens, and the watchdog skips any issue that has a linked PR — so the issue holds `in-progress` and every assignment behind it waits until a human notices. PRs #507 and #508 both ended exactly there, both promising the marker "will follow once those jobs report". Nothing comes back to add it; the only session that could have is over. `agentic-auto-merge` now fails its step on a non-draft `pipeline/feature-*` PR with no marker, so the state is loud instead of silent — but the run must not create it in the first place.
+
+## The paused handover PR
+
+A run that stops on a dependency it filed leaves its finished work on a draft PR rather than losing it. That PR is the one kind whose job is to *not* merge yet, and it is marked so the queue can tell:
+
+| | |
+|---|---|
+| Status | `--draft`, no `READY TO MERGE` |
+| Label | `paused` — **required** |
+| Body | `Closes #<issue>`, then Done / Remaining / What the blocker changes / Resuming. Format in `agentic-decision-autonomy` |
+| Issue | back to `ready` + `paused`, with the blocker as its `Blocked by` |
+
+**The label is load-bearing, not decoration.** `assignability.cjs` refuses any issue with an open deliverable PR — a second run would collide with the branch that PR is built on — and `paused` is the one exemption. Without it the issue is unassignable to everyone, forever: it sits `ready` behind a PR nobody is coming back to. With it, the next run is handed the PR number and its branch and told to continue there.
+
+It follows that a paused PR **must not be closed or merged** by anything, and that a run resuming one **must not open a second PR against the same issue** — that recreates the deadlock the label exists to avoid. If the remaining work turns out unrelated to the branch, say so on the PR and continue on it anyway.
+
+Everything else about it is an ordinary PR: it gets the issue's `full-ci` label if the issue carried one, and it never carries `[skip ci]`.
 
 ## The `full-ci` label
 
