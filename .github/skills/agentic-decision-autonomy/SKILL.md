@@ -101,7 +101,12 @@ An answer — which of two contradictory requirements is meant, a credential nob
 1. **File the blocker** as an ordinary issue, per `agentic-issue-creation`. It gets `ready` if you are confident it is real and specified, which after hitting it head-on you usually are.
 2. **Set it as your issue's dependency** — the `blocked_by` relationship *and* the `## Blocked by` section, both, per `agentic-issue-creation`'s "Setting a dependency". The relationship is what `assignability.cjs` trusts.
 3. **Save whatever you finished.** If you have commits, push `pipeline/feature-<label>` and open a **draft** pull request against `main`, labelled `paused`, carrying `Closes #<your issue>` and no `READY TO MERGE`. Its body states what is done, what remains, and what the blocker changes — format below. With no commits, skip this; there is nothing to hand over.
-4. **Return your issue to the queue:** add `ready`, add `paused`, remove `in-progress`.
+4. **Return your issue to the queue:** add `ready`, add `paused`, remove `in-progress`. `agentic-intake.yml` keeps the label defined, but create it idempotently first rather than assuming — the same `--force` pattern the `decision-review` label uses above, so a repository that has never paused does not fail the step:
+
+   ```bash
+   gh label create paused --color fbca04 --force \
+     --description "A run stopped here on a dependency; the queue returns to it when that dependency lands"
+   ```
 5. **Comment on your issue** naming the blocker, what you finished, and the PR that holds it. Stop with `PAUSED: waiting on #<blocker>`.
 
 What then happens without anyone watching: `assignability.cjs` skips your issue while the blocker is open, `handle-failure.yml` chains the queue on to the next issue, the pipeline works the blocker, and when the blocker's PR merges your issue becomes assignable again. The next run is told to resume from your draft PR's branch rather than start over.
