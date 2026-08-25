@@ -1,6 +1,6 @@
 {
   "name": "ore-haul-dispatch",
-  "description": "Regression scenario for #671: collectedOre.<material> never rose via automatic haul dispatch because estimateActionCost/selectBestActionForEmployee (ActionSelection.ts) ranked haul_debris/fragment_debris candidates purely by travel-time cost, with zero ore-awareness. A small Tier 1 freight_warehouse (2000kg, BuildingDefs.ts) fills solid from the first cheapest (nearest, ore-agnostic) fragments and permanently excludes remaining ones -- including ore-bearing ones, since nothing frees warehouse room except a player's own contract sale. Seed 10's 3x3 drill grid at (18,19) deterministically exposes ~250 ore-bearing ground fragments alongside plenty of plain rock (sandbox-confirmed end to end against the real, un-cheated console pipeline -- no fixture injection, no forced needs gauges, exact ids/commands below reproduced verbatim): under today's pure-travel-time ranking, the warehouse fills solid from plain spoil alone (stuck permanently at storedMassKg 2125/2000, confirmed unchanged 500+ ticks past the build) and collectedOreTotal never rises off zero. Once ActionSelection.ts's estimateActionCost subtracts ORE_HAUL_PRIORITY_BONUS_TICKS for ore-bearing candidates (haulActionCarriesOre, HaulDispatch.ts), an ore fragment should outrank at least some nearby plain ones and get delivered before the warehouse fills solid. Command-mode only (issue #671 is a dispatch-ranking/economy fix with no player-facing UI surface) -- no interaction arrays on the mutating steps below, so interaction mode no-ops them rather than asserting on clicks this bug has none of.",
+  "description": "Regression scenario for #671: collectedOre.<material> never rose via automatic haul dispatch because estimateActionCost/selectBestActionForEmployee (ActionSelection.ts) ranked haul_debris/fragment_debris candidates purely by travel-time cost, with zero ore-awareness. A small Tier 1 freight_warehouse (2000kg, BuildingDefs.ts) fills solid from the first cheapest (nearest, ore-agnostic) fragments and permanently excludes remaining ones -- including ore-bearing ones, since nothing frees warehouse room except a player's own contract sale. Seed 10's 3x3 drill grid at (18,19) deterministically exposes ~250 ore-bearing ground fragments alongside plenty of plain rock (sandbox-confirmed end to end against the real, un-cheated console pipeline -- no fixture injection, no forced needs gauges, exact ids/commands below reproduced verbatim): under today's pure-travel-time ranking, the warehouse fills solid from plain spoil alone (stuck permanently at storedMassKg 2125/2000, confirmed unchanged 500+ ticks past the build) and collectedOreTotal never rises off zero. Once ActionSelection.ts's estimateActionCost subtracts ORE_HAUL_PRIORITY_BONUS_TICKS for ore-bearing candidates (haulActionCarriesOre, HaulDispatch.ts), an ore fragment should outrank at least some nearby plain ones and get delivered before the warehouse fills solid. Runs correctly in both command mode and interaction mode: every state-dependent step below carries a real, click-driven interaction array, so interaction mode drives the same mutations through the UI rather than falling back to the console.",
   "steps": [
     {
       "command": "new_game mine_type:desert seed:10 size:64 staffed:true cash:200000",
@@ -20,8 +20,44 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:18,19",
-      "description": "9-hole grid, deterministic under seed 10 -- sandbox-confirmed to expose ~250 ore-bearing ground fragments alongside plenty of plain rock once blasted.",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:18,19 diameter:0.089",
+      "description": "9-hole grid, deterministic under seed 10 -- sandbox-confirmed to expose ~250 ore-bearing ground fragments alongside plenty of plain rock once blasted. diameter:0.089 added to match the real grid-tool confirm's own DEFAULT_DIAMETER_M (Drill.ts) -- an omitted diameter fell back to a different console-only default (0.15, mining.ts), desyncing drill duration/tick timing against interaction mode (same fix as rock-fragmenter-breaking.json's own drill_plan step).",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-param-strip [data-field=\"depth\"] .bsx-stepper-btn:last-child"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 18,
+          "z1": 19,
+          "x2": 24,
+          "z2": 25
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
       "role": "player",
       "expect": {
         "equals": {
@@ -53,6 +89,13 @@
     },
     {
       "command": "charge hole:* explosive:boomite amount:5 stemming:2",
+      "description": "DEFAULT_AMOUNT_KG (5) and DEFAULT_STEMMING_M (2) in Charge.ts already match this command's declared amount/stemming, so no stepper clicks are needed before Charge All.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
       "role": "player",
       "expect": {
         "increased": [
@@ -83,6 +126,12 @@
     },
     {
       "command": "sequence auto delay_step:25",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
       "role": "player",
       "expect": {
         "equals": {
@@ -93,6 +142,28 @@
     {
       "command": "blast",
       "timeout": 30,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
       "role": "player",
       "expect": {
         "equals": {
@@ -106,11 +177,31 @@
     },
     {
       "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ],
       "role": "observe"
     },
     {
       "command": "employee hire role:driver",
       "description": "#553: staffed:true's roster (driller/blaster/driver/driver/driver, ids 1-5 -- STARTING_SITE_STAFFED_COMPOSITION, balance.ts) means this hire is the roster's 6th employee, not its 1st. It also means employees 3-5 already hold driving licences (one driving.truck, two driving.excavator) and vehicle #2 is already a debris_hauler -- this scenario deliberately hires/buys a fresh driver+hauler and addresses both by their explicit new ids (6/5) below rather than \"the first driver\"/\"the first debris_hauler\", which would instead resolve to one of the pre-existing staffed ones.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
       "role": "player",
       "expect": {
         "decreased": [
@@ -124,6 +215,12 @@
     {
       "command": "employee assign_skill 6 skill:driving.truck level:5",
       "description": "Left unmarked: hiring already grants the Rookie driving.truck qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Bootstrap-only primitive (BOOTSTRAP_COMMAND_ALLOWLIST), no UI equivalent by design.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 6 skill:driving.truck level:5"
+        }
+      ],
       "role": "bootstrap",
       "expect": {
         "changedBy": {
@@ -134,6 +231,20 @@
     {
       "command": "vehicle buy debris_hauler",
       "description": "#553: staffed:true's fleet (drill_rig/debris_hauler/rock_digger/rock_fragmenter, ids 1-4) means this purchase is the fleet's 5th vehicle, not its 1st -- and the blast above destroyed the drill_rig (vehicle #1, sitting inside its own hole's blast radius), so vehicleCount goes 3 -> 4, not 0 -> 1.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
+        }
+      ],
       "role": "player",
       "expect": {
         "decreased": [
@@ -146,7 +257,22 @@
     },
     {
       "command": "vehicle driver 5 6",
-      "description": "Vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5.",
+      "description": "Vehicle 5 (the debris_hauler just bought) and employee 6 (the driver just hired) -- staffed:true's fleet/roster occupy ids 1-4/1-5. Employee 3 (staffed:true's own driving.truck-licensed driver, untaken since its original vehicle mount is gone or never filled) sorts ahead of #6 in the driver <select>'s roster-order option list, so the unset dropdown defaults to #3, not #6 -- the explicit 'set' step below picks option value \"6\" before the assign click, matching the console command's own explicit employee id (mirrors hauling-gate.json's own `vehicle driver 5 6` step, which has this identical ambiguity).",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+        },
+        {
+          "type": "set",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] select",
+          "value": "6"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel [data-vehicle-id=\"5\"] .bs-vehicle-assign-btn"
+        }
+      ],
       "role": "player",
       "expect": {
         "changedBy": {
@@ -157,6 +283,29 @@
     {
       "command": "build freight_warehouse at:13,13",
       "description": "Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) -- small relative to the blast's total haulable mass, which is the whole point of this scenario.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 13,
+          "z": 13
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
       "role": "player",
       "expect": {
         "decreased": [
@@ -192,10 +341,22 @@
     },
     {
       "command": "fragments",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "fragments"
+        }
+      ],
       "role": "observe"
     },
     {
       "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
       "role": "observe"
     }
   ]

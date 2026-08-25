@@ -112,7 +112,7 @@ describe('tutorial-steps-visual.json descriptions', () => {
         expect(step.description).toMatch(/all 9 holes/i);
     });
 
-    it('step 29 (blast) description re-derives deathCount:1 against the real footprint, assertion itself untouched', () => {
+    it('step 29 (blast) description re-derives deathCount:0 against the real footprint, assertion itself untouched', () => {
         const { steps } = loadScenarioDef(SCENARIO_NAME);
         const step = findStep(steps, (s) => s.command === 'blast', 'blast');
 
@@ -126,11 +126,28 @@ describe('tutorial-steps-visual.json descriptions', () => {
         expect(step.description).not.toContain('z:20-29');
         expect(step.description).not.toContain('4x4');
 
-        // #689-followup: the drill/charge waits above are now waitUntil-driven
-        // instead of fixed-tick padded, reaching this blast ~350 ticks earlier
-        // (tick 363 instead of 715) -- direct trace confirms the surveyor
-        // survives (idle near the relocated living_quarters) while the driller
-        // still dies at the grid-centre spawn point, so deathCount is 1, not 2.
-        expect(step.expect?.equals?.deathCount).toBe(1);
+        // #707 (converged): forceShiftRestIfNeededByPolicy's (GameLoop.ts)
+        // idle-employee proactive-rest fix changed BOTH employees' fates
+        // here, not just the surveyor's (Walt Dusty) -- Kurt Pickaxe (the
+        // driller) also gets routed away from the grid once idle. A
+        // tick-by-tick command-mode probe from the chargedCount:9 landing
+        // point found deathCount:2 for the first 5 ticks after that point,
+        // deathCount:1 for exactly 1 more tick, and deathCount:0 -- both
+        // employees clear of the blast footprint -- from 6 ticks onward,
+        // continuously through at least 900 ticks past that point. No
+        // nonzero deathCount is a safe target any more: the earlier
+        // #689-followup value (1) was only ever true for a single-tick
+        // window in command mode's own timeline, and interaction mode's own
+        // per-step polling overhead has no reason to land its blast tick in
+        // that same single tick. A new `tick 50` step (between the
+        // chargedCount wait and `event choose 0`) spends 50 idle ticks --
+        // comfortably inside the wide 6-900 safe window, and identical in
+        // both modes since a plain `tick N` with no waitUntil target
+        // advances both trajectories by the same fixed amount -- so this
+        // step's own deathCount converges to 0 in both. See
+        // tutorial-steps-visual.json's own step comments (the new `tick 50`
+        // step and this blast step) for the full account, verified in both
+        // command mode and a real interaction-mode run.
+        expect(step.expect?.equals?.deathCount).toBe(0);
     });
 });
