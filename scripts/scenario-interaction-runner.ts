@@ -75,7 +75,13 @@ export async function runScenarioInteraction(
   viewport: { width: number; height: number },
   enableScreenshots: boolean,
   screenshotDir: string,
+  // Required, not defaulted — every caller must pass the scenario def's own
+  // ScenarioDef.skipBlastPlayback ?? false (#761). No default param here so a
+  // caller that forgets to thread it fails to compile instead of silently
+  // observing playback.
+  skipBlastPlayback: boolean,
 ): Promise<StepResult[]> {
+  void skipBlastPlayback; // TODO(implementer): wire into the post-blast skip call below.
   const outDir = resolve(screenshotDir, `scenario-${name}-interaction`);
   mkdirSync(outDir, { recursive: true });
   const results: StepResult[] = [];
@@ -212,6 +218,9 @@ export async function runScenarioInteraction(
               statePath,
               ...(sizeWarn !== undefined ? { warning: sizeWarn } : {}),
             });
+
+            // TODO(implementer): call window.__skipBlastPlayback() after a successful
+            // blast command when skipBlastPlayback is true.
           })(),
           timeoutPromise,
         ]);

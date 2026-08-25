@@ -320,6 +320,12 @@ export function deserialize(json: string): GameState {
       }
     }
 
+    // ghostPreviewsRevision added alongside the renderer's dirty-check gate
+    // (#761) — a save from before this had no counter at all.
+    if (typeof obj['ghostPreviewsRevision'] !== 'number') {
+      (obj as Record<string, unknown>)['ghostPreviewsRevision'] = 0;
+    }
+
     // A pre-v8 save's dispatched-and-claimed actions (not the self-claimed
     // rest actions handled above) were already deleted from pendingActions by
     // the old bug, so an employee's activeActionId can reference an id no

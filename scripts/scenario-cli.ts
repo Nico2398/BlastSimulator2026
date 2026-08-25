@@ -24,6 +24,7 @@ export interface ParsedArgs {
   mode: string;
   screenshots: boolean;
   reportDrift: boolean;
+  skipBlastPlayback: boolean;
 }
 
 function parseViewsArg(raw: string): ShotDef[] {
@@ -49,6 +50,7 @@ export function parseArgs(): ParsedArgs {
   let mode = 'command'; // default mode
   let screenshots = false;
   let reportDrift = false;
+  let skipBlastPlayback = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -56,6 +58,7 @@ export function parseArgs(): ParsedArgs {
       try {
         const def = loadScenarioDef(name, resolve(process.cwd(), 'scripts/scenario-defs'));
         steps = def.steps;
+        skipBlastPlayback = def.skipBlastPlayback ?? false;
         if (def.shots && Array.isArray(def.shots)) {
           shots = def.shots.map(s => ({
             name: s.name, yaw: s.yaw, pitch: s.pitch,
@@ -127,5 +130,6 @@ export function parseArgs(): ParsedArgs {
     mode,
     screenshots,
     reportDrift,
+    skipBlastPlayback,
   };
 }

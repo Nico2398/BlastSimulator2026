@@ -95,6 +95,11 @@ export class GameRenderer {
   private ghosts: GhostMesh | null = null;
   private taskProgress: TaskProgressBar | null = null;
   private lastGrid: VoxelGrid | null = null;
+  /** Last ghostPreviewsRevision synced — syncEntities() skips ghost-mesh resync when unchanged (#761). */
+  private lastGhostRevision = -1;
+  // TODO: implementer bumps this in remeshTerrainRegion() etc; syncEntities() gates on it (#761).
+  private terrainMeshRevision = 0;
+  private lastSyncedTerrainRevision = -1;
 
   /** Seed of the currently loaded game — used to detect new_game calls. */
   private loadedSeed: number | null = null;
@@ -122,6 +127,21 @@ export class GameRenderer {
   /** ID of the currently-bound VoxelGrid, for diagnostics. Null if no grid is loaded. */
   get lastGridId(): number | null {
     return this.lastGrid?.id ?? null;
+  }
+
+  /** ghostPreviewsRevision last synced by syncEntities(), for diagnostics (#761). -1 before the first sync. */
+  get lastGhostRevisionSynced(): number {
+    return this.lastGhostRevision;
+  }
+
+  /** Current terrain-mesh revision, bumped by remeshTerrainRegion() etc, for diagnostics (#761). */
+  get terrainMeshRevisionCount(): number {
+    return this.terrainMeshRevision;
+  }
+
+  /** terrainMeshRevision last synced by syncEntities(), for diagnostics (#761). -1 before the first sync. */
+  get lastTerrainRevisionSynced(): number {
+    return this.lastSyncedTerrainRevision;
   }
 
   /** Number of task-progress bars currently rendered — for diagnostics. */
