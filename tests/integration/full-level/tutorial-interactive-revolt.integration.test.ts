@@ -32,30 +32,31 @@
 // and asserts no worker_revolt happens before blast, and that well-being
 // never stays pinned at 0 for a full REVOLT_TICKS window.
 //
-// The fix under test (NOT implemented by this file -- TDD Red phase): a new
+// The fix under test required two separate landings, not one. The
 // role:'bootstrap' step granting employee #1 the same `blasting`
 // qualification employee #2 already has (mirroring the file's existing
-// `employee assign_skill 2 skill:blasting level:3` step), so the 9-hole
-// charge order splits across two idle qualified employees instead of
-// grinding through one, keeping the real elapsed charging time short of the
-// revolt collision. This test is run here against the CURRENT (unfixed)
-// tutorial-interactive.json, where only employee #2 ever receives
-// `blasting` -- so it is EXPECTED TO FAIL now (a worker_revolt does happen)
-// and expected to PASS once the bootstrap step lands.
+// `employee assign_skill 2 skill:blasting level:3` step) landed first
+// (4e5846b) and was NOT sufficient on its own: run this test against that
+// commit alone and it still fails with a worker_revolt. The actual
+// dominant cause was deeper -- `forceShiftRestIfNeededByPolicy`
+// (src/core/engine/GameLoop.ts) unconditionally skipped idle employees, so
+// an idle employee under an applied site policy never received proactive
+// rest and crashed to 0 well-being purely from sitting idle, independent
+// of who ended up doing the charging. That fix landed second (e12fad1).
+// Only with both commits does the 9-hole charge order split across two
+// qualified employees *and* the idle one stop crashing to 0 well-being
+// before charging even starts, keeping the real elapsed charging time
+// short of the revolt collision.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, mkdtempSync } from 'fs';
+import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 
 import { createGameEngine, runSteps } from '../../../scripts/shared/command-runner.js';
-import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
 import { tickWithEvents } from './helpers.js';
 import { REVOLT_TICKS } from '../../../src/core/campaign/WorkerRevolt.js';
-
-const currentDir = dirname(fileURLToPath(import.meta.url));
-const SCENARIO_PATH = resolve(currentDir, '../../../scripts/scenario-defs/tutorial-interactive.json');
 
 /**
  * Interaction mode reaches chargedCount:9 ~249 ticks later than command
@@ -72,8 +73,7 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
     'does not trigger a worker_revolt before blast once interaction mode\'s ' +
       'extra grind ticks are reproduced in command mode',
     () => {
-      const def = JSON.parse(readFileSync(SCENARIO_PATH, 'utf-8')) as { steps: ScenarioStepDef[] };
-      const steps = def.steps;
+      const steps = loadScenarioDef('tutorial-interactive', SCENARIO_DIR).steps;
 
       // Locate the two structural anchors this test pads/drives around:
       // "every ordered hole has actually landed" and "blast fired".
