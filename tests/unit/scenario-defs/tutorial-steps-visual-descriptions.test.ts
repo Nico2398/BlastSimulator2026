@@ -112,7 +112,7 @@ describe('tutorial-steps-visual.json descriptions', () => {
         expect(step.description).toMatch(/all 9 holes/i);
     });
 
-    it('step 29 (blast) description re-derives deathCount:1 against the real footprint, assertion itself untouched', () => {
+    it('step 29 (blast) description re-derives deathCount:2 against the real footprint, assertion itself untouched', () => {
         const { steps } = loadScenarioDef(SCENARIO_NAME);
         const step = findStep(steps, (s) => s.command === 'blast', 'blast');
 
@@ -126,11 +126,18 @@ describe('tutorial-steps-visual.json descriptions', () => {
         expect(step.description).not.toContain('z:20-29');
         expect(step.description).not.toContain('4x4');
 
-        // #689-followup: the drill/charge waits above are now waitUntil-driven
-        // instead of fixed-tick padded, reaching this blast ~350 ticks earlier
-        // (tick 363 instead of 715) -- direct trace confirms the surveyor
-        // survives (idle near the relocated living_quarters) while the driller
-        // still dies at the grid-centre spawn point, so deathCount is 1, not 2.
-        expect(step.expect?.equals?.deathCount).toBe(1);
+        // #707: forceShiftRestIfNeededByPolicy (GameLoop.ts) now proactively
+        // rests an idle employee under an applied site policy exactly like a
+        // working one, where before it returned early on activeActionId ===
+        // null. That idle-employee coverage shifts the tick every other
+        // employee's own dispatch lands on for the rest of the run -- the
+        // blast now lands at tick 337 (was 363), and by then the surveyor
+        // (Walt Dusty, also driving the rock_digger on the ramp order) is no
+        // longer idle near living_quarters -- direct trace confirms them
+        // mid-dig, well down the excavated ramp shaft, which channels the
+        // CATASTROPHIC blast's own fragment throw toward them. Both the
+        // surveyor and the driller are dead by this step, so deathCount is
+        // 2, not 1 (#689-followup's own "1" is superseded, not restored).
+        expect(step.expect?.equals?.deathCount).toBe(2);
     });
 });
