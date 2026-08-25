@@ -14,9 +14,10 @@
 // tests/unit/scenario-interaction.test.ts and tests/unit/scenario-test.test.ts
 // already use), so this stays in the `logic` channel.
 //
-// DO NOT implement the wiring here — scenario-interaction-runner.ts's
-// TODO(implementer) comment is deliberately unfilled on this branch. These
-// tests must fail until that TODO is resolved.
+// scenario-interaction-runner.ts's skipBlastPlayback wiring is fully
+// implemented on this branch — these tests exercise the real call site
+// (the page.evaluate(__skipBlastPlayback) call inside the per-step try
+// block, after a successful blast step), not a pending TODO.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
@@ -126,6 +127,29 @@ describe('runScenarioInteraction — skipBlastPlayback wiring (#761)', () => {
     await runScenarioInteraction(
       'tutorial-interactive-fixture',
       [{ command: 'tick 1', role: 'setup' }],
+      [], 5173, undefined, 1, 200,
+      { width: 1280, height: 720 },
+      false, '/tmp/screenshots',
+      true, // skipBlastPlayback
+    );
+
+    const calledWithSkip = fakePage.evaluate.mock.calls.some(call =>
+      String(call[0]).includes('__skipBlastPlayback'),
+    );
+    expect(calledWithSkip).toBe(false);
+  });
+
+  it('never calls window.__skipBlastPlayback() when the blast step itself throws, even when skipBlastPlayback is true', async () => {
+    // The skip call sits inside the same try block as the step's own actions
+    // (scenario-interaction-runner.ts, after `results.push(...)`), so a step
+    // that throws before reaching that line must never reach the skip call
+    // either — this pins that ordering rather than just the flag/command
+    // gating the other cases cover.
+    executeInteractionActionsMock.mockRejectedValueOnce(new Error('step action failed'));
+
+    await runScenarioInteraction(
+      'tutorial-interactive-fixture',
+      [blastStep()],
       [], 5173, undefined, 1, 200,
       { width: 1280, height: 720 },
       false, '/tmp/screenshots',

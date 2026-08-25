@@ -959,9 +959,10 @@ describe('GameRenderer — staged level load (#474)', () => {
 // behind `ghostPreviewsRevision !== lastGhostRevision || terrainMeshRevision
 // !== lastSyncedTerrainRevision` — TaskDispatch.ts bumps ghostPreviewsRevision
 // at its four ghostPreviews-mutating call sites (see
-// tests/unit/engine/TaskDispatch.test.ts's own #761 suite); nothing in this
-// repo yet bumps terrainMeshRevision (the field exists, stubbed at a constant
-// 0, with a TODO(implementer) marking where a future remesh call bumps it).
+// tests/unit/engine/TaskDispatch.test.ts's own #761 suite); GameRenderer.ts
+// bumps terrainMeshRevision at its four remesh call sites (localized and
+// full-rebuild paths in onBlast(), plus the other terrain-mutating call
+// sites), no TODO remains.
 //
 // These assert the gating decision through the three diagnostic getters
 // (lastGhostRevisionSynced / terrainMeshRevisionCount / lastTerrainRevisionSynced)
