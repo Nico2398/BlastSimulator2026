@@ -222,13 +222,13 @@ export async function runScenarioInteraction(
             // (#761) — reaching this line already means the step's own actions
             // ran without throwing, mirroring how src/main.ts's runGameCommand
             // gates its own onBlast() effects on `cmdName === 'blast' &&
-            // result.success`. The verb is read the same simple way: the
-            // step's own `command` field, first whitespace-delimited token —
-            // a player step's `interaction` array never contains a `command`
-            // action (scenario-defs.md), so the step's declared command is the
-            // only place the verb is known in interaction mode.
-            const cmdVerb = step.command.trim().split(/\s+/)[0];
-            if (skipBlastPlayback && cmdVerb === 'blast') {
+            // result.success`. The verb is read via the same `cmdSlug`
+            // (formatCommandSlug's first-token extraction) already computed
+            // above for screenshot/state filenames — a player step's
+            // `interaction` array never contains a `command` action
+            // (scenario-defs.md), so the step's declared command is the only
+            // place the verb is known in interaction mode.
+            if (skipBlastPlayback && cmdSlug === 'blast') {
               await page.evaluate(() => {
                 const w = window as unknown as { __skipBlastPlayback?: () => void };
                 w.__skipBlastPlayback?.();

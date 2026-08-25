@@ -679,6 +679,9 @@ window.__debugGridInfo = () => {
     taskProgressBarCount: gameRenderer.taskProgressBarCount,
     ghostPreviewsInState: ctx.state?.ghostPreviews.length ?? -1,
     surveyOverlayVisible: gameRenderer.surveyOverlayVisible,
+    lastGhostRevisionSynced: gameRenderer.lastGhostRevisionSynced,
+    terrainMeshRevisionCount: gameRenderer.terrainMeshRevisionCount,
+    lastTerrainRevisionSynced: gameRenderer.lastTerrainRevisionSynced,
   };
 };
 
