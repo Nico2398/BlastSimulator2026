@@ -110,6 +110,7 @@ export function dispatchPendingAction(
     targetY: action.targetY,
     claimed: false,
   });
+  state.ghostPreviewsRevision++;
   return { success: true };
 }
 
@@ -136,7 +137,10 @@ export function claimPendingAction(
   action.holderId = employeeId;
 
   const ghost = state.ghostPreviews.find(g => g.id === actionId);
-  if (ghost) ghost.claimed = true;
+  if (ghost) {
+    ghost.claimed = true;
+    state.ghostPreviewsRevision++;
+  }
 
   return action;
 }
@@ -155,7 +159,10 @@ export function completePendingAction(
   const [action] = state.pendingActions.splice(idx, 1);
 
   const ghostIdx = state.ghostPreviews.findIndex(g => g.id === actionId);
-  if (ghostIdx !== -1) state.ghostPreviews.splice(ghostIdx, 1);
+  if (ghostIdx !== -1) {
+    state.ghostPreviews.splice(ghostIdx, 1);
+    state.ghostPreviewsRevision++;
+  }
 
   return action ?? null;
 }
@@ -283,7 +290,10 @@ export function interruptActiveAction(
       action.holderId = null;
 
       const ghost = state.ghostPreviews.find(g => g.id === actionId);
-      if (ghost) ghost.claimed = false;
+      if (ghost) {
+        ghost.claimed = false;
+        state.ghostPreviewsRevision++;
+      }
 
       // releaseVehicleReservation no-ops on its own when nothing is reserved
       // for this action id, so no need to gate the call on requiredVehicleRole.

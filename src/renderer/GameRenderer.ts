@@ -95,6 +95,11 @@ export class GameRenderer {
   private ghosts: GhostMesh | null = null;
   private taskProgress: TaskProgressBar | null = null;
   private lastGrid: VoxelGrid | null = null;
+  /** Last ghostPreviewsRevision synced — syncEntities() skips ghost-mesh resync when unchanged (#761). */
+  private lastGhostRevision = -1;
+  /** Bumped whenever the terrain mesh actually changes (remesh or full rebuild) — syncEntities() gates its ghost resync on it too, since a terrain change can move the surface Y a ghost preview snaps to (#761). */
+  private terrainMeshRevision = 0;
+  private lastSyncedTerrainRevision = -1;
 
   /** Seed of the currently loaded game — used to detect new_game calls. */
   private loadedSeed: number | null = null;
@@ -122,6 +127,21 @@ export class GameRenderer {
   /** ID of the currently-bound VoxelGrid, for diagnostics. Null if no grid is loaded. */
   get lastGridId(): number | null {
     return this.lastGrid?.id ?? null;
+  }
+
+  /** ghostPreviewsRevision last synced by syncEntities(), for diagnostics (#761). -1 before the first sync. */
+  get lastGhostRevisionSynced(): number {
+    return this.lastGhostRevision;
+  }
+
+  /** Current terrain-mesh revision, bumped by remeshTerrainRegion() etc, for diagnostics (#761). */
+  get terrainMeshRevisionCount(): number {
+    return this.terrainMeshRevision;
+  }
+
+  /** terrainMeshRevision last synced by syncEntities(), for diagnostics (#761). -1 before the first sync. */
+  get lastTerrainRevisionSynced(): number {
+    return this.lastSyncedTerrainRevision;
   }
 
   /** Number of task-progress bars currently rendered — for diagnostics. */
@@ -155,6 +175,7 @@ export class GameRenderer {
       // TerrainMesh holds a grid reference — rebind it so it reads from the new grid
       this.terrain?.setGrid(ctx.grid);
       this.terrain?.buildAll();
+      this.terrainMeshRevision++;
       // A differently-sized grid needs a fresh landscape too — same rebuild
       // loadGame() does, but this branch fires even when loadGame() didn't
       // (campaign level swaps grid size while keeping the seed, #458 T3.2).
@@ -228,11 +249,23 @@ export class GameRenderer {
     // (see employees.ts), so at the terrain's actual height that box renders
     // buried inside solid voxels — snap it onto the surface like vehicles and
     // characters above, or the ghost is queued but never visible (#406).
+    //
+    // Gated behind a cheap revision dirty-check (#761): the remap +
+    // GhostMesh.sync() below is wasted work when neither the ghost-preview
+    // queue nor the terrain mesh changed since the last sync — with ~1000
+    // queued previews mid-scenario, resyncing on every unrelated console
+    // command (movement ticks, drilling, etc.) was measurably expensive.
     if (this.ghosts) {
-      const previews = this.lastGrid
-        ? ctx.state.ghostPreviews.map(p => ({ ...p, targetY: this.getTerrainSurfaceY(p.targetX, p.targetZ) }))
-        : ctx.state.ghostPreviews;
-      this.ghosts.sync(previews);
+      const ghostsDirty = ctx.state.ghostPreviewsRevision !== this.lastGhostRevision;
+      const terrainDirty = this.terrainMeshRevision !== this.lastSyncedTerrainRevision;
+      if (ghostsDirty || terrainDirty) {
+        const previews = this.lastGrid
+          ? ctx.state.ghostPreviews.map(p => ({ ...p, targetY: this.getTerrainSurfaceY(p.targetX, p.targetZ) }))
+          : ctx.state.ghostPreviews;
+        this.ghosts.sync(previews);
+        this.lastGhostRevision = ctx.state.ghostPreviewsRevision;
+        this.lastSyncedTerrainRevision = this.terrainMeshRevision;
+      }
     }
 
     // Task progress bars — reflect the current working/idle state each sync (#546)
@@ -718,6 +751,7 @@ export class GameRenderer {
   rebuildTerrain(): void {
     console.log(`[GameRenderer] rebuildTerrain: lastGrid=${this.lastGrid?.id}`);
     this.terrain?.buildAll();
+    this.terrainMeshRevision++;
   }
 
   /**
@@ -728,6 +762,7 @@ export class GameRenderer {
    */
   remeshTerrainRegion(ctx: MiningContext, region: DirtyRegion): void {
     this.terrain?.remeshRegion(region);
+    this.terrainMeshRevision++;
     if (!this.siteBoundsChanged(ctx.grid)) return;
 
     // A claim moves the site's bounding box: the camera leash has to let the
@@ -855,6 +890,7 @@ export class GameRenderer {
     // (#559).
     this.terrain.setEdgeHeightSampler(this.landscapeEdgeHeightSampler(ctx));
     this.terrain.buildAll();
+    this.terrainMeshRevision++;
     this.terrain.sharedMaterial.attachCSM(csm);
 
     // Bind the grid before sampling terrain height below — buildings, vehicles,
@@ -1070,6 +1106,12 @@ export class GameRenderer {
     this.terrain = null;
     this.landscapeHandle = null;
     this.lastCutBounds = '';
+    // Force one resync on the next syncEntities() call after a fresh load —
+    // the reset game state's ghostPreviewsRevision restarts at 0, which would
+    // otherwise equal a stale lastGhostRevision left over from the previous
+    // level (#761).
+    this.lastGhostRevision = -1;
+    this.lastSyncedTerrainRevision = -1;
     this.buildings = null;
     this.vehicles = null;
     this.characters = null;

@@ -20,6 +20,7 @@ import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
+import { GhostMesh } from '../../../src/renderer/GhostMesh.js';
 
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
@@ -186,6 +187,10 @@ describe('GameRenderer — ghost preview positioning (issue #406)', () => {
     const before = new Set(sm.scene.children);
 
     ctx.state!.ghostPreviews.push({ id: 1, type: 'general_work', targetX: 5, targetZ: 5, targetY: 0 });
+    // Real dispatch (TaskDispatch.ts's dispatchPendingAction) bumps this on every
+    // push — this fixture pushes directly, bypassing it, so it must bump the
+    // revision itself or syncFromContext's dirty-check (#761) sees no change.
+    ctx.state!.ghostPreviewsRevision++;
     renderer.syncFromContext(ctx);
 
     expect(renderer.ghostCount).toBe(1);
@@ -943,5 +948,108 @@ describe('GameRenderer — staged level load (#474)', () => {
   it('finishLevelLoad() is a no-op without a loaded state/grid, rather than throwing', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
     expect(() => renderer.finishLevelLoad({ state: null, grid: null, landscape: null, emitter: new EventEmitter() })).not.toThrow();
+  });
+});
+
+// ── Ghost/terrain resync dirty-check gating (#761) ──────────────────────────
+//
+// syncEntities() unconditionally re-syncs ~1000 ghost-preview meshes on
+// every console command today, which is what stalls tutorial-interactive.json
+// at step 37 in interaction mode (30s timeout). The fix gates GhostMesh.sync()
+// behind `ghostPreviewsRevision !== lastGhostRevision || terrainMeshRevision
+// !== lastSyncedTerrainRevision` — TaskDispatch.ts bumps ghostPreviewsRevision
+// at its four ghostPreviews-mutating call sites (see
+// tests/unit/engine/TaskDispatch.test.ts's own #761 suite); GameRenderer.ts
+// bumps terrainMeshRevision at its four remesh call sites (localized and
+// full-rebuild paths in onBlast(), plus the other terrain-mutating call
+// sites), no TODO remains.
+//
+// These assert the gating decision through the three diagnostic getters
+// (lastGhostRevisionSynced / terrainMeshRevisionCount / lastTerrainRevisionSynced)
+// and by spying on GhostMesh.prototype.sync directly — the same seam
+// GameRenderer's other tests already use for onBlast()/spawnFragments above.
+
+describe('GameRenderer — ghost/terrain resync dirty-check gating (#761)', () => {
+  it('lastGhostRevisionSynced starts at -1 before any sync', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    expect(renderer.lastGhostRevisionSynced).toBe(-1);
+  });
+
+  it('lastTerrainRevisionSynced starts at -1 before any sync', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    expect(renderer.lastTerrainRevisionSynced).toBe(-1);
+  });
+
+  it('terrainMeshRevisionCount starts at 0 before any sync', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    expect(renderer.terrainMeshRevisionCount).toBe(0);
+  });
+
+  it('the first syncFromContext() call records the current ghostPreviewsRevision/terrainMeshRevision as synced', () => {
+    const renderer = new GameRenderer(makeMockSceneManager() as any);
+    const ctx = makeCtx();
+    expect(ctx.state!.ghostPreviewsRevision).toBe(0); // fresh GameState default
+
+    renderer.syncFromContext(ctx);
+
+    expect(renderer.lastGhostRevisionSynced).toBe(0);
+    expect(renderer.lastTerrainRevisionSynced).toBe(renderer.terrainMeshRevisionCount);
+  });
+
+  it('GhostMesh.sync() runs on the first syncFromContext() call', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    const syncSpy = vi.spyOn(GhostMesh.prototype, 'sync');
+
+    renderer.syncFromContext(ctx);
+
+    expect(syncSpy).toHaveBeenCalledTimes(1);
+    syncSpy.mockRestore();
+  });
+
+  it('a second syncFromContext() call with unchanged ghostPreviewsRevision and terrainMeshRevision does NOT re-sync ghosts', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx); // first sync — always runs
+    const syncSpy = vi.spyOn(GhostMesh.prototype, 'sync');
+
+    renderer.syncFromContext(ctx); // nothing changed since the first sync
+
+    expect(syncSpy).not.toHaveBeenCalled();
+    syncSpy.mockRestore();
+  });
+
+  it('bumping ghostPreviewsRevision between two syncFromContext() calls triggers a re-sync', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx);
+    const syncSpy = vi.spyOn(GhostMesh.prototype, 'sync');
+
+    // Simulates what TaskDispatch's dispatch/claim/complete/interrupt sites
+    // do to state.ghostPreviewsRevision between two command-driven syncs.
+    ctx.state!.ghostPreviewsRevision += 1;
+    renderer.syncFromContext(ctx);
+
+    expect(syncSpy).toHaveBeenCalledTimes(1);
+    expect(renderer.lastGhostRevisionSynced).toBe(ctx.state!.ghostPreviewsRevision);
+    syncSpy.mockRestore();
+  });
+
+  it('three consecutive unchanged syncFromContext() calls after the first sync ghosts exactly once in total', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    const syncSpy = vi.spyOn(GhostMesh.prototype, 'sync');
+
+    renderer.syncFromContext(ctx);
+    renderer.syncFromContext(ctx);
+    renderer.syncFromContext(ctx);
+    renderer.syncFromContext(ctx);
+
+    expect(syncSpy).toHaveBeenCalledTimes(1);
+    syncSpy.mockRestore();
   });
 });

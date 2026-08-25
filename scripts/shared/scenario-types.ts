@@ -321,6 +321,15 @@ export interface ScenarioDef {
     /** Camera distance from `target`, in world units. Ignored unless `target` is also set. */
     distance?: number;
   }>;
+  /**
+   * Interaction mode default is OBSERVE: a blast's fragment collapse plays out
+   * on screen (window.__skipBlastPlayback is never called). Set true only for
+   * a scenario that has no visual checkpoint over the collapse and would
+   * otherwise pay real wall-clock time for it — e.g. tutorial-interactive.json
+   * (functional/bootstrap flow, not a blast-visual scenario per
+   * dev-testing-strategy's playthrough checkpoint table).
+   */
+  skipBlastPlayback?: boolean;
 }
 
 /**

@@ -192,6 +192,51 @@ describe('deserialize — v7→v8 migration for PendingAction lifecycle (#547)',
   });
 });
 
+// ── GameState.ghostPreviewsRevision backward compat (#761) ──────────────────
+// ghostPreviewsRevision (renderer dirty-check counter, bumped by TaskDispatch
+// on every ghostPreviews mutation) was introduced alongside the v7→v8
+// PendingAction-lifecycle migration — a save from before it existed has no
+// counter at all and must default to 0, matching createGame's own default,
+// rather than deserializing to undefined (which would make every
+// `!==`-based dirty comparison in GameRenderer.syncEntities() true forever).
+
+describe('deserialize — GameState.ghostPreviewsRevision backward compat (#761)', () => {
+  it('a pre-v8 save with no ghostPreviewsRevision field at all deserializes with it defaulting to 0', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 7;
+    delete parsed['ghostPreviewsRevision'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.ghostPreviewsRevision).toBe(0);
+  });
+
+  it('a pre-v8 save never deserializes ghostPreviewsRevision as undefined', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 7;
+    delete parsed['ghostPreviewsRevision'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.ghostPreviewsRevision).not.toBeUndefined();
+    expect(typeof restored.ghostPreviewsRevision).toBe('number');
+  });
+
+  it('a v8+ save that already carries a non-zero ghostPreviewsRevision is left untouched by the migration', () => {
+    const state = createGame({ seed: 42 });
+    state.ghostPreviewsRevision = 7;
+    const json = serialize(state);
+
+    const restored = deserialize(json);
+
+    expect(restored.ghostPreviewsRevision).toBe(7);
+  });
+});
+
 // ── v8→v9 migration for Employee.taskQueue (#549) ───────────────────────────
 // SAVE_VERSION bumped 8→9 when Employee gained a `taskQueue: number[]` field
 // (cost-based per-employee action selection). A save written before that has
