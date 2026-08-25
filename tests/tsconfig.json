@@ -41,6 +41,7 @@
     "./integration/full-level/level3-win.integration.test.ts",
     "./integration/full-level/tutorial-contract-delivery.integration.test.ts",
     "./integration/full-level/tutorial-no-random-events.integration.test.ts",
+    "./integration/full-level/tutorial-interactive-revolt.integration.test.ts",
     "./integration/full-level/tutorial-terrain-coordinates.integration.test.ts",
     "./integration/full-level/tutorial.integration.test.ts",
     "./integration/navmesh.integration.test.ts",

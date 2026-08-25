@@ -1405,15 +1405,35 @@ function forceShiftRestIfNeeded(
  * > 0) forces rest for real, using any living_quarters tier (tier 1
  * included) or resting in place if none exists.
  *
- * Same guard shape as the legacy function: skip an employee already resting
- * (restTicksRemaining !== null), already walking to a queued rest
- * (pendingRestDuration !== null), or currently idle (activeActionId ===
- * null — shouldForceRest's own `isWorking` gate; an idle employee has
- * nothing to interrupt and is handled by the other need-restoration paths
- * instead). shouldForceRest itself then decides, per SitePolicy's rules: a
- * full shift under a timed mode (shift_8h/shift_12h), or hunger/fatigue at
- * or below its effective threshold (custom-mode per-employee overrides via
- * getEffectiveThresholds) for every mode including continuous/custom.
+ * Guards: skip an employee already resting (restTicksRemaining !== null),
+ * already walking to a queued rest (pendingRestDuration !== null), or mid-walk
+ * to board a vehicle from a manual `vehicle driver` command
+ * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
+ * same field, GameLoop.ts's #552 comment) — overwriting activeActionId/
+ * destinationX/Z on that employee here would silently cancel the boarding
+ * walk underneath the player. Otherwise runs for an idle employee
+ * (activeActionId === null) exactly like a working one (#707 fix): earlier
+ * this function returned early on idle, on the reasoning that "an idle
+ * employee has nothing to interrupt and is handled by the other
+ * need-restoration paths instead" — but those other paths
+ * (autoInsertNeedTasks) fire at the much lower reactive NEED_WARNING_THRESHOLDS
+ * (35/25/30), not this policy's own configured (and player-chosen, typically
+ * higher) hungerRestThreshold/fatigueRestThreshold. An idle employee — one
+ * with no active task to interrupt because none exists yet, not one who
+ * chose to slack off — drained on the low reactive threshold instead of the
+ * policy's proactive one, so a long enough idle stretch (no work queued for
+ * them) crashed morale well before any work-driven trigger ever got a
+ * chance, exactly the gap tutorial-interactive.json's own `set_policy
+ * mode:continuous` step means to close ("protects the crew through the grind
+ * that follows") but silently didn't for whichever employee(s) end up
+ * waiting idle rather than working through it. shouldForceRest itself then
+ * decides, per SitePolicy's rules: a full shift under a timed mode
+ * (shift_8h/shift_12h — moot for a genuinely idle employee, since
+ * incrementWorkTick only advances ticksWorked while activeActionId !== null,
+ * so an idle employee's ticksWorked is whatever it was when they last went
+ * idle, not accruing further), or hunger/fatigue at or below its effective
+ * threshold (custom-mode per-employee overrides via getEffectiveThresholds)
+ * for every mode including continuous/custom.
  *
  * Unlike the legacy function (fatigue-only, fixed SHIFT_SLEEP_DURATION_TICKS,
  * tier>=2 only), this routes to the nearest living_quarters of ANY tier
@@ -1438,7 +1458,9 @@ function forceShiftRestIfNeededByPolicy(
   // Already walking to a queued rest — see forceShiftRestIfNeeded's own
   // comment on the same check (#437).
   if (emp.pendingRestDuration !== null) return;
-  if (emp.activeActionId === null) return;
+  // Mid-walk to board a vehicle from a manual `vehicle driver` command —
+  // see this function's own doc comment above (#707).
+  if (emp.pendingDriverVehicleId !== null) return;
 
   const snapshot = { id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked };
   if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
@@ -1456,6 +1478,10 @@ function forceShiftRestIfNeededByPolicy(
   // finishes. interruptActiveAction preserves the in-progress payload
   // (remaining duration, vehicle reservation released) so the same or another
   // qualified employee resumes it later instead of restarting from scratch.
+  // #707: a genuinely idle employee (activeActionId already null) has
+  // nothing to interrupt — interruptActiveAction(state, emp, null) is a safe
+  // no-op in that case (TaskDispatch.ts), so this call is unconditional here
+  // rather than gated on activeActionId !== null.
   const priorActionId = emp.activeActionId;
   interruptActiveAction(state, emp, priorActionId);
 
