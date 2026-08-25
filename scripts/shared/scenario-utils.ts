@@ -10,6 +10,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from './scenario-types.js';
+import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from './scenario-types.js';
 
 export const SCENARIO_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', 'scenario-defs');
 
@@ -165,7 +166,10 @@ export const TIMEOUT_MARGIN_MS = 5000;
  * field is required); `resolveEventIfPending` defaults to 30000
  * (interaction-executor.ts); `clickIfPresent` to 0 (a bare settle, not a
  * wait); `awaitUsable`/`zoomOut`/`focusTile`/`clickEntity` share
- * `DEFAULT_TIMEOUT_MS` = 6000 (interaction-driver.ts).
+ * `DEFAULT_TIMEOUT_MS` = 6000 (interaction-driver.ts). `waitForTutorialStep`
+ * is handled separately below via the shared
+ * `WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS` constant, since its own inner
+ * deadline field is named `timeout`, not `timeoutMs`.
  */
 const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], number>> = {
   resolveEventIfPending: 30000,
@@ -213,10 +217,10 @@ export function effectiveStepTimeoutMs(step: ScenarioStepDef, defaultOuterSecond
     const fallback = DEFAULT_INNER_TIMEOUT_MS[action.type];
     if (action.type === 'waitForTutorialStep') {
       // Own inner deadline field is named `timeout`, not `timeoutMs`
-      // (interaction-executor.ts's `action.timeout ?? 30000`) — recognized
-      // separately from the `timeoutMs`/table branches above, matching that
-      // default exactly so the two stay in lockstep.
-      maxInnerMs = Math.max(maxInnerMs, action.timeout ?? 30000);
+      // (interaction-executor.ts's `action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS`)
+      // — recognized separately from the `timeoutMs`/table branches above,
+      // sharing that same constant so the two stay in lockstep.
+      maxInnerMs = Math.max(maxInnerMs, action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS);
       continue;
     }
     if (explicit === undefined && fallback === undefined) continue;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from '../../../scripts/shared/scenario-types.js';
 import { effectiveStepTimeoutMs, loadScenarioDef, SCENARIO_DIR, TIMEOUT_MARGIN_MS } from '../../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
 
@@ -237,7 +238,7 @@ describe('tutorial-interactive.json — outer step timeout covers every inner wa
     const stepObj = scenario.steps[i] as ScenarioStepDef;
     it(`step[${i}] (${stepObj.description ?? stepObj.command}) — outer timeout covers waitForTutorialStep's inner timeout with margin`, () => {
       const outerMs = effectiveStepTimeoutMs(stepObj, 60);
-      const innerMs = action.timeout ?? 30000;
+      const innerMs = action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS;
       expect(outerMs).toBeGreaterThanOrEqual(innerMs + TIMEOUT_MARGIN_MS);
     });
   });
