@@ -46,11 +46,17 @@ export interface SyncDeps {
   syncSurveyOverlay: (options: SurveyConfidenceOverlayOptions | null) => void;
 }
 
-/** Fields syncGameRendererEntities() mutates that the caller (GameRenderer) must write back. */
+/**
+ * Fields syncGameRendererEntities() mutates that the caller (GameRenderer)
+ * must write back. `lastWeather` is only present when the original's guard
+ * (`this.skybox && ctx.weatherCycle`) would have reassigned it — a
+ * null-skybox/present-weatherCycle call must leave the caller's existing
+ * value untouched, matching the pre-split behaviour exactly.
+ */
 export interface SyncResult {
   lastGhostRevision: number;
   lastSyncedTerrainRevision: number;
-  lastWeather: WeatherState;
+  lastWeather?: WeatherState;
 }
 
 /** Per-call entity/state sync shared by syncFromContext() and finishLevelLoad() (#474, extracted #767). */
@@ -58,7 +64,7 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
   const state = deps.state;
   let lastGhostRevision = deps.lastGhostRevision;
   let lastSyncedTerrainRevision = deps.lastSyncedTerrainRevision;
-  let lastWeather: WeatherState = deps.weatherCycle?.current ?? 'sunny';
+  let lastWeather: WeatherState | undefined;
 
   // Sync entities added since last call
   syncEntitySets(
@@ -144,7 +150,11 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
     buildSurveyOverlayOptions(state, deps.lastGrid),
   );
 
-  return { lastGhostRevision, lastSyncedTerrainRevision, lastWeather };
+  return {
+    lastGhostRevision,
+    lastSyncedTerrainRevision,
+    ...(lastWeather !== undefined ? { lastWeather } : {}),
+  };
 }
 
 /**

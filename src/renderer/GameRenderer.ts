@@ -227,7 +227,11 @@ export class GameRenderer {
     });
     this.lastGhostRevision = result.lastGhostRevision;
     this.lastSyncedTerrainRevision = result.lastSyncedTerrainRevision;
-    this.lastWeather = result.lastWeather;
+    // Matches the pre-split guard (`this.skybox && ctx.weatherCycle`) exactly:
+    // syncGameRendererEntities() only returns lastWeather when that guard held.
+    if (result.lastWeather !== undefined) {
+      this.lastWeather = result.lastWeather;
+    }
   }
 
   /**
@@ -484,19 +488,52 @@ export class GameRenderer {
     this.applySceneSetupDeps(deps);
   }
 
-  /** Threaded into SceneSetupDeps so buildLandscapeMesh can call it without importing GameRendererTerrain.ts's rebuildBorderWall's own module cyclically — both live behind this same-class indirection. */
-  private rebuildBorderWallCallback(ctx: MiningContext): void {
-    const deps = this.terrainDeps();
+  /**
+   * Threaded into SceneSetupDeps so buildLandscapeMesh can call it without
+   * importing GameRendererTerrain.ts's rebuildBorderWall's own module
+   * cyclically — both live behind this same-class indirection. Takes the
+   * in-flight `sceneDeps` (not `this`) so it reads/writes the same object
+   * loadGame()'s chained call is mutating — building a TerrainDeps from
+   * stale `this` fields here caused #767's stale-closure regression.
+   */
+  private rebuildBorderWallCallback(sceneDeps: SceneSetupDeps, ctx: MiningContext): void {
+    const deps = this.terrainDepsFrom(sceneDeps);
     rebuildBorderWall(deps, ctx);
-    this.applyTerrainDeps(deps);
+    this.copyTerrainDepsInto(sceneDeps, deps);
   }
 
   /** Threaded into SceneSetupDeps for the same reason as rebuildBorderWallCallback above. */
-  private siteBoundsChangedCallback(grid: VoxelGrid | null): boolean {
-    const deps = this.terrainDeps();
+  private siteBoundsChangedCallback(sceneDeps: SceneSetupDeps, grid: VoxelGrid | null): boolean {
+    const deps = this.terrainDepsFrom(sceneDeps);
     const changed = siteBoundsChanged(deps, grid);
-    this.applyTerrainDeps(deps);
+    this.copyTerrainDepsInto(sceneDeps, deps);
     return changed;
+  }
+
+  /** Build a TerrainDeps view onto an in-flight SceneSetupDeps's live fields, instead of `this`'s possibly-stale ones. */
+  private terrainDepsFrom(sceneDeps: SceneSetupDeps): TerrainDeps {
+    return {
+      terrain: sceneDeps.terrain,
+      lastGrid: sceneDeps.lastGrid,
+      terrainMeshRevision: sceneDeps.terrainMeshRevision,
+      lastCutBounds: sceneDeps.lastCutBounds,
+      landscape: sceneDeps.landscape,
+      landscapeHandle: sceneDeps.landscapeHandle,
+      borderWall: sceneDeps.borderWall,
+      sm: this.sm,
+      refreshPanLeash: () => this.refreshPanLeash(),
+    };
+  }
+
+  /** Copy a TerrainDeps' mutated fields back onto the in-flight SceneSetupDeps it was built from. */
+  private copyTerrainDepsInto(sceneDeps: SceneSetupDeps, deps: TerrainDeps): void {
+    sceneDeps.terrain = deps.terrain;
+    sceneDeps.lastGrid = deps.lastGrid;
+    sceneDeps.terrainMeshRevision = deps.terrainMeshRevision;
+    sceneDeps.lastCutBounds = deps.lastCutBounds;
+    sceneDeps.landscape = deps.landscape;
+    sceneDeps.landscapeHandle = deps.landscapeHandle;
+    sceneDeps.borderWall = deps.borderWall;
   }
 
   private terrainDeps(): TerrainDeps {
@@ -524,7 +561,7 @@ export class GameRenderer {
   }
 
   private sceneSetupDeps(): SceneSetupDeps {
-    return {
+    const deps: SceneSetupDeps = {
       sm: this.sm,
       terrain: this.terrain,
       buildings: this.buildings,
@@ -557,12 +594,22 @@ export class GameRenderer {
       renderedBuildingIds: this.renderedBuildingIds,
       renderedVehicleIds: this.renderedVehicleIds,
       renderedEmployeeIds: this.renderedEmployeeIds,
-      getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
+      // Placeholders — reassigned below once `deps` exists, so these three
+      // callbacks close over the in-flight `deps` object instead of `this`.
+      // loadGame()'s chained buildPlayableMesh -> buildLandscapeMesh ->
+      // buildAmbient -> frameCameraOnGrid call shares one `deps` without any
+      // intermediate applySceneSetupDeps(), so a `this`-bound callback would
+      // read fields `deps` had already moved past (#767 regression).
+      getTerrainSurfaceY: () => 0,
       landscapeEdgeHeightSampler: ctx => landscapeEdgeHeightSampler(ctx),
       playableCut: grid => playableCut(grid),
-      rebuildBorderWall: ctx => this.rebuildBorderWallCallback(ctx),
-      siteBoundsChanged: grid => this.siteBoundsChangedCallback(grid),
+      rebuildBorderWall: () => {},
+      siteBoundsChanged: () => false,
     };
+    deps.getTerrainSurfaceY = (x, z) => getTerrainSurfaceY(deps.lastGrid, x, z);
+    deps.rebuildBorderWall = ctx => this.rebuildBorderWallCallback(deps, ctx);
+    deps.siteBoundsChanged = grid => this.siteBoundsChangedCallback(deps, grid);
+    return deps;
   }
 
   private applySceneSetupDeps(deps: SceneSetupDeps): void {
