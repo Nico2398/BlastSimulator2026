@@ -6,6 +6,7 @@
 | 2 | 753 | 707 | Written specifically to document exhibit 1. Quoted exhibit 1's own disclaiming sentence as evidence, in plain prose. Merged; same issue ended a second time. |
 | 3 | 641 | 572 | Wrote a genuine, correctly-parsed closing reference. The fix behind it answered a tangent (why the issue's own pipeline run had gone missing) rather than the issue's original report (an unbounded loop, still unguarded in the codebase after this PR merged). |
 | 4 | 754 | 707 | Opened specifically to correct exhibits 1 and 2, with its own new commits and PR body checked clean beforehand. Still ended the same issue a third time — see below. |
+| 5 | (this PR) | 755 | Reproduced exhibit 1's shape deliberately against a throwaway test issue and confirmed the mechanical guard below catches it before merge, rather than documenting the rule a fourth time. |
 
 ## Why exhibits 1 and 2 matter more than they look
 
@@ -25,9 +26,59 @@ The branch that produced exhibit 2 was then updated for exhibit 4 with a merge o
 
 Exhibit 2's PR body also referenced exhibit 3's issue number, written as inline code — a closing-keyword phrase inside backticks. That issue was unaffected. The parser skips code spans and fenced code blocks entirely; that is the one reliable boundary, in a commit message exactly as in a PR body.
 
-## The rule
+## What makes it unnecessary to write around now (issue #755)
 
-Never let a closing keyword sit immediately before a bare `#<number>` anywhere it could end up in the base branch's history — a PR body, a commit message, or a squash-merge message that concatenates one — regardless of grammar:
+Exhibits 1, 2 and 4 all happened because the only defense was a human or agent
+re-reading their own prose and catching a pattern shaped like the one they had
+just been warned about — and each of the three sessions that tried that,
+failed at it. That is not a reliability gap prose can close by being written
+more carefully; it needs a machine reading the text the same way GitHub's
+parser does, before the merge happens rather than after.
+
+Two changes, evaluated together per issue #755's own instructions:
+
+- **A repo setting alone does not cover it.** GitHub has no setting that
+  disables closing-keyword parsing — Settings → General → Pull Requests has no
+  such toggle, confirmed by both a search of GitHub's own documentation and the
+  absence of any matching field on the repository API resource. What the repo
+  *does* control is which text becomes a squash commit's message:
+  `squash_merge_commit_message` is `COMMIT_MESSAGES` (concatenates every
+  constituent commit message verbatim — exactly the mechanism exhibit 4 used to
+  carry a stale commit message forward). Switching it to `PR_BODY` would close
+  exhibit 4's specific vector for a squash merge — recorded as a decision under
+  `## Decisions taken` on the PR for #755, not applied by that run itself,
+  because a repository-settings write needs the `Administration` permission and
+  the pipeline's token carries only `contents`/`pull-requests`/`issues` write.
+  Even applied, it would not be complete: this repo still allows merge-commit
+  and rebase-merge, both of which land every constituent commit message on
+  `main` verbatim regardless of this setting, and exhibits 1 and 2 were never a
+  commit-message problem in the first place — they were the PR body itself. The
+  setting narrows the surface; it does not obsolete a check on the text.
+- **A required CI check reads the PR the same way the parser does.**
+  `.github/workflows/agentic-closing-keyword-guard.yml` runs
+  `.github/scripts/check-closing-keywords.cjs` against the PR title, the PR
+  body, and every commit message in the PR's range on every open/edit/push —
+  matching `close[sd]?/fix(es|ed)?/resolve[sd]?\s+#\d+` outside fenced and
+  inline code spans, exempting only a line whose entire content is a
+  standalone closing directive (`Closes #<N>`, the pipeline's own convention).
+  A match anywhere else fails the check — including a correct reference to the
+  right issue, if it is not written as that standalone line, because the
+  incidents were never about the wrong number, they were about the phrase
+  appearing where a reader parses it as prose rather than as a deliberate
+  directive. No branch protection rule was added for it: `agentic-auto-merge`
+  and `scripts/await-pr-ci.ts` already read every workflow run on a PR's head
+  and treat any reported failure as red, so a new required-shaped workflow is
+  enough on its own.
+
+## Manual defense in depth
+
+The guard above is what actually stops a fifth exhibit; the checklist below is
+what to do by hand in the rare case something reaches the base branch outside
+a pull request the guard could see (a direct push, a squash performed outside
+the pipeline's own tooling). Never let a closing keyword sit immediately
+before a bare `#<number>` anywhere it could end up in the base branch's
+history — a PR body, a commit message, or a squash-merge message that
+concatenates one — regardless of grammar:
 
 - Rephrase so the keyword and the number are not adjacent, in every commit message as much as the PR body.
 - If the literal phrase must appear — quoting another PR, demonstrating the pattern — wrap the whole keyword-plus-number phrase in one code span or fenced block, in the commit message too, not only where it is later quoted.
