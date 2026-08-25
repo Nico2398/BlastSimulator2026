@@ -187,6 +187,10 @@ describe('GameRenderer — ghost preview positioning (issue #406)', () => {
     const before = new Set(sm.scene.children);
 
     ctx.state!.ghostPreviews.push({ id: 1, type: 'general_work', targetX: 5, targetZ: 5, targetY: 0 });
+    // Real dispatch (TaskDispatch.ts's dispatchPendingAction) bumps this on every
+    // push — this fixture pushes directly, bypassing it, so it must bump the
+    // revision itself or syncFromContext's dirty-check (#761) sees no change.
+    ctx.state!.ghostPreviewsRevision++;
     renderer.syncFromContext(ctx);
 
     expect(renderer.ghostCount).toBe(1);

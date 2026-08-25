@@ -81,7 +81,6 @@ export async function runScenarioInteraction(
   // observing playback.
   skipBlastPlayback: boolean,
 ): Promise<StepResult[]> {
-  void skipBlastPlayback; // TODO(implementer): wire into the post-blast skip call below.
   const outDir = resolve(screenshotDir, `scenario-${name}-interaction`);
   mkdirSync(outDir, { recursive: true });
   const results: StepResult[] = [];
@@ -219,8 +218,22 @@ export async function runScenarioInteraction(
               ...(sizeWarn !== undefined ? { warning: sizeWarn } : {}),
             });
 
-            // TODO(implementer): call window.__skipBlastPlayback() after a successful
-            // blast command when skipBlastPlayback is true.
+            // Skip the fragment-collapse playback after a successful blast step
+            // (#761) — reaching this line already means the step's own actions
+            // ran without throwing, mirroring how src/main.ts's runGameCommand
+            // gates its own onBlast() effects on `cmdName === 'blast' &&
+            // result.success`. The verb is read the same simple way: the
+            // step's own `command` field, first whitespace-delimited token —
+            // a player step's `interaction` array never contains a `command`
+            // action (scenario-defs.md), so the step's declared command is the
+            // only place the verb is known in interaction mode.
+            const cmdVerb = step.command.trim().split(/\s+/)[0];
+            if (skipBlastPlayback && cmdVerb === 'blast') {
+              await page.evaluate(() => {
+                const w = window as unknown as { __skipBlastPlayback?: () => void };
+                w.__skipBlastPlayback?.();
+              });
+            }
           })(),
           timeoutPromise,
         ]);
