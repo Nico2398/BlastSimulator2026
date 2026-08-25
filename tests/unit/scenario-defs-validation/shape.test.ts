@@ -187,3 +187,30 @@ describe('Visual scenarios have valid shots array', () => {
     });
   }
 });
+
+// ──────────────────────────────────────────────
+// 11. skipBlastPlayback (#761) is a boolean when present, and absent from
+//     every scenario except the one that opts in
+// ──────────────────────────────────────────────
+describe('Scenario skipBlastPlayback field is a boolean when present (#761)', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — skipBlastPlayback is boolean, or absent`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR) as ScenarioDef;
+      if (scenario.skipBlastPlayback === undefined) return; // absent is valid
+      expect(typeof scenario.skipBlastPlayback).toBe('boolean');
+    });
+  }
+
+  it('tutorial-interactive — opts in with skipBlastPlayback: true (functional/bootstrap flow, no blast-visual checkpoint)', () => {
+    const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR) as ScenarioDef;
+    expect(scenario.skipBlastPlayback).toBe(true);
+  });
+
+  it('every scenario other than tutorial-interactive omits skipBlastPlayback (interaction mode default: OBSERVE the collapse)', () => {
+    for (const name of ALL_SCENARIO_NAMES) {
+      if (name === 'tutorial-interactive') continue;
+      const scenario = loadScenarioDef(name, SCENARIO_DIR) as ScenarioDef;
+      expect(scenario.skipBlastPlayback, `${name} unexpectedly sets skipBlastPlayback`).toBeUndefined();
+    }
+  });
+});

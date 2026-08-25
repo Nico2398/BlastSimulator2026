@@ -1003,3 +1003,145 @@ describe('interruptActiveAction (#549)', () => {
     expect(stored.payload.durationTicks).toBeUndefined();
   });
 });
+
+// ── Section 8: ghostPreviewsRevision dirty-check counter (#761) ─────────────
+//   GameRenderer.syncEntities() re-syncs ~1000 ghost-preview meshes on every
+//   console command unconditionally today, which stalls interaction-mode
+//   scenarios (issue #761). The fix gates that resync on a monotonic
+//   revision counter TaskDispatch bumps at its four ghostPreviews-mutating
+//   sites: dispatchPendingAction (the push), claimPendingAction,
+//   completePendingAction, and interruptActiveAction. These tests describe
+//   the counter's contract independent of the renderer — GameRenderer's own
+//   gating is covered separately in tests/unit/renderer/GameRenderer.test.ts.
+
+describe('GameState.ghostPreviewsRevision (#761)', () => {
+  it('starts at 0 on a fresh GameState', () => {
+    const state = makeGame();
+    expect(state.ghostPreviewsRevision).toBe(0);
+  });
+});
+
+describe('ghostPreviewsRevision — bumped by exactly the four ghostPreviews-mutating call sites (#761)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('dispatchPendingAction increments ghostPreviewsRevision by exactly 1 on a successful dispatch', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const before = state.ghostPreviewsRevision;
+
+    dispatchPendingAction(state, makePendingAction({ id: 100, requiredSkill: 'blasting' }));
+
+    expect(state.ghostPreviewsRevision).toBe(before + 1);
+  });
+
+  it('a rejected dispatch (no qualified employee, nothing pushed) leaves ghostPreviewsRevision unchanged', () => {
+    const before = state.ghostPreviewsRevision;
+
+    dispatchPendingAction(state, makePendingAction({ id: 101, requiredSkill: 'blasting' }));
+
+    expect(state.ghostPreviewsRevision).toBe(before);
+  });
+
+  it('claimPendingAction increments ghostPreviewsRevision by exactly 1', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    dispatchPendingAction(state, makePendingAction({ id: 102, requiredSkill: 'blasting' }));
+    const before = state.ghostPreviewsRevision;
+
+    claimPendingAction(state, 102, 999);
+
+    expect(state.ghostPreviewsRevision).toBe(before + 1);
+  });
+
+  it('a no-op claim (unknown action id) leaves ghostPreviewsRevision unchanged', () => {
+    const before = state.ghostPreviewsRevision;
+
+    claimPendingAction(state, 9999, 1);
+
+    expect(state.ghostPreviewsRevision).toBe(before);
+  });
+
+  it('completePendingAction increments ghostPreviewsRevision by exactly 1', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    dispatchPendingAction(state, makePendingAction({ id: 103, requiredSkill: 'blasting' }));
+    const before = state.ghostPreviewsRevision;
+
+    completePendingAction(state, 103);
+
+    expect(state.ghostPreviewsRevision).toBe(before + 1);
+  });
+
+  it('a no-op complete (unknown action id) leaves ghostPreviewsRevision unchanged', () => {
+    const before = state.ghostPreviewsRevision;
+
+    completePendingAction(state, 9999);
+
+    expect(state.ghostPreviewsRevision).toBe(before);
+  });
+
+  it('interruptActiveAction increments ghostPreviewsRevision by exactly 1 when releasing a claimed action', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const action = makePendingAction({ id: 104, requiredSkill: 'blasting', targetX: 5, targetZ: 6 });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 104, empId, {
+      targetX: 5, targetZ: 6, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    const before = state.ghostPreviewsRevision;
+
+    interruptActiveAction(state, emp, 104);
+
+    expect(state.ghostPreviewsRevision).toBe(before + 1);
+  });
+
+  it('interruptActiveAction(actionId: null) touches no ghost and leaves ghostPreviewsRevision unchanged', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const emp = state.employees.employees[0]!;
+    const before = state.ghostPreviewsRevision;
+
+    interruptActiveAction(state, emp, null);
+
+    expect(state.ghostPreviewsRevision).toBe(before);
+  });
+
+  it('interruptActiveAction on an already-completed (removed) action leaves ghostPreviewsRevision unchanged beyond the completion itself', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const action = makePendingAction({ id: 106, requiredSkill: 'blasting' });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 106, empId, {
+      targetX: 10, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    completePendingAction(state, 106);
+    const before = state.ghostPreviewsRevision;
+
+    interruptActiveAction(state, emp, 106);
+
+    expect(state.ghostPreviewsRevision).toBe(before);
+  });
+
+  it('an unrelated state mutation (advancing tickCount/time, no ghost-preview mutation) does not change ghostPreviewsRevision', () => {
+    const before = state.ghostPreviewsRevision;
+
+    state.tickCount += 1;
+    state.time += 1000;
+
+    expect(state.ghostPreviewsRevision).toBe(before);
+  });
+
+  it('accumulates exactly one increment per mutating call across a dispatch → claim → complete cycle', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const before = state.ghostPreviewsRevision;
+
+    dispatchPendingAction(state, makePendingAction({ id: 105, requiredSkill: 'blasting' })); // +1
+    claimPendingAction(state, 105, empId); // +1
+    completePendingAction(state, 105); // +1
+
+    expect(state.ghostPreviewsRevision).toBe(before + 3);
+  });
+});
