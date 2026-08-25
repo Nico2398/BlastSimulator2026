@@ -157,7 +157,7 @@ export function formatScenarioViolations<V extends ScenarioViolation>(
  * outer race (setTimeout vs. the inner action's own deadline check) cannot
  * land close enough for scheduling jitter to flip which one fires first.
  */
-const TIMEOUT_MARGIN_MS = 5000;
+export const TIMEOUT_MARGIN_MS = 5000;
 
 /**
  * Effective inner deadline when an action's own `timeoutMs` is absent. Must
@@ -211,6 +211,14 @@ export function effectiveStepTimeoutMs(step: ScenarioStepDef, defaultOuterSecond
     // table entry — has no timeoutMs concept and is skipped.
     const explicit = 'timeoutMs' in action ? action.timeoutMs : undefined;
     const fallback = DEFAULT_INNER_TIMEOUT_MS[action.type];
+    if (action.type === 'waitForTutorialStep') {
+      // Own inner deadline field is named `timeout`, not `timeoutMs`
+      // (interaction-executor.ts's `action.timeout ?? 30000`) — recognized
+      // separately from the `timeoutMs`/table branches above, matching that
+      // default exactly so the two stay in lockstep.
+      maxInnerMs = Math.max(maxInnerMs, action.timeout ?? 30000);
+      continue;
+    }
     if (explicit === undefined && fallback === undefined) continue;
     maxInnerMs = Math.max(maxInnerMs, explicit ?? fallback ?? 0);
   }
