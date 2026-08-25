@@ -35,11 +35,10 @@ vi.mock('fs', async (importOriginal) => {
 // any variable a factory closes over must itself be declared through
 // vi.hoisted() — a plain `const` here would throw "Cannot access before
 // initialization" the moment the mocked module is imported.
-const { fakeBrowser, fakePageRef, initBrowserMock, executeInteractionActionsMock, suspendDrawingMock, waitOneFrameMock, captureFrameMock } = vi.hoisted(() => {
+const { fakePageRef, initBrowserMock, executeInteractionActionsMock, suspendDrawingMock, waitOneFrameMock, captureFrameMock } = vi.hoisted(() => {
   const fakeBrowser = { close: vi.fn(async () => {}) };
-  const fakePageRef: { current: { evaluate: ReturnType<typeof vi.fn> } | null } = { current: null };
+  const fakePageRef: { current: { evaluate: ReturnType<typeof vi.fn<any[], Promise<undefined>>> } | null } = { current: null };
   return {
-    fakeBrowser,
     fakePageRef,
     initBrowserMock: vi.fn(async () => ({ browser: fakeBrowser, page: fakePageRef.current })),
     executeInteractionActionsMock: vi.fn(async () => ({
@@ -54,7 +53,7 @@ const { fakeBrowser, fakePageRef, initBrowserMock, executeInteractionActionsMock
   };
 });
 
-let fakePage: { evaluate: ReturnType<typeof vi.fn> };
+let fakePage: { evaluate: ReturnType<typeof vi.fn<any[], Promise<undefined>>> };
 
 vi.mock('../../../scripts/shared/puppeteer-utils.js', () => ({
   initBrowser: initBrowserMock,
