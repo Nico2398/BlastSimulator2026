@@ -838,15 +838,15 @@
       }
     },
     {
-      "command": "wait_until field:tickCount equals:300 max_ticks:90",
+      "command": "wait_until field:tickCount equals:320 max_ticks:90",
       "timeout": 60,
-      "description": "#689-followup: the build-living-quarters relocation (13,4 -> 18,14, this file's own earlier steps) shortens the crew's commute enough to clear the drilling deadlock, but it also shifts every tick landing downstream of it -- this step now lands at tick 340 instead of the pre-relocation value, and the contract offer pool (REFRESH_INTERVAL=20 ticks, Contract.ts) doesn't happen to carry a rubble_disposal offer at that exact tick (8 ore_sale offers, no rubble_disposal, direct trace). rubble_disposal is the one contract type this file can actually deliver later (consumeStoredOre() draws on raw storedMassKg, which the debris hauler fills; ore_sale/supply need specific ore this hauler never produces) -- not a type this step can simply switch away from the way level2-playthrough-win.json's own accept steps do. #707: retargeted 400 -> 300 -- granting employee #1 blasting (new bootstrap step above, before drill_plan) lets them share the 9 charge_hole dispatches with the driller instead of the driller carrying all 9 alone, so charging now finishes by tick 288 (command mode) instead of ~340, and this step's own entry tick drops with it. Direct trace (command mode) confirms the pool carries a rubble_disposal offer continuously from tick 289 through tick 339 (8-offer pool, one rubble_disposal slot, evicted at 340) -- 300 sits well inside that window with margin on both sides, still deterministic given the fixed seed. No state-dump field for 'a rubble_disposal offer exists' to wait on directly, same as before.",
+      "description": "#689-followup: the build-living-quarters relocation (13,4 -> 18,14, this file's own earlier steps) shortens the crew's commute enough to clear the drilling deadlock, but it also shifts every tick landing downstream of it -- this step now lands at tick 340 instead of the pre-relocation value, and the contract offer pool (REFRESH_INTERVAL=20 ticks, Contract.ts) doesn't happen to carry a rubble_disposal offer at that exact tick (8 ore_sale offers, no rubble_disposal, direct trace). rubble_disposal is the one contract type this file can actually deliver later (consumeStoredOre() draws on raw storedMassKg, which the debris hauler fills; ore_sale/supply need specific ore this hauler never produces) -- not a type this step can simply switch away from the way level2-playthrough-win.json's own accept steps do. #707: retargeted 400 -> 300 -- granting employee #1 blasting (new bootstrap step above, before drill_plan) lets them share the 9 charge_hole dispatches with the driller instead of the driller carrying all 9 alone, so charging now finishes by tick 288 (command mode) instead of ~340, and this step's own entry tick drops with it. Direct trace (command mode) confirms the pool carries a rubble_disposal offer continuously from tick 289 through tick 339 (8-offer pool, one rubble_disposal slot, evicted at 340) -- 300 sits well inside that window with margin on both sides, still deterministic given the fixed seed. No state-dump field for 'a rubble_disposal offer exists' to wait on directly, same as before. #707 follow-up (this fix): the real root cause of #707's worker_revolt was `forceShiftRestIfNeededByPolicy` (GameLoop.ts) silently skipping idle employees, leaving them to the much-lower reactive NEED_WARNING_THRESHOLDS instead of the site policy's own proactive thresholds -- fixed in core, not this file. That core fix makes idle employees rest proactively more often, which costs a few extra real ticks: this step's own entry tick moves from 288 to 303 (command mode, direct trace). The contract offer pool's rubble_disposal window shifts with it, now continuous from tick 304 through tick 339 (evicted at 340, same 20-tick refresh cadence) -- retargeted 300 -> 320 to keep comfortable margin on both sides of the new window (16 ticks above the floor, 19 below the eviction) instead of sitting right at its old edge.",
       "role": "setup",
       "interaction": [
         {
           "type": "waitUntil",
           "field": "tickCount",
-          "equals": 300,
+          "equals": 320,
           "maxTicks": 90,
           "timeoutMs": 60000
         }
@@ -854,7 +854,7 @@
       "expect": {
         "tutorialStep": "contract-accept",
         "equals": {
-          "tickCount": 300
+          "tickCount": 320
         }
       }
     },
