@@ -1124,4 +1124,82 @@ describe('GameRenderer — ghost/terrain resync dirty-check gating (#761)', () =
     expect(syncSpy).toHaveBeenCalledTimes(1);
     syncSpy.mockRestore();
   });
+
+  it("clearAll()'s reset stops a stale lastGhostRevision from colliding with the next fresh GameState's own ghostPreviewsRevision (#769 regression)", () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx1 = makeCtx();
+    renderer.syncFromContext(ctx1); // real load — creates a real GhostMesh via buildPlayableMesh()
+
+    // Simulate the exact bookkeeping state a previous game/level could leave
+    // this renderer in: a nonzero leftover ghost revision, and — because
+    // buildPlayableMesh() always bumps terrainMeshRevision in the same call
+    // that runs clearAll() (GameRendererSceneSetup.ts:122,134) —
+    // `ghostsDirty || terrainDirty` (GameRendererSync.ts:112-113) would
+    // otherwise force the next resync via the terrain half regardless of
+    // whether the ghost fix exists. Poke terrainMeshRevision and
+    // lastSyncedTerrainRevision to the exact pair clearAll()'s own reset
+    // will leave them at, so only the ghost check under test can move the
+    // needle.
+    (renderer as any).lastGhostRevision = 3;
+    (renderer as any).terrainMeshRevision = -1;
+    (renderer as any).lastSyncedTerrainRevision = -1;
+
+    (renderer as any).clearAll(); // the real #761 call site
+
+    // These are the assertions that actually fail if the two reset lines
+    // in clearAll() are removed — lastGhostRevisionSynced would stay 3.
+    expect(renderer.lastGhostRevisionSynced).toBe(-1);
+    expect(renderer.lastTerrainRevisionSynced).toBe(-1);
+    expect(renderer.terrainMeshRevisionCount).toBe(-1); // untouched by clearAll() — confirms the isolation above held
+
+    // clearAll() disposes and nulls the ghost mesh; buildPlayableMesh()
+    // recreates it in the same call in production — mirror that so the
+    // next sync has something to resync.
+    (renderer as any).ghosts = new GhostMesh(sm.scene);
+    const syncSpy = vi.spyOn(GhostMesh.prototype, 'sync');
+
+    const ctx2: MiningContext = {
+      state: createGame({ seed: 99, startingCash: 100_000 }),
+      grid: ctx1.grid,
+      emitter: new EventEmitter(),
+    };
+    expect(ctx2.state!.ghostPreviewsRevision).toBe(0); // fresh GameState default — the exact value the code comment names
+
+    (renderer as any).syncEntities(ctx2); // syncFromContext()'s per-call sync, without retriggering loadGame()
+
+    expect(syncSpy).toHaveBeenCalledTimes(1);
+    syncSpy.mockRestore();
+  });
+
+  it('a real level swap (different seed) still resyncs ghost previews for the newly-loaded GameState (#769, end-to-end companion)', () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+
+    const ctx1 = makeCtx();
+    renderer.syncFromContext(ctx1);
+    // Dispatch/claim-style activity (TaskDispatch.ts's #761 call sites)
+    // advances ghostPreviewsRevision past 0 over the course of the session.
+    ctx1.state!.ghostPreviewsRevision += 1;
+    renderer.syncFromContext(ctx1);
+    ctx1.state!.ghostPreviewsRevision += 1;
+    renderer.syncFromContext(ctx1);
+    expect(renderer.lastGhostRevisionSynced).toBe(2);
+
+    // A second, freshly-created GameState — a real level swap or "New
+    // Game" — its own ghostPreviewsRevision starting at 0 again.
+    const ctx2: MiningContext = {
+      state: createGame({ seed: 7, startingCash: 100_000 }),
+      grid: new VoxelGrid(32, 16, 32),
+      emitter: new EventEmitter(),
+    };
+    expect(ctx2.state!.ghostPreviewsRevision).toBe(0);
+
+    const syncSpy = vi.spyOn(GhostMesh.prototype, 'sync');
+    renderer.syncFromContext(ctx2); // different seed → loadGame() → clearAll()
+
+    expect(syncSpy).toHaveBeenCalledTimes(1);
+    expect(renderer.lastGhostRevisionSynced).toBe(0);
+    syncSpy.mockRestore();
+  });
 });
