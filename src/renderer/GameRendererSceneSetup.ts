@@ -243,6 +243,22 @@ export function buildLandscapeMesh(deps: SceneSetupDeps, ctx: MiningContext): vo
 }
 
 /**
+ * Dispose the 6 per-biome/per-level ambient modules, shared by buildAmbient()
+ * (which immediately rebuilds all 6 afterward) and clearAll() (which nulls
+ * them afterward) — both need the same stale-instance teardown so meshes from
+ * the previous grid don't pile up in the scene. Pre-existing duplication in
+ * the original monolith, extracted here (#767 refactor pass).
+ */
+function disposeAmbientModules(deps: Pick<SceneSetupDeps, 'birds' | 'smoke' | 'water' | 'vegetation' | 'dustDevils' | 'fireflies'>): void {
+  deps.birds?.dispose();
+  deps.smoke?.dispose();
+  deps.water?.dispose();
+  deps.vegetation?.dispose();
+  deps.dustDevils?.dispose();
+  deps.fireflies?.dispose();
+}
+
+/**
  * Stage 3 of a level load (#474): birds, chimney smoke, water, vegetation
  * sway, and the per-biome dust-devil/firefly extras — rebuilt from the
  * landscape's own StructureSet every time this runs (a campaign level swap
@@ -258,12 +274,7 @@ export function buildAmbient(deps: SceneSetupDeps, ctx: MiningContext): void {
   if (!biome) return;
   const handle = ctx.landscape;
 
-  deps.birds?.dispose();
-  deps.smoke?.dispose();
-  deps.water?.dispose();
-  deps.vegetation?.dispose();
-  deps.dustDevils?.dispose();
-  deps.fireflies?.dispose();
+  disposeAmbientModules(deps);
   const centerX = ctx.grid.minX + ctx.grid.sizeX / 2;
   const centerZ = ctx.grid.minZ + ctx.grid.sizeZ / 2;
   const sampleHeight = (x: number, z: number) => handle.sampleColumn(x, z).height;
@@ -332,12 +343,7 @@ export function clearAll(deps: SceneSetupDeps): void {
   deps.clouds?.dispose();
   if (deps.borderWall) deps.sm.postPipeline.removeOverlayObject(deps.borderWall.object3d);
   deps.borderWall?.dispose();
-  deps.birds?.dispose();
-  deps.smoke?.dispose();
-  deps.water?.dispose();
-  deps.vegetation?.dispose();
-  deps.dustDevils?.dispose();
-  deps.fireflies?.dispose();
+  disposeAmbientModules(deps);
   deps.fragments?.dispose();
   deps.blastEffects?.dispose();
   deps.landscape?.dispose();
