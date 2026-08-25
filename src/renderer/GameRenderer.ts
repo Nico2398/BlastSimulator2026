@@ -1,67 +1,61 @@
 // BlastSimulator2026 — Game Renderer
 // Bridges MiningContext (game state) to all Three.js sub-renderers.
 // Call syncFromContext() after each console command; update() each frame.
+//
+// Split (#767) into GameRendererSync/Terrain/SceneSetup/BlastVisuals/Picking —
+// this file keeps every field, every public method's exact signature, and
+// update() (genuinely cross-cutting, touches nearly every sub-renderer each
+// frame). Every extracted method becomes a thin wrapper: build a `*Deps`
+// object from `this`, call the pure function, write whatever it mutated back
+// onto `this`.
 
 import * as THREE from 'three';
 import type { MiningContext } from '../console/commands/mining.js';
-import { ensureLandscape, type LandscapeHandle } from '../console/commands/world.js';
+import type { LandscapeHandle } from '../console/commands/world.js';
 import type { GameState } from '../core/state/GameState.js';
-import { type VoxelGrid, computeVoxelColumnSurfaceY, computeVoxelColumnSurfaceHeight } from '../core/world/VoxelGrid.js';
-import { getBiome } from '../core/world/BiomeCatalog.js';
+import type { VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherState } from '../core/weather/WeatherCycle.js';
-import { BIOME_GRADES, NEUTRAL_GRADE } from './post/AerialPerspectivePass.js';
 import type { SceneManager } from './SceneManager.js';
-import { TerrainMesh, type DirtyRegion } from './TerrainMesh.js';
-import { BuildingMesh } from './BuildingMesh.js';
-import { VehicleMesh } from './VehicleMesh.js';
-import { CharacterMesh } from './CharacterMesh.js';
-import { SkyboxWeather } from './SkyboxWeather.js';
-import { WindState } from './ambient/WindState.js';
-import { CloudLayer } from './ambient/CloudLayer.js';
-import { BirdFlocks } from './ambient/BirdFlocks.js';
-import { ChimneySmoke } from './ambient/ChimneySmoke.js';
-import { WaterSurface } from './ambient/WaterSurface.js';
-import { VegetationSway } from './ambient/VegetationSway.js';
-import { DustDevils } from './ambient/DustDevils.js';
-import { Fireflies } from './ambient/Fireflies.js';
+import type { TerrainMesh, DirtyRegion } from './TerrainMesh.js';
+import type { BuildingMesh } from './BuildingMesh.js';
+import type { VehicleMesh } from './VehicleMesh.js';
+import type { CharacterMesh } from './CharacterMesh.js';
+import type { SkyboxWeather } from './SkyboxWeather.js';
+import type { WindState } from './ambient/WindState.js';
+import type { CloudLayer } from './ambient/CloudLayer.js';
+import type { BirdFlocks } from './ambient/BirdFlocks.js';
+import type { ChimneySmoke } from './ambient/ChimneySmoke.js';
+import type { WaterSurface } from './ambient/WaterSurface.js';
+import type { VegetationSway } from './ambient/VegetationSway.js';
+import type { DustDevils } from './ambient/DustDevils.js';
+import type { Fireflies } from './ambient/Fireflies.js';
 import { createAmbientUniforms, type AmbientUniforms } from './ambient/AmbientUniforms.js';
-import { FragmentMesh } from './FragmentMesh.js';
-import { BlastEffects } from './BlastEffects.js';
-import { FragmentAnimator } from './FragmentAnimator.js';
-import { LandscapeMesh, type PlayableCut } from './terrain/LandscapeMesh.js';
-import { WorldBorderWall } from './WorldBorderWall.js';
-import { BlastPlanOverlay } from './BlastPlanOverlay.js';
-import { GhostMesh } from './GhostMesh.js';
-import { TaskProgressBar } from './TaskProgressBar.js';
-import { syncEntitySets, buildingCenterSurfaceY } from './EntitySync.js';
-import type { SurveyConfidenceOverlayOptions, SurveyConfidencePoint } from './SurveyConfidenceOverlay.js';
-import { isSurveyStale } from '../core/mining/SurveyCalc.js';
+import type { FragmentMesh } from './FragmentMesh.js';
+import type { BlastEffects } from './BlastEffects.js';
+import type { FragmentAnimator } from './FragmentAnimator.js';
+import type { LandscapeMesh } from './terrain/LandscapeMesh.js';
+import type { WorldBorderWall } from './WorldBorderWall.js';
+import type { BlastPlanOverlay } from './BlastPlanOverlay.js';
+import type { GhostMesh } from './GhostMesh.js';
+import type { TaskProgressBar } from './TaskProgressBar.js';
+import type { SurveyConfidenceOverlayOptions } from './SurveyConfidenceOverlay.js';
+
+import { syncGameRendererEntities, syncSurveyOverlay, buildSurveyOverlayOptions } from './GameRendererSync.js';
 import {
-  BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
-  BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
-} from '../core/config/balance.js';
-import { isInZone } from '../core/entities/Zone.js';
-import { assembleBlastPlan } from '../core/mining/BlastPlan.js';
-import { previewHoleDetails } from '../core/mining/Software.js';
-import { boundingBoxXZ, getBlastOriginSurfaceY } from './BlastOriginSampling.js';
-
-/**
- * How far past the playable rect manual panning may wander (#458 T6.1/D13:
- * "pan gets a soft leash to the playable rect ± margin"). No exact figure is
- * specified in the plan (default-and-record); 80m clears the boundary-shading
- * band (T5.3, ~5m) and reaches nearby landscape structures without letting
- * the camera drift into the empty far landscape.
- */
-const PAN_LEASH_MARGIN = 80;
-
-/**
- * Per-biome ambient extras (#458 T7.3, executor's pick, recorded here):
- * dust devils for the two arid biomes, fireflies for the one humid one.
- * Neither is universal — GameRenderer only builds the module whose biome
- * set contains the level's current biome id.
- */
-const DUST_DEVIL_BIOMES: ReadonlySet<string> = new Set(['desert_badlands', 'red_canyon']);
-const FIREFLY_BIOMES: ReadonlySet<string> = new Set(['tropical_karst']);
+  rebuildTerrain, remeshTerrainRegion, siteBoundsChanged, playableCut,
+  landscapeEdgeHeightSampler, rebuildBorderWall, getTerrainSurfaceY,
+  type TerrainDeps,
+} from './GameRendererTerrain.js';
+import {
+  loadGame, buildPlayableMesh, buildLandscapeMesh, buildAmbient,
+  frameCameraOnGrid, refreshPanLeash, clearAll,
+  type SceneSetupDeps,
+} from './GameRendererSceneSetup.js';
+import { onBlast, showBlastPlanOverlay, notifyBlastScatter, type BlastVisualsDeps } from './GameRendererBlastVisuals.js';
+import {
+  raycastSurfaceY, raycastTerrainFromNDC, surfaceYAt, pickables,
+  resolveFragmentId, entityWorldPosition, type PickingDeps,
+} from './GameRendererPicking.js';
 
 export class GameRenderer {
   private readonly sm: SceneManager;
@@ -192,15 +186,12 @@ export class GameRenderer {
   }
 
   /**
-   * Complete a staged level load driven phase-by-phase by the loading screen
-   * (#474): `enterLevel` in main.ts runs buildPlayableMesh() /
+   * Completes a staged level load driven phase-by-phase by the loading
+   * screen (#474): `enterLevel` in main.ts runs buildPlayableMesh() /
    * buildLandscapeMesh() / buildAmbient() as separate weighted LoadPhases,
-   * bypassing syncFromContext() entirely so each one gets its own presented
-   * frame. This finishes it — frame the camera, then record the same
-   * bookkeeping syncFromContext() sets after loadGame() (so a later
-   * syncFromContext() call treats the load as already done rather than
-   * repeating it) and run the same per-call entity/state sync
-   * syncFromContext() performs every time it runs.
+   * bypassing syncFromContext() entirely so each gets its own presented
+   * frame. Frames the camera, then records the same bookkeeping
+   * syncFromContext() sets after loadGame(), and runs the same per-call sync.
    */
   finishLevelLoad(ctx: MiningContext): void {
     if (!ctx.state || !ctx.grid) return;
@@ -210,103 +201,44 @@ export class GameRenderer {
     this.syncEntities(ctx);
   }
 
-  /** Per-call entity/state sync shared by syncFromContext() and finishLevelLoad() (#474). */
+  /** Per-call entity/state sync shared by syncFromContext() and finishLevelLoad() (#474, extracted #767). */
   private syncEntities(ctx: MiningContext): void {
     if (!ctx.state) return;
-    // Sync entities added since last call
-    syncEntitySets(
-      ctx.state, this.buildings, this.renderedBuildingIds,
-      this.vehicles, this.renderedVehicleIds,
-      this.characters, this.renderedEmployeeIds,
-      (x, z) => this.getTerrainSurfaceY(x, z),
-    );
-
-    // Place vehicles at terrain surface height (not buried at y=0). This
-    // corrects only the instant terrain-surface `y` value via setSurfaceY();
-    // x/z motion (including the waiting-queue render offset, #411) is left
-    // entirely to the per-frame tween inside VehicleMesh.update() (#520), so
-    // this sync never stomps a mid-glide or fused 'waiting' vehicle's x/z.
-    if (this.vehicles && this.lastGrid) {
-      for (const v of ctx.state.vehicles.vehicles) {
-        if (this.renderedVehicleIds.has(v.id)) {
-          const surfaceY = this.getTerrainSurfaceY(v.x, v.z);
-          this.vehicles.setSurfaceY(v.id, surfaceY);
-        }
-      }
+    const result = syncGameRendererEntities({
+      state: ctx.state,
+      weatherCycle: ctx.weatherCycle,
+      buildings: this.buildings,
+      renderedBuildingIds: this.renderedBuildingIds,
+      vehicles: this.vehicles,
+      renderedVehicleIds: this.renderedVehicleIds,
+      characters: this.characters,
+      renderedEmployeeIds: this.renderedEmployeeIds,
+      lastGrid: this.lastGrid,
+      ghosts: this.ghosts,
+      lastGhostRevision: this.lastGhostRevision,
+      terrainMeshRevision: this.terrainMeshRevision,
+      lastSyncedTerrainRevision: this.lastSyncedTerrainRevision,
+      taskProgress: this.taskProgress,
+      skybox: this.skybox,
+      clouds: this.clouds,
+      zone: ctx.state.zone.activeZone,
+      getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
+      syncSurveyOverlay: options => this.syncSurveyOverlay(options),
+    });
+    this.lastGhostRevision = result.lastGhostRevision;
+    this.lastSyncedTerrainRevision = result.lastSyncedTerrainRevision;
+    // Matches the pre-split guard (`this.skybox && ctx.weatherCycle`) exactly:
+    // syncGameRendererEntities() only returns lastWeather when that guard held.
+    if (result.lastWeather !== undefined) {
+      this.lastWeather = result.lastWeather;
     }
-
-    // Place characters at terrain surface height (not buried at y=0)
-    if (this.characters && this.lastGrid) {
-      for (const e of ctx.state.employees.employees) {
-        if (this.renderedEmployeeIds.has(e.id)) {
-          const surfaceY = this.getTerrainSurfaceY(e.x, e.z);
-          this.characters.setSurfaceY(e.id, surfaceY);
-        }
-      }
-    }
-
-    // Sync ghost previews for pending actions. Every dispatch sets targetY:0
-    // (see employees.ts), so at the terrain's actual height that box renders
-    // buried inside solid voxels — snap it onto the surface like vehicles and
-    // characters above, or the ghost is queued but never visible (#406).
-    //
-    // Gated behind a cheap revision dirty-check (#761): the remap +
-    // GhostMesh.sync() below is wasted work when neither the ghost-preview
-    // queue nor the terrain mesh changed since the last sync — with ~1000
-    // queued previews mid-scenario, resyncing on every unrelated console
-    // command (movement ticks, drilling, etc.) was measurably expensive.
-    if (this.ghosts) {
-      const ghostsDirty = ctx.state.ghostPreviewsRevision !== this.lastGhostRevision;
-      const terrainDirty = this.terrainMeshRevision !== this.lastSyncedTerrainRevision;
-      if (ghostsDirty || terrainDirty) {
-        const previews = this.lastGrid
-          ? ctx.state.ghostPreviews.map(p => ({ ...p, targetY: this.getTerrainSurfaceY(p.targetX, p.targetZ) }))
-          : ctx.state.ghostPreviews;
-        this.ghosts.sync(previews);
-        this.lastGhostRevision = ctx.state.ghostPreviewsRevision;
-        this.lastSyncedTerrainRevision = this.terrainMeshRevision;
-      }
-    }
-
-    // Task progress bars — reflect the current working/idle state each sync (#546)
-    if (this.taskProgress && this.characters) {
-      this.taskProgress.sync(
-        ctx.state.employees.employees,
-        ctx.state.vehicles.vehicles,
-        id => this.characters!.getGroup(id),
-      );
-    }
-
-    // Blink employees still inside an active safety zone during clearing
-    if (this.characters) {
-      const zone = ctx.state.zone.activeZone;
-      for (const e of ctx.state.employees.employees) {
-        this.characters.setEvacuating(e.id, zone !== null && isInZone(e.x, e.z, zone));
-      }
-    }
-
-    // Sync weather
-    if (this.skybox && ctx.weatherCycle) {
-      this.lastWeather = ctx.weatherCycle.current;
-      this.skybox.setWeather(ctx.weatherCycle.current);
-      this.clouds?.setWeather(ctx.weatherCycle.current);
-    }
-
-    // Sync survey confidence overlay
-    this.syncSurveyOverlay(
-      this.buildSurveyOverlayOptions(ctx.state),
-    );
   }
 
   /**
-   * Jump the collapse straight to its end, leaving every fragment on the resting
-   * place the blast already chose for it.
-   *
-   * The animation only ever walks rock to a destination core decided, so cutting
-   * it short changes nothing about the game — which is what makes it safe for a
-   * harness to do. Without a GPU a frame costs seconds while the animation clock
-   * advances at most 0.1 s per frame, so a screenshot of a settled muck pile is
-   * otherwise minutes of wall clock away.
+   * Jump the collapse straight to its end — the animation only ever walks
+   * rock to a destination core already decided, so cutting it short is safe
+   * for a harness (a settled muck pile is otherwise minutes of wall clock
+   * away without a GPU, at 0.1s/frame of animation clock).
    */
   skipFragmentPlayback(): void {
     this.fragmentAnimator?.finish();
@@ -402,56 +334,7 @@ export class GameRenderer {
    * Call from main.ts after drill_plan, charge, or sequence commands.
    */
   showBlastPlanOverlay(ctx: MiningContext): void {
-    if (!this.blastOverlay || !ctx.state) return;
-    const { drillHoles, plannedDrillHoles, chargesByHole, plannedChargesByHole, sequenceDelays, softwareTier } = ctx.state;
-    const allHoles = [...drillHoles, ...plannedDrillHoles];
-    if (allHoles.length === 0) { this.blastOverlay.hide(); return; }
-
-    const cx = allHoles.reduce((s, h) => s + h.x, 0) / allHoles.length;
-    const cz = allHoles.reduce((s, h) => s + h.z, 0) / allHoles.length;
-    const originSurfaceY = this.getTerrainSurfaceY(cx, cz);
-
-    // Per-hole fragment-size / projection-speed predictions, tier-gated the
-    // same as the console `preview` commands. Without these, BlastPlanOverlay's
-    // fragment-size dots and projection arcs never render — their per-hole
-    // fields stay undefined and the overlay's own guards skip them. Only
-    // already-drilled holes have a charge to preview against — an ordered
-    // hole (#553) has no charge/delay/frag-size data yet.
-    let holeDetails: Record<string, import('../core/mining/Software.js').HolePreviewDetail> = {};
-    if (softwareTier >= 2 && ctx.grid && drillHoles.length > 0) {
-      const plan = assembleBlastPlan(drillHoles, chargesByHole, sequenceDelays);
-      holeDetails = previewHoleDetails(plan, ctx.grid, softwareTier);
-    }
-
-    this.blastOverlay.show({
-      softwareTier,
-      origin: new THREE.Vector3(cx, originSurfaceY, cz),
-      holes: [
-        ...drillHoles.map(h => {
-          const hd: import('./BlastPlanOverlay.js').HoleOverlayData = {
-            hole: h,
-            delayMs: sequenceDelays[h.id] ?? 0,
-            surfaceY: this.getTerrainSurfaceY(h.x, h.z),
-            drilled: true,
-            chargeOrdered: h.id in plannedChargesByHole,
-          };
-          const charge = chargesByHole[h.id];
-          if (charge) hd.charge = charge;
-          const detail = holeDetails[h.id];
-          if (detail?.fragSizeCm !== undefined) hd.predictedFragSizeCm = detail.fragSizeCm;
-          if (detail?.projectionSpeedMs !== undefined) hd.projectionSpeed = detail.projectionSpeedMs;
-          return hd;
-        }),
-        // Ordered-but-undrilled holes (#553) — rendered as ghosts by
-        // BlastPlanOverlay (drilled: false), no charge/delay/frag-size data.
-        ...plannedDrillHoles.map(h => ({
-          hole: h,
-          delayMs: -1,
-          surfaceY: this.getTerrainSurfaceY(h.x, h.z),
-          drilled: false,
-        } satisfies import('./BlastPlanOverlay.js').HoleOverlayData)),
-      ],
-    });
+    showBlastPlanOverlay(this.blastVisualsDeps(), ctx);
   }
 
   /** Player-facing visibility preference for the survey confidence overlay (#496). */
@@ -468,7 +351,7 @@ export class GameRenderer {
   setSurveyOverlayVisible(visible: boolean): void {
     this.surveyOverlayPreference = visible;
     if (!this.lastState) return;
-    this.syncSurveyOverlay(this.buildSurveyOverlayOptions(this.lastState));
+    this.syncSurveyOverlay(buildSurveyOverlayOptions(this.lastState, this.lastGrid));
   }
 
   /** Flip the survey confidence overlay's visibility preference (#496) and return the new value, so callers (e.g. the keyboard shortcut) don't have to read-flip-set by hand. */
@@ -484,372 +367,66 @@ export class GameRenderer {
    * preference (#496) — either being false hides the overlay.
    */
   syncSurveyOverlay(options: SurveyConfidenceOverlayOptions | null): void {
-    if (!this.terrain) return;
-
-    const overlay = this.terrain.getSurveyOverlay();
-    if (options && options.points.length > 0 && this.surveyOverlayPreference) {
-      overlay.show(options);
-    } else {
-      overlay.hide();
-    }
+    syncSurveyOverlay(this.terrain, options, this.surveyOverlayPreference);
   }
 
-  /**
-   * Convert GameState.surveyResults into overlay options.
-   * Returns null when there are no survey results.
-   */
-  private buildSurveyOverlayOptions(
-    state: import('../core/state/GameState.js').GameState,
-  ): SurveyConfidenceOverlayOptions | null {
-    if (state.surveyResults.length === 0 || !this.lastGrid) return null;
-
-    const currentTick = state.tickCount;
-    const grid = this.lastGrid;
-    const points: SurveyConfidencePoint[] = [];
-
-    for (const survey of state.surveyResults) {
-      const fresh = !isSurveyStale(survey, currentTick);
-
-      for (const colKey of Object.keys(survey.estimates)) {
-        const parts = colKey.split(',').map(Number);
-        const x = parts[0]!;
-        const z = parts[1]!;
-
-        // Surface Y = topmost solid voxel + 1
-        let surfaceY = 0;
-        const clampedX = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
-        const clampedZ = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
-        for (let y = grid.sizeY - 1; y >= 0; y--) {
-          const voxel = grid.getVoxel(clampedX, y, clampedZ);
-          if (voxel && voxel.density > 0) {
-            surfaceY = y + 1;
-            break;
-          }
-        }
-
-        points.push({
-          x,
-          z,
-          surfaceY,
-          confidence: survey.confidence,
-          fresh,
-        });
-      }
-    }
-
-    if (points.length === 0) return null;
-
-    return { points, opacity: 0.4 };
-  }
-
-  /**
-   * Public wrapper around `getTerrainSurfaceY`, used by the scenario camera
-   * bridge (`window.__cameraFocus`) so a scripted shot can centre on a world
-   * (x, z) point at the correct terrain height without duplicating the voxel
-   * lookup (#410).
-   */
+  /** Public wrapper around `getTerrainSurfaceY`, for the scenario camera bridge (`window.__cameraFocus`, #410). See GameRendererPicking.ts. */
   surfaceYAt(x: number, z: number): number {
-    return this.getTerrainSurfaceY(x, z);
+    return surfaceYAt(this.pickingDeps(), x, z);
   }
 
-  /**
-   * Exact rendered-mesh height at (x, z), found by raycasting straight down
-   * through the terrain meshes — unlike surfaceYAt's voxel-column lookup,
-   * this matches the smoothed mesh surface a pointer raycast actually hits.
-   * Used as the starting guess for interaction mode's world-to-screen
-   * bridge (window.__worldToScreen, main.ts) — see raycastTerrainFromNDC for
-   * why a single vertical raycast still isn't the whole fix. Returns null
-   * off the terrain (no grid, or (x, z) outside every chunk).
-   */
+  /** Exact rendered-mesh height at (x, z) via a vertical raycast. Returns null off the terrain. See GameRendererPicking.ts. */
   raycastSurfaceY(x: number, z: number): number | null {
-    if (!this.terrain) return null;
-    const raycaster = new THREE.Raycaster(new THREE.Vector3(x, 10_000, z), new THREE.Vector3(0, -1, 0));
-    const hit = this.raycastTerrainOrLandscape(raycaster);
-    return hit ? hit.point.y : null;
+    return raycastSurfaceY(this.pickingDeps(), x, z);
   }
 
-  /**
-   * Terrain-only hit for a camera ray through NDC (ndcX, ndcY) — the same
-   * raycast a real pointer click resolves via ScenePicking/PlacementController,
-   * without pulling in their entity/hover machinery.
-   *
-   * window.__worldToScreen needs this, not just raycastSurfaceY, because the
-   * camera ray through a screen pixel is never vertical: on sloped ground the
-   * point directly above/below (x, z) is not generally the same point the
-   * camera's own oblique ray would hit when aimed at that pixel. A ground-level
-   * camera (the game's default framing) makes this worse — near-horizontal rays
-   * turn a sub-metre height gap into a many-tile miss. Callers converge on a
-   * pixel that truly round-trips by re-deriving the height from this hit and
-   * reprojecting, rather than trusting one vertical sample.
-   */
+  /** Terrain-only hit for a camera ray through NDC (ndcX, ndcY) — the world-to-screen bridge's starting guess. See GameRendererPicking.ts. */
   raycastTerrainFromNDC(ndcX: number, ndcY: number, camera: THREE.Camera): THREE.Vector3 | null {
-    if (!this.terrain) return null;
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-    const hit = this.raycastTerrainOrLandscape(raycaster);
-    return hit ? hit.point.clone() : null;
+    return raycastTerrainFromNDC(this.pickingDeps(), ndcX, ndcY, camera);
   }
 
-  /**
-   * First hit against the terrain meshes, falling back to the landscape
-   * meshes past the site's claimed edge (#558) when terrain misses. Shared
-   * by raycastSurfaceY (vertical ray) and raycastTerrainFromNDC (camera ray)
-   * — both need the same terrain-then-landscape fallback, only the ray
-   * differs.
-   */
-  private raycastTerrainOrLandscape(raycaster: THREE.Raycaster): THREE.Intersection | undefined {
-    if (!this.terrain) return undefined;
-    const hit = raycaster.intersectObjects(this.terrain.meshes, true)[0];
-    if (hit) return hit;
-    return this.landscape ? raycaster.intersectObjects(this.landscape.meshes, true)[0] : undefined;
-  }
-
-  /**
-   * Every entity root object raycastable for scene picking (P2/P4): buildings,
-   * vehicles, employees, the 8 fragment shape buckets, and the current blast
-   * plan's drill holes. Terrain is raycast separately via `terrain.meshes` —
-   * it's a fallback hit, not an entity, and callers usually want to know when
-   * nothing else was hit.
-   */
+  /** Every entity root object raycastable for scene picking (P2/P4). See GameRendererPicking.ts. */
   pickables(): THREE.Object3D[] {
-    return [
-      ...(this.buildings?.pickables() ?? []),
-      ...(this.vehicles?.pickables() ?? []),
-      ...(this.characters?.pickables() ?? []),
-      ...(this.fragments?.pickables() ?? []),
-      ...(this.blastOverlay?.pickables() ?? []),
-    ];
+    return pickables(this.pickingDeps());
   }
 
   /** Resolve a fragment-bucket raycast hit (bucketIndex, instanceId) to the fragment id occupying that slot. */
   resolveFragmentId(bucketIndex: number, instanceId: number): number | null {
-    return this.fragments?.fragmentIdAt(bucketIndex, instanceId) ?? null;
+    return resolveFragmentId(this.pickingDeps(), bucketIndex, instanceId);
   }
 
-  /**
-   * Current world-space position of a live entity, for hover-tag/highlight
-   * placement. Buildings/vehicles/employees read their Group's position
-   * directly; fragments resolve through their InstancedMesh slot; holes
-   * resolve through the blast plan overlay's per-hole surface anchor. Null
-   * when the entity isn't currently rendered (removed, or never synced).
-   */
+  /** Current world-space position of a live entity, for hover-tag/highlight placement. See GameRendererPicking.ts. */
   entityWorldPosition(kind: 'building' | 'vehicle' | 'employee' | 'fragment' | 'hole', id: number): THREE.Vector3 | null {
-    switch (kind) {
-      case 'building': return this.buildings?.getPosition(id) ?? null;
-      case 'vehicle': return this.vehicles?.getPosition(id) ?? null;
-      case 'employee': return this.characters?.getPosition(id) ?? null;
-      case 'fragment': return this.fragments?.fragmentPosition(id) ?? null;
-      case 'hole': return this.blastOverlay?.getHolePosition(id) ?? null;
-    }
+    return entityWorldPosition(this.pickingDeps(), kind, id);
   }
 
   /** Find the highest solid-voxel Y at the given (x, z) column. Returns 0 if no grid. */
   private getTerrainSurfaceY(x: number, z: number): number {
-    if (!this.lastGrid) return 0;
-    return computeVoxelColumnSurfaceY(this.lastGrid, x, z) + 1;
+    return getTerrainSurfaceY(this.lastGrid, x, z);
   }
 
-  /**
-   * A blast fired at (originX, originZ) — scatters any nearby bird flock
-   * (#458 T7.2/D12/A26). Call from main.ts's `emitter.on('blast:started', ...)`
-   * subscription, which already carries the blast origin.
-   */
+  /** A blast fired at (originX, originZ) — scatters any nearby bird flock (#458 T7.2/D12/A26). See GameRendererBlastVisuals.ts. */
   notifyBlastScatter(originX: number, originZ: number): void {
-    this.birds?.onBlast(originX, originZ);
+    notifyBlastScatter(this.blastVisualsDeps(), originX, originZ);
   }
 
-  /**
-   * Trigger blast visual effects and rebuild terrain.
-   * Call from main.ts immediately after a successful blast command.
-   */
+  /** Trigger blast visual effects. Call from main.ts immediately after a successful blast command. See GameRendererBlastVisuals.ts. */
   onBlast(ctx: MiningContext): void {
-    console.log(`[GameRenderer] onBlast: lastGrid=${this.lastGrid?.id} fragments=${ctx.lastBlastFragments?.length ?? 0}`);
-    if (!this.terrain || !this.lastGrid) return;
-
-    // Clear the blast plan overlay (holes are consumed by blast)
-    if (this.blastOverlay) {
-      this.blastOverlay.hide();
-    }
-
-    // Terrain remesh already happened: executeBlast emits terrain:updated,
-    // which main.ts's subscription turns into rebuildTerrain() synchronously
-    // before this method ever runs (#458 T0.2) — no longer this method's job.
-
-    // Spawn fragment meshes for the blasted rock, then play the collapse.
-    // spawnFragments places them where they came to rest; the animator walks
-    // them there from where they broke, so the player sees the face come down
-    // instead of a finished muck pile appearing at the moment of detonation.
-    if (this.fragments && ctx.lastBlastFragmentData && ctx.lastBlastFragmentData.length > 0) {
-      this.fragments.clearAll();
-      this.fragments.spawnFragments(ctx.lastBlastFragmentData);
-      if (ctx.lastBlastFlights) this.fragmentAnimator?.begin(ctx.lastBlastFlights);
-    }
-
-    if (!this.blastEffects || !ctx.state) return;
-
-    // Compute blast origin from fragment centroid or grid centre
-    let ox = this.lastGrid.minX + this.lastGrid.sizeX / 2;
-    let oz = this.lastGrid.minZ + this.lastGrid.sizeZ / 2;
-    // Size the surface-sample ring to the blast's own footprint (half its
-    // bounding-box diagonal + margin), so a large multi-hole blast's crater
-    // doesn't swallow the whole sampling ring.
-    let sampleRadius: number = BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS;
-    if (ctx.lastBlastFragments && ctx.lastBlastFragments.length > 0) {
-      ox = ctx.lastBlastFragments.reduce((s, p) => s + p.x, 0) / ctx.lastBlastFragments.length;
-      oz = ctx.lastBlastFragments.reduce((s, p) => s + p.z, 0) / ctx.lastBlastFragments.length;
-      const { minX, maxX, minZ, maxZ } = boundingBoxXZ(ctx.lastBlastFragments);
-      const halfDiagonal = Math.hypot(maxX - minX, maxZ - minZ) / 2;
-      sampleRadius = Math.max(
-        BLAST_ORIGIN_SURFACE_SEARCH_MIN_RADIUS,
-        halfDiagonal + BLAST_ORIGIN_SURFACE_SEARCH_MARGIN,
-      );
-    }
-    // Anchor at the surrounding terrain surface, not y=0. A mine site rarely
-    // sits at grid y=0 — it's typically well above it — so a hardcoded 0 here
-    // buried the dust cloud and detonation flash inside solid terrain, fully
-    // occluded and never visible on screen.
-    const origin = new THREE.Vector3(
-      ox,
-      getBlastOriginSurfaceY(this.lastGrid, (x, z) => this.getTerrainSurfaceY(x, z), ox, oz, sampleRadius),
-      oz,
-    );
-
-    // Build per-hole detonation list from sequence delays
-    const holes: import('./BlastEffects.js').HoleDetonation[] = [];
-    const sequenceDelays = ctx.state.sequenceDelays;
-
-    // If we have sequence delays, use them for per-hole timing
-    if (Object.keys(sequenceDelays).length > 0) {
-      for (const [holeId, delayMs] of Object.entries(sequenceDelays)) {
-        // Find hole position from last known drill holes
-        const holePos = ctx.lastBlastHoles?.find(h => h.id === holeId)
-          ?? ctx.state.drillHoles.find(h => h.id === holeId);
-        if (holePos) {
-          holes.push({
-            x: holePos.x,
-            y: this.getTerrainSurfaceY(holePos.x, holePos.z),
-            z: holePos.z,
-            delaySeconds: delayMs / 1000,
-          });
-        }
-      }
-    }
-
-    // Fallback: single explosion at centroid if no per-hole data
-    if (holes.length === 0) {
-      holes.push({ x: ox, y: origin.y, z: oz, delaySeconds: 0 });
-    }
-
-    this.blastEffects.trigger({
-      holes,
-      energyLevel: 0.6,
-      origin,
-    });
+    onBlast(this.blastVisualsDeps(), ctx);
   }
 
-  /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). */
+  /** Force a full terrain rebuild — grid identity changes only (new_game, campaign start, load). See GameRendererTerrain.ts. */
   rebuildTerrain(): void {
-    console.log(`[GameRenderer] rebuildTerrain: lastGrid=${this.lastGrid?.id}`);
-    this.terrain?.buildAll();
-    this.terrainMeshRevision++;
+    const deps = this.terrainDeps();
+    rebuildTerrain(deps);
+    this.applyTerrainDeps(deps);
   }
 
-  /**
-   * Re-mesh only the chunks a terrain:updated region touches (#458 T3.1).
-   * The main.ts subscription calls this for every mutation (blast, drill,
-   * ramp) instead of rebuildTerrain() — a single-voxel drill dig no longer
-   * pays for re-marching chunks its region never touched.
-   */
+  /** Re-mesh only the chunks a terrain:updated region touches (#458 T3.1). See GameRendererTerrain.ts. */
   remeshTerrainRegion(ctx: MiningContext, region: DirtyRegion): void {
-    this.terrain?.remeshRegion(region);
-    this.terrainMeshRevision++;
-    if (!this.siteBoundsChanged(ctx.grid)) return;
-
-    // A claim moves the site's bounding box: the camera leash has to let the
-    // player follow the ground they just took, the landscape has to stop
-    // covering it, and the wall has to be re-raised on the new frontier.
-    this.refreshPanLeash();
-
-    // A null ctx.landscape means the grid itself was just replaced (new game,
-    // campaign level, load) and buildLandscapeMesh is about to run with a
-    // fresh handle. Rebuilding here would cut the new site against the old
-    // level's landscape and then be thrown away.
-    if (!ctx.landscape || !ctx.grid || !this.landscape || !this.landscapeHandle) return;
-
-    this.landscape.build(this.landscapeHandle, ctx.grid.palette, this.playableCut(ctx.grid));
-    this.rebuildBorderWall(ctx);
-  }
-
-  /** True when the site's bounding box differs from the one the landscape and wall were built against. */
-  private siteBoundsChanged(grid: VoxelGrid | null): boolean {
-    const key = grid ? `${grid.minX},${grid.minZ},${grid.maxX},${grid.maxZ},${grid.chunkCount}` : '';
-    if (key === this.lastCutBounds) return false;
-    this.lastCutBounds = key;
-    return true;
-  }
-
-  /** The site's live shape, for the landscape mesher to cut itself against (#473 D8). */
-  private playableCut(grid: VoxelGrid): PlayableCut {
-    return {
-      rect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
-      ownsColumn: (x, z) => grid.containsColumn(x, z),
-      // Live surface height, so the landscape's claim-boundary ring matches
-      // whatever the playable marching-cubes mesh renders there right now —
-      // before or after a blast — instead of the static WorldGen prediction.
-      boundaryHeightAt: (x, z) => computeVoxelColumnSurfaceHeight(grid, x, z),
-      meshClaimsColumn: (x, z) => grid.claimsColumnForMeshing(x, z),
-    };
-  }
-
-  /**
-   * The landscape's theoretical height function, ready to hand to
-   * TerrainMesh.setEdgeHeightSampler() — or null when no landscape can be
-   * built yet (no world/biome). Calls ensureLandscape(), which caches on
-   * ctx.landscape, so calling this before buildLandscapeMesh() does not
-   * duplicate the (expensive) structure-set build; buildLandscapeMesh()
-   * simply gets the same cached handle back (#559).
-   */
-  private landscapeEdgeHeightSampler(ctx: MiningContext): ((x: number, z: number) => number) | null {
-    if (!ctx.state?.world || !ctx.grid) return null;
-    const biome = getBiome(ctx.state.mineType);
-    if (!biome) return null;
-    const { sizeX, sizeY, sizeZ } = ctx.state.world;
-    const handle = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
-    if (!handle) return null;
-    return (x, z) => handle.sampleColumn(x, z).height;
-  }
-
-  /**
-   * Raise the containment field on the frontier between claimable ground and
-   * the protected structures beside the site (#473 P4). Nothing is drawn when
-   * no protected chunk borders the site — open ground gets no wall, which is
-   * the whole point of the change.
-   */
-  private rebuildBorderWall(ctx: MiningContext): void {
-    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
-    this.borderWall?.dispose();
-    this.borderWall = null;
-
-    const grid = ctx.grid;
-    const area = ctx.playableArea;
-    if (!grid || !area || !this.terrain) return;
-    // Never trace the world's rivers from a render path just to find out
-    // there is no wall to draw — buildLandscapeMesh hands over the set it
-    // already built, and calls this again once it has.
-    if (!area.hasStructures()) return;
-
-    const frontier = area.protectedFrontier();
-    if (frontier.length === 0) return;
-
-    const bounds = this.terrain.getBounds();
-    const groundY = this.landscapeHandle?.groundLevelY ?? 0;
-    this.borderWall = new WorldBorderWall(this.sm.scene, {
-      protectedRects: frontier.map(f => f.rect),
-      siteRect: { minX: grid.minX, minZ: grid.minZ, maxX: grid.maxX, maxZ: grid.maxZ },
-      minGroundY: bounds?.minY ?? groundY,
-      maxGroundY: bounds?.maxY ?? groundY + 20,
-    });
-    this.sm.postPipeline.addOverlayObject(this.borderWall.object3d);
+    const deps = this.terrainDeps();
+    remeshTerrainRegion(deps, ctx, region);
+    this.applyTerrainDeps(deps);
   }
 
   dispose(): void {
@@ -858,283 +435,236 @@ export class GameRenderer {
 
   // ---------- Internal ----------
 
+  /** Whole-scene rebuild on a new game/level (#474). See GameRendererSceneSetup.ts. */
   private loadGame(ctx: MiningContext): void {
-    this.buildPlayableMesh(ctx);
-    this.buildLandscapeMesh(ctx);
-    this.buildAmbient(ctx);
-    this.frameCameraOnGrid();
+    const deps = this.sceneSetupDeps();
+    loadGame(deps, ctx);
+    this.applySceneSetupDeps(deps);
   }
 
-  /**
-   * Stage 1 of a level load (#474): clear the scene and rebuild everything
-   * except the landscape zone and its ambient dressing — the playable
-   * terrain mesh (marching cubes over the grid the player actually mines),
-   * buildings, vehicles, characters, sky, wind/clouds, fragments, blast
-   * effects and overlays. Public so the loading screen can pace this as its
-   * own weighted phase (`enterLevel` in main.ts); `loadGame()` also calls it
-   * directly for callers that still want the whole load in one shot (tests,
-   * the debug-preview path that never drives the loading screen at all).
-   */
+  /** Stage 1 of a level load (#474): playable terrain mesh, buildings, vehicles, characters, sky, fragments, overlays. See GameRendererSceneSetup.ts. */
   buildPlayableMesh(ctx: MiningContext): void {
-    const state = ctx.state!;
-    const grid = ctx.grid!;
-    this.clearAll();
-
-    const { scene, sunLight, ambient, fill, csm } = this.sm;
-
-    // Terrain mesh (marching cubes)
-    this.terrain = new TerrainMesh(scene, grid, ctx.state?.mineType);
-    // Wire the landscape's theoretical height into the edge-normal sampler
-    // BEFORE the first buildAll(), so the initial mesh already carries the
-    // boundary-normal fix instead of needing a later remesh to pick it up
-    // (#559).
-    this.terrain.setEdgeHeightSampler(this.landscapeEdgeHeightSampler(ctx));
-    this.terrain.buildAll();
-    this.terrainMeshRevision++;
-    this.terrain.sharedMaterial.attachCSM(csm);
-
-    // Bind the grid before sampling terrain height below — buildings, vehicles,
-    // and characters loaded from a save (not just a fresh new_game) need
-    // getTerrainSurfaceY() to see this grid, not the previous one (#408).
-    this.lastGrid = grid;
-
-    // Buildings
-    this.buildings = new BuildingMesh(scene);
-    for (const b of state.buildings.buildings) {
-      const surfaceY = buildingCenterSurfaceY(b, (x, z) => this.getTerrainSurfaceY(x, z));
-      this.buildings.addBuilding(b, surfaceY);
-    }
-
-    // Vehicles
-    this.vehicles = new VehicleMesh(scene);
-    for (const v of state.vehicles.vehicles) {
-      const surfaceY = this.getTerrainSurfaceY(v.x, v.z);
-      this.vehicles.addVehicle(v, surfaceY);
-    }
-
-    // Characters (placed at terrain surface height, not y=0)
-    this.characters = new CharacterMesh(scene);
-    for (const e of state.employees.employees) {
-      const surfaceY = this.getTerrainSurfaceY(e.x, e.z);
-      this.characters.addEmployee(e, surfaceY);
-    }
-
-    // Task progress bars — billboarded above working employees (#546)
-    this.taskProgress = new TaskProgressBar(scene, this.sm.camera);
-
-    // Weather sky
-    this.skybox = new SkyboxWeather(scene, sunLight, ambient, fill);
-
-    // Wind + clouds (#458 T7.1/D12): one WindState per level, seeded so every
-    // ambient module (clouds now, birds/smoke/water/sway in T7.2) leans the
-    // same way. Cloud disc centres on the playable rect, same point
-    // frameCameraOnGrid() frames the camera on.
-    this.windState = new WindState(state.seed);
-    this.clouds = new CloudLayer(scene, state.seed, grid.minX + grid.sizeX / 2, grid.minZ + grid.sizeZ / 2);
-
-    // Fragments (empty until blast runs) — shares terrain's material so a
-    // fresh cut face matches the rock it broke off from (#458 T4.1/D9).
-    this.fragments = new FragmentMesh(scene, this.terrain.sharedMaterial);
-    this.fragmentAnimator = new FragmentAnimator(this.fragments);
-
-    // Blast effects
-    this.blastEffects = new BlastEffects(scene, this.sm.camera);
-
-    // Blast plan overlay (hidden until shown)
-    this.blastOverlay = new BlastPlanOverlay(scene);
-
-    // Ghost previews (initially empty)
-    this.ghosts = new GhostMesh(scene);
+    const deps = this.sceneSetupDeps();
+    buildPlayableMesh(deps, ctx);
+    this.applySceneSetupDeps(deps);
   }
 
-  /**
-   * Stage 2 of a level load (#474): the landscape zone — its coarse map
-   * (built lazily by ensureLandscape(), cached on ctx.landscape so this is a
-   * cache hit if a caller already forced it, e.g. main.ts's own "landscape
-   * map" phase or buildPlayableMesh()'s edge-height sampler above), the
-   * marching-cubes mesh past the playable rect, aerial-perspective
-   * calibration, and the border wall. Split from buildAmbient() below
-   * because it costs meaningfully more (a full landscape mesh vs. a handful
-   * of particle systems) and the loading screen weights the two
-   * differently. Command-mode scenarios never construct a GameRenderer at
-   * all, so this cost never lands on the fast, frequently-run scenario
-   * suite; only the browser game and interaction-mode/visual harnesses pay
-   * it.
-   */
+  /** Stage 2 of a level load (#474): the landscape zone, aerial-perspective calibration, and the border wall. See GameRendererSceneSetup.ts. */
   buildLandscapeMesh(ctx: MiningContext): void {
-    if (!this.terrain || !ctx.state?.world || !ctx.grid) return;
-    const biome = getBiome(ctx.state.mineType);
-    if (!biome) return;
-
-    const { sizeX, sizeY, sizeZ } = ctx.state.world;
-    const handle = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
-    if (!handle) return;
-
-    if (!this.landscape) {
-      this.landscape = new LandscapeMesh(this.sm.scene, this.terrain.sharedMaterial);
-    }
-    this.landscapeHandle = handle;
-    // Idempotent re-apply: a campaign level swap rebuilds the grid (and
-    // re-marches terrain) before landscape geometry catches up, so the
-    // sampler installed at loadGame() time can go stale — re-set it here
-    // whenever landscape geometry changes (#559).
-    this.terrain.setEdgeHeightSampler((x, z) => handle.sampleColumn(x, z).height);
-    // The landscape's StructureSet already carries every river, village and
-    // landmark for this seed — hand it to the claim path rather than have it
-    // trace them all a second time (#473 D6).
-    ctx.playableArea?.adoptStructures(handle.structureSet);
-    this.landscape.build(handle, ctx.grid.palette, this.playableCut(ctx.grid));
-    // Record what we just cut against, so the next terrain:updated only
-    // rebuilds when the site has actually moved since this build.
-    this.siteBoundsChanged(ctx.grid);
-
-    // Aerial perspective's haze thickness and per-biome grade — set once per
-    // level load, not per frame (#458 T5.2/A21).
-    const { aerial } = this.sm.postPipeline;
-    aerial.setHeightRef(handle.groundLevelY);
-    aerial.setGrade(BIOME_GRADES[biome.id] ?? NEUTRAL_GRADE);
-
-    // The "not here" marker: the frontier between claimable ground and the
-    // generated structures a claim can never take (#473 D6/P4). Sized from
-    // the terrain's own height range so it stands on the ground rather than
-    // floating or being buried.
-    this.rebuildBorderWall(ctx);
+    const deps = this.sceneSetupDeps();
+    buildLandscapeMesh(deps, ctx);
+    this.applySceneSetupDeps(deps);
   }
 
-  /**
-   * Stage 3 of a level load (#474): birds, chimney smoke, water, vegetation
-   * sway, and the per-biome dust-devil/firefly extras — rebuilt from the
-   * landscape's own StructureSet every time this runs (a campaign level swap
-   * can call this again for the same GameRenderer, so stale instances from
-   * the previous grid must go first or their meshes pile up in the scene).
-   * Requires buildLandscapeMesh() to have already cached ctx.landscape this
-   * load — the cheapest of the three staged rebuilds, so it carries the
-   * loading screen's lightest weight.
-   */
+  /** Stage 3 of a level load (#474): birds, chimney smoke, water, vegetation sway, per-biome dust-devil/firefly extras. See GameRendererSceneSetup.ts. */
   buildAmbient(ctx: MiningContext): void {
-    if (!ctx.state?.world || !ctx.grid || !ctx.landscape) return;
-    const biome = getBiome(ctx.state.mineType);
-    if (!biome) return;
-    const handle = ctx.landscape;
-
-    this.birds?.dispose();
-    this.smoke?.dispose();
-    this.water?.dispose();
-    this.vegetation?.dispose();
-    this.dustDevils?.dispose();
-    this.fireflies?.dispose();
-    const centerX = ctx.grid.minX + ctx.grid.sizeX / 2;
-    const centerZ = ctx.grid.minZ + ctx.grid.sizeZ / 2;
-    const sampleHeight = (x: number, z: number) => handle.sampleColumn(x, z).height;
-    this.birds = new BirdFlocks(this.sm.scene, ctx.state.seed, centerX, centerZ);
-    this.smoke = new ChimneySmoke(this.sm.scene, ctx.state.seed, handle.structureSet.villages);
-    this.water = new WaterSurface(this.sm.scene, biome.id, handle.structureSet.rivers, handle.structureSet.landmarks);
-    this.vegetation = new VegetationSway(
-      this.sm.scene, ctx.state.seed, this.ambientUniforms, handle.structureSet.trees,
-      centerX, centerZ, handle.playableRect, sampleHeight,
-    );
-    // Per-biome ambient extras (#458 T7.3) — only the module matching this
-    // level's biome gets built; the other stays null.
-    this.dustDevils = DUST_DEVIL_BIOMES.has(biome.id)
-      ? new DustDevils(this.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
-      : null;
-    this.fireflies = FIREFLY_BIOMES.has(biome.id)
-      ? new Fireflies(this.sm.scene, ctx.state.seed, centerX, centerZ, sampleHeight)
-      : null;
+    const deps = this.sceneSetupDeps();
+    buildAmbient(deps, ctx);
+    this.applySceneSetupDeps(deps);
   }
 
-  /**
-   * Centre the camera on the loaded grid and pull back far enough to show all
-   * of it. Aimed at the surface rather than y=0 so the benches sit mid-frame.
-   */
+  /** Centre the camera on the loaded grid and pull back far enough to show all of it. See GameRendererSceneSetup.ts. */
   private frameCameraOnGrid(): void {
-    const grid = this.lastGrid;
-    if (!grid) return;
-    const cx = grid.minX + grid.sizeX / 2;
-    const cz = grid.minZ + grid.sizeZ / 2;
-    const span = Math.max(grid.sizeX, grid.sizeZ);
-    this.sm.cameraController.frameSite(cx, this.getTerrainSurfaceY(cx, cz), cz, span);
-    // Manual panning may wander past the pit rim to glance at nearby
-    // landscape, but not indefinitely — the landscape is viewable, not the
-    // play focus (#458 T6.1/D13).
-    this.refreshPanLeash();
+    const deps = this.sceneSetupDeps();
+    frameCameraOnGrid(deps);
+    this.applySceneSetupDeps(deps);
   }
 
   /**
-   * Re-leash the camera to the landscape's fixed generation extent (#558) —
-   * NOT the site's live bounding box, which only grows as the player claims
-   * chunks and would otherwise leash the player to ground already claimed
-   * instead of the ground actually rendered. Centred on the level's ORIGINAL
-   * playable rect, exactly like `buildLandscapeMap` centres its tiles, so the
-   * leash stays fixed for the whole level. Cheap; safe to call every remesh.
+   * Re-leash the camera to the landscape's fixed generation extent (#558).
+   * Threaded into TerrainDeps as a callback so GameRendererTerrain.ts's
+   * remeshTerrainRegion can call it without importing
+   * GameRendererSceneSetup.ts directly (would cycle).
    */
   private refreshPanLeash(): void {
-    const handle = this.landscapeHandle;
-    if (!handle) return;
-    const rect = handle.playableRect;
-    const centerX = (rect.minX + rect.maxX) / 2;
-    const centerZ = (rect.minZ + rect.maxZ) / 2;
-    const half = handle.map.extentHalf;
-    this.sm.cameraController.setPanLeash(
-      { minX: centerX - half, minZ: centerZ - half, maxX: centerX + half, maxZ: centerZ + half },
-      PAN_LEASH_MARGIN,
-    );
+    const deps = this.sceneSetupDeps();
+    refreshPanLeash(deps);
+    this.applySceneSetupDeps(deps);
   }
 
   private clearAll(): void {
-    this.terrain?.dispose();
-    this.buildings?.clearAll();
-    this.vehicles?.clearAll();
-    this.characters?.clearAll();
-    this.skybox?.dispose();
-    this.clouds?.dispose();
-    if (this.borderWall) this.sm.postPipeline.removeOverlayObject(this.borderWall.object3d);
-    this.borderWall?.dispose();
-    this.birds?.dispose();
-    this.smoke?.dispose();
-    this.water?.dispose();
-    this.vegetation?.dispose();
-    this.dustDevils?.dispose();
-    this.fireflies?.dispose();
-    this.fragments?.dispose();
-    this.blastEffects?.dispose();
-    this.landscape?.dispose();
-    this.blastOverlay?.dispose();
-    this.ghosts?.dispose();
-    this.taskProgress?.dispose();
+    const deps = this.sceneSetupDeps();
+    clearAll(deps);
+    this.applySceneSetupDeps(deps);
+  }
 
-    this.terrain = null;
-    this.landscapeHandle = null;
-    this.lastCutBounds = '';
-    // Force one resync on the next syncEntities() call after a fresh load —
-    // the reset game state's ghostPreviewsRevision restarts at 0, which would
-    // otherwise equal a stale lastGhostRevision left over from the previous
-    // level (#761).
-    this.lastGhostRevision = -1;
-    this.lastSyncedTerrainRevision = -1;
-    this.buildings = null;
-    this.vehicles = null;
-    this.characters = null;
-    this.skybox = null;
-    this.borderWall = null;
-    this.windState = null;
-    this.clouds = null;
-    this.birds = null;
-    this.smoke = null;
-    this.water = null;
-    this.vegetation = null;
-    this.dustDevils = null;
-    this.fireflies = null;
-    this.fragments = null;
-    this.blastEffects = null;
-    this.landscape = null;
-    this.blastOverlay = null;
-    this.ghosts = null;
-    this.taskProgress = null;
-    this.lastGrid = null;
+  /**
+   * Threaded into SceneSetupDeps so buildLandscapeMesh can call it without
+   * importing GameRendererTerrain.ts's rebuildBorderWall's own module
+   * cyclically — both live behind this same-class indirection. Takes the
+   * in-flight `sceneDeps` (not `this`) so it reads/writes the same object
+   * loadGame()'s chained call is mutating — building a TerrainDeps from
+   * stale `this` fields here caused #767's stale-closure regression.
+   */
+  private rebuildBorderWallCallback(sceneDeps: SceneSetupDeps, ctx: MiningContext): void {
+    const deps = this.terrainDepsFrom(sceneDeps);
+    rebuildBorderWall(deps, ctx);
+    this.copyTerrainDepsInto(sceneDeps, deps);
+  }
 
-    this.renderedBuildingIds.clear();
-    this.renderedVehicleIds.clear();
-    this.renderedEmployeeIds.clear();
+  /** Threaded into SceneSetupDeps for the same reason as rebuildBorderWallCallback above. */
+  private siteBoundsChangedCallback(sceneDeps: SceneSetupDeps, grid: VoxelGrid | null): boolean {
+    const deps = this.terrainDepsFrom(sceneDeps);
+    const changed = siteBoundsChanged(deps, grid);
+    this.copyTerrainDepsInto(sceneDeps, deps);
+    return changed;
+  }
+
+  /** Build a TerrainDeps view onto an in-flight SceneSetupDeps's live fields, instead of `this`'s possibly-stale ones. */
+  private terrainDepsFrom(sceneDeps: SceneSetupDeps): TerrainDeps {
+    return {
+      terrain: sceneDeps.terrain,
+      lastGrid: sceneDeps.lastGrid,
+      terrainMeshRevision: sceneDeps.terrainMeshRevision,
+      lastCutBounds: sceneDeps.lastCutBounds,
+      landscape: sceneDeps.landscape,
+      landscapeHandle: sceneDeps.landscapeHandle,
+      borderWall: sceneDeps.borderWall,
+      sm: this.sm,
+      refreshPanLeash: () => this.refreshPanLeash(),
+    };
+  }
+
+  /** Copy a TerrainDeps' mutated fields back onto the in-flight SceneSetupDeps it was built from. */
+  private copyTerrainDepsInto(sceneDeps: SceneSetupDeps, deps: TerrainDeps): void {
+    sceneDeps.terrain = deps.terrain;
+    sceneDeps.lastGrid = deps.lastGrid;
+    sceneDeps.terrainMeshRevision = deps.terrainMeshRevision;
+    sceneDeps.lastCutBounds = deps.lastCutBounds;
+    sceneDeps.landscape = deps.landscape;
+    sceneDeps.landscapeHandle = deps.landscapeHandle;
+    sceneDeps.borderWall = deps.borderWall;
+  }
+
+  private terrainDeps(): TerrainDeps {
+    return {
+      terrain: this.terrain,
+      lastGrid: this.lastGrid,
+      terrainMeshRevision: this.terrainMeshRevision,
+      lastCutBounds: this.lastCutBounds,
+      landscape: this.landscape,
+      landscapeHandle: this.landscapeHandle,
+      borderWall: this.borderWall,
+      sm: this.sm,
+      refreshPanLeash: () => this.refreshPanLeash(),
+    };
+  }
+
+  private applyTerrainDeps(deps: TerrainDeps): void {
+    this.terrain = deps.terrain;
+    this.lastGrid = deps.lastGrid;
+    this.terrainMeshRevision = deps.terrainMeshRevision;
+    this.lastCutBounds = deps.lastCutBounds;
+    this.landscape = deps.landscape;
+    this.landscapeHandle = deps.landscapeHandle;
+    this.borderWall = deps.borderWall;
+  }
+
+  private sceneSetupDeps(): SceneSetupDeps {
+    const deps: SceneSetupDeps = {
+      sm: this.sm,
+      terrain: this.terrain,
+      buildings: this.buildings,
+      vehicles: this.vehicles,
+      characters: this.characters,
+      taskProgress: this.taskProgress,
+      skybox: this.skybox,
+      windState: this.windState,
+      clouds: this.clouds,
+      birds: this.birds,
+      smoke: this.smoke,
+      water: this.water,
+      vegetation: this.vegetation,
+      dustDevils: this.dustDevils,
+      fireflies: this.fireflies,
+      ambientUniforms: this.ambientUniforms,
+      fragments: this.fragments,
+      fragmentAnimator: this.fragmentAnimator,
+      blastEffects: this.blastEffects,
+      landscape: this.landscape,
+      landscapeHandle: this.landscapeHandle,
+      borderWall: this.borderWall,
+      blastOverlay: this.blastOverlay,
+      ghosts: this.ghosts,
+      lastGrid: this.lastGrid,
+      lastCutBounds: this.lastCutBounds,
+      terrainMeshRevision: this.terrainMeshRevision,
+      lastGhostRevision: this.lastGhostRevision,
+      lastSyncedTerrainRevision: this.lastSyncedTerrainRevision,
+      renderedBuildingIds: this.renderedBuildingIds,
+      renderedVehicleIds: this.renderedVehicleIds,
+      renderedEmployeeIds: this.renderedEmployeeIds,
+      // Placeholders — reassigned below once `deps` exists, so these three
+      // callbacks close over the in-flight `deps` object instead of `this`.
+      // loadGame()'s chained buildPlayableMesh -> buildLandscapeMesh ->
+      // buildAmbient -> frameCameraOnGrid call shares one `deps` without any
+      // intermediate applySceneSetupDeps(), so a `this`-bound callback would
+      // read fields `deps` had already moved past (#767 regression).
+      getTerrainSurfaceY: () => 0,
+      landscapeEdgeHeightSampler: ctx => landscapeEdgeHeightSampler(ctx),
+      playableCut: grid => playableCut(grid),
+      rebuildBorderWall: () => {},
+      siteBoundsChanged: () => false,
+    };
+    deps.getTerrainSurfaceY = (x, z) => getTerrainSurfaceY(deps.lastGrid, x, z);
+    deps.rebuildBorderWall = ctx => this.rebuildBorderWallCallback(deps, ctx);
+    deps.siteBoundsChanged = grid => this.siteBoundsChangedCallback(deps, grid);
+    return deps;
+  }
+
+  private applySceneSetupDeps(deps: SceneSetupDeps): void {
+    this.terrain = deps.terrain;
+    this.buildings = deps.buildings;
+    this.vehicles = deps.vehicles;
+    this.characters = deps.characters;
+    this.taskProgress = deps.taskProgress;
+    this.skybox = deps.skybox;
+    this.windState = deps.windState;
+    this.clouds = deps.clouds;
+    this.birds = deps.birds;
+    this.smoke = deps.smoke;
+    this.water = deps.water;
+    this.vegetation = deps.vegetation;
+    this.dustDevils = deps.dustDevils;
+    this.fireflies = deps.fireflies;
+    this.fragments = deps.fragments;
+    this.fragmentAnimator = deps.fragmentAnimator;
+    this.blastEffects = deps.blastEffects;
+    this.landscape = deps.landscape;
+    this.landscapeHandle = deps.landscapeHandle;
+    this.borderWall = deps.borderWall;
+    this.blastOverlay = deps.blastOverlay;
+    this.ghosts = deps.ghosts;
+    this.lastGrid = deps.lastGrid;
+    this.lastCutBounds = deps.lastCutBounds;
+    this.terrainMeshRevision = deps.terrainMeshRevision;
+    this.lastGhostRevision = deps.lastGhostRevision;
+    this.lastSyncedTerrainRevision = deps.lastSyncedTerrainRevision;
+  }
+
+  private blastVisualsDeps(): BlastVisualsDeps {
+    return {
+      terrain: this.terrain,
+      lastGrid: this.lastGrid,
+      blastOverlay: this.blastOverlay,
+      fragments: this.fragments,
+      fragmentAnimator: this.fragmentAnimator,
+      blastEffects: this.blastEffects,
+      birds: this.birds,
+      getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
+    };
+  }
+
+  private pickingDeps(): PickingDeps {
+    return {
+      terrain: this.terrain,
+      landscape: this.landscape,
+      buildings: this.buildings,
+      vehicles: this.vehicles,
+      characters: this.characters,
+      fragments: this.fragments,
+      blastOverlay: this.blastOverlay,
+      getTerrainSurfaceY: (x, z) => this.getTerrainSurfaceY(x, z),
+    };
   }
 }

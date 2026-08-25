@@ -294,6 +294,36 @@ describe('GameRenderer — camera framing', () => {
     renderer.syncFromContext(ctx);
     expect(sm.cameraController.frameSite).not.toHaveBeenCalled();
   });
+
+  it('frames on the surface height computed mid-load, not a stale pre-load value (#767)', () => {
+    // A fresh grid (never seen by this renderer before) takes syncFromContext()'s
+    // combined loadGame() path — buildPlayableMesh -> buildLandscapeMesh ->
+    // buildAmbient -> frameCameraOnGrid, all sharing one un-applied `deps`
+    // object built once by sceneSetupDeps(). #767's regression had
+    // frameCameraOnGrid's getTerrainSurfaceY callback close over `this`
+    // instead of that in-flight `deps`, so it read `this.lastGrid` — still
+    // null mid-chain, since applySceneSetupDeps() only runs after the whole
+    // chained call returns — and framed on a stale y=0 instead of the
+    // surface buildPlayableMesh had just bound moments earlier.
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    // Solid column under the grid's center (16, 16, the point
+    // frameCameraOnGrid frames on) up to y=9 — surface sits at y=10
+    // (getTerrainSurfaceY returns the topmost solid voxel + 1).
+    for (let y = 0; y <= 9; y++) {
+      ctx.grid!.setVoxel(16, y, 16, { composition: { rocks: [] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+    }
+
+    renderer.syncFromContext(ctx);
+
+    expect(sm.cameraController.frameSite).toHaveBeenCalled();
+    const [cx, y, cz, span] = sm.cameraController.frameSite.mock.calls.at(-1)!;
+    expect(cx).toBe(16);
+    expect(cz).toBe(16);
+    expect(span).toBe(32);
+    expect(y).toBe(10); // not 0 — the stale-closure regression's symptom
+  });
 });
 
 describe('GameRenderer — wind and clouds (#458 T7.1/D12)', () => {
@@ -343,6 +373,48 @@ describe('GameRenderer — wind and clouds (#458 T7.1/D12)', () => {
     for (let i = 0; i < 200; i++) renderer.update(0.05);
 
     expect(uniforms['uCloudCoverage']!.value as number).toBeGreaterThan(0.9);
+  });
+});
+
+describe('GameRenderer — lastWeather guard, no skybox (#767)', () => {
+  it('syncGameRendererEntities leaves lastWeather unset when skybox is null, even with a weatherCycle present', async () => {
+    // #767's split briefly dropped the pre-split guard (`this.skybox &&
+    // ctx.weatherCycle`) — syncGameRendererEntities() always computed
+    // lastWeather from weatherCycle alone (defaulting to 'sunny' with no
+    // weatherCycle at all) and GameRenderer.ts copied it back
+    // unconditionally, so a null skybox no longer blocked the write. Drives
+    // the exported sync function directly, since skybox is only ever null
+    // through the public API before a game is loaded or after dispose() —
+    // states where weatherCycle/lastGrid aren't independently constructible.
+    const { syncGameRendererEntities } = await import('../../../src/renderer/GameRendererSync.js');
+    const { createWeatherCycle } = await import('../../../src/core/weather/WeatherCycle.js');
+    const state = createGame({ seed: 42, startingCash: 100_000 });
+    const weatherCycle = createWeatherCycle(42);
+    weatherCycle.current = 'storm';
+
+    const result = syncGameRendererEntities({
+      state,
+      weatherCycle,
+      buildings: null,
+      renderedBuildingIds: new Set(),
+      vehicles: null,
+      renderedVehicleIds: new Set(),
+      characters: null,
+      renderedEmployeeIds: new Set(),
+      lastGrid: null,
+      ghosts: null,
+      lastGhostRevision: -1,
+      terrainMeshRevision: 0,
+      lastSyncedTerrainRevision: -1,
+      taskProgress: null,
+      skybox: null, // guard should block the write regardless of weatherCycle
+      clouds: null,
+      zone: null,
+      getTerrainSurfaceY: () => 0,
+      syncSurveyOverlay: () => {},
+    });
+
+    expect(result.lastWeather).toBeUndefined();
   });
 });
 
