@@ -11,6 +11,16 @@
  */
 
 /**
+ * Default inner deadline (ms) for a `waitForTutorialStep` action whose own
+ * `timeout` field is absent. Shared so `interaction-executor.ts` (which
+ * applies it) and `scenario-utils.ts`'s `effectiveStepTimeoutMs` (which must
+ * fold the identical value into its outer-timeout margin computation, or the
+ * two silently drift out of lockstep) read one source instead of repeating
+ * the bare literal.
+ */
+export const WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS = 30000;
+
+/**
  * A single interaction action within a scenario step.
  * Covers all supported Puppeteer interaction types.
  */
