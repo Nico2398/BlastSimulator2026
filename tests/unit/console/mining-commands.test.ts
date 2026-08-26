@@ -11,6 +11,7 @@ import {
   cancelRampCommand,
   chargeCommand,
   drillPlanCommand,
+  previewCommand,
   sequenceCommand,
   surveyCommand,
   tubingCommand,
@@ -1745,5 +1746,168 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     // The cancelled segment's own action/ghost are gone.
     expect(ctx.state!.pendingActions.find(a => a.id === targetTracker.actionId)).toBeUndefined();
     expect(ctx.state!.ghostPreviews.find(g => g.id === targetTracker.actionId)).toBeUndefined();
+  });
+});
+
+// ── #790 characterization tests ─────────────────────────────────────────────
+// The refactor extracts requireGameWithSub/dispatchDrillHoleAction/
+// assembleCurrentBlastPlan/validateCurrentBlastPlan/formatBlastPlanErrors as
+// shared helpers behind drillPlanCommand/sequenceCommand/blastPlanCommand/
+// tubingCommand/previewCommand's existing bodies. These tests pin the current,
+// pre-refactor observable behavior of those public command functions so the
+// refactor can be proven behavior-preserving: they pass today against the
+// unmodified bodies and must keep passing unchanged once the helpers are
+// wired in.
+
+// ── Cluster 1 — no-game-loaded guard, one command each that currently has no
+// dedicated test for it (#790) ──────────────────────────────────────────────
+
+describe('drillPlanCommand — requires a loaded game', () => {
+  it('returns success:false with "No game loaded" when ctx.state is null', () => {
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const result = drillPlanCommand(ctx, ['grid'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+});
+
+describe('sequenceCommand — requires a loaded game', () => {
+  it('returns success:false with "No game loaded" when ctx.state is null', () => {
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const result = sequenceCommand(ctx, ['set'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+});
+
+describe('blastPlanCommand — requires a loaded game', () => {
+  it('returns success:false with "No game loaded" when ctx.state is null', () => {
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const result = blastPlanCommand(ctx, ['save'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+});
+
+describe('tubingCommand — requires a loaded game', () => {
+  it('returns success:false with "No game loaded" when ctx.state is null', () => {
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const result = tubingCommand(ctx, ['buy'], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('No game loaded');
+  });
+});
+
+// ── Cluster 2 — drill_plan add's dispatched action, currently unasserted in
+// payload detail (#790) ─────────────────────────────────────────────────────
+
+describe('drillPlanCommand — add subcommand dispatch (#790 characterization)', () => {
+  it('queues one drill_hole PendingAction with the expected payload', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.15' });
+
+    expect(result.success).toBe(true);
+    const drillActions = ctx.state!.pendingActions.filter(a => a.type === 'drill_hole');
+    expect(drillActions).toHaveLength(1);
+    const action = drillActions[0]!;
+    expect(action.requiredSkill).toBe('blasting');
+    expect(action.requiredVehicleRole).toBe('drill_rig');
+    expect(action.targetX).toBe(5);
+    expect(action.targetZ).toBe(5);
+    expect(action.payload['depth']).toBe(8);
+    expect(action.payload['diameter']).toBe(0.15);
+    expect(typeof action.payload['durationTicks']).toBe('number');
+    expect(action.payload['durationTicks'] as number).toBeGreaterThan(0);
+  });
+
+  it('pushes the new hole into plannedDrillHoles', () => {
+    const ctx = makeMiningContext();
+
+    const result = drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.15' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedDrillHoles).toHaveLength(1);
+    const action = ctx.state!.pendingActions.find(a => a.type === 'drill_hole')!;
+    expect(ctx.state!.plannedDrillHoles[0]!.id).toBe(action.payload['holeId']);
+  });
+
+  it('is additive — a prior grid plan survives a following add', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '6' });
+    const gridCount = ctx.state!.plannedDrillHoles.length;
+    expect(gridCount).toBe(2);
+
+    drillPlanCommand(ctx, ['add'], { x: '5', z: '5', depth: '8', diameter: '0.15' });
+
+    expect(ctx.state!.plannedDrillHoles.length).toBe(gridCount + 1);
+  });
+});
+
+// ── Cluster 3 — previewCommand has zero direct test coverage today (#790) ──
+
+describe('previewCommand (#790 characterization)', () => {
+  /**
+   * Mirrors blast_preview's own makePlan helper above: a single-hole plan
+   * (1 hole, 1 charge, 1 sequence delay), optionally at a given software tier.
+   */
+  function makePlan(ctx: MiningContext, tier?: number): void {
+    if (tier !== undefined) ctx.state!.softwareTier = tier;
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+  }
+
+  it('returns the usage message with no subcommand', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 4);
+
+    const result = previewCommand(ctx, [], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: preview energy|fragments|projections|vibrations');
+  });
+
+  it('tier 0 — energy/fragments/projections/vibrations all require higher tier', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 0);
+
+    const energy = previewCommand(ctx, ['energy'], {});
+    expect(energy.success).toBe(false);
+    expect(energy.output).toBe('Requires software tier 1+ (current: 0)');
+
+    const fragments = previewCommand(ctx, ['fragments'], {});
+    expect(fragments.success).toBe(false);
+    expect(fragments.output).toBe('Requires software tier 2+ (current: 0)');
+
+    const projections = previewCommand(ctx, ['projections'], {});
+    expect(projections.success).toBe(false);
+    expect(projections.output).toBe('Requires software tier 3+ (current: 0)');
+
+    const vibrations = previewCommand(ctx, ['vibrations'], {});
+    expect(vibrations.success).toBe(false);
+    expect(vibrations.output).toBe('Requires software tier 4+ (current: 0)');
+  });
+
+  it('tier 1+ — energy sub returns a populated summary', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 1);
+
+    const result = previewCommand(ctx, ['energy'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toMatch(/^Energy preview: \d+ voxels, max=[\d.]+, min=[\d.]+$/);
+  });
+
+  it('unknown subcommand returns the usage message', () => {
+    const ctx = makeMiningContext();
+    makePlan(ctx, 4);
+
+    const result = previewCommand(ctx, ['bogus'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Usage: preview energy|fragments|projections|vibrations');
   });
 });
