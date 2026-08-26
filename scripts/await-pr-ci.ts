@@ -191,10 +191,8 @@ export function latestRunPerWorkflow(runs: WorkflowRun[]): WorkflowRun[] {
 }
 
 function jobDurationMs(job: WorkflowJob): number {
-  // TODO(#772): implement in impl phase, using PHANTOM_JOB_MAX_DURATION_MS.
-  void job;
-  void PHANTOM_JOB_MAX_DURATION_MS;
-  throw new Error('not implemented');
+  if (!job.started_at || !job.completed_at) return 0;
+  return new Date(job.completed_at).getTime() - new Date(job.started_at).getTime();
 }
 
 /**
@@ -202,10 +200,8 @@ function jobDurationMs(job: WorkflowJob): number {
  * (matrix never expanded), or every job cancelled at ~0 duration.
  */
 export function isPhantomCancelledRun(jobs: WorkflowJob[]): boolean {
-  // TODO(#772): implement in impl phase, using jobDurationMs per job.
-  void jobs;
-  void jobDurationMs;
-  throw new Error('not implemented');
+  if (jobs.length === 0) return true;
+  return jobs.every((job) => job.conclusion === 'cancelled' && jobDurationMs(job) <= PHANTOM_JOB_MAX_DURATION_MS);
 }
 
 /**
@@ -220,10 +216,35 @@ export function dropPhantomCancelledRuns(
   runs: WorkflowRun[],
   fetchJobs: (runId: number) => WorkflowJob[]
 ): WorkflowRun[] {
-  // TODO(#772): implement in impl phase
-  void runs;
-  void fetchJobs;
-  throw new Error('not implemented');
+  const byWorkflow = new Map<number, WorkflowRun[]>();
+  for (const run of runs) {
+    const group = byWorkflow.get(run.workflow_id);
+    if (group) group.push(run);
+    else byWorkflow.set(run.workflow_id, [run]);
+  }
+
+  const toDrop = new Set<number>();
+  for (const [workflowId, group] of byWorkflow) {
+    if (group.length < 2) continue;
+
+    const cancelled = group.filter((run) => run.status === 'completed' && run.conclusion === 'cancelled');
+    if (cancelled.length === 0) continue;
+
+    const phantomRuns = cancelled.filter((run) => isPhantomCancelledRun(fetchJobs(run.id)));
+    if (phantomRuns.length === 0) continue;
+
+    if (phantomRuns.length === group.length) {
+      console.error(
+        `await-pr-ci: every run of workflow_id ${workflowId} looks phantom-cancelled `
+        + '(no jobs ever ran) — keeping all of them since none has real data to fall back on.'
+      );
+      continue;
+    }
+
+    for (const run of phantomRuns) toDrop.add(run.id);
+  }
+
+  return runs.filter((run) => !toDrop.has(run.id));
 }
 
 /**
@@ -394,13 +415,14 @@ async function main(): Promise<number> {
       return 3;
     }
 
-    const verdict = verdictOf(runs);
-    const latest = latestRunPerWorkflow(runs);
+    const usableRuns = dropPhantomCancelledRuns(runs, jobsForRun);
+    const verdict = verdictOf(usableRuns);
+    const latest = latestRunPerWorkflow(usableRuns);
     const pending = latest.filter((run) => run.status !== 'completed').length;
 
     if (verdict === 'red') {
       console.log(`CI RED — pull request #${pr.number} on ${pr.head.sha.slice(0, 7)}:`);
-      reportFailure(runs);
+      reportFailure(usableRuns);
       console.log('Fix the failure on this branch, push, and wait again. Never end the run on this verdict.');
       return 1;
     }
