@@ -25,6 +25,7 @@ export interface WorkflowJob {
   conclusion: string | null;
   started_at?: string | null;
   completed_at?: string | null;
+  html_url?: string;
 }
 
 /**

@@ -267,16 +267,13 @@ function jobsForRun(runId: number): WorkflowJob[] {
 }
 
 /** Failing jobs, so the caller reads what to fix rather than that something broke. */
-function reportFailure(runs: WorkflowRun[]): void {
+export function reportFailure(runs: WorkflowRun[], fetchJobs: (runId: number) => WorkflowJob[]): void {
   for (const run of latestRunPerWorkflow(runs)) {
     if (run.status !== 'completed' || !RUN_FAILURES.has(run.conclusion ?? '')) continue;
     console.log(`  ✗ ${run.name} — ${run.conclusion}`);
     console.log(`    ${run.html_url}`);
     try {
-      const { jobs } = gh<{ jobs: { name: string; conclusion: string | null; html_url: string }[] }>([
-        'api',
-        `repos/{owner}/{repo}/actions/runs/${run.id}/jobs?per_page=100&filter=latest`,
-      ]);
+      const jobs = fetchJobs(run.id);
       for (const job of jobs) {
         if (job.conclusion && RUN_FAILURES.has(job.conclusion)) {
           console.log(`      job: ${job.name} — ${job.html_url}`);
@@ -349,7 +346,7 @@ async function main(): Promise<number> {
 
     if (verdict === 'red') {
       console.log(`CI RED — pull request #${pr.number} on ${pr.head.sha.slice(0, 7)}:`);
-      reportFailure(usableRuns);
+      reportFailure(usableRuns, cachedJobsForRun);
       console.log('Fix the failure on this branch, push, and wait again. Never end the run on this verdict.');
       return 1;
     }
