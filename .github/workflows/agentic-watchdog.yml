@@ -208,7 +208,7 @@ jobs:
             const PIPELINE_HEAD = /^pipeline\/feature-\d+(?:-\d+)?$/;
             const RUN_FAILURES = ['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'];
 
-            // Kept in shape with `scripts/await-pr-ci.ts` and the fail-safe's own
+            // Kept in shape with `scripts/lib/workflow-verdict.ts` and the fail-safe's own
             // copy: a run on the head is a channel unless it is named here. Read
             // as a path list rather than a `ci.yml` lookup because a red check
             // blocks the merge whichever workflow emitted it (PR #773's was the

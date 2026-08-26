@@ -861,7 +861,7 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
 // case reading GREEN where this action's own equivalent reads every gated
 // label missing) before this test existed. Comparing the two literals
 // directly is what would have caught it before the behavior ever diverged.
-describe('LABEL_GATED_JOBS stays identical between await-pr-ci.ts and this action', () => {
+describe('LABEL_GATED_JOBS stays identical between scripts/lib/label-gated-jobs.ts and this action', () => {
   it('the two array literals are the same value, not just similarly shaped', () => {
     const actionSource = readFileSync(
       join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
