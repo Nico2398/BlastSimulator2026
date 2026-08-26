@@ -64,6 +64,50 @@ jobs:
           pr: ${{ inputs.pr }}
           head: ${{ github.event.workflow_run.head_branch }}
 
+      # The sweep's own last line calls a marked-but-unarmed PR "the last place
+      # it can be said out loud". It was not enough: a failed workflow run is
+      # announced to nobody, so PR #773 sat `unstable` behind a red
+      # `closing-keyword-guard` while this job went red beside it and both were
+      # silence. Saying it out loud has to mean raising an event, and the event
+      # already exists — `agentic-ci-failure.yml` is the fail-safe that hands a
+      # red pull request back to the agent that owns it.
+      #
+      # This is the general path, and deliberately not keyed to any workflow: the
+      # sweep reads *every* run on the head and refuses on any failure, so
+      # dispatching from its refusal covers a red check from a workflow nobody
+      # thought to enumerate — which is the whole class of bug #773 belongs to.
+      # The fail-safe re-applies each of its own guards (pipeline head, not a
+      # draft, no live session, `ci-fix-hold`, the attempt limit), so this decides
+      # nothing; it only makes sure the question gets asked.
+      #
+      # `always()` because the sweep step fails on exactly the PRs this handles.
+      - name: Hand an unmergeable marked PR back to the agent
+        if: always() && steps.merge.outputs.unarmed != ''
+        uses: actions/github-script@v7
+        env:
+          UNARMED: ${{ steps.merge.outputs.unarmed }}
+        with:
+          github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          script: |
+            const prs = (process.env.UNARMED || '').split(/\s+/).filter(Boolean);
+            for (const pr of prs) {
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'agentic-ci-failure.yml',
+                  ref: context.payload.repository?.default_branch || 'main',
+                  inputs: { pr: String(pr) }
+                });
+                core.info(`#${pr}: marked but unmergeable — handed to the CI fail-safe.`);
+              } catch (error) {
+                // Never fail this step on the dispatch: the sweep has already
+                // gone red for these PRs, and the watchdog re-raises them on its
+                // next pass. Losing the fast path is not worth losing the report.
+                core.warning(`#${pr}: could not dispatch the CI fail-safe: ${error.message}`);
+              }
+            }
+
       # `always()`: the sweep fails the job when a marked PR ends unarmed, and
       # that is precisely the run whose numbers are worth printing.
       - name: Report

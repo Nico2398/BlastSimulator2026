@@ -17,42 +17,10 @@
 // audited `BOOTSTRAP_COMMAND_ALLOWLIST`.
 
 import { describe, it, expect } from 'vitest';
-import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
-import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { scenarioFiles, SCENARIO_DIR, collectScenarioViolations, formatScenarioViolations } from '../../../scripts/shared/scenario-utils.js';
 import { isAllowedBootstrapCommand } from '../../../scripts/shared/interaction-executor.js';
 
 const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
-
-interface RoleViolation {
-  file: string;
-  stepIndex: number;
-  command: string;
-}
-
-function formatViolations(violations: RoleViolation[]): string {
-  return violations
-    .map((v) => `  ${v.file}.json step[${v.stepIndex}] ("${v.command}")`)
-    .join('\n');
-}
-
-// Shared enumeration: walk every scenario file's every step, collecting the
-// ones for which `isViolation` returns true. Each `it` below supplies only
-// its own predicate (which is also responsible for skipping steps it does
-// not apply to, by returning false) — the file/step traversal and violation
-// bookkeeping live here once.
-function collectViolations(isViolation: (step: ScenarioStepDef) => boolean): RoleViolation[] {
-  const violations: RoleViolation[] = [];
-  for (const file of ALL_SCENARIO_NAMES) {
-    const scenario = loadScenarioDef(file, SCENARIO_DIR);
-    scenario.steps.forEach((rawStep, stepIndex) => {
-      const step = rawStep as ScenarioStepDef;
-      if (isViolation(step)) {
-        violations.push({ file, stepIndex, command: step.command });
-      }
-    });
-  }
-  return violations;
-}
 
 describe('repo-wide — every scenario step has a role (issue #515)', () => {
   it('sanity: the scenario directory is non-empty (guards against a silently broken glob)', () => {
@@ -60,20 +28,21 @@ describe('repo-wide — every scenario step has a role (issue #515)', () => {
   });
 
   it('every scenario step has a role', () => {
-    const violations = collectViolations((step) => step.role === undefined);
+    const violations = collectScenarioViolations((step) => step.role === undefined, ALL_SCENARIO_NAMES);
     expect(
       violations,
-      `${violations.length} scenario step(s) missing role:\n${formatViolations(violations)}`,
+      `${violations.length} scenario step(s) missing role:\n${formatScenarioViolations(violations)}`,
     ).toEqual([]);
   });
 
   it('every guard-role step proves a control is disabled', () => {
-    const violations = collectViolations(
+    const violations = collectScenarioViolations(
       (step) => step.role === 'guard' && step.expect?.blocked === undefined,
+      ALL_SCENARIO_NAMES,
     );
     expect(
       violations,
-      `${violations.length} guard-role step(s) with no expect.blocked:\n${formatViolations(violations)}`,
+      `${violations.length} guard-role step(s) with no expect.blocked:\n${formatScenarioViolations(violations)}`,
     ).toEqual([]);
   });
 
@@ -88,13 +57,14 @@ describe('repo-wide — every scenario step has a role (issue #515)', () => {
       () => isAllowedBootstrapCommand('employee assign_skill 1 skill:geology level:3'),
     ).not.toThrow();
 
-    const violations = collectViolations(
+    const violations = collectScenarioViolations(
       (step) => step.role === 'bootstrap' && !isAllowedBootstrapCommand(step.command),
+      ALL_SCENARIO_NAMES,
     );
     expect(
       violations,
       `${violations.length} bootstrap-role step(s) with a command outside `
-      + `BOOTSTRAP_COMMAND_ALLOWLIST:\n${formatViolations(violations)}`,
+      + `BOOTSTRAP_COMMAND_ALLOWLIST:\n${formatScenarioViolations(violations)}`,
     ).toEqual([]);
   });
 });

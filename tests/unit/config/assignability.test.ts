@@ -34,15 +34,17 @@ interface FakeIssue {
   isPullRequest?: boolean;
   prMergedAt?: string | null;
   /** The PR from this issue's own `pipeline/feature-<N>[-<runId>]` branch, if one exists. */
-  pipelinePr?: { number: number; merged: boolean } | null;
+  pipelinePr?: { number: number; merged: boolean; labels?: string[]; head?: string } | null;
   /** Head branch that PR sits on. Defaults to the bare pre-convention name. */
   pipelineBranch?: string;
   /** PRs GitHub records as closing this issue (open and merged only). */
-  closers?: { number: number; merged: boolean }[];
+  closers?: { number: number; merged: boolean; labels?: string[]; head?: string }[];
   /** The deliverable-PR read failed — callers must fail closed. */
   deliverableUnknown?: boolean;
   /** When `blocked` was last applied, epoch ms. */
   blockedAt?: number | null;
+  /** When `paused` was last applied, epoch ms. */
+  pausedAt?: number | null;
   /** Whether a run ever owned this issue (it carried `in-progress` at some point). */
   everInProgress?: boolean;
   /** Issue numbers GitHub records as blocking this one (the Relationships panel). */
@@ -72,6 +74,7 @@ const issue = (partial: FakeIssue): Required<FakeIssue> => ({
   closers: [],
   deliverableUnknown: false,
   blockedAt: null,
+  pausedAt: null,
   everInProgress: true,
   blockedBy: [],
   relationshipsUnknown: false,
@@ -94,10 +97,18 @@ function fakeApi(issues: FakeIssue[], options: { lastMergeAt?: number | null } =
       return byNumber.get(number) ?? null;
     },
     async deliverableFor(number: number) {
+      // `labels` defaults to empty, which is what a degraded read produces too —
+      // and empty must read as "not paused", so the rules block rather than
+      // resume onto a branch they could not confirm.
+      const withLabels = (pr: { number: number; merged: boolean; labels?: string[]; head?: string }) => ({
+        labels: [],
+        head: null,
+        ...pr,
+      });
       const found = byNumber.get(number);
       return {
-        pipeline: found?.pipelinePr ?? null,
-        closers: found?.closers ?? [],
+        pipeline: found?.pipelinePr ? withLabels(found.pipelinePr) : null,
+        closers: (found?.closers ?? []).map(withLabels),
         unknown: found?.deliverableUnknown ?? false,
       };
     },
@@ -109,8 +120,9 @@ function fakeApi(issues: FakeIssue[], options: { lastMergeAt?: number | null } =
         unknown: found?.relationshipsUnknown ?? false,
       };
     },
-    async blockedLabelledAt(number: number) {
-      return byNumber.get(number)?.blockedAt ?? null;
+    async labelAppliedAt(number: number, label: string) {
+      const found = byNumber.get(number);
+      return (label === 'paused' ? found?.pausedAt : found?.blockedAt) ?? null;
     },
     async everCarriedInProgress(number: number) {
       return byNumber.get(number)?.everInProgress ?? true;
@@ -598,6 +610,173 @@ describe('picking the next issue', () => {
   });
 });
 
+// A run that stops on a dependency it filed does not need a human, so it does
+// not take its issue out of the queue: the issue goes back to `ready` with that
+// dependency as its `Blocked by`, and the queue returns to it once the
+// dependency lands. What that costs is the open pull request holding the partial
+// work — which every other rule here reads as "a run is in flight, keep clear".
+// The `paused` label on the PR is what separates a handover from a collision.
+describe('resuming a paused run', () => {
+  const pausedPr = (number: number, head?: string) => ({
+    number,
+    merged: false,
+    labels: ['paused'],
+    ...(head ? { head } : {}),
+  });
+
+  it('does not refuse an issue whose only open PR is the paused handover', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['ready', 'paused'], pipelinePr: pausedPr(99) },
+    ]);
+    const { issue } = await select(api);
+    expect(issue?.number).toBe(20);
+  });
+
+  // The label is not blocking on its own — the dependency is. An issue whose
+  // blocker is still open stays out, exactly as it would without the pause.
+  it('still holds a paused issue back while its dependency is open', async () => {
+    const api = fakeApi([
+      { number: 10, labels: ['ready'] },
+      {
+        number: 20,
+        labels: ['ready', 'paused'],
+        body: '## Blocked by\n- #10\n',
+        pipelinePr: pausedPr(99),
+      },
+    ]);
+    const { issue } = await select(api);
+    expect(issue?.number).toBe(10);
+  });
+
+  it('picks the paused issue up again once its dependency has merged', async () => {
+    const api = fakeApi([
+      { number: 10, state: 'closed', closers: [{ number: 11, merged: true }] },
+      {
+        number: 20,
+        labels: ['ready', 'paused'],
+        body: '## Blocked by\n- #10\n',
+        pipelinePr: pausedPr(99),
+      },
+    ]);
+    const { issue } = await select(api);
+    expect(issue?.number).toBe(20);
+  });
+
+  // The carve-out is exactly one label wide. Anything else open against the
+  // issue is a live run, and #547's collision reasoning is unchanged.
+  it('still refuses an issue whose open PR is not a handover', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['ready'], pipelinePr: { number: 99, merged: false } },
+    ]);
+    const { issue, reason } = await select(api);
+    expect(issue).toBeNull();
+    expect(reason).toContain('no assignable ready issue');
+  });
+
+  // Fail closed on the mix: a paused handover plus a live PR is still a live
+  // run, and resuming into it would collide with the branch that run is on.
+  it('refuses when a live PR is open alongside the handover', async () => {
+    const api = fakeApi([
+      {
+        number: 20,
+        labels: ['ready', 'paused'],
+        pipelinePr: pausedPr(99),
+        closers: [{ number: 100, merged: false }],
+      },
+    ]);
+    const { issue } = await select(api);
+    expect(issue).toBeNull();
+  });
+
+  // A degraded read produces no labels. That must read as "not paused" and
+  // block, never as a handover to push commits onto.
+  it('treats an open PR whose labels could not be read as live, not paused', async () => {
+    const api = fakeApi([
+      { number: 20, labels: ['ready', 'paused'], pipelinePr: { number: 99, merged: false } },
+    ]);
+    const { issue } = await select(api);
+    expect(issue).toBeNull();
+  });
+
+  // #730, 25 Aug 2026. Its handover PR #740 also carried `Closes #758` for a
+  // defect the same run fixed in passing, so #758's own assignment was answered
+  // with #730's handover and told to continue on `pipeline/feature-730-*`. The
+  // carve-out has to be this issue's own handover, not any paused PR that
+  // happens to close it.
+  it("does not exempt an issue for another issue's handover", async () => {
+    const api = fakeApi([
+      {
+        number: 758,
+        labels: ['ready'],
+        closers: [
+          { number: 740, merged: false, labels: ['paused'], head: 'pipeline/feature-730-32642264036' },
+        ],
+      },
+    ]);
+    const { issue, reason } = await select(api);
+    expect(issue).toBeNull();
+    expect(reason).toContain('no assignable ready issue');
+  });
+
+  // The other half of the same incident, and the symptom a human sees: the run
+  // that took over #730's branch removed `paused` from PR #740 and marked it
+  // ready, so #730 dropped out of the queue and every assignment after it took
+  // some other issue. The refusal itself is correct — what must not happen is
+  // reaching this state, which the test above now prevents.
+  it('refuses an issue whose handover has been unpaused by another run', async () => {
+    const api = fakeApi([
+      {
+        number: 730,
+        labels: ['ready', 'paused'],
+        pipelinePr: { number: 740, merged: false, labels: ['full-ci'] },
+      },
+    ]);
+    const { issue } = await select(api);
+    expect(issue).toBeNull();
+  });
+
+  describe('naming the branch the next run continues', () => {
+    it('reports the paused PR and its head', () => {
+      const target = rules.resumeTargetFor({
+        pipeline: pausedPr(99, 'pipeline/feature-20-123'),
+        closers: [],
+      });
+      expect(target).toEqual({ number: 99, head: 'pipeline/feature-20-123' });
+    });
+
+    // A handover is the PR on this issue's own branch, and `deliverableFor`
+    // reports that one — and only that one — as `pipeline`. A closer is any PR
+    // whose body writes `Closes #N`, which says nothing about its branch, so it
+    // can be another issue's handover. #730's was: PR #740 sat on
+    // `pipeline/feature-730-32642264036` carrying `Closes #758`, and answering
+    // #758's assignment with it sent that run onto #730's branch.
+    it('reports nothing for a paused PR that only closes the issue', () => {
+      expect(
+        rules.resumeTargetFor({
+          pipeline: null,
+          closers: [pausedPr(740, 'pipeline/feature-730-32642264036')],
+        })
+      ).toBeNull();
+    });
+
+    it('reports nothing when no open PR is paused', () => {
+      expect(
+        rules.resumeTargetFor({ pipeline: { number: 99, merged: false, labels: [] }, closers: [] })
+      ).toBeNull();
+    });
+
+    // A merged PR is finished work, not a handover to continue.
+    it('reports nothing for a merged PR that still carries the label', () => {
+      expect(
+        rules.resumeTargetFor({
+          pipeline: { number: 99, merged: true, labels: ['paused'] },
+          closers: [],
+        })
+      ).toBeNull();
+    });
+  });
+});
+
 describe('the cascade brake', () => {
   const HOUR = 60 * 60 * 1000;
   const now = Date.parse('2026-08-11T12:00:00Z');
@@ -618,7 +797,7 @@ describe('the cascade brake', () => {
       ],
       { lastMergeAt }
     );
-    expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(2);
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(2);
   });
 
   // A merged pipeline PR is proof the loop can still finish something, so it
@@ -627,7 +806,7 @@ describe('the cascade brake', () => {
     const api = fakeApi([blockedAt(1, lastMergeAt - HOUR), blockedAt(2, lastMergeAt - 2 * HOUR)], {
       lastMergeAt,
     });
-    expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(0);
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(0);
   });
 
   // With no merge to count from, an unbounded lookback would count every blocked
@@ -640,7 +819,7 @@ describe('the cascade brake', () => {
       ],
       { lastMergeAt: null }
     );
-    expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(1);
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(1);
   });
 
   // #474 is a human note labelled `blocked` by hand — no run ever owned it.
@@ -653,12 +832,61 @@ describe('the cascade brake', () => {
       ],
       { lastMergeAt }
     );
-    expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(1);
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(1);
   });
 
   it('ignores a blocked issue with no labelling event to age', async () => {
     const api = fakeApi([{ number: 1, labels: ['blocked'], blockedAt: null }], { lastMergeAt });
-    expect(await rules.consecutiveBlockedRuns(api, { now })).toBe(0);
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(0);
+  });
+
+  // Both halts count. A pause is the healthier outcome, but a broken `main`
+  // produces a queue full of them just as readily — a brake watching only
+  // `blocked` would sit open while the other label marched through the backlog.
+  it('counts paused runs alongside blocked ones', async () => {
+    const api = fakeApi(
+      [
+        blockedAt(1, lastMergeAt + HOUR),
+        { number: 2, labels: ['ready', 'paused'], pausedAt: lastMergeAt + 2 * HOUR },
+      ],
+      { lastMergeAt }
+    );
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(2);
+  });
+
+  // One run, one halt. An issue wearing both labels has still only failed once.
+  it('counts an issue carrying both labels once', async () => {
+    const api = fakeApi(
+      [
+        {
+          number: 1,
+          labels: ['blocked', 'paused'],
+          blockedAt: lastMergeAt + HOUR,
+          pausedAt: lastMergeAt + 2 * HOUR,
+        },
+      ],
+      { lastMergeAt }
+    );
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(1);
+  });
+
+  // `listForRepo` returns pull requests too, and `paused` is a label this
+  // pipeline puts on pull requests by design. The handover PR is not a second
+  // halted run — the run that opened it already counted through its own issue.
+  it('does not count the paused pull request that carries a handover', async () => {
+    const api = fakeApi(
+      [
+        { number: 1, labels: ['ready', 'paused'], pausedAt: lastMergeAt + HOUR },
+        {
+          number: 99,
+          labels: ['paused'],
+          isPullRequest: true,
+          pausedAt: lastMergeAt + HOUR,
+        },
+      ],
+      { lastMergeAt }
+    );
+    expect(await rules.consecutiveHaltedRuns(api, { now })).toBe(1);
   });
 
   it.each([
@@ -762,7 +990,7 @@ describe('the GitHub half', () => {
         ],
       }),
     });
-    expect(await client.blockedLabelledAt(1)).toBe(Date.parse('2026-08-11T12:00:00Z'));
+    expect(await client.labelAppliedAt(1, 'blocked')).toBe(Date.parse('2026-08-11T12:00:00Z'));
     expect(await client.everCarriedInProgress(1)).toBe(false);
   });
 
@@ -780,7 +1008,17 @@ describe('the GitHub half', () => {
             pulls: {
               list: async (params: { head: string }) => {
                 askedHead = params.head;
-                return { data: [{ number: 566, state: 'open', merged_at: null }] };
+                return {
+                  data: [
+                    {
+                      number: 566,
+                      state: 'open',
+                      merged_at: null,
+                      labels: [{ name: 'paused' }],
+                      head: { ref: 'pipeline/feature-547-9001' },
+                    },
+                  ],
+                };
               },
             },
           },
@@ -788,9 +1026,26 @@ describe('the GitHub half', () => {
             graphqlVariables = variables;
             expect(query).toContain('closedByPullRequestsReferences');
             expect(query).toContain('includeClosedPrs: false');
+            // Both are load-bearing rather than decorative: `assessCandidate`
+            // reads the labels to tell a paused handover from a run in flight,
+            // and the assignment comment names the head so the resuming run
+            // continues that branch instead of building one from `main`.
+            expect(query).toContain('headRefName');
+            expect(query).toContain('labels');
             return {
               repository: {
-                issue: { closedByPullRequestsReferences: { nodes: [{ number: 570, merged: true }] } },
+                issue: {
+                  closedByPullRequestsReferences: {
+                    nodes: [
+                      {
+                        number: 570,
+                        merged: true,
+                        headRefName: 'pipeline/feature-547-8000',
+                        labels: { nodes: [{ name: 'full-ci' }] },
+                      },
+                    ],
+                  },
+                },
               },
             };
           },
@@ -801,8 +1056,20 @@ describe('the GitHub half', () => {
       expect(askedHead).toBe('o:pipeline/feature-547');
       expect(graphqlVariables).toMatchObject({ owner: 'o', repo: 'r', number: 547 });
       expect(result).toEqual({
-        pipeline: { number: 566, merged: false },
-        closers: [{ number: 570, merged: true }],
+        pipeline: {
+          number: 566,
+          merged: false,
+          labels: ['paused'],
+          head: 'pipeline/feature-547-9001',
+        },
+        closers: [
+          {
+            number: 570,
+            merged: true,
+            labels: ['full-ci'],
+            head: 'pipeline/feature-547-8000',
+          },
+        ],
         unknown: false,
       });
     });
@@ -837,7 +1104,7 @@ describe('the GitHub half', () => {
         const client = withRefs(['pipeline/feature-554-32056002769'], {
           'pipeline/feature-554-32056002769': [{ number: 610, state: 'open', merged_at: null }],
         });
-        expect((await client.deliverableFor(554)).pipeline).toEqual({ number: 610, merged: false });
+        expect((await client.deliverableFor(554)).pipeline).toMatchObject({ number: 610, merged: false });
       });
 
       // A merged branch is deleted; the pull request is still the deliverable.
@@ -845,7 +1112,7 @@ describe('the GitHub half', () => {
         const client = withRefs([], {
           'pipeline/feature-554': [{ number: 586, state: 'closed', merged_at: '2026-08-15T18:25:39Z' }],
         });
-        expect((await client.deliverableFor(554)).pipeline).toEqual({ number: 586, merged: true });
+        expect((await client.deliverableFor(554)).pipeline).toMatchObject({ number: 586, merged: true });
       });
 
       // An open run is what a second assignment must not collide with, so it
@@ -855,7 +1122,7 @@ describe('the GitHub half', () => {
           'pipeline/feature-554': [{ number: 586, state: 'closed', merged_at: '2026-08-15T18:25:39Z' }],
           'pipeline/feature-554-99': [{ number: 610, state: 'open', merged_at: null }],
         });
-        expect((await client.deliverableFor(554)).pipeline).toEqual({ number: 610, merged: false });
+        expect((await client.deliverableFor(554)).pipeline).toMatchObject({ number: 610, merged: false });
       });
 
       // The dash is the boundary: `pipeline/feature-55-<runId>` belongs to #55,
@@ -968,7 +1235,7 @@ describe('the GitHub half', () => {
         );
         expect(await client.deliverableFor(554)).toEqual({
           pipeline: null,
-          closers: [{ number: 570, merged: true }],
+          closers: [{ number: 570, merged: true, labels: [], head: null }],
           unknown: false,
         });
         expect(log.join('\n')).toContain('asking again');
@@ -1045,7 +1312,7 @@ describe('the GitHub half', () => {
         // #603 closes it but was closed unmerged — `includeClosedPrs: false`.
         expect(await client.deliverableFor(554)).toEqual({
           pipeline: null,
-          closers: [{ number: 610, merged: false }],
+          closers: [{ number: 610, merged: false, labels: [], head: null }],
           unknown: false,
         });
       });
@@ -1163,7 +1430,7 @@ describe('the GitHub half', () => {
     it('reads the timeline once however many rules ask about it', async () => {
       const pager = paged(2);
       const client = api({ listEventsForTimeline: pager.listEventsForTimeline });
-      await client.blockedLabelledAt(1);
+      await client.labelAppliedAt(1, 'blocked');
       await client.everCarriedInProgress(1);
       expect(pager.pagesServed()).toBe(2);
     });
@@ -1177,7 +1444,7 @@ describe('the GitHub half', () => {
           data: Array.from({ length: 100 }, () => ({ event: 'labeled', label: { name: 'noise' } })),
         }),
       });
-      expect(await client.blockedLabelledAt(1, now)).toBe(now);
+      expect(await client.labelAppliedAt(1, 'blocked', now)).toBe(now);
     });
   });
 });
@@ -1396,7 +1663,13 @@ describe('running the assign action end to end', () => {
     const result = await run({ issues: [{ number: 30, labels: ['ready'] }, { number: 20, labels: ['ready'] }] });
     expect(result.outputs.issue).toBe('20');
     expect(result.labelled).toEqual([{ issue: 20, labels: ['in-progress'] }]);
-    expect(result.unlabelled).toEqual([{ issue: 20, label: 'ready' }]);
+    // `paused` comes off alongside `ready`: the issue has just been picked up,
+    // so a run no longer stopped there. Removing a label that is not present is a
+    // no-op, so this happens on every assignment rather than only a resumed one.
+    expect(result.unlabelled).toEqual([
+      { issue: 20, label: 'ready' },
+      { issue: 20, label: 'paused' },
+    ]);
     expect(result.comments[0].body).toContain('@claude');
     expect(result.comments[0].body).toContain('issue #20');
   });
@@ -1536,7 +1809,7 @@ describe('running the assign action end to end', () => {
     });
     expect(result.outputs.issue).toBe('');
     expect(result.outputs.halted).toBe('true');
-    expect(result.comments.at(-1)?.body).toContain('Pipeline paused');
+    expect(result.comments.at(-1)?.body).toContain('Pipeline halted');
     // The one state the loop cannot leave on its own has to name its way out.
     expect(result.comments.at(-1)?.body).toContain('dispatch');
   });

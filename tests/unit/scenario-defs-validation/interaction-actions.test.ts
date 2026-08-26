@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
-import { captureCostFloorMs, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from '../../../scripts/shared/scenario-types.js';
+import { captureCostFloorMs, effectiveStepTimeoutMs, loadScenarioDef, SCENARIO_DIR, TIMEOUT_MARGIN_MS } from '../../../scripts/shared/scenario-utils.js';
 import { ALL_SCENARIO_NAMES, KNOWN_INTERACTION_ACTION_TYPES } from './fixtures.js';
 
 // Dual-play scenario steps — interaction array validation (data-driven) —
@@ -28,16 +29,32 @@ function forEachActionOfType<T extends InteractionStepAction['type']>(
   actionType: T,
   check: (action: Extract<InteractionStepAction, { type: T }>, stepIndex: number) => void,
 ): void {
+  for (const { stepIndex, interaction } of stepsWithInteraction(scenario)) {
+    for (const action of interaction) {
+      if (action.type === actionType) {
+        check(action as Extract<InteractionStepAction, { type: T }>, stepIndex);
+      }
+    }
+  }
+}
+
+/**
+ * Shared scaffold behind `forEachActionOfType` and the outer-timeout test
+ * below (#736, factored out of #722's own new duplication): walks
+ * `scenario.steps`, skipping plain-string steps and steps with no
+ * `.interaction` array, and yields the step index, the narrowed step object,
+ * and its already-non-optional `interaction` array for every step that has
+ * one.
+ */
+function* stepsWithInteraction(
+  scenario: ScenarioDef,
+): Generator<{ stepIndex: number; stepObj: ScenarioStepDef; interaction: InteractionStepAction[] }> {
   for (let i = 0; i < scenario.steps.length; i++) {
     const step = scenario.steps[i];
     if (typeof step === 'string') continue;
     const stepObj = step as ScenarioStepDef;
     if (!stepObj.interaction) continue;
-    for (const action of stepObj.interaction) {
-      if (action.type === actionType) {
-        check(action as Extract<InteractionStepAction, { type: T }>, i);
-      }
-    }
+    yield { stepIndex: i, stepObj, interaction: stepObj.interaction };
   }
 }
 
@@ -177,13 +194,9 @@ describe('Dual-play scenario steps — data-driven validation', () => {
       // mismatch undetected. `resolveEventIfPending.timeoutMs` defaults to
       // 30000 (interaction-executor.ts) when absent, same default used here.
       const scenario = loadScenarioDef(name, SCENARIO_DIR);
-      for (let i = 0; i < scenario.steps.length; i++) {
-        const step = scenario.steps[i];
-        if (typeof step === 'string') continue;
-        const stepObj = step as ScenarioStepDef;
-        if (!stepObj.interaction) continue;
+      for (const { stepObj, interaction } of stepsWithInteraction(scenario)) {
         const outerMs = (stepObj.timeout ?? 60) * 1000;
-        for (const action of stepObj.interaction) {
+        for (const action of interaction) {
           if (action.type === 'waitUntil') {
             expect(action.timeoutMs).toBeLessThanOrEqual(outerMs);
           } else if (action.type === 'resolveEventIfPending') {
@@ -220,4 +233,39 @@ describe('Dual-play scenario steps — data-driven validation', () => {
       }
     });
   }
+});
+
+// ──────────────────────────────────────────────
+// 12. tutorial-interactive.json — outer step timeout covers every inner
+// waitForTutorialStep deadline with genuine margin (issue #730, tightened
+// by its own follow-up)
+//
+// Deliberately scoped to this one file rather than folded into the shared
+// cross-file check above (which only covers waitUntil/resolveEventIfPending):
+// tutorial-steps-visual.json has 14 pre-existing waitForTutorialStep steps
+// whose outer timeout does not cover the 30000ms inner default, and pulling
+// them into scope here is out of scope for #730 (tracked separately).
+//
+// `outerMs` is computed via `effectiveStepTimeoutMs` — the same value the
+// interaction/bench runners actually race against — rather than the step's
+// raw declared `timeout`: `effectiveStepTimeoutMs` folds a `waitForTutorialStep`
+// action's own inner deadline (`action.timeout ?? 30000`) into its margin
+// computation, so a step's declared JSON `timeout` alone is no longer what
+// determines the real outer race. The assertion requires `outerMs` to clear
+// `innerMs + TIMEOUT_MARGIN_MS`, not merely tie it — an exact tie (zero
+// margin) is precisely the bug this test exists to catch: 12 steps in this
+// file declare `"timeout": 30` against a 30000ms inner default, an exact
+// tie that scheduling jitter can and does lose (step 34, `hire-manager`).
+// ──────────────────────────────────────────────
+describe('tutorial-interactive.json — outer step timeout covers every inner waitForTutorialStep timeout with margin', () => {
+  const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
+
+  forEachActionOfType(scenario, 'waitForTutorialStep', (action, i) => {
+    const stepObj = scenario.steps[i] as ScenarioStepDef;
+    it(`step[${i}] (${stepObj.description ?? stepObj.command}) — outer timeout covers waitForTutorialStep's inner timeout with margin`, () => {
+      const outerMs = effectiveStepTimeoutMs(stepObj, 60);
+      const innerMs = action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS;
+      expect(outerMs).toBeGreaterThanOrEqual(innerMs + TIMEOUT_MARGIN_MS);
+    });
+  });
 });

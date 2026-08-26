@@ -10,6 +10,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import type { InteractionStepAction, ScenarioDef, ScenarioStepDef } from './scenario-types.js';
+import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from './scenario-types.js';
 
 export const SCENARIO_DIR = resolve(import.meta.dirname ?? process.cwd(), '..', 'scenario-defs');
 
@@ -106,11 +107,58 @@ export function loadScenarioDef(name: string, dir?: string): ScenarioDef {
 }
 
 /**
+ * Violation entry shared by the structural lints under tests/unit/lint/ —
+ * every lint walks the same file/step traversal and reports the same three
+ * fields; individual lints add their own extra fields on top via generics.
+ */
+export interface ScenarioViolation {
+  file: string;
+  stepIndex: number;
+  command: string;
+}
+
+/**
+ * Shared traversal: walk every scenario file's every step (optionally
+ * restricted to `scenarioNames`), collecting the ones for which
+ * `isViolation` returns true.
+ */
+export function collectScenarioViolations(
+  isViolation: (step: ScenarioStepDef) => boolean,
+  scenarioNames: string[] = scenarioFiles(SCENARIO_DIR),
+): ScenarioViolation[] {
+  const violations: ScenarioViolation[] = [];
+  for (const file of scenarioNames) {
+    const scenario = loadScenarioDef(file, SCENARIO_DIR);
+    scenario.steps.forEach((rawStep, stepIndex) => {
+      const step = rawStep as ScenarioStepDef;
+      if (isViolation(step)) {
+        violations.push({ file, stepIndex, command: step.command });
+      }
+    });
+  }
+  return violations;
+}
+
+/**
+ * Format a list of scenario violations for a test failure message, one line
+ * per violation. `describeExtra` lets a caller append lint-specific detail
+ * beyond the shared file/stepIndex/command fields.
+ */
+export function formatScenarioViolations<V extends ScenarioViolation>(
+  violations: V[],
+  describeExtra?: (v: V) => string,
+): string {
+  return violations
+    .map((v) => `  ${v.file}.json step[${v.stepIndex}] ("${v.command}")${describeExtra ? describeExtra(v) : ''}`)
+    .join('\n');
+}
+
+/**
  * Safety margin added on top of the slowest inner `timeoutMs` below, so the
  * outer race (setTimeout vs. the inner action's own deadline check) cannot
  * land close enough for scheduling jitter to flip which one fires first.
  */
-const TIMEOUT_MARGIN_MS = 5000;
+export const TIMEOUT_MARGIN_MS = 5000;
 
 /**
  * Per-frame cost of screenshot/frame capture under software rasterization
@@ -127,7 +175,10 @@ export const SOFTWARE_RASTER_FRAME_COST_MS = 6000;
  * field is required); `resolveEventIfPending` defaults to 30000
  * (interaction-executor.ts); `clickIfPresent` to 0 (a bare settle, not a
  * wait); `awaitUsable`/`zoomOut`/`focusTile`/`clickEntity` share
- * `DEFAULT_TIMEOUT_MS` = 6000 (interaction-driver.ts).
+ * `DEFAULT_TIMEOUT_MS` = 6000 (interaction-driver.ts). `waitForTutorialStep`
+ * is handled separately below via the shared
+ * `WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS` constant, since its own inner
+ * deadline field is named `timeout`, not `timeoutMs`.
  */
 const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], number>> = {
   resolveEventIfPending: 30000,
@@ -198,6 +249,14 @@ export function effectiveStepTimeoutMs(
     // table entry — has no timeoutMs concept and is skipped.
     const explicit = 'timeoutMs' in action ? action.timeoutMs : undefined;
     const fallback = DEFAULT_INNER_TIMEOUT_MS[action.type];
+    if (action.type === 'waitForTutorialStep') {
+      // Own inner deadline field is named `timeout`, not `timeoutMs`
+      // (interaction-executor.ts's `action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS`)
+      // — recognized separately from the `timeoutMs`/table branches above,
+      // sharing that same constant so the two stay in lockstep.
+      maxInnerMs = Math.max(maxInnerMs, action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS);
+      continue;
+    }
     if (explicit === undefined && fallback === undefined) continue;
     maxInnerMs = Math.max(maxInnerMs, explicit ?? fallback ?? 0);
   }

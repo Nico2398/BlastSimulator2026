@@ -250,6 +250,15 @@ export function deserialize(json: string): GameState {
     (obj as Record<string, unknown>)['collectedOre'] = {};
   }
 
+  // ghostPreviewsRevision added alongside the renderer's dirty-check gate
+  // (#761) — no dedicated save-version bump, so this can't be gated behind
+  // a `version < N` check: every save that predates the PR, including the
+  // current v13, is missing it. Read unconditionally, like collectedOre/
+  // softwareTier above.
+  if (typeof obj['ghostPreviewsRevision'] !== 'number') {
+    (obj as Record<string, unknown>)['ghostPreviewsRevision'] = 0;
+  }
+
   // v6 → v7: softwareTier/tubingState moved onto GameState from the
   // console-only MiningContext, so a save from before this had neither.
   if (typeof obj['softwareTier'] !== 'number') {

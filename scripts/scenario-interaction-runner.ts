@@ -75,6 +75,11 @@ export async function runScenarioInteraction(
   viewport: { width: number; height: number },
   enableScreenshots: boolean,
   screenshotDir: string,
+  // Required, not defaulted — every caller must pass the scenario def's own
+  // ScenarioDef.skipBlastPlayback ?? false (#761). No default param here so a
+  // caller that forgets to thread it fails to compile instead of silently
+  // observing playback.
+  skipBlastPlayback: boolean,
 ): Promise<StepResult[]> {
   const outDir = resolve(screenshotDir, `scenario-${name}-interaction`);
   mkdirSync(outDir, { recursive: true });
@@ -215,6 +220,23 @@ export async function runScenarioInteraction(
               statePath,
               ...(sizeWarn !== undefined ? { warning: sizeWarn } : {}),
             });
+
+            // Skip the fragment-collapse playback after a successful blast step
+            // (#761) — reaching this line already means the step's own actions
+            // ran without throwing, mirroring how src/main.ts's runGameCommand
+            // gates its own onBlast() effects on `cmdName === 'blast' &&
+            // result.success`. The verb is read via the same `cmdSlug`
+            // (formatCommandSlug's first-token extraction) already computed
+            // above for screenshot/state filenames — a player step's
+            // `interaction` array never contains a `command` action
+            // (scenario-defs.md), so the step's declared command is the only
+            // place the verb is known in interaction mode.
+            if (skipBlastPlayback && cmdSlug === 'blast') {
+              await page.evaluate(() => {
+                const w = window as unknown as { __skipBlastPlayback?: () => void };
+                w.__skipBlastPlayback?.();
+              });
+            }
           })(),
           timeoutPromise,
         ]);

@@ -1,16 +1,29 @@
 ---
 name: agentic-decision-autonomy
 description: >
-  How an autonomous run resolves an underspecified requirement on its own: the default-and-record
-  rule, the narrow list of genuine blockers, and how a defaulted decision is recorded so a human can
-  revisit it later. Use when a task leaves a choice open, or when weighing whether to escalate.
+  How an autonomous run resolves an underspecified requirement or an obstacle on its own: the
+  default-and-record rule, when to fix a finding on the spot rather than file it, how to bypass a
+  blocker with a TODO tagged to its issue, how to pause behind a dependency instead of blocking, and
+  the narrow list of genuine blockers. Use when a task leaves a choice open, when something you found
+  is in the way of the work, or when weighing whether to escalate.
 ---
 
 # Decision Autonomy
 
-A pipeline run gets one turn and has nobody to ask. Underspecification is the normal state of an issue — humans write the main line and leave the corners implicit — so **an open choice is work to do, not a reason to stop.**
+A pipeline run gets one turn and has nobody to ask. Underspecification is the normal state of an issue — humans write the main line and leave the corners implicit — so **an open choice is work to do, not a reason to stop.** So is most of what gets in the way: a finding you could fix in two minutes, or work around behind a `TODO`, is not a halt.
 
 The cost of stopping is concrete: a halted run holds its issue `in-progress`, which defers every later assignment until a human returns. A wrong default costs one follow-up issue.
+
+Four ways a run stops, and only one of them waits for a person:
+
+| Outcome | What it means | Who acts next |
+|---------|---------------|---------------|
+| Merged-ready PR | The work landed | Nobody — auto-merge |
+| `done` + closed | The deliverable was an answer or a command, not a diff | Nobody |
+| `paused` | An issue you filed has to land first; yours is back in the queue behind it | The pipeline, on its own |
+| `blocked` | A human has to answer something | A human |
+
+Reach for the last one last.
 
 ## ▶ The default-and-record rule
 
@@ -46,21 +59,101 @@ The `decision-review` label carries no `ready`, so the issue stays out of the as
 
 `--force` updates the label when it already exists, so the step is safe to run on every issue rather than only the first. Both runners give the agent's shell a `GH_TOKEN` that already opens PRs and edits labels, and both workflows declare `issues: write`, so no extra permission is needed.
 
+## ▶ Something in your way — try three things before you stop
+
+An obstacle is not a verdict. Most of what stops a run mid-task is smaller than the run, and stopping costs the whole session either way. Work down this list and take the first option that holds — never skip to the bottom because the finding *sounds* structural.
+
+**1. Fix it.** Small, local, and inside what you already understand — a wrong path, a stale comment, a missing guard, an unexported type, a test fixture one value out. Fix it in your own diff and say so in the PR body. Filing an issue for a two-minute fix spends a whole run to deliver two minutes of work, and leaves your own task blocked in the meantime for no reason.
+
+Size is the test, not tidiness. "It is not my task" is never a reason to file something you could have fixed while you were looking at it.
+
+**2. Bypass it, with a `TODO` that names the issue.** The finding is real work — too big for your diff, or in code your task has no business rewriting — but your task can still be delivered around it. File the issue, then write the smallest honest workaround and tag it:
+
+```ts
+// TODO(#742): SurveyPanel re-reads the grid on every tick. Cache once #742 lands.
+const composition = grid.compositionAt(x, y); // recomputed per frame until then
+```
+
+**File the issue first, then write the comment.** This is the one follow-up that cannot wait for the pipeline's `followup` step: that step runs *after* `open-pr`, and a `TODO` cannot name a number that does not exist yet. File it the moment you decide to bypass, take the number, write it into the code, and let `followup` merely record it in the summary table.
+
+Rules for a bypass:
+
+- **It names its issue.** `TODO(#N)`, with the number of an issue that exists. A bare `TODO` is debt nobody can find; `TODO(#N)` is debt with an owner and a queue position.
+- **It says what to do when the issue lands**, not just what is wrong. The run that closes #N deletes this comment, and it should not have to re-derive the plan.
+- **It is honest about the cost.** A bypass that quietly degrades behaviour says so on the line and in the PR body under `## Decisions taken`.
+- **It never bypasses a verification channel.** Working around a failing check by loosening the check is not a bypass, it is a false report — see the default-and-record rule above.
+- **The filed issue owns the cleanup.** Its `## Task` says the `TODO(#N)` comes out, and its `## Files` names the file the bypass is in.
+
+A bypassed run is a normal run: full verification, `READY TO MERGE`, no draft, nothing about it holds the PR.
+
+**3. Pause.** There is no bypass — the task cannot be delivered at all until the thing you found lands. Procedure below.
+
+## ▶ Pausing — you are blocked by an issue, not by a human
+
+The distinction that decides everything: **is what you are waiting for work, or an answer?**
+
+Work — a defect, a missing affordance, a broken harness, an unrunnable channel that another issue can repair — is something the pipeline does by itself. Nothing about it needs a human, so nothing about it should wait for one. Pause.
+
+An answer — which of two contradictory requirements is meant, a credential nobody has — needs a person. Block.
+
+**Pausing, step by step:**
+
+1. **File the blocker** as an ordinary issue, per `agentic-issue-creation`. It gets `ready` if you are confident it is real and specified, which after hitting it head-on you usually are.
+2. **Set it as your issue's dependency** — the `blocked_by` relationship *and* the `## Blocked by` section, both, per `agentic-issue-creation`'s "Setting a dependency". The relationship is what `assignability.cjs` trusts.
+3. **Save whatever you finished.** If you have commits, push `pipeline/feature-<label>` and open a **draft** pull request against `main`, labelled `paused`, carrying `Closes #<your issue>` and no `READY TO MERGE`. Its body states what is done, what remains, and what the blocker changes — format below. With no commits, skip this; there is nothing to hand over.
+4. **Return your issue to the queue:** add `ready`, add `paused`, remove `in-progress`. `agentic-intake.yml` keeps the label defined, but create it idempotently first rather than assuming — the same `--force` pattern the `decision-review` label uses above, so a repository that has never paused does not fail the step:
+
+   ```bash
+   gh label create paused --color fbca04 --force \
+     --description "A run stopped here on a dependency; the queue returns to it when that dependency lands"
+   ```
+5. **Comment on your issue** naming the blocker, what you finished, and the PR that holds it. Stop with `PAUSED: waiting on #<blocker>`.
+
+What then happens without anyone watching: `assignability.cjs` skips your issue while the blocker is open, `handle-failure.yml` chains the queue on to the next issue, the pipeline works the blocker, and when the blocker's PR merges your issue becomes assignable again. The next run is told to resume from your draft PR's branch rather than start over.
+
+**The handover PR body:**
+
+```markdown
+Closes #<your issue>
+
+⏸️ **Paused — waiting on #<blocker>.**
+
+## Done
+- <what is on this branch, and which verification channels passed on it>
+
+## Remaining
+- <what is left, in the order to do it>
+
+## What #<blocker> changes
+<why the remaining work could not be done until that issue lands, and what
+becomes possible once it has>
+
+## Resuming
+Continue on this branch. Do not open a second pull request against
+#<your issue> — an issue with a second open PR is unassignable to everyone.
+Re-run every verification channel: these results were recorded against an
+older `main`.
+```
+
+**Never close a paused PR to tidy up, and never merge it.** Closing discards the work; merging lands a half-finished change. It stays a draft until the run that resumes it finishes it.
+
+**Never leave a paused issue holding `in-progress`.** The pause is terminal for your session — `agentic-run-state` reads the `paused` label and schedules no retry — and an issue left `in-progress` defers every later assignment until the watchdog sweeps it.
+
 ## ▶ Genuine blockers — the whole list
 
-Escalate only when the work cannot be produced, or cannot be trusted once produced:
+Everything above is a way not to be here. Block only when the work cannot be produced or trusted, **and** what is missing is something only a human can supply:
 
 | Blocker | Shape it takes |
 |---------|----------------|
 | Contradictory requirements | The issue asks for X and for not-X; no reading satisfies both, and picking one silently discards stated intent |
-| Missing external dependency | A credential, asset, endpoint, or data file the run cannot obtain and cannot substitute |
+| Missing external dependency | A credential, asset, endpoint, or data file the run cannot obtain, cannot substitute, and **cannot file an issue for** — nobody but a human can produce it |
 | Capability gap | The task needs something the runtime does not have — see the Capability Gate in `CLAUDE.md` |
-| A verification channel cannot run | `VISUAL: BLOCKED`, no browser, dev server unreachable — the work may be right but nothing can prove it |
+| A verification channel cannot run, **and no issue would fix it** | The runtime has no browser at all, or the channel is unrunnable for a reason no code change addresses. A channel broken by a defect is a **pause**, not a block: file the defect and requeue behind it |
 | Irreversible action outside the ask | Force-pushing a shared branch, deleting work the run does not own, rewriting published history |
 
 Escalation is the same shape as any other halt: label the issue `blocked`, comment what is missing and what would unblock it, stop with `ESCALATED: <reason>`.
 
-Everything not on that list is a decision to take.
+Everything not on that list is a decision to take, a fix to make, a bypass to write, or a pause.
 
 ## There is no asking
 

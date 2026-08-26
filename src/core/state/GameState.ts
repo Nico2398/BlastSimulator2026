@@ -276,6 +276,10 @@ export interface GameState {
   nextPendingActionId: number;
   /** Lightweight ghost-mesh preview entries for the renderer. */
   ghostPreviews: GhostPreview[];
+  /** Monotonic counter bumped by TaskDispatch on every ghostPreviews mutation
+   *  (dispatch, claim, complete, interrupt) — lets the renderer detect "nothing
+   *  changed" in O(1) instead of diffing the array. Mirrors sitePolicy.revision. */
+  ghostPreviewsRevision: number;
   /** Ore report from the most recent blast, or null if no blast has occurred yet. */
   lastOreReport: BlastOreReport | null;
   /** Structured summary of the most recent blast, for BlastReportModal (redesign P4/§5.A). Null until the first blast. */
@@ -388,6 +392,7 @@ export function createGame(config: GameConfig): GameState {
     pendingActions: [],
     nextPendingActionId: 1,
     ghostPreviews: [],
+    ghostPreviewsRevision: 0,
     lastOreReport: null,
     lastBlastReport: null,
     softwareTier: 0,

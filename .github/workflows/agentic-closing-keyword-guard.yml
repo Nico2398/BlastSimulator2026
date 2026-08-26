@@ -1,0 +1,56 @@
+name: "Pipeline: guard against accidental issue-closing keywords"
+
+# Three independent incidents on issue #707 in one calendar day, each a
+# docs-only attempt to correct the previous one, each retriggering the exact
+# bug it was documenting — GitHub's merge-time parser matches a closing
+# keyword immediately before a bare `#<number>` as a substring, with no
+# awareness of negation, quotation, or tense. Prose guidance alone proved
+# insufficient: each fix was written by an agent that had just read the rule
+# and still produced the trigger pattern. This is the mechanical guard —
+# see `.github/scripts/check-closing-keywords.cjs` and
+# `.claude/skills/agentic-autonomous-pipeline/references/keyword-closing-postmortem.md`.
+#
+# Scans the PR title, PR body, and every commit message in the PR's range —
+# this repo's squash-merge default concatenates constituent commit messages
+# into the squash commit body (`squash_merge_commit_message: PR_BODY` as of
+# issue #755 changes that going forward, but existing commits already in a
+# branch's history, and merge/rebase-merge which this repo also allows, still
+# carry commit messages forward verbatim, so the guard checks all three
+# sources rather than relying on the setting alone).
+#
+# A failing run here is a normal failed check on the PR head: no branch
+# protection rule is needed for it to block merge — `agentic-auto-merge`'s own
+# sweep and `scripts/await-pr-ci.ts` already read every workflow run on the
+# head and treat any reported failure as red.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  closing-keyword-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect PR title, body and commit messages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          mkdir -p /tmp/closing-guard
+          printf '%s' "$PR_TITLE" > /tmp/closing-guard/title.txt
+          printf '%s' "$PR_BODY" > /tmp/closing-guard/body.txt
+          gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits" \
+            --jq '[.[].commit.message]' > /tmp/closing-guard/commits.json
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run closing-keyword guard
+        run: node .github/scripts/check-closing-keywords.cjs /tmp/closing-guard/title.txt /tmp/closing-guard/body.txt /tmp/closing-guard/commits.json

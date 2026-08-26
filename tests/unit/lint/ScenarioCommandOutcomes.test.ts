@@ -29,7 +29,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { tmpdir } from 'os';
-import { scenarioFiles, loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import { scenarioFiles, loadScenarioDef, SCENARIO_DIR, formatScenarioViolations, type ScenarioViolation } from '../../../scripts/shared/scenario-utils.js';
 import { createGameEngine, runWaitUntil, findWaitUntilAction } from '../../../scripts/shared/command-runner.js';
 import { runCommand } from '../../../src/console/createRunner.js';
 import { serializeGameState } from '../../../src/console-api.js';
@@ -37,9 +37,7 @@ import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js'
 
 const ALL_SCENARIO_NAMES = scenarioFiles(SCENARIO_DIR);
 
-interface UndeclaredRefusal {
-  stepIndex: number;
-  command: string;
+interface UndeclaredRefusal extends ScenarioViolation {
   output: string;
 }
 
@@ -84,17 +82,11 @@ function findUndeclaredRefusals(name: string, scratchDir: string): UndeclaredRef
 
     if (step.commandOutcome !== undefined) return; // already declared — not this lint's concern
     if (!result.success) {
-      violations.push({ stepIndex: i, command: step.command, output: result.output });
+      violations.push({ file: name, stepIndex: i, command: step.command, output: result.output });
     }
   });
 
   return violations;
-}
-
-function formatViolations(name: string, violations: UndeclaredRefusal[]): string {
-  return violations
-    .map(v => `  ${name}.json step[${v.stepIndex}] ("${v.command}") refused: ${v.output}`)
-    .join('\n');
 }
 
 describe('repo-wide — every scenario step declares its command outcome (issue #585)', () => {
@@ -108,7 +100,8 @@ describe('repo-wide — every scenario step declares its command outcome (issue 
       const violations = findUndeclaredRefusals(name, scratchDir);
       expect(
         violations,
-        `${violations.length} undeclared refusal(s) in ${name}.json:\n${formatViolations(name, violations)}`,
+        `${violations.length} undeclared refusal(s) in ${name}.json:\n`
+        + formatScenarioViolations(violations, (v) => ` refused: ${v.output}`),
       ).toEqual([]);
     });
   }

@@ -10,6 +10,7 @@
 
 import type { Page, KeyInput } from 'puppeteer';
 import type { InteractionStepAction, ScenarioStepDef } from './scenario-types.js';
+import { WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS } from './scenario-types.js';
 import { awaitPlacementArmed } from './tile-picker.js';
 import { isAllowedSetupCommand, SETUP_COMMAND_ALLOWLIST, TIME_COMMAND_ALLOWLIST } from './interaction-types.js';
 import type { PlayerAction } from './interaction-types.js';
@@ -719,7 +720,7 @@ export async function executeActionOnPage(
     }
     case 'waitForTutorialStep': {
       const wanted = Array.isArray(action.stepId) ? action.stepId : [action.stepId];
-      const deadline = Date.now() + (action.timeout ?? 30000);
+      const deadline = Date.now() + (action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS);
       const maxTicks = action.maxTicks ?? 3000;
       // #601: loops the console's own `tick 1` (the same `__gameConsole`
       // call the real auto-tick loop itself makes — main.ts's per-command

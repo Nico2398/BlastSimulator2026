@@ -24,6 +24,14 @@ description: >
 - **Named exports** — no default exports except entry points
 - **File size limit:** 300 lines per code file. Split into sub-modules if needed.
 - **Comments:** Document non-obvious algorithms. Don't comment obvious code.
+- **`TODO(#N)` — every TODO names its issue.** A bare `TODO` is debt with no owner and no queue position; `TODO(#N)` is debt an issue will come back and remove. Write what to do when #N lands, not just what is wrong, and say so on the line when the workaround degrades behaviour:
+
+  ```ts
+  // TODO(#742): SurveyPanel re-reads the grid every tick. Cache once #742 lands.
+  const composition = grid.compositionAt(x, y); // recomputed per frame until then
+  ```
+
+  A `TODO(#N)` is how a run gets past a blocker without stopping — the procedure, and when a bypass is the right call at all, is in `agentic-decision-autonomy`. The issue it names carries a `## Bypass to remove` section pointing back at this file, and closing that issue deletes the comment.
 
 ## Naming Conventions
 

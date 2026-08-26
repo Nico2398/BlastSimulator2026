@@ -69,11 +69,13 @@ Four independent channels prove a change works. Each catches what the others mis
 
 ## ▶ Autonomous pipeline sessions
 
-The project takes one human input: a GitHub issue. Filing one starts nothing, and neither does labelling it `ready` — that marks the issue **eligible**, and it waits in the queue. A run starts in exactly three ways, and no others: a human dispatching `agentic-trigger.yml`, a merged pipeline pull request chaining to the next `ready` issue, or a run that ended `blocked` chaining past itself through `handle-failure.yml`. Nothing on a schedule starts a session, and the only issue event that does is the `blocked` label. Once started, a run carries its issue to a merged pull request or to a stated blocker, and always leaves it in a terminal state; an issue left holding `in-progress` stalls every assignment behind it.
+The project takes one human input: a GitHub issue. Filing one starts nothing, and neither does labelling it `ready` — that marks the issue **eligible**, and it waits in the queue. A run starts in exactly three ways, and no others: a human dispatching `agentic-trigger.yml`, a merged pipeline pull request chaining to the next `ready` issue, or a run that halted chaining past itself through `handle-failure.yml`. Nothing on a schedule starts a session, and the only issue events that do are the `blocked` and `paused` labels. Once started, a run always leaves its issue in a terminal state, and there are four: a merged pull request, `paused` behind a dependency it filed (the issue returns to `ready` and the queue comes back to it once that dependency lands), `blocked` on a question only a human can answer, or closed and `done` when the deliverable was an answer rather than a diff. An issue left holding `in-progress` stalls every assignment behind it.
 
-What may be assigned is decided in one place, `.github/scripts/assignability.cjs`, and every rule in it fails closed: an issue is skipped when it already has an open pull request, when a declared dependency is open, abandoned, or closed with its pull request still unmerged, and when a dependency cannot be read at all. Dependencies come from GitHub's own `blocked_by` relationships, which are the authority, unioned with the issue body's `Blocked by` section, which is read strictly so that quoting an issue does not block on it. Chaining from a failure is bounded by a cascade brake — `AGENTIC_BLOCKED_CHAIN_LIMIT` runs ending `blocked` since the last pipeline merge parks the queue instead of working through the backlog. Details in `agentic-autonomous-pipeline`.
+What may be assigned is decided in one place, `.github/scripts/assignability.cjs`, and every rule in it fails closed: an issue is skipped when it already has an open pull request, when a declared dependency is open, abandoned, or closed with its pull request still unmerged, and when a dependency cannot be read at all. One open pull request does not skip it: a draft labelled `paused` is a halted run's deliberate handover, and the next run is told to continue that branch rather than build its own. Dependencies come from GitHub's own `blocked_by` relationships, which are the authority, unioned with the issue body's `Blocked by` section, which is read strictly so that quoting an issue does not block on it. Chaining from a halt is bounded by a cascade brake — `AGENTIC_BLOCKED_CHAIN_LIMIT` runs ending `blocked` or `paused` since the last pipeline merge parks the queue instead of working through the backlog. Details in `agentic-autonomous-pipeline`.
 
 A session started by the autonomous pipeline — a GitHub Actions run woken by the configured agent mention in a pipeline assignment comment — is not an ordinary session. Its first action is to run as the orchestrator: classify the task, then delegate every step to specialists. Never implement a pipeline-assigned task directly, and never explore the codebase before the task has been classified. The `/agentic-run` command carries that mandate; the system around it is described in `agentic-autonomous-pipeline`.
+
+That mandate is for a pipeline-dispatched run specifically. Any session that touches a numbered issue — including one opened directly against it, with no `/agentic-run` in sight — still owns getting its branch, PR and labels right before ending, whether or not it ever enters the orchestrator: `agentic-autonomous-pipeline`'s before-ending checklist binds regardless of entry point, including a hard-won rule about how GitHub's own merge-time parser reads a PR body — load that skill before your last message whenever your work discusses an issue you are not closing.
 
 ## ▶ Capability Gate — CHECK BEFORE ANY ACTION
 
@@ -90,13 +92,20 @@ Do NOT attempt workarounds. Do NOT read image files hoping to extract text. Do N
 
 ## ▶ Follow-up Gate — work you found that is not your task
 
-| You found | You file |
-|-----------|----------|
-| A default you chose that a human may want to revisit | The decision — `agentic-decision-autonomy` |
-| Tech debt, a gap, or an inconsistency unrelated to your task | The finding — `agentic-issue-creation` |
-| That your own task is bigger than one run | The scope you cut, so the remainder is not lost — `agentic-issue-creation` |
+Sort a finding by **size** and by **whether it is in your way**. Those two questions decide everything; the label on the finding does not.
+
+| You found | You do |
+|-----------|--------|
+| Something small enough to fix where you stand — a wrong path, a stale comment, a one-line guard, a missing type | **Fix it.** No issue. A separate issue for a two-minute fix costs a whole run to deliver. |
+| Tech debt, a gap, or an inconsistency that is **not in your way** | File the finding and carry on — `agentic-issue-creation` |
+| Something in your way that you can **work around** | File it, then bypass it with a `TODO(#N)` naming that issue, and finish your task on the bypass. The filed issue removes the bypass when it lands. |
+| Something in your way with **no way around it** — your task cannot be delivered at all | File it, then **pause**: your issue returns to `ready` with the new issue as its `Blocked by`, and any work already done goes on a draft PR labelled `paused` — `agentic-decision-autonomy` |
+| A default you chose that a human may want to revisit | File the decision — `agentic-decision-autonomy` |
+| That your own task is bigger than one run | File the scope you cut, so the remainder is not lost — `agentic-issue-creation` |
 
 **Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you — it is filed after review, once every agent's findings are in.
+
+**A blocker in your path is not automatically the end of your run.** Reach for the bypass before the pause: a `TODO(#N)` that keeps the rest of the task deliverable is worth far more than a run that stops with nothing landed. Pause only when there is genuinely nothing left to deliver. And `blocked` is narrower still — it is for a question only a human can answer, never for work another issue will do.
 
 ## Communication Style
 

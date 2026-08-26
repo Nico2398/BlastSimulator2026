@@ -11,6 +11,16 @@
  */
 
 /**
+ * Default inner deadline (ms) for a `waitForTutorialStep` action whose own
+ * `timeout` field is absent. Shared so `interaction-executor.ts` (which
+ * applies it) and `scenario-utils.ts`'s `effectiveStepTimeoutMs` (which must
+ * fold the identical value into its outer-timeout margin computation, or the
+ * two silently drift out of lockstep) read one source instead of repeating
+ * the bare literal.
+ */
+export const WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS = 30000;
+
+/**
  * A single interaction action within a scenario step.
  * Covers all supported Puppeteer interaction types.
  */
@@ -321,6 +331,15 @@ export interface ScenarioDef {
     /** Camera distance from `target`, in world units. Ignored unless `target` is also set. */
     distance?: number;
   }>;
+  /**
+   * Interaction mode default is OBSERVE: a blast's fragment collapse plays out
+   * on screen (window.__skipBlastPlayback is never called). Set true only for
+   * a scenario that has no visual checkpoint over the collapse and would
+   * otherwise pay real wall-clock time for it — e.g. tutorial-interactive.json
+   * (functional/bootstrap flow, not a blast-visual scenario per
+   * dev-testing-strategy's playthrough checkpoint table).
+   */
+  skipBlastPlayback?: boolean;
 }
 
 /**

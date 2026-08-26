@@ -25,6 +25,28 @@ const BLOCKED = 'blocked';
 const DONE = 'done';
 
 /**
+ * A run stopped here on a dependency it filed, not on a question for a human.
+ *
+ * `blocked` and `paused` are both terminal — the session is over either way —
+ * and they differ in who is expected to act next. `blocked` needs a human, so
+ * the issue leaves the queue. `paused` needs another *issue* to land, which the
+ * pipeline will work on its own, so the issue stays in the queue carrying
+ * `ready` and its `Blocked by` dependency: `graphVerdict` holds it back until
+ * the blocker merges, and then it is picked up like anything else. Nobody has to
+ * remember it.
+ *
+ * The label is bookkeeping on top of that, and it does two jobs `ready` alone
+ * cannot: it is the event `handle-failure.yml` chains from, so the queue keeps
+ * moving past a paused run, and it is what the cascade brake counts. It is
+ * removed the moment the issue is assigned again — see `agentic-assign`.
+ *
+ * On a *pull request* the same label means the other half of the handover: this
+ * open PR holds a paused run's partial work, and the next run continues that
+ * branch instead of building its own. `assessCandidate` is where that is read.
+ */
+const PAUSED = 'paused';
+
+/**
  * Dependency graph nodes walked before the module gives up. A real chain is two
  * or three deep; anything past this is a malformed body or a cross-referencing
  * accident, and an unwalked graph is an unverified one.
@@ -146,6 +168,11 @@ function labelVerdict(issue) {
   if (labels.has(IN_PROGRESS)) {
     return no('it is already labelled `in-progress`');
   }
+  // `paused` is deliberately absent from this list. A paused issue is *meant* to
+  // be picked up again — what holds it back is its unmet dependency, checked in
+  // `graphVerdict`, and the moment that dependency merges the issue is ordinary
+  // work again. Refusing it on the label would strand exactly the issues the
+  // pause was designed to bring back on their own.
   // Contradictory rather than impossible: a run releases a non-PR deliverable by
   // closing the issue and labelling it `done`, and a human reopening it without
   // dropping `done` leaves both labels on. Assigning would re-do finished work.
@@ -309,15 +336,72 @@ async function assessCandidate(api, issue) {
   if (deliverable.unknown) {
     return no('its pull requests could not be read, so an open one cannot be ruled out', true);
   }
-  if (deliverable.pipeline && !deliverable.pipeline.merged) {
-    return no(`pull request #${deliverable.pipeline.number} is already open against it`);
-  }
-  const openCloser = deliverable.closers.find((pr) => !pr.merged);
-  if (openCloser) {
-    return no(`pull request #${openCloser.number} is already open against it`);
+
+  // One exception, and it is the whole point of a pause: a `paused` pull request
+  // is not a run in flight, it is a finished run's handover. Its branch holds
+  // work that was deliberately stopped and written up, and the next run is
+  // supposed to check it out and finish it rather than start again from `main`.
+  // Refusing it here would make the partial work unreachable forever — the issue
+  // would sit `ready` behind a PR nobody is coming back to.
+  //
+  // The exception is exactly one pull request wide, and it is *this* issue's own
+  // handover — `resumeTargetFor` below, which reads only the branch family this
+  // issue's runs build on. A `paused` pull request that merely writes `Closes
+  // #N` from another issue's branch is that issue's handover; exempting it here
+  // would put two issues on one branch, which is the #730/#758 collision the
+  // resume rule below describes.
+  //
+  // Fail closed on the rest: every other open deliverable pull request is a live
+  // run and the collision reasoning above still applies. A read that could not
+  // produce labels yields `[]`, which is not the handover and lands here too.
+  const openPrs = [
+    ...(deliverable.pipeline && !deliverable.pipeline.merged ? [deliverable.pipeline] : []),
+    ...deliverable.closers.filter((pr) => !pr.merged),
+  ];
+  const handover = resumeTargetFor(deliverable);
+  const live = openPrs.find((pr) => pr.number !== handover?.number);
+  if (live) {
+    return no(`pull request #${live.number} is already open against it`);
   }
 
   return graphVerdict(api, issue);
+}
+
+/**
+ * The open pull request a new run on this issue must continue, if there is one.
+ *
+ * Read after the issue has been selected, not as part of selecting it: whether
+ * the issue is assignable is `assessCandidate`'s question, and this answers the
+ * different question of *how* to assign it. A paused pull request means the
+ * assignment comment has to send the run to that branch — telling it to build
+ * `pipeline/feature-<N>-<runId>` from `main` would silently abandon the work the
+ * pause existed to save.
+ *
+ * Only the `pipeline` entry can be that handover, never a closer. `pipeline` is
+ * the pull request opened from this issue's own `pipeline/feature-<N>[-<runId>]`
+ * branch, head-matched by `deliverableFor`, so it cannot be another issue's
+ * work. A closer is any pull request whose body writes `Closes #N`, which says
+ * nothing at all about the branch it sits on.
+ *
+ * Issue #730 is the incident, on 25 Aug 2026. Its paused handover, PR #740,
+ * carried `Closes #758` for a defect the same run had fixed in passing. When
+ * #758 came up for assignment, this function answered with #730's handover, and
+ * the assignment comment told that run — in the words this function's caller
+ * writes — that "a previous run on this issue" had left its work on
+ * `pipeline/feature-730-32642264036`. The run obeyed: it finished on #730's
+ * branch, took `paused` off #730's pull request and marked it ready for review.
+ * That removed the one label holding #730's carve-out open, so every assignment
+ * afterwards skipped #730 with "pull request #740 is already open against it"
+ * and took a different issue instead, with nothing anywhere reporting it.
+ *
+ * @param {{pipeline: object|null, closers: object[]}} deliverable from `deliverableFor`
+ * @returns {{number: number, head: string|null}|null}
+ */
+function resumeTargetFor(deliverable) {
+  const pipeline = deliverable?.pipeline;
+  if (!pipeline || pipeline.merged) return null;
+  if (!(pipeline.labels || []).includes(PAUSED)) return null;
+  return { number: pipeline.number, head: pipeline.head || null };
 }
 
 /**
@@ -372,37 +456,51 @@ async function selectNextAssignable(api, options = {}) {
 }
 
 /**
- * How many runs have ended `blocked` since the pipeline last merged anything.
+ * How many runs have halted without merging since the pipeline last merged
+ * anything.
  *
- * The cascade brake's input. Chaining from a failure is what keeps a fully
+ * The cascade brake's input. Chaining from a halt is what keeps a fully
  * autonomous queue moving, and it is also how a systemic failure — an expired
  * token, a broken `main`, a runner image that no longer builds — marches
- * through the entire backlog labelling every issue `blocked` in minutes. A
- * merged pipeline PR is proof the pipeline can still finish something, so it is
- * what resets the count.
+ * through the entire backlog in minutes. A merged pipeline PR is proof the
+ * pipeline can still finish something, so it is what resets the count.
+ *
+ * Both terminal-without-merging outcomes count. A `paused` run is the healthier
+ * of the two — it filed the blocker and queued itself behind it — but a broken
+ * `main` produces a queue full of them just as readily as it produces `blocked`
+ * ones, and a brake that watched only one label would sit open while the other
+ * marched. What separates a healthy pause from a cascade is the merge that
+ * resets the count, not the label.
  *
  * @param {IssueApi} api
  * @param {{now?: number}} options
  */
-async function consecutiveBlockedRuns(api, options = {}) {
+async function consecutiveHaltedRuns(api, options = {}) {
   const now = options.now ?? Date.now();
   const lastMerge = await api.latestPipelineMergeAt();
   const floor = lastMerge ?? now - BLOCKED_CHAIN_FALLBACK_WINDOW_MS;
 
-  const blocked = await api.listIssuesByLabel(BLOCKED);
-  let count = 0;
-  for (const issue of blocked) {
-    const at = await api.blockedLabelledAt(issue.number);
-    if (at === null || at <= floor) continue;
-    // A human labelling a backlog note `blocked` is filing a reminder, not
-    // ending a run, and three notes in a week must not park the queue. Only an
-    // issue a run once owned counts toward the brake — the same test the chain
-    // guard applies to the issue it fires from. Reads the timeline the
-    // timestamp above already fetched, so this costs nothing extra.
-    if (!(await api.everCarriedInProgress(issue.number))) continue;
-    count += 1;
+  const counted = new Set();
+  for (const label of [BLOCKED, PAUSED]) {
+    for (const issue of await api.listIssuesByLabel(label)) {
+      if (counted.has(issue.number)) continue;
+      // `listForRepo` returns pull requests alongside issues, and `paused` is a
+      // label this pipeline puts on pull requests by design. A handover PR is
+      // not a halted run — the run that opened it already counted through its
+      // own issue — so counting it would brake twice on one pause.
+      if (issue.isPullRequest) continue;
+      const at = await api.labelAppliedAt(issue.number, label, now);
+      if (at === null || at <= floor) continue;
+      // A human labelling a backlog note `blocked` is filing a reminder, not
+      // ending a run, and three notes in a week must not park the queue. Only an
+      // issue a run once owned counts toward the brake — the same test the chain
+      // guard applies to the issue it fires from. Reads the timeline the
+      // timestamp above already fetched, so this costs nothing extra.
+      if (!(await api.everCarriedInProgress(issue.number))) continue;
+      counted.add(issue.number);
+    }
   }
-  return count;
+  return counted.size;
 }
 
 /**
@@ -435,9 +533,10 @@ function resolveMention(raw) {
  * @typedef {object} IssueApi
  * @property {(label: string) => Promise<object[]>} listIssuesByLabel
  * @property {(number: number) => Promise<object|null>} getIssue
- * @property {(number: number) => Promise<{pipeline: {number: number, merged: boolean}|null, closers: {number: number, merged: boolean}[], unknown: boolean}>} deliverableFor
+ * @property {(number: number) => Promise<{pipeline: object|null, closers: object[], unknown: boolean}>} deliverableFor
  * @property {(number: number) => Promise<{numbers: number[], available: boolean, unknown: boolean}>} [declaredBlockedBy]
- * @property {(number: number) => Promise<number|null>} blockedLabelledAt
+ * @property {(number: number, label: string, now?: number) => Promise<number|null>} labelAppliedAt
+ * @property {(number: number) => Promise<boolean>} everCarriedInProgress
  * @property {() => Promise<number|null>} latestPipelineMergeAt
  */
 
@@ -445,6 +544,7 @@ module.exports = {
   BLOCKED,
   DONE,
   IN_PROGRESS,
+  PAUSED,
   READY,
   BLOCKED_CHAIN_FALLBACK_WINDOW_MS,
   DEFAULT_BLOCKED_CHAIN_LIMIT,
@@ -452,11 +552,12 @@ module.exports = {
   assessCandidate,
   blockedByFor,
   blockedChainLimit,
-  consecutiveBlockedRuns,
+  consecutiveHaltedRuns,
   dependencyVerdict,
   graphVerdict,
   labelVerdict,
   parseDependencies,
   resolveMention,
+  resumeTargetFor,
   selectNextAssignable,
 };

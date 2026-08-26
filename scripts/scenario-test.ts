@@ -95,7 +95,7 @@ async function runScenarioCommand(
 }
 
 // Main
-const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots, reportDrift } = parseArgs();
+const { name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, mode, screenshots, reportDrift, skipBlastPlayback } = parseArgs();
 if (steps.length === 0) {
   console.error('No steps defined. Use --scenario <name> or --commands "cmd1; cmd2; ..."');
   process.exit(1);
@@ -148,7 +148,7 @@ if (mode === 'command') {
       process.exit(1);
     });
 } else {
-  runScenarioInteraction(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, screenshots, SCREENSHOT_DIR)
+  runScenarioInteraction(name, steps, shots, port, puppeteerPath, frames, intervalMs, viewport, screenshots, SCREENSHOT_DIR, skipBlastPlayback)
     .then(exitForResults)
     .catch(err => {
       console.error('Scenario failed:', err);

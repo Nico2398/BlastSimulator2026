@@ -4082,7 +4082,22 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     expect(employee.activeActionId).toBe(1300);
   });
 
-  it('never force-rests an idle employee (activeActionId === null)', () => {
+  // #707: previously "never force-rests an idle employee" — an idle employee
+  // (nothing claimed yet, not mid-task) has nothing for interruptActiveAction
+  // to release, but that is not a reason to skip them: they still have
+  // hunger/fatigue gauges draining, and skipping them here left them to the
+  // much lower reactive NEED_WARNING_THRESHOLDS (autoInsertNeedTasks) instead
+  // of this policy's own configured (higher, proactive) thresholds — a long
+  // enough idle stretch (waiting for work that doesn't exist yet, e.g. a
+  // second qualified employee with nothing to do until a first one finishes
+  // drilling) crashed morale well before any work-driven trigger got a
+  // chance, which is what let a genuine worker_revolt fire during
+  // tutorial-interactive.json's own pre-blast charging grind (#707) — the
+  // crew's morale was already at rock bottom from the idle wait, not from
+  // the charging work itself. This test fails on the old code (idle skipped
+  // outright, no rest ever queued no matter how depleted) and passes on the
+  // fix (idle employees are evaluated exactly like working ones).
+  it('force-rests an idle employee (activeActionId === null) exactly like a working one', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);
     applyPolicy(state, { shiftMode: 'shift_8h' });
@@ -4098,7 +4113,30 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     processShiftCycle(state, []);
 
     expect(employee.restTicksRemaining).toBeNull();
+    expect(employee.pendingRestDuration).not.toBeNull();
+    expect(employee.activeActionId).not.toBeNull();
+  });
+
+  it('does not disturb an idle employee mid-walk to board a vehicle (pendingDriverVehicleId set)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    placeBuilding(state.buildings, 'living_quarters', 0, 0, 100, 100, 1);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = null;
+    employee.pendingDriverVehicleId = 7;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h * 10;
+    employee.hunger = 1;
+    employee.fatigue = 1;
+
+    processShiftCycle(state, []);
+
+    expect(employee.pendingDriverVehicleId).toBe(7);
+    expect(employee.restTicksRemaining).toBeNull();
     expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.activeActionId).toBeNull();
   });
 });
 

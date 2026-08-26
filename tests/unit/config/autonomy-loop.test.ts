@@ -65,6 +65,17 @@ describe('entry points into the assignment queue', () => {
     expect(intake).not.toMatch(/\n {2}assign:/);
   });
 
+  // Every lifecycle label a run reaches for has to exist before it reaches for
+  // it. `paused` is the one that also goes on pull requests, where
+  // `assignability.cjs` reads it as a handover rather than a collision — an
+  // undefined label there means a paused run's issue is unassignable to
+  // everyone until somebody notices.
+  it('keeps every lifecycle label a run applies defined', () => {
+    const intake = workflow('agentic-intake.yml');
+    const defined = [...intake.matchAll(/ensureLabel\(\s*'([a-z-]+)'/g)].map((m) => m[1]);
+    expect(defined).toEqual(expect.arrayContaining(['agent-task', 'ready', 'paused']));
+  });
+
   it('starts a run from a human dispatching the trigger', () => {
     const trigger = workflow('agentic-trigger.yml');
     const triggers = trigger.slice(trigger.indexOf('\non:'), trigger.indexOf('\npermissions:'));
@@ -145,8 +156,18 @@ describe('chaining past a run that ended blocked', () => {
   // Without the guard, a human labelling a backlog issue `blocked` — filing a
   // note, not ending a run — would start a session.
   it('chains only from an issue a run actually held', () => {
-    expect(failure).toContain('guard: after_blocked_run');
+    expect(failure).toContain('after_blocked_run');
     expect(failure).toContain('completed_issue: ${{ github.event.issue.number }}');
+  });
+
+  // `paused` is the other terminal-without-merging outcome: the run stopped on a
+  // dependency it filed, put the issue back at `ready` behind that dependency,
+  // and ended. It releases the queue exactly as `blocked` does, and if this
+  // workflow did not fire on it the queue would simply stop — nothing else
+  // starts the next session.
+  it('chains past a paused run too, under its own guard', () => {
+    expect(failure).toContain("github.event.label.name == 'paused'");
+    expect(failure).toContain('after_paused_run');
   });
 
   // The reason this path did not exist before. A systemic failure — expired
@@ -155,7 +176,7 @@ describe('chaining past a run that ended blocked', () => {
   it('bounds the cascade a failure chain could cause', () => {
     expect(failure).toContain('blocked_chain_limit:');
     const rules = readFileSync(join(ROOT, '.github/scripts/assignability.cjs'), 'utf8');
-    expect(rules).toContain('consecutiveBlockedRuns');
+    expect(rules).toContain('consecutiveHaltedRuns');
     expect(rules).toContain('latestPipelineMergeAt');
   });
 
@@ -167,7 +188,19 @@ describe('chaining past a run that ended blocked', () => {
   // The notification must survive a chain step that threw, or a failure whose
   // assignment could not run becomes a failure nobody is told about.
   it('reports even when the chain step failed', () => {
-    expect(failure).toMatch(/if:\s*always\(\) && github\.event\.label\.name == 'blocked'/);
+    expect(failure).toMatch(/if:\s*always\(\) &&.*github\.event\.label\.name == 'blocked'/);
+  });
+
+  // A pause asks nothing of a human — the issue is already requeued behind its
+  // dependency and comes back on its own. Printing the `blocked` notice's
+  // "add the clarification this issue is missing" would send someone looking
+  // for a question that was never asked.
+  it('does not ask a human for a clarification when the run only paused', () => {
+    const notify = failure.slice(failure.indexOf('  notify:'));
+    expect(notify).toContain("HALT_LABEL: ${{ github.event.label.name }}");
+    expect(notify).toContain('paused');
+    // The two notices are chosen from, not concatenated.
+    expect(notify).toMatch(/paused\s*\n?\s*\?/);
   });
 
   // Under the PAT every pipeline comment is authored by a real user, and the
@@ -969,7 +1002,32 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   // CI failing on `main`, on a human's branch, or on a harness branch summons
   // nobody. The pipeline's own branch is the entire scope.
   it('acts only on the pipeline\'s own feature branch', () => {
-    expect(failsafe).toMatch(/PIPELINE_HEAD = \/\^pipeline\\\/feature-\(\\d\+\)\$\//);
+    const pattern = /const PIPELINE_HEAD = (\/\^pipeline.*?\/);/.exec(failsafe);
+    expect(pattern, 'PIPELINE_HEAD not found in the fail-safe').toBeTruthy();
+    const head = new RegExp(pattern[1].slice(1, -1));
+    expect(head.test('main')).toBe(false);
+    expect(head.test('pipeline/tests-769-32908623869')).toBe(false);
+    expect(head.test('feature/something')).toBe(false);
+  });
+
+  // The bug that made the whole fail-safe dead code: anchored `-(\d+)$`, it
+  // matched `pipeline/feature-769` and nothing a run actually pushes. Every
+  // branch has carried `<issue>-<runId>` since #554, so no red pipeline PR was
+  // ever handed back — PR #773's reached a human instead.
+  it('matches the run-id-suffixed heads real runs produce, and reads the issue from both', () => {
+    const pattern = /const PIPELINE_HEAD = (\/\^pipeline.*?\/);/.exec(failsafe);
+    const head = new RegExp(pattern[1].slice(1, -1));
+    expect(head.exec('pipeline/feature-769-32908623869')?.[1]).toBe('769');
+    expect(head.exec('pipeline/feature-769')?.[1]).toBe('769');
+  });
+
+  // PR #773 again, from the other side: `ci.yml` green, the head red on a
+  // workflow this lookup did not name. A failing run blocks the merge whichever
+  // file emitted it, so the fail-safe reads channels, not one path.
+  it('evaluates every channel on the head rather than ci.yml alone', () => {
+    expect(failsafe).not.toContain("run.path === '.github/workflows/ci.yml'");
+    expect(failsafe).toContain('MACHINERY.has(run.path)');
+    expect(failsafe).toContain('latestPerWorkflow');
   });
 
   // Under GITHUB_TOKEN the comment is authored by `github-actions[bot]` and both
@@ -1189,6 +1247,76 @@ describe('what may carry an agent mention', () => {
 // red and no session is left to read it. The fail-safe covers that on the CI
 // event; this sweep covers the case where the fail-safe declined because a
 // session was live, and the case of a dropped webhook.
+// PR #773's ending, made impossible. The sweep already refused to merge it —
+// it reads every run on the head and a failing `closing-keyword-guard` made the
+// verdict `stuck` — and then said so only by failing its own job, which is
+// announced to nobody. `agentic-ci-failure.yml` is the thing that hands a red PR
+// back to an agent, and nothing was calling it for a red that was not `ci.yml`'s.
+describe('auto-merge hands back what it refuses to merge', () => {
+  const autoMerge = workflow('agentic-auto-merge.yml');
+  const handback = autoMerge.slice(autoMerge.indexOf('- name: Hand an unmergeable marked PR back'));
+
+  it('dispatches the fail-safe for every marked PR it could not arm', () => {
+    expect(handback).toContain('createWorkflowDispatch');
+    expect(handback).toContain("workflow_id: 'agentic-ci-failure.yml'");
+    expect(handback).toContain('steps.merge.outputs.unarmed');
+  });
+
+  // The sweep calls `core.setFailed` on exactly these PRs, so a step without
+  // `always()` would never run on the case it exists for.
+  it('runs even though the sweep step failed', () => {
+    expect(handback).toMatch(/if: always\(\) && steps\.merge\.outputs\.unarmed != ''/);
+  });
+
+  // A dispatch that raises no event wakes nobody — the same reason every other
+  // event-raising step in this tree carries the PAT.
+  it('dispatches with the PAT', () => {
+    expect(handback).toContain('github-token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}');
+  });
+
+  // It decides nothing: the fail-safe re-applies its own guards, so a failed
+  // dispatch is a lost fast path, not a lost report — the watchdog re-raises.
+  it('never fails the job on the dispatch itself', () => {
+    expect(handback).toContain('core.warning');
+    expect(handback).not.toContain('core.setFailed');
+  });
+});
+
+// The one list that decides, in three places, whether a workflow run on a PR
+// head is a channel or the merge machinery. `scripts/await-pr-ci.ts` decides
+// whether a run may end on it, the fail-safe whether to hand it back, the
+// watchdog whether to re-raise it — and a copy that drifts reintroduces #773
+// in whichever reader drifted. Inline in the two workflows because neither job
+// checks out the repository.
+describe('the machinery list is one list, in three copies', () => {
+  const MACHINERY = [
+    'agentic-auto-merge.yml',
+    'agentic-ci-failure.yml',
+    'agentic-intake.yml',
+    'agentic-trigger.yml',
+    'agentic-watchdog.yml',
+    'auto-assign-next.yml',
+    'claude-runner.yml',
+    'handle-failure.yml',
+    'opencode-runner.yml',
+  ];
+
+  // The guard is the workflow that proved a prefix rule fails open: it named
+  // itself `agentic-` and exempted itself from every reader at once.
+  it.each([
+    ['scripts/await-pr-ci.ts', 'const MACHINERY_WORKFLOWS'],
+    ['.github/workflows/agentic-ci-failure.yml', 'const MACHINERY = new Set(['],
+    ['.github/workflows/agentic-watchdog.yml', 'const MACHINERY = new Set(['],
+  ])('%s lists the same set, and never the closing-keyword guard', (path, marker) => {
+    const text = readFileSync(join(ROOT, path), 'utf8');
+    const start = text.indexOf(marker);
+    expect(start, `${marker} not found in ${path}`).toBeGreaterThan(-1);
+    const block = text.slice(start, text.indexOf(']', start));
+    const listed = [...block.matchAll(/'(?:\.github\/workflows\/)?([\w.-]+\.yml)'/g)].map((m) => m[1]);
+    expect(listed.sort()).toEqual([...MACHINERY].sort());
+  });
+});
+
 describe('the watchdog re-raises a red CI it would otherwise skip', () => {
   const watchdog = workflow('agentic-watchdog.yml');
 
@@ -1213,10 +1341,30 @@ describe('the watchdog re-raises a red CI it would otherwise skip', () => {
     expect(watchdog.slice(0, watchdog.indexOf('jobs:'))).toMatch(/actions: write/);
   });
 
-  it('scopes the sweep to non-draft pipeline PRs whose latest CI run failed', () => {
+  it('scopes the sweep to non-draft pipeline PRs with a red channel on the head', () => {
     expect(watchdog).toMatch(/PIPELINE_HEAD\.test\(pr\.head\?\.ref \|\| ''\) \|\| pr\.draft/);
-    expect(watchdog).toContain("'.github/workflows/ci.yml'");
-    expect(watchdog).toContain("ci.status !== 'completed'");
+    expect(watchdog).toContain("run.status === 'completed' && RUN_FAILURES.includes(run.conclusion)");
+  });
+
+  // PR #773: `ci.yml` was green and the head still carried a failing
+  // `closing-keyword-guard` run, so a sweep that looked up one workflow by path
+  // saw nothing to re-raise. What blocks a merge is a failing run, whichever
+  // workflow emitted it.
+  it('reads every channel on the head, not just ci.yml', () => {
+    expect(reRaise).not.toContain("'.github/workflows/ci.yml'");
+    expect(reRaise).toContain('MACHINERY.has(run.path)');
+  });
+
+  // Since #554 every branch a run creates carries its own run id, so a pattern
+  // anchored without the suffix matched no real pipeline head and swept nothing.
+  it('matches the run-id-suffixed heads real runs produce', () => {
+    const pattern = /const PIPELINE_HEAD = (\/\^pipeline.*?\/);/.exec(watchdog);
+    expect(pattern, 'PIPELINE_HEAD not found in the watchdog').toBeTruthy();
+    const head = new RegExp(pattern[1].slice(1, -1));
+    expect(head.test('pipeline/feature-769-32908623869')).toBe(true);
+    expect(head.test('pipeline/feature-769')).toBe(true);
+    expect(head.test('main')).toBe(false);
+    expect(head.test('pipeline/tests-769-32908623869')).toBe(false);
   });
 });
 

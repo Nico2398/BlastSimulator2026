@@ -12,9 +12,51 @@
 // runners now race the *derived* value, so a new step with a large
 // `timeoutMs` and no `timeout` of its own is correct by construction.
 
-import { describe, it, expect } from 'vitest';
-import { effectiveStepTimeoutMs, SOFTWARE_RASTER_FRAME_COST_MS } from '../../../../scripts/shared/scenario-utils.js';
-import type { ScenarioStepDef } from '../../../../scripts/shared/scenario-types.js';
+import { describe, it, expect, vi } from 'vitest';
+import { resolve } from 'path';
+import {
+  effectiveStepTimeoutMs,
+  collectScenarioViolations,
+  formatScenarioViolations,
+  SCENARIO_DIR,
+  SOFTWARE_RASTER_FRAME_COST_MS,
+  type ScenarioViolation,
+} from '../../../../scripts/shared/scenario-utils.js';
+import type { ScenarioDef, ScenarioStepDef } from '../../../../scripts/shared/scenario-types.js';
+
+// collectScenarioViolations always reads scenario files through
+// loadScenarioDef(name) with no dir override — it hardcodes SCENARIO_DIR the
+// same way loadScenarioDef's own default does. So a unit test that wants
+// controlled, multi-file fixture content (rather than whatever real files
+// happen to live in scripts/scenario-defs/ today) has to intercept the fs
+// reads loadScenarioDef makes, keyed by the exact resolved path it computes
+// (`resolve(SCENARIO_DIR, \`${name}.json\`)`), and fall through to the real
+// filesystem for every other path — mirroring how loadScenarioDef itself
+// resolves paths (scripts/shared/scenario-utils.ts).
+const fixtures = vi.hoisted(() => new Map<string, string>());
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    readFileSync: (path: unknown, encoding?: BufferEncoding) => {
+      const key = String(path);
+      if (fixtures.has(key)) return fixtures.get(key)!;
+      return actual.readFileSync(path as never, encoding as never);
+    },
+    existsSync: (path: unknown) => {
+      const key = String(path);
+      if (fixtures.has(key)) return true;
+      return actual.existsSync(path as never);
+    },
+  };
+});
+
+/** Registers a fixture scenario file `loadScenarioDef` will read back from SCENARIO_DIR. */
+function registerScenario(name: string, steps: ScenarioStepDef[]): void {
+  const def: ScenarioDef = { name, description: `fixture: ${name}`, steps };
+  fixtures.set(resolve(SCENARIO_DIR, `${name}.json`), JSON.stringify(def));
+}
 
 const DEFAULT_OUTER_SECONDS = 60;
 
@@ -181,5 +223,78 @@ describe('effectiveStepTimeoutMs — capture-cost floor (#725)', () => {
     const floorMs = (1 + 1 + 2 + 3) * SOFTWARE_RASTER_FRAME_COST_MS;
     expect(floorMs).toBe(42000);
     expect(result).toBe(floorMs);
+  });
+});
+
+describe('collectScenarioViolations', () => {
+  it('collects matching steps across multiple scenario files, in file/step order', () => {
+    registerScenario('fixture-alpha', [
+      step({ command: 'new_game seed:1' }),
+      step({ command: 'blast' }),
+    ]);
+    registerScenario('fixture-beta', [
+      step({ command: 'tick 1' }),
+      step({ command: 'blast' }),
+      step({ command: 'blast' }),
+    ]);
+
+    const violations = collectScenarioViolations(
+      (s) => s.command === 'blast',
+      ['fixture-alpha', 'fixture-beta'],
+    );
+
+    expect(violations).toEqual<ScenarioViolation[]>([
+      { file: 'fixture-alpha', stepIndex: 1, command: 'blast' },
+      { file: 'fixture-beta', stepIndex: 1, command: 'blast' },
+      { file: 'fixture-beta', stepIndex: 2, command: 'blast' },
+    ]);
+  });
+
+  it('returns an empty array when scenarioNames is explicitly empty', () => {
+    expect(collectScenarioViolations(() => true, [])).toEqual([]);
+  });
+
+  it('returns an empty array when the predicate matches nothing', () => {
+    registerScenario('fixture-gamma', [
+      step({ command: 'new_game seed:1' }),
+      step({ command: 'tick 1' }),
+    ]);
+
+    expect(collectScenarioViolations(() => false, ['fixture-gamma'])).toEqual([]);
+  });
+});
+
+describe('formatScenarioViolations', () => {
+  it('formats a single violation as one indented line, no describeExtra', () => {
+    const violations: ScenarioViolation[] = [
+      { file: 'blast-basic', stepIndex: 3, command: 'blast' },
+    ];
+    expect(formatScenarioViolations(violations)).toBe(
+      '  blast-basic.json step[3] ("blast")',
+    );
+  });
+
+  it('joins multiple violations with newlines, in the order given', () => {
+    const violations: ScenarioViolation[] = [
+      { file: 'blast-basic', stepIndex: 3, command: 'blast' },
+      { file: 'survey-then-blast', stepIndex: 0, command: 'new_game seed:1' },
+    ];
+    expect(formatScenarioViolations(violations)).toBe(
+      '  blast-basic.json step[3] ("blast")\n'
+      + '  survey-then-blast.json step[0] ("new_game seed:1")',
+    );
+  });
+
+  it('returns an empty string for an empty violation list', () => {
+    expect(formatScenarioViolations([])).toBe('');
+  });
+
+  it("appends describeExtra's return value verbatim, right after the closing paren, with no injected separator", () => {
+    const violations: ScenarioViolation[] = [
+      { file: 'blast-basic', stepIndex: 3, command: 'blast' },
+    ];
+    expect(
+      formatScenarioViolations(violations, () => ' refused: boom'),
+    ).toBe('  blast-basic.json step[3] ("blast") refused: boom');
   });
 });
