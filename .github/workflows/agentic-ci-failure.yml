@@ -85,7 +85,47 @@ jobs:
             // The pipeline's own branch is the whole scope of this workflow. CI
             // failing on `main`, on a human's branch, or on a harness branch is
             // somebody else's problem and must not summon an agent.
-            const PIPELINE_HEAD = /^pipeline\/feature-(\d+)$/;
+            //
+            // The `-<runId>` suffix is not optional decoration: since #554 every
+            // branch a run creates carries its own run id, so `pipeline/feature-769`
+            // is the shorthand and `pipeline/feature-769-32908623869` is what is
+            // actually on the remote. This pattern was anchored `-(\d+)$` and so
+            // matched none of them — the entire outside fail-safe had been dead
+            // for every real pipeline PR, silently, which is why PR #773's red
+            // check reached a human instead of an agent. Both halves match, and
+            // the issue number is group 1 either way.
+            const PIPELINE_HEAD = /^pipeline\/feature-(\d+)(?:-\d+)?$/;
+
+            // Kept in shape with `MACHINERY_WORKFLOWS` in `scripts/await-pr-ci.ts`
+            // and with the watchdog's own copy: a workflow run on the head is a
+            // verification channel unless it is named here. Inline rather than
+            // imported because this job has no checkout, and pinned across all
+            // copies by `autonomy-loop.test.ts`.
+            const MACHINERY = new Set([
+              '.github/workflows/agentic-auto-merge.yml',
+              '.github/workflows/agentic-ci-failure.yml',
+              '.github/workflows/agentic-intake.yml',
+              '.github/workflows/agentic-trigger.yml',
+              '.github/workflows/agentic-watchdog.yml',
+              '.github/workflows/auto-assign-next.yml',
+              '.github/workflows/claude-runner.yml',
+              '.github/workflows/handle-failure.yml',
+              '.github/workflows/opencode-runner.yml',
+            ]);
+            const RUN_FAILURES = ['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'];
+
+            // One run per workflow, newest — `cancel-in-progress` leaves
+            // superseded runs on the same head forever, and counting those makes
+            // every pushed fix permanently red.
+            const latestPerWorkflow = (runs) => {
+              const latest = new Map();
+              for (const run of runs) {
+                if (MACHINERY.has(run.path)) continue;
+                const seen = latest.get(run.workflow_id);
+                if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
+              }
+              return [...latest.values()];
+            };
 
             const dispatched = parseInt(process.env.DISPATCH_PR || '', 10);
             let pr;
@@ -200,27 +240,41 @@ jobs:
             // live — there is no such run, so the head's own latest CI run is
             // found here, and it must actually be red: a dispatch is a request to
             // look, never evidence.
+            //
+            // **Every channel on the head, not just `ci.yml`.** This used to look
+            // up one workflow by path, so a red check any other workflow emitted
+            // was invisible to the fail-safe — which is precisely how PR #773's
+            // `closing-keyword-guard` failure reached nobody while `ci.yml` itself
+            // was green. What blocks a merge is a failing run, whichever file
+            // emitted it.
             const dispatchedLookup = Number.isNaN(ciRunId);
+            let redRuns = [];
             if (dispatchedLookup) {
               const onHead = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
                 owner, repo, head_sha: pr.head.sha, per_page: 100
               });
-              const ci = onHead
-                .filter((run) => run.path === '.github/workflows/ci.yml')
-                .sort((a, b) => b.id - a.id)[0];
-              if (!ci) {
-                core.info(`#${pr.number}: no CI run on ${pr.head.sha.slice(0, 7)} yet. Nothing to hand back.`);
+              const channels = latestPerWorkflow(onHead);
+              if (channels.length === 0) {
+                core.info(`#${pr.number}: no channel has reported on ${pr.head.sha.slice(0, 7)} yet. Nothing to hand back.`);
                 return;
               }
-              if (ci.status !== 'completed') {
-                core.info(`#${pr.number}: CI is still running on ${pr.head.sha.slice(0, 7)}. Nothing to hand back.`);
+              redRuns = channels.filter(
+                (run) => run.status === 'completed' && RUN_FAILURES.includes(run.conclusion)
+              );
+              if (redRuns.length === 0) {
+                const stillGoing = channels.filter((run) => run.status !== 'completed');
+                core.info(
+                  stillGoing.length > 0
+                    ? `#${pr.number}: ${stillGoing.length} channel(s) still running on ${pr.head.sha.slice(0, 7)}, none red. Nothing to hand back.`
+                    : `#${pr.number}: every channel on ${pr.head.sha.slice(0, 7)} reported green. Nothing to fix.`
+                );
                 return;
               }
-              if (!['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'].includes(ci.conclusion)) {
-                core.info(`#${pr.number}: CI concluded \`${ci.conclusion}\` on ${pr.head.sha.slice(0, 7)}. Nothing to fix.`);
-                return;
-              }
-              ciRunId = ci.id;
+              // The marker names one run, so the newest red one identifies the
+              // handback; the comment below still lists the jobs of all of them.
+              ciRunId = redRuns.map((run) => run.id).sort((a, b) => b - a)[0];
+            } else {
+              redRuns = [{ id: ciRunId }];
             }
 
             // ── Idempotency, and the brake ──
@@ -269,15 +323,17 @@ jobs:
             // sends the session to go and find out; naming the jobs and their
             // log URLs is the difference between a fix and a re-diagnosis.
             let failures = [];
-            try {
-              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
-                owner, repo, run_id: ciRunId, filter: 'latest', per_page: 100
-              });
-              failures = jobs
-                .filter((job) => ['failure', 'cancelled', 'timed_out'].includes(job.conclusion))
-                .map((job) => `- \`${job.name}\` — ${job.conclusion} — ${job.html_url}`);
-            } catch (error) {
-              core.warning(`Could not list the failing jobs of run ${ciRunId}: ${error.message}`);
+            for (const red of redRuns) {
+              try {
+                const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                  owner, repo, run_id: red.id, filter: 'latest', per_page: 100
+                });
+                failures.push(...jobs
+                  .filter((job) => ['failure', 'cancelled', 'timed_out'].includes(job.conclusion))
+                  .map((job) => `- \`${job.name}\` — ${job.conclusion} — ${job.html_url}`));
+              } catch (error) {
+                core.warning(`Could not list the failing jobs of run ${red.id}: ${error.message}`);
+              }
             }
             const failureBlock = failures.length
               ? failures.join('\n')

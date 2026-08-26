@@ -60,15 +60,31 @@ Two changes, evaluated together per issue #755's own instructions:
   body, and every commit message in the PR's range on every open/edit/push —
   matching `close[sd]?/fix(es|ed)?/resolve[sd]?\s+#\d+` outside fenced and
   inline code spans, exempting only a line whose entire content is a
-  standalone closing directive (`Closes #<N>`, the pipeline's own convention).
-  A match anywhere else fails the check — including a correct reference to the
-  right issue, if it is not written as that standalone line, because the
-  incidents were never about the wrong number, they were about the phrase
-  appearing where a reader parses it as prose rather than as a deliberate
-  directive. No branch protection rule was added for it: `agentic-auto-merge`
-  and `scripts/await-pr-ci.ts` already read every workflow run on a PR's head
-  and treat any reported failure as red, so a new required-shaped workflow is
-  enough on its own.
+  standalone closing directive — `Closes #<N>`, the pipeline's body convention,
+  optionally behind a conventional-commit type, which is the PR title
+  `agentic-pipeline-finalization` mandates (`fix: Resolve #<N>`). A match
+  anywhere else fails the check — including a correct reference to the right
+  issue, if it is not written as one of those two shapes, because the incidents
+  were never about the wrong number, they were about the phrase appearing where
+  a reader parses it as prose rather than as a deliberate directive.
+
+  **The title shape had to be admitted, and the omission cost a pull request.**
+  The guard shipped while `open-pr` was already required to write exactly that
+  title, so the two landed in direct contradiction: PR #773 — the first pipeline
+  PR opened after the guard merged — failed this check on its own mandated
+  title, and every pipeline PR after it would have failed the same way. A guard
+  that rejects the convention it ships beside does not harden the pipeline, it
+  stops it.
+
+  No branch protection rule was added for this check, on the grounds that
+  `agentic-auto-merge` and `scripts/await-pr-ci.ts` already read every workflow
+  run on a PR's head and treat any reported failure as red. **Half of that was
+  untrue when it was written.** `await-pr-ci` excluded merge machinery by a
+  `^agentic-` filename prefix, so this guard — named
+  `agentic-closing-keyword-guard.yml` — exempted itself from the verdict by its
+  own name, and #773's session read GREEN over a failing check. Both readers now
+  decide by a named list rather than a prefix, and an unrecognised workflow
+  counts as a channel. See "A red CI is nobody's report" in `github-loop.md`.
 
 ## Manual defense in depth
 

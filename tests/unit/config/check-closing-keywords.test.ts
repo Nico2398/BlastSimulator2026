@@ -88,6 +88,37 @@ describe('findClosingKeywordViolations', () => {
     expect(violations).toHaveLength(0);
   });
 
+  // The pipeline's `open-pr` step mandates the title `<type>: Resolve #<N>`.
+  // The guard (#765) landed against that convention, so PR #773 — the first
+  // pipeline PR opened after it merged — failed on its own mandated title, and
+  // every pipeline PR after it would have too. Both shapes are deliberate
+  // directives, not the prose the postmortem is about.
+  it.each([
+    'fix: Resolve #769',
+    'feat: Closes #12',
+    'refactor(renderer): Resolves #300',
+    'fix(core)!: Fixes #1',
+  ])('does not flag the mandated PR title shape %s', (title) => {
+    expect(findClosingKeywordViolations({ title })).toHaveLength(0);
+  });
+
+  // The prefix is a closed list of conventional-commit types, which is what
+  // keeps the exemption a recognised shape rather than "any word before a
+  // colon".
+  it('still flags a closing directive behind an unrecognised prefix word', () => {
+    const violations = findClosingKeywordViolations({ body: 'note: fixes #99' });
+    expect(violations).toHaveLength(1);
+  });
+
+  // The exemption is about the whole line, never about the number: a typed
+  // prefix does not license prose after the directive.
+  it('still flags a typed line that carries prose past the directive', () => {
+    const violations = findClosingKeywordViolations({
+      title: 'fix: Resolve #769 and also resolve #770 while we are here',
+    });
+    expect(violations.length).toBeGreaterThan(0);
+  });
+
   it('flags the same keyword+number embedded mid-sentence even for the right issue', () => {
     const violations = findClosingKeywordViolations({
       body: 'This change finally resolves #755 after three tries.',
