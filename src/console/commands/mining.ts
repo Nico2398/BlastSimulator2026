@@ -142,6 +142,46 @@ function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
 }
 
 /**
+ * Resolve a user-supplied hole spec (`named['hole']`) to a canonical hole
+ * id: the exact id if it already names a real hole, otherwise the legacy
+ * `hole_N` fallback format. `includePlanned` controls whether an ordered-
+ * but-not-yet-drilled hole counts as "real" for this purpose — drill_plan
+ * remove and charge must see planned holes; sequence set and tubing install
+ * must not, since they only ever act on an already-drilled hole (#634).
+ */
+function resolveHoleId(
+  state: GameState,
+  holeSpec: string,
+  includePlanned: boolean = true,
+): string {
+  void state;
+  void holeSpec;
+  void includePlanned;
+  // TODO(#634): implementer fills in — see plan for exact ternary logic
+  throw new Error('not implemented');
+}
+
+/**
+ * Drop every per-hole charge/sequence record for `holeId` — called when a
+ * hole leaves the plan (drilled or still-ordered branch of drill_plan
+ * remove) so no stale charge or delay survives under an id nothing
+ * references anymore (#634).
+ */
+function clearHoleCharges(state: GameState, holeId: string): void {
+  void state;
+  void holeId;
+  // TODO(#634): implementer fills in — see plan for exact delete triple
+  throw new Error('not implemented');
+}
+
+// Not yet called anywhere (#634 skeleton phase: existing call sites in this
+// file stay on their inline ternary/delete-triple until the implementer
+// phase wires them in) — referenced here only so `noUnusedLocals` doesn't
+// flag these as dead code before that wiring lands.
+void resolveHoleId;
+void clearHoleCharges;
+
+/**
  * Removes a cancelled `drill_hole`/`charge_hole` action's own ghost from the
  * "ordered but not yet landed" pool it was tracked in (`plannedDrillHoles`/
  * `plannedChargesByHole`) — `cancelAction` (`TaskDispatch.ts`) only removes
