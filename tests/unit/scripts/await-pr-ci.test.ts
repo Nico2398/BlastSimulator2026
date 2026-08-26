@@ -339,7 +339,7 @@ describe('reportFailure uses the injected job-fetch function', () => {
     const failingA = run({ workflow_id: 1, conclusion: 'failure' });
     const failingB = run({ workflow_id: 2, conclusion: 'timed_out' });
     const passing = run({ workflow_id: 3, conclusion: 'success' });
-    const fetchJobs = vi.fn((): WorkflowJob[] => []);
+    const fetchJobs = vi.fn((_runId: number): WorkflowJob[] => []);
 
     reportFailure([failingA, failingB, passing], fetchJobs);
 
