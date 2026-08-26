@@ -15,7 +15,7 @@ import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
-import { MIN_STEMMING_M } from '../../core/config/balance.js';
+import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH } from '../../core/config/balance.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -217,6 +217,16 @@ export function drillPlanCommand(
     const spacing = parseFloat(named['spacing'] ?? '3');
     const depth = parseFloat(named['depth'] ?? '8');
     const diameter = parseFloat(named['diameter'] ?? '0.15');
+
+    if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1) {
+      return { success: false, output: 'Invalid drill grid: rows and cols must be positive whole numbers.' };
+    }
+    if (rows * cols > MAX_DRILL_GRID_HOLES) {
+      return {
+        success: false,
+        output: `Drill grid too large: ${rows}×${cols} = ${rows * cols} holes exceeds the ${MAX_DRILL_GRID_HOLES}-hole limit per plan.`,
+      };
+    }
 
     resetHoleIds();
     const planned = createGridPlan(
@@ -900,6 +910,20 @@ export function buildRampCommand(
     originZ = origin[1] ?? 0;
     direction = (named['direction'] ?? 'south') as RampDirection;
     length = parseInt(named['length'] ?? '10', 10);
+  }
+
+  // Pre-check runs before rampFootprint/cellsInRect build the array (the cost this
+  // bounds), and therefore also before validateRampOrder's own length<=0 check below —
+  // that check stays as a safety net for any other caller of buildRamp/validateRampOrder,
+  // but on this call path it is now unreachable for length<1.
+  if (!Number.isFinite(length) || length < 1) {
+    return { success: false, output: 'Invalid ramp length: length must be a finite positive number.' };
+  }
+  if (length > MAX_RAMP_LENGTH) {
+    return {
+      success: false,
+      output: `Ramp too long: ${length}m exceeds the ${MAX_RAMP_LENGTH}m limit per ramp.`,
+    };
   }
 
   const footprint = rampFootprint(originX, originZ, direction, length);

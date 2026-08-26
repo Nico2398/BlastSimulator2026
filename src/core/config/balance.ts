@@ -247,6 +247,28 @@ export const CHARGE_HOLE_REFERENCE_AMOUNT_KG = 5;
  *  never under-stem what a player could ever click. */
 export const MIN_STEMMING_M = 0.5;
 
+/**
+ * Largest rows×cols product `drill_plan grid` will build in one command
+ * (#572, mirrors #569's MAX_CLAIM_BRIDGE_CHUNKS bound-the-work approach).
+ * Checked before any hole is constructed — rows/cols are unauthenticated
+ * console input, and looping rows×cols to build the plan is the cost this
+ * bounds, not just the accepted grid size. Comfortably above the largest
+ * grid any scenario or tutorial step ever orders (8×8 = 64 holes).
+ */
+export const MAX_DRILL_GRID_HOLES = 10_000;
+
+/**
+ * Longest ramp `build_ramp` will accept, in metres/voxels (#572, mirrors
+ * MAX_DRILL_GRID_HOLES above). Checked before `rampFootprint`/`cellsInRect`
+ * build the footprint, whether `length` comes from `--length` directly or
+ * is derived from `--start`/`--end` — both console-supplied, both
+ * unbounded before this. Comfortably above the longest ramp any scenario
+ * orders (~12m) and above the furthest a single `claimForAction` bridge can
+ * ever reach (MAX_CLAIM_BRIDGE_CHUNKS × CHUNK_SIZE ≈ 384 voxels) — nothing
+ * longer could ever be built anyway.
+ */
+export const MAX_RAMP_LENGTH = 1_000;
+
 /** Converts catalog `energyPerKg` into the energy units voxel absorption thresholds
  *  are written in. The catalog numbers were tuned against an inverse-square field
  *  whose epsilon amplified them at close range; propagation conserves energy instead,
