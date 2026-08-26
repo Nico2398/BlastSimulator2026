@@ -817,8 +817,8 @@
     },
     {
       "command": "employee hire role:manager",
-      "timeout": 30,
-      "description": "hire-manager complete: manager hired now that the event is resolved",
+      "timeout": 60,
+      "description": "hire-manager complete: manager hired now that the event is resolved. #776: raised from 30s to 60s -- this step lands right after the blast sequence (steps 24-31) when the scene is heaviest, and effectiveStepTimeoutMs's formula-correct 35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out at exactly 35000ms with the real hire + tutorial advance to contract-accept already having succeeded before the deadline fired.",
       "role": "player",
       "interaction": [
         {
