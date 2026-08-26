@@ -356,4 +356,44 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
         `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
     ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
   });
+
+  // Step 36's beat (issue #776 second follow-up): two fresh independent
+  // interaction-mode runs both cleared the "hire-driver" beat above (step
+  // 35) cleanly, then timed out identically at the very next
+  // waitForTutorialStep beat — hiring a driver and waiting for the
+  // tutorial to advance to "vehicle-buy-assign". Same shape as the two
+  // cases above: the real hire action succeeds in-browser but the
+  // harness's poll times out first, because this step's declared
+  // "timeout": 30 in the JSON produces the same too-tight ~35000ms
+  // effectiveStepTimeoutMs budget. A planner audit of the rest of the file
+  // (steps 37-46) found no other step with this same tight-margin shape —
+  // this is the last one needing the fix. Located via the same
+  // forEachActionOfType scaffold, not a hand-rolled locator.
+  let driverAssignStepIndex = -1;
+  let driverAssignStepObj: ScenarioStepDef | undefined;
+  forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
+    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
+    if (stepObj.command !== 'employee hire role:driver') return;
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('vehicle-buy-assign')) return;
+    driverAssignStepIndex = stepIndex;
+    driverAssignStepObj = stepObj;
+  });
+
+  it('step hiring the driver and waiting for tutorial step "vehicle-buy-assign" has effectiveStepTimeoutMs >= 60000ms', () => {
+    expect(
+      driverAssignStepIndex,
+      'expected to find a step with command "employee hire role:driver" whose interaction array waits for tutorial step "vehicle-buy-assign" — tutorial-interactive.json may have changed shape',
+    ).toBeGreaterThanOrEqual(0);
+
+    const stepObj = driverAssignStepObj as ScenarioStepDef;
+    const outerMs = effectiveStepTimeoutMs(stepObj, 60);
+
+    expect(
+      outerMs,
+      `step[${driverAssignStepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
+        `too tight for the real-world post-blast beat (issue #776: two independent interaction-mode runs both ` +
+        `timed out here at ~35000ms even though the underlying actions succeeded). Needs real wall-clock slack ` +
+        `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
+    ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
+  });
 });
