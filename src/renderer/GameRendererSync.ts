@@ -160,6 +160,11 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
 /**
  * Convert GameState.surveyResults into overlay options. Returns null when
  * there are no survey results or no grid is bound.
+ *
+ * skeleton-writer (#770): no skeleton changes needed — reconciling this
+ * existing, already-exported buildSurveyOverlayOptions against the existing,
+ * already-exported computeVoxelColumnSurfaceY (src/core/world/VoxelGrid.ts)
+ * happens in the TDD implementer step.
  */
 export function buildSurveyOverlayOptions(
   state: GameState,
