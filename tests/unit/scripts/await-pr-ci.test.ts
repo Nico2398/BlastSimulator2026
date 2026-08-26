@@ -6,12 +6,13 @@
 // interesting case here is a way of reading red as green, which is the one
 // mistake that puts the queue back where #581 left it.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   isMachineryWorkflow,
   latestRunPerWorkflow,
   missingGatedJobs,
   parseArgs,
+  reportFailure,
   verdictOf,
   wantedGatedLabels,
   type WorkflowJob,
@@ -263,6 +264,89 @@ describe('wantedGatedLabels — the fail-closed case when no ci.yml run exists a
     expect(wantedGatedLabels(['full-ci'])).toEqual(['full-ci']);
     expect(wantedGatedLabels(['build-check'])).toEqual(['build-check']);
     expect(wantedGatedLabels(['full-ci', 'build-check'])).toEqual(['full-ci', 'build-check']);
+  });
+});
+
+// reportFailure used to shell out to `gh api` itself for a failing run's jobs.
+// It now takes an injected fetchJobs function (#781) — the same shape
+// dropPhantomCancelledRuns already takes — so a test can prove what it does
+// with the jobs it's handed without mocking `gh`. Mocking precedent: "never
+// calls fetchJobs for a solo cancelled run" in phantom-cancelled-runs.test.ts.
+describe('reportFailure uses the injected job-fetch function', () => {
+  it('calls fetchJobs once per failing run, with that run\'s id', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const failing = run({ conclusion: 'failure' });
+    const fetchJobs = vi.fn((): WorkflowJob[] => []);
+
+    reportFailure([failing], fetchJobs);
+
+    expect(fetchJobs).toHaveBeenCalledTimes(1);
+    expect(fetchJobs).toHaveBeenCalledWith(failing.id);
+    logSpy.mockRestore();
+  });
+
+  it('never calls fetchJobs when no run failed', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const passing = run({ conclusion: 'success' });
+    const fetchJobs = vi.fn((): WorkflowJob[] => []);
+
+    reportFailure([passing], fetchJobs);
+
+    expect(fetchJobs).not.toHaveBeenCalled();
+    logSpy.mockRestore();
+  });
+
+  it('never calls fetchJobs for a run still in progress', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const inProgress = run({ status: 'in_progress', conclusion: null });
+    const fetchJobs = vi.fn((): WorkflowJob[] => []);
+
+    reportFailure([inProgress], fetchJobs);
+
+    expect(fetchJobs).not.toHaveBeenCalled();
+    logSpy.mockRestore();
+  });
+
+  it("logs the failing job's name (and not a passing job's name) from what fetchJobs returns", () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const failing = run({ conclusion: 'failure' });
+    const failingJob = job({ name: 'Scenarios (interaction mode) — shard 2/4', conclusion: 'failure', html_url: 'https://github.com/o/r/actions/runs/1/job/2' });
+    const passingJob = job({ name: 'Scenarios (interaction mode) — shard 1/4', conclusion: 'success' });
+    const fetchJobs = (): WorkflowJob[] => [passingJob, failingJob];
+
+    reportFailure([failing], fetchJobs);
+
+    const logged = logSpy.mock.calls.map((args) => String(args[0])).join('\n');
+    expect(logged).toContain(failingJob.name);
+    expect(logged).not.toContain(passingJob.name);
+    logSpy.mockRestore();
+  });
+
+  it('falls back to the existing "could not be listed" message when fetchJobs throws', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const failing = run({ conclusion: 'failure' });
+    const fetchJobs = (): WorkflowJob[] => { throw new Error('gh api failed'); };
+
+    reportFailure([failing], fetchJobs);
+
+    const logged = logSpy.mock.calls.map((args) => String(args[0])).join('\n');
+    expect(logged).toContain('(jobs could not be listed; open the run URL above)');
+    logSpy.mockRestore();
+  });
+
+  it('calls fetchJobs once per distinct failing run across multiple workflows, not for a passing one', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const failingA = run({ workflow_id: 1, conclusion: 'failure' });
+    const failingB = run({ workflow_id: 2, conclusion: 'timed_out' });
+    const passing = run({ workflow_id: 3, conclusion: 'success' });
+    const fetchJobs = vi.fn((): WorkflowJob[] => []);
+
+    reportFailure([failingA, failingB, passing], fetchJobs);
+
+    expect(fetchJobs).toHaveBeenCalledTimes(2);
+    const calledIds = fetchJobs.mock.calls.map((args) => args[0]).sort((a, b) => a - b);
+    expect(calledIds).toEqual([failingA.id, failingB.id].sort((a, b) => a - b));
+    logSpy.mockRestore();
   });
 });
 
