@@ -282,7 +282,7 @@ describe('dropping a phantom cancelled run (#772)', () => {
   it('drops a cancelled run whose matrix never expanded, sibling reports success', () => {
     const successRun = run({ id: 20, workflow_id: 50, status: 'completed', conclusion: 'success' });
     const cancelledRun = run({ id: 21, workflow_id: 50, status: 'completed', conclusion: 'cancelled' });
-    const fetchJobs = (runId: number): WorkflowJob[] => (runId === cancelledRun.id ? [] : []);
+    const fetchJobs = (): WorkflowJob[] => [];
 
     const dropped = dropPhantomCancelledRuns([successRun, cancelledRun], fetchJobs);
 
@@ -340,6 +340,27 @@ describe('dropping a phantom cancelled run (#772)', () => {
     expect(verdictOf(dropped)).toBe('red');
   });
 
+  // The test above never actually exercises real-vs-phantom job data — it
+  // exits on `group.length < 2` before `fetchJobs` is ever called. This is
+  // the case its name implies: a solo cancelled run whose jobs, if they were
+  // consulted, would look phantom. It still stays red, because with no
+  // sibling to fall back on there is nothing to justify dropping it — proving
+  // the "no sibling" guard, not the phantom check, is what protects it.
+  it('keeps a solo cancelled run red even when its own jobs look phantom', () => {
+    const soloRun = run({ id: 41, workflow_id: 71, status: 'completed', conclusion: 'cancelled' });
+    const phantomJobs = [
+      job({ conclusion: 'cancelled', started_at: ZERO_DURATION, completed_at: ZERO_DURATION }),
+    ];
+    expect(isPhantomCancelledRun(phantomJobs)).toBe(true);
+    expect(isPhantomCancelledRun([])).toBe(true);
+
+    const fetchJobs = (runId: number): WorkflowJob[] => (runId === soloRun.id ? phantomJobs : []);
+    const dropped = dropPhantomCancelledRuns([soloRun], fetchJobs);
+
+    expect(dropped).toEqual([soloRun]);
+    expect(verdictOf(dropped)).toBe('red');
+  });
+
   it('keeps a cancelled run with a sibling when at least one of its own jobs ran for real', () => {
     const successRun = run({ id: 50, workflow_id: 80, status: 'completed', conclusion: 'success' });
     const cancelledRun = run({ id: 51, workflow_id: 80, status: 'completed', conclusion: 'cancelled' });
@@ -358,8 +379,7 @@ describe('dropping a phantom cancelled run (#772)', () => {
     const runA = run({ id: 60, workflow_id: 90, status: 'completed', conclusion: 'success' });
     const runB = run({ id: 61, workflow_id: 90, status: 'completed', conclusion: 'cancelled' });
     const runC = run({ id: 62, workflow_id: 90, status: 'completed', conclusion: 'cancelled' });
-    const fetchJobs = (runId: number): WorkflowJob[] =>
-      (runId === runB.id || runId === runC.id) ? [] : [];
+    const fetchJobs = (): WorkflowJob[] => [];
 
     const dropped = dropPhantomCancelledRuns([runA, runB, runC], fetchJobs);
 
@@ -419,5 +439,24 @@ describe('isPhantomCancelledRun', () => {
     expect(isPhantomCancelledRun([
       job({ conclusion: 'cancelled', started_at: '2026-01-01T00:00:00.000Z', completed_at: '2026-01-01T00:01:00.000Z' }),
     ])).toBe(false);
+  });
+
+  // The code uses `<=`, so exactly PHANTOM_JOB_MAX_DURATION_MS (5000ms) counts
+  // as phantom — this pins the boundary rather than just either side of it.
+  it('is true at exactly the 5000ms phantom-duration boundary', () => {
+    expect(isPhantomCancelledRun([
+      job({ conclusion: 'cancelled', started_at: '2026-01-01T00:00:00.000Z', completed_at: '2026-01-01T00:00:05.000Z' }),
+    ])).toBe(true);
+  });
+
+  // jobDurationMs is not exported; a job missing either timestamp is the only
+  // way to exercise its "treat as 0 duration" branch from here.
+  it('treats a job with a missing timestamp as zero duration — phantom if cancelled', () => {
+    expect(isPhantomCancelledRun([
+      job({ conclusion: 'cancelled', started_at: undefined, completed_at: '2026-01-01T00:01:00.000Z' }),
+    ])).toBe(true);
+    expect(isPhantomCancelledRun([
+      job({ conclusion: 'cancelled', started_at: '2026-01-01T00:00:00.000Z', completed_at: undefined }),
+    ])).toBe(true);
   });
 });

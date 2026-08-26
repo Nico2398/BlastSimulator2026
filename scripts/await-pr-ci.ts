@@ -216,8 +216,13 @@ export function dropPhantomCancelledRuns(
   runs: WorkflowRun[],
   fetchJobs: (runId: number) => WorkflowJob[]
 ): WorkflowRun[] {
+  // Machinery workflows are ignored by the verdict downstream (`verdictOf` /
+  // `latestRunPerWorkflow` already drop them), so grouping them here would
+  // only ever cost a wasted `fetchJobs` call on a phantom machinery run.
+  // Skipped from grouping only — still passed through in the return value.
   const byWorkflow = new Map<number, WorkflowRun[]>();
   for (const run of runs) {
+    if (isMachineryWorkflow(run.path)) continue;
     const group = byWorkflow.get(run.workflow_id);
     if (group) group.push(run);
     else byWorkflow.set(run.workflow_id, [run]);
@@ -384,6 +389,15 @@ async function main(): Promise<number> {
     ? undefined
     : Date.now() + parsed.timeoutMinutes * 60_000;
 
+  // Jobs of a `completed` run never change, and both call sites below only
+  // ever query completed runs — so caching across poll iterations saves a
+  // `gh api` round trip per run per poll for the life of a long wait.
+  const jobsCache = new Map<number, WorkflowJob[]>();
+  function cachedJobsForRun(runId: number): WorkflowJob[] {
+    if (!jobsCache.has(runId)) jobsCache.set(runId, jobsForRun(runId));
+    return jobsCache.get(runId)!;
+  }
+
   for (;;) {
     let pr: PullRequest | undefined;
     let runs: WorkflowRun[];
@@ -415,7 +429,7 @@ async function main(): Promise<number> {
       return 3;
     }
 
-    const usableRuns = dropPhantomCancelledRuns(runs, jobsForRun);
+    const usableRuns = dropPhantomCancelledRuns(runs, cachedJobsForRun);
     const verdict = verdictOf(usableRuns);
     const latest = latestRunPerWorkflow(usableRuns);
     const pending = latest.filter((run) => run.status !== 'completed').length;
@@ -436,7 +450,7 @@ async function main(): Promise<number> {
       // `ciRuns.length === 0` branch (see wantedGatedLabels's doc comment).
       const wanted = wantedGatedLabels(labels);
       const missing = wanted.length === 0 ? []
-        : ciRun ? missingGatedJobs(labels, jobsForRun(ciRun.id))
+        : ciRun ? missingGatedJobs(labels, cachedJobsForRun(ciRun.id))
         : wanted;
 
       if (missing.length > 0) {
