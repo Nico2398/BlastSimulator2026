@@ -70,6 +70,8 @@ export type Verdict = 'green' | 'red' | 'pending';
 export interface WorkflowJob {
   name: string;
   conclusion: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
 }
 
 /**
@@ -127,6 +129,13 @@ export function wantedGatedLabels(labels: string[]): string[] {
 const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale']);
 
 /**
+ * A job counts as "never actually ran" below this duration. 5s sits above
+ * scheduling/HTTP overhead and below the fastest real job in ci.yml
+ * (typecheck, tens of seconds). Reverse by changing this constant.
+ */
+const PHANTOM_JOB_MAX_DURATION_MS = 5_000;
+
+/**
  * Workflows that are the merge machinery rather than a verification channel.
  *
  * `agentic-auto-merge.yml` runs on `workflow_run`, so its own run carries the
@@ -179,6 +188,42 @@ export function latestRunPerWorkflow(runs: WorkflowRun[]): WorkflowRun[] {
     if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
   }
   return [...latest.values()];
+}
+
+function jobDurationMs(job: WorkflowJob): number {
+  // TODO(#772): implement in impl phase, using PHANTOM_JOB_MAX_DURATION_MS.
+  void job;
+  void PHANTOM_JOB_MAX_DURATION_MS;
+  throw new Error('not implemented');
+}
+
+/**
+ * True when a completed-cancelled run never did real work: no jobs at all
+ * (matrix never expanded), or every job cancelled at ~0 duration.
+ */
+export function isPhantomCancelledRun(jobs: WorkflowJob[]): boolean {
+  // TODO(#772): implement in impl phase, using jobDurationMs per job.
+  void jobs;
+  void jobDurationMs;
+  throw new Error('not implemented');
+}
+
+/**
+ * Drops a cancelled run this script would otherwise treat as authoritative
+ * but that never actually ran — GitHub firing two `pull_request` events for
+ * one head under one concurrency group (#772). Dropped only when a sibling
+ * run of the same workflow on the same head has real job activity to fall
+ * back on. If every run for a workflow is phantom, none are dropped and a
+ * clear message is logged instead — fail loud, not silent.
+ */
+export function dropPhantomCancelledRuns(
+  runs: WorkflowRun[],
+  fetchJobs: (runId: number) => WorkflowJob[]
+): WorkflowRun[] {
+  // TODO(#772): implement in impl phase
+  void runs;
+  void fetchJobs;
+  throw new Error('not implemented');
 }
 
 /**
