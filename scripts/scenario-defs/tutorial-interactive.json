@@ -892,8 +892,8 @@
     },
     {
       "command": "employee hire role:driver",
-      "timeout": 30,
-      "description": "hire-driver complete: driver hired through the crew panel",
+      "timeout": 60,
+      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and contract-accept steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired.",
       "role": "player",
       "interaction": [
         {
