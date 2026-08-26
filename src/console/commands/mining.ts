@@ -572,6 +572,26 @@ function formatBlastPlanErrors(errors: ValidationError[], header: string): strin
   return `${header}:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}`;
 }
 
+/**
+ * Assemble the current blast plan and validate it, returning either the
+ * CommandResult to return immediately on validation failure or the valid
+ * plan to proceed with — the assemble+validate+early-return sequence
+ * duplicated identically at every command that must refuse to blast an
+ * invalid plan (blastCommand, blastPlanCommand's validate sub,
+ * blastPreviewCommand) (#790).
+ */
+function assembleValidBlastPlan(
+  state: GameState,
+  header: string,
+): { error: CommandResult } | { error: null; plan: BlastPlan } {
+  const plan = assembleCurrentBlastPlan(state);
+  const errors = validateCurrentBlastPlan(state, plan);
+  if (errors.length > 0) {
+    return { error: { success: false, output: formatBlastPlanErrors(errors, header) } };
+  }
+  return { error: null, plan };
+}
+
 export function blastCommand(
   ctx: MiningContext,
   _args: string[],
@@ -580,11 +600,9 @@ export function blastCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const plan = assembleCurrentBlastPlan(ctx.state!);
-  const errors = validateCurrentBlastPlan(ctx.state!, plan);
-  if (errors.length > 0) {
-    return { success: false, output: formatBlastPlanErrors(errors, 'Invalid plan') };
-  }
+  const assembled = assembleValidBlastPlan(ctx.state!, 'Invalid plan');
+  if (assembled.error) return assembled.error;
+  const plan = assembled.plan;
 
   // ctx.weatherCycle may not exist yet (created lazily by the `weather`
   // command, eagerly by main.ts on new_game/campaign start/sandbox start —
@@ -752,10 +770,9 @@ export function blastPlanCommand(
   }
 
   if (sub === 'validate') {
-    const plan = assembleCurrentBlastPlan(ctx.state!);
-    const errors = validateCurrentBlastPlan(ctx.state!, plan);
-    if (errors.length === 0) return { success: true, output: 'Plan is valid and ready to blast.' };
-    return { success: false, output: formatBlastPlanErrors(errors, 'Validation issues') };
+    const assembled = assembleValidBlastPlan(ctx.state!, 'Validation issues');
+    if (assembled.error) return assembled.error;
+    return { success: true, output: 'Plan is valid and ready to blast.' };
   }
 
   if (sub === 'list') {
@@ -822,11 +839,9 @@ export function blastPreviewCommand(
     return { success: false, output: 'No drill plan. Create one with drill_plan grid or drill_plan add.' };
   }
 
-  const plan = assembleCurrentBlastPlan(ctx.state!);
-  const errors = validateCurrentBlastPlan(ctx.state!, plan);
-  if (errors.length > 0) {
-    return { success: false, output: formatBlastPlanErrors(errors, 'Invalid plan') };
-  }
+  const assembled = assembleValidBlastPlan(ctx.state!, 'Invalid plan');
+  if (assembled.error) return assembled.error;
+  const plan = assembled.plan;
 
   const tier = ctx.state!.softwareTier;
   const energyPreview = previewEnergy(plan, ctx.grid!, tier);
