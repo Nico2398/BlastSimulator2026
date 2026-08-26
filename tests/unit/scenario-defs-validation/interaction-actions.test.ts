@@ -243,3 +243,74 @@ describe('tutorial-interactive.json — outer step timeout covers every inner wa
     });
   });
 });
+
+// ──────────────────────────────────────────────
+// 13. tutorial-interactive.json — post-blast waitForTutorialStep beats need
+// real wall-clock slack, not just the bare formula minimum (issue #776).
+//
+// Two independent interaction-mode browser runs both timed out
+// deterministically at the "hire-manager" step (`employee hire
+// role:manager`, then `waitForTutorialStep(stepId:"contract-accept")`),
+// which sits right after the blast sequence (steps 24-31: drill, charge,
+// sequence, fire) and the consultant event-resolve step (32). Both real
+// actions (hire manager, tutorial advance to "contract-accept") actually
+// succeeded in-browser before the outer deadline fired — this is not a
+// logic bug, it's a timeout-budget bug: `effectiveStepTimeoutMs` computes
+// exactly `max(30000, 30000 + TIMEOUT_MARGIN_MS) = 35000ms` for this step
+// (formula-correct, same shape the #730 test above already covers), but
+// 35000ms of real wall-clock time is not enough for this specific beat —
+// page.evaluate round-trips are still comparatively slow right after the
+// blast/event stretch. Same root cause as #758 (fixed in PR #740): a
+// step's formula-correct budget was empirically too tight for its
+// real-world beat, and the fix there was to widen the step's own declared
+// `timeout`, not the shared formula or margin constant.
+//
+// This test encodes the requirement the #730 loop above cannot see: that
+// this step has genuine slack above the bare minimum, not merely a budget
+// that satisfies the formula. The floor chosen (60000ms) is double the
+// current 35000ms effective budget — the same order-of-magnitude margin
+// #758/#740 aimed for — comfortably absorbing render-frame jitter in the
+// tick immediately following a blast without being a placeholder that
+// passes trivially. Locates the step by its actual shape (hires a manager,
+// then waits for the "contract-accept" tutorial step) rather than a bare
+// index, so it keeps finding the right step if earlier steps are ever
+// inserted/removed.
+// ──────────────────────────────────────────────
+describe('tutorial-interactive.json — post-blast waitForTutorialStep step has real wall-clock margin, not just the formula minimum', () => {
+  const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
+
+  // Minimum acceptable effective timeout for this beat. Chosen as 2x the
+  // current (too-tight) 35000ms effective budget that produced #776's
+  // observed timeouts — a generous, concrete floor rather than the exact
+  // formula minimum this bug already clears.
+  const POST_BLAST_BEAT_MIN_TIMEOUT_MS = 60000;
+
+  it('step hiring the manager and waiting for tutorial step "contract-accept" has effectiveStepTimeoutMs >= 60000ms', () => {
+    const stepIndex = scenario.steps.findIndex((step) => {
+      if (typeof step === 'string') return false;
+      const stepObj = step as ScenarioStepDef;
+      if (stepObj.command !== 'employee hire role:manager') return false;
+      return (stepObj.interaction ?? []).some(
+        (action) =>
+          action.type === 'waitForTutorialStep' &&
+          (Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('contract-accept'),
+      );
+    });
+
+    expect(
+      stepIndex,
+      'expected to find a step with command "employee hire role:manager" whose interaction array waits for tutorial step "contract-accept" — tutorial-interactive.json may have changed shape',
+    ).toBeGreaterThanOrEqual(0);
+
+    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
+    const outerMs = effectiveStepTimeoutMs(stepObj, 60);
+
+    expect(
+      outerMs,
+      `step[${stepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
+        `too tight for the real-world post-blast beat (issue #776: two independent interaction-mode runs both ` +
+        `timed out here at 35000ms even though the underlying actions succeeded). Needs real wall-clock slack ` +
+        `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
+    ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
+  });
+});
