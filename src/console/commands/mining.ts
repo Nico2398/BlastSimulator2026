@@ -13,6 +13,7 @@ import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispa
 import { createCharge, batchCharge, computeChargeHoleDurationTicks } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
+import type { BlastPlan, ValidationError } from '../../core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH } from '../../core/config/balance.js';
@@ -75,6 +76,26 @@ function requireGame(ctx: MiningContext): string | null {
   if (!ctx.state || !ctx.grid) return 'No game loaded. Use new_game first.';
   return null;
 }
+
+/**
+ * Shared preamble for every *Command function that requires an active
+ * game and then dispatches on a subcommand (args[0]) — the no-game-loaded
+ * guard and the subcommand extraction were duplicated identically across
+ * drillPlanCommand, sequenceCommand, blastPlanCommand, tubingCommand, and
+ * surveyCommand (#790). Returns the CommandResult to return immediately
+ * on failure, or the extracted subcommand to continue with.
+ */
+function requireGameWithSub(
+  _ctx: MiningContext,
+  _args: string[],
+): { error: CommandResult } | { error: null; sub: string | undefined } {
+  throw new Error('not implemented');
+}
+// Skeleton-phase marker: no call site references this helper yet — that
+// wiring is the implementation phase's job (#790). Keeps it non-exported
+// (matching resolveHoleId/clearHoleCharges) while satisfying noUnusedLocals
+// until then.
+void requireGameWithSub;
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
 export interface DrillHoleActionPayload {
@@ -427,6 +448,23 @@ function dispatchChargeAction(
   state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
 }
 
+/**
+ * Queue a `drill_hole` PendingAction for `hole` — the per-hole dispatch
+ * built independently by drill_plan grid's loop and drill_plan add's
+ * single-hole path (#790, mirrors dispatchChargeAction's #554
+ * extraction for charge_hole). Does not touch plannedDrillHoles: grid's
+ * caller pushes the hole itself; add's caller already got it pushed by
+ * addHole.
+ */
+function dispatchDrillHoleAction(
+  _ctx: MiningContext,
+  _hole: { id: string; x: number; z: number; depth: number; diameter: number },
+): void {
+  throw new Error('not implemented');
+}
+// Skeleton-phase marker (#790) — see requireGameWithSub above.
+void dispatchDrillHoleAction;
+
 export function chargeCommand(
   ctx: MiningContext,
   _args: string[],
@@ -525,6 +563,41 @@ export function sequenceCommand(
 }
 
 // ── Blast commands ──
+
+/**
+ * Assemble the current drill/charge/sequence state into a BlastPlan —
+ * the same three GameState fields passed to assembleBlastPlan at every
+ * call site (blastCommand, blastPlanCommand's validate, previewCommand,
+ * blastPreviewCommand) (#790).
+ */
+function assembleCurrentBlastPlan(_state: GameState): BlastPlan {
+  throw new Error('not implemented');
+}
+// Skeleton-phase marker (#790) — see requireGameWithSub above.
+void assembleCurrentBlastPlan;
+
+/**
+ * Validate the current blast plan against the current set of
+ * still-loading charge orders — the second GameState field
+ * (plannedChargesByHole) every validate-then-refuse call site reads
+ * identically (#790).
+ */
+function validateCurrentBlastPlan(_state: GameState, _plan: BlastPlan): ValidationError[] {
+  throw new Error('not implemented');
+}
+// Skeleton-phase marker (#790) — see requireGameWithSub above.
+void validateCurrentBlastPlan;
+
+/**
+ * Render blast-plan validation errors as the multi-line message every
+ * validate-then-refuse call site built identically, varying only in
+ * header text ("Invalid plan" vs "Validation issues") (#790).
+ */
+function formatBlastPlanErrors(_errors: ValidationError[], _header: string): string {
+  throw new Error('not implemented');
+}
+// Skeleton-phase marker (#790) — see requireGameWithSub above.
+void formatBlastPlanErrors;
 
 export function blastCommand(
   ctx: MiningContext,
