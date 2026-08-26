@@ -175,6 +175,79 @@ describe('drillPlanCommand — remove subcommand', () => {
     expect(result.output).toContain('not found');
     expect(ctx.state!.drillHoles.length).toBe(1);
   });
+
+  // ── characterization (#634): a spec matching neither the drilled nor the
+  // planned pool falls back to the legacy `hole_${spec}` id form — pin the
+  // exact resolved id in the "not found" message for a bare-number spec.
+  it('falls back to the hole_<spec> legacy form for a bare-number spec matching no real hole', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: '42' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Hole "hole_42" not found');
+  });
+
+  // ── characterization (#634): removing a *drilled* hole deletes its charge,
+  // sequence delay, AND plannedChargesByHole entry — all three seeded
+  // manually here (a real drill/charge flow never populates
+  // plannedChargesByHole for an already-drilled hole) to pin the full
+  // teardown triple the refactor's clearHoleCharges must reproduce exactly.
+  it('removing a drilled hole deletes its charge, sequence delay, AND plannedChargesByHole entry', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    const holeId = ctx.state!.drillHoles[0]!.id;
+    ctx.state!.chargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    ctx.state!.plannedChargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    ctx.state!.sequenceDelays[holeId] = 25;
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: holeId });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.chargesByHole[holeId]).toBeUndefined();
+    expect(ctx.state!.plannedChargesByHole[holeId]).toBeUndefined();
+    expect(ctx.state!.sequenceDelays[holeId]).toBeUndefined();
+  });
+});
+
+// ── drill_plan remove — planned (not-yet-drilled) hole branch (#634) ───────
+// No existing test exercises this branch's own charge/sequence/planned-charge
+// cleanup — the "drops the removed hole's charge and sequence delay entries"
+// test above only covers the already-drilled branch.
+
+describe('drillPlanCommand — remove subcommand, planned (not-yet-drilled) hole branch', () => {
+  it('splices a still-planned hole out of plannedDrillHoles by its real id', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '2', spacing: '3', depth: '8' });
+    // Deliberately not driven to completion — both holes stay in
+    // plannedDrillHoles, none reach drillHoles.
+    expect(ctx.state!.plannedDrillHoles.map(h => h.id)).toEqual(['H1', 'H2']);
+    expect(ctx.state!.drillHoles).toEqual([]);
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: 'H1' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedDrillHoles.map(h => h.id)).toEqual(['H2']);
+  });
+
+  it('removing a planned hole deletes its charge, sequence delay, AND plannedChargesByHole entry', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    const holeId = ctx.state!.plannedDrillHoles[0]!.id;
+    ctx.state!.chargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    ctx.state!.plannedChargesByHole[holeId] = { explosiveId: 'boomite', amountKg: 5, stemmingM: 2 };
+    ctx.state!.sequenceDelays[holeId] = 25;
+
+    const result = drillPlanCommand(ctx, ['remove'], { hole: holeId });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.chargesByHole[holeId]).toBeUndefined();
+    expect(ctx.state!.plannedChargesByHole[holeId]).toBeUndefined();
+    expect(ctx.state!.sequenceDelays[holeId]).toBeUndefined();
+  });
 });
 
 describe('drillPlanCommand — clear subcommand', () => {
@@ -1177,6 +1250,146 @@ describe('chargeCommand — stemming floor', () => {
     driveChargePlanToCompletion(ctx);
     expect(ctx.state!.chargesByHole['H1']).toBeDefined();
     expect(ctx.state!.chargesByHole['H1']!.stemmingM).toBe(MIN_STEMMING_M);
+  });
+});
+
+// ── chargeCommand — hole id resolution (#634) ───────────────────────────────
+// Characterizes the inline ternary at the top of chargeCommand's non-'*'
+// branch: a spec matching a real drilled OR planned hole id resolves to that
+// exact id; anything else falls back to the legacy hole_${spec} form.
+// Unlike sequenceCommand/tubingCommand below, chargeCommand DOES check the
+// planned pool — that's the intentional divergence pinned in case 4/5.
+
+describe('chargeCommand — hole id resolution', () => {
+  it('a spec matching a drilled hole\'s real id resolves and charges it', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    const holeId = ctx.state!.drillHoles[0]!.id;
+
+    const result = chargeCommand(ctx, [], { hole: holeId, explosive: 'boomite', amount: '5kg', stemming: '2m' });
+
+    expect(result.success).toBe(true);
+    driveChargePlanToCompletion(ctx);
+    expect(ctx.state!.chargesByHole[holeId]).toBeDefined();
+  });
+
+  it('a spec matching only a planned (not-drilled) hole\'s real id resolves to that id and reports "has not been drilled yet."', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    const holeId = ctx.state!.plannedDrillHoles[0]!.id;
+    expect(ctx.state!.drillHoles).toEqual([]);
+
+    const result = chargeCommand(ctx, [], { hole: holeId, explosive: 'boomite', amount: '5kg', stemming: '2m' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(`Hole "${holeId}" has not been drilled yet.`);
+  });
+
+  it('a spec matching neither pool, not already hole_-prefixed, reports Hole "hole_<spec>" not found', () => {
+    const ctx = makeMiningContext();
+
+    const result = chargeCommand(ctx, [], { hole: '42', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Hole "hole_42" not found');
+  });
+
+  it('a spec matching neither pool, already hole_-prefixed, reports Hole "<spec>" not found (not doubled)', () => {
+    const ctx = makeMiningContext();
+
+    const result = chargeCommand(ctx, [], { hole: 'hole_42', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Hole "hole_42" not found');
+  });
+});
+
+// ── sequenceCommand set — hole id resolution (#634) ─────────────────────────
+// Characterizes the inline ternary in sequenceCommand's 'set' branch: unlike
+// chargeCommand, this one checks ONLY state.drillHoles, never
+// plannedDrillHoles — an existing, intentional divergence pinned here as
+// current behavior, not treated as a bug.
+
+describe('sequenceCommand — set subcommand, hole id resolution', () => {
+  it('a spec matching a drilled hole\'s real id resolves and sets sequenceDelays under that exact key', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    const holeId = ctx.state!.drillHoles[0]!.id;
+
+    const result = sequenceCommand(ctx, ['set'], { hole: holeId, delay: '25ms' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.sequenceDelays[holeId]).toBe(25);
+  });
+
+  it('a spec matching only a planned (undrilled) hole\'s real id does NOT resolve to that id — falls through to the hole_${spec} legacy form', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    const holeId = ctx.state!.plannedDrillHoles[0]!.id;
+    expect(ctx.state!.drillHoles).toEqual([]);
+
+    const result = sequenceCommand(ctx, ['set'], { hole: holeId, delay: '25ms' });
+
+    expect(result.success).toBe(true);
+    // NOT set under the planned hole's own real id...
+    expect(ctx.state!.sequenceDelays[holeId]).toBeUndefined();
+    // ...instead set under the legacy hole_<spec> fallback form.
+    expect(ctx.state!.sequenceDelays[`hole_${holeId}`]).toBe(25);
+  });
+});
+
+// ── tubingCommand install — hole id resolution (#634) ───────────────────────
+// Characterizes the inline ternary in tubingCommand's 'install' branch —
+// behaviorally identical to sequenceCommand's: checks only state.drillHoles,
+// never plannedDrillHoles.
+
+describe('tubingCommand — install subcommand, hole id resolution', () => {
+  it('a spec matching a drilled hole\'s real id resolves and installs tubing under that exact id', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 999_999;
+    tubingCommand(ctx, ['buy'], { amount: '1' });
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    const holeId = ctx.state!.drillHoles[0]!.id;
+
+    const result = tubingCommand(ctx, ['install'], { hole: holeId });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Tubing installed on hole ${holeId}`);
+    expect(ctx.state!.tubingState.installedHoles.has(holeId)).toBe(true);
+  });
+
+  it('a spec matching only a planned (undrilled) hole\'s real id falls through to the hole_${spec} legacy form, exactly mirroring sequenceCommand', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 999_999;
+    tubingCommand(ctx, ['buy'], { amount: '1' });
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    const holeId = ctx.state!.plannedDrillHoles[0]!.id;
+    expect(ctx.state!.drillHoles).toEqual([]);
+
+    const result = tubingCommand(ctx, ['install'], { hole: holeId });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(`Tubing installed on hole hole_${holeId}`);
+    expect(ctx.state!.tubingState.installedHoles.has(holeId)).toBe(false);
+    expect(ctx.state!.tubingState.installedHoles.has(`hole_${holeId}`)).toBe(true);
+  });
+
+  it('a spec matching neither pool (bare number, no hole_ prefix) resolves to hole_<spec>, reporting the exact current duplicate message', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 999_999;
+    tubingCommand(ctx, ['buy'], { amount: '1' });
+    // Pre-seed the fallback id as already installed so the resolved id shows
+    // up verbatim in the response, proving resolution landed on hole_42
+    // rather than "42" or some doubled form.
+    ctx.state!.tubingState.installedHoles.add('hole_42');
+
+    const result = tubingCommand(ctx, ['install'], { hole: '42' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe('Tubing already installed on hole hole_42');
   });
 });
 
