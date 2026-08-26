@@ -70,6 +70,8 @@ export type Verdict = 'green' | 'red' | 'pending';
 export interface WorkflowJob {
   name: string;
   conclusion: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
 }
 
 /**
@@ -127,6 +129,13 @@ export function wantedGatedLabels(labels: string[]): string[] {
 const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale']);
 
 /**
+ * A job counts as "never actually ran" below this duration. 5s sits above
+ * scheduling/HTTP overhead and below the fastest real job in ci.yml
+ * (typecheck, tens of seconds). Reverse by changing this constant.
+ */
+const PHANTOM_JOB_MAX_DURATION_MS = 5_000;
+
+/**
  * Workflows that are the merge machinery rather than a verification channel.
  *
  * `agentic-auto-merge.yml` runs on `workflow_run`, so its own run carries the
@@ -179,6 +188,70 @@ export function latestRunPerWorkflow(runs: WorkflowRun[]): WorkflowRun[] {
     if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
   }
   return [...latest.values()];
+}
+
+function jobDurationMs(job: WorkflowJob): number {
+  if (!job.started_at || !job.completed_at) return 0;
+  return new Date(job.completed_at).getTime() - new Date(job.started_at).getTime();
+}
+
+/**
+ * True when a completed-cancelled run never did real work: no jobs at all
+ * (matrix never expanded), or every job cancelled at ~0 duration.
+ */
+export function isPhantomCancelledRun(jobs: WorkflowJob[]): boolean {
+  if (jobs.length === 0) return true;
+  return jobs.every((job) => job.conclusion === 'cancelled' && jobDurationMs(job) <= PHANTOM_JOB_MAX_DURATION_MS);
+}
+
+/**
+ * Drops a cancelled run this script would otherwise treat as authoritative
+ * but that never actually ran — GitHub firing two `pull_request` events for
+ * one head under one concurrency group (#772). Dropped only when a sibling
+ * run of the same workflow on the same head has real job activity to fall
+ * back on. If every run for a workflow is phantom, none are dropped and a
+ * clear message is logged instead — fail loud, not silent.
+ */
+export function dropPhantomCancelledRuns(
+  runs: WorkflowRun[],
+  fetchJobs: (runId: number) => WorkflowJob[]
+): WorkflowRun[] {
+  // Machinery workflows are ignored by the verdict downstream (`verdictOf` /
+  // `latestRunPerWorkflow` already drop them), so grouping them here would
+  // only ever cost a wasted `fetchJobs` call on a phantom machinery run.
+  // Skipped from grouping only — still passed through in the return value.
+  const byWorkflow = new Map<number, WorkflowRun[]>();
+  for (const run of runs) {
+    if (isMachineryWorkflow(run.path)) continue;
+    const group = byWorkflow.get(run.workflow_id);
+    if (group) group.push(run);
+    else byWorkflow.set(run.workflow_id, [run]);
+  }
+
+  const toDrop = new Set<number>();
+  for (const [workflowId, group] of byWorkflow) {
+    if (group.length < 2) continue;
+
+    const cancelled = group.filter((run) => run.status === 'completed' && run.conclusion === 'cancelled');
+    if (cancelled.length === 0) continue;
+
+    const phantomRuns = cancelled.filter((run) => isPhantomCancelledRun(fetchJobs(run.id)));
+    if (phantomRuns.length === 0) continue;
+
+    if (phantomRuns.length === group.length) {
+      const [first] = group;
+      if (!first) continue;
+      console.error(
+        `await-pr-ci: every run of workflow "${first.name}" (workflow_id ${workflowId}) looks `
+        + 'phantom-cancelled (no jobs ever ran) — keeping all of them since none has real data to fall back on.'
+      );
+      continue;
+    }
+
+    for (const run of phantomRuns) toDrop.add(run.id);
+  }
+
+  return runs.filter((run) => !toDrop.has(run.id));
 }
 
 /**
@@ -318,6 +391,15 @@ async function main(): Promise<number> {
     ? undefined
     : Date.now() + parsed.timeoutMinutes * 60_000;
 
+  // Jobs of a `completed` run never change, and both call sites below only
+  // ever query completed runs — so caching across poll iterations saves a
+  // `gh api` round trip per run per poll for the life of a long wait.
+  const jobsCache = new Map<number, WorkflowJob[]>();
+  function cachedJobsForRun(runId: number): WorkflowJob[] {
+    if (!jobsCache.has(runId)) jobsCache.set(runId, jobsForRun(runId));
+    return jobsCache.get(runId)!;
+  }
+
   for (;;) {
     let pr: PullRequest | undefined;
     let runs: WorkflowRun[];
@@ -349,13 +431,14 @@ async function main(): Promise<number> {
       return 3;
     }
 
-    const verdict = verdictOf(runs);
-    const latest = latestRunPerWorkflow(runs);
+    const usableRuns = dropPhantomCancelledRuns(runs, cachedJobsForRun);
+    const verdict = verdictOf(usableRuns);
+    const latest = latestRunPerWorkflow(usableRuns);
     const pending = latest.filter((run) => run.status !== 'completed').length;
 
     if (verdict === 'red') {
       console.log(`CI RED — pull request #${pr.number} on ${pr.head.sha.slice(0, 7)}:`);
-      reportFailure(runs);
+      reportFailure(usableRuns);
       console.log('Fix the failure on this branch, push, and wait again. Never end the run on this verdict.');
       return 1;
     }
@@ -369,7 +452,7 @@ async function main(): Promise<number> {
       // `ciRuns.length === 0` branch (see wantedGatedLabels's doc comment).
       const wanted = wantedGatedLabels(labels);
       const missing = wanted.length === 0 ? []
-        : ciRun ? missingGatedJobs(labels, jobsForRun(ciRun.id))
+        : ciRun ? missingGatedJobs(labels, cachedJobsForRun(ciRun.id))
         : wanted;
 
       if (missing.length > 0) {
