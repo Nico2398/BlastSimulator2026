@@ -698,6 +698,43 @@ describe('resuming a paused run', () => {
     expect(issue).toBeNull();
   });
 
+  // #730, 25 Aug 2026. Its handover PR #740 also carried `Closes #758` for a
+  // defect the same run fixed in passing, so #758's own assignment was answered
+  // with #730's handover and told to continue on `pipeline/feature-730-*`. The
+  // carve-out has to be this issue's own handover, not any paused PR that
+  // happens to close it.
+  it("does not exempt an issue for another issue's handover", async () => {
+    const api = fakeApi([
+      {
+        number: 758,
+        labels: ['ready'],
+        closers: [
+          { number: 740, merged: false, labels: ['paused'], head: 'pipeline/feature-730-32642264036' },
+        ],
+      },
+    ]);
+    const { issue, reason } = await select(api);
+    expect(issue).toBeNull();
+    expect(reason).toContain('no assignable ready issue');
+  });
+
+  // The other half of the same incident, and the symptom a human sees: the run
+  // that took over #730's branch removed `paused` from PR #740 and marked it
+  // ready, so #730 dropped out of the queue and every assignment after it took
+  // some other issue. The refusal itself is correct — what must not happen is
+  // reaching this state, which the test above now prevents.
+  it('refuses an issue whose handover has been unpaused by another run', async () => {
+    const api = fakeApi([
+      {
+        number: 730,
+        labels: ['ready', 'paused'],
+        pipelinePr: { number: 740, merged: false, labels: ['full-ci'] },
+      },
+    ]);
+    const { issue } = await select(api);
+    expect(issue).toBeNull();
+  });
+
   describe('naming the branch the next run continues', () => {
     it('reports the paused PR and its head', () => {
       const target = rules.resumeTargetFor({
@@ -707,13 +744,19 @@ describe('resuming a paused run', () => {
       expect(target).toEqual({ number: 99, head: 'pipeline/feature-20-123' });
     });
 
-    // The timeline fallback carries no head ref. The assignment can still name
-    // the pull request, which is the part the resuming run actually needs.
-    it('reports the PR with a null head when the branch is unknown', () => {
-      expect(rules.resumeTargetFor({ pipeline: null, closers: [pausedPr(99)] })).toEqual({
-        number: 99,
-        head: null,
-      });
+    // A handover is the PR on this issue's own branch, and `deliverableFor`
+    // reports that one — and only that one — as `pipeline`. A closer is any PR
+    // whose body writes `Closes #N`, which says nothing about its branch, so it
+    // can be another issue's handover. #730's was: PR #740 sat on
+    // `pipeline/feature-730-32642264036` carrying `Closes #758`, and answering
+    // #758's assignment with it sent that run onto #730's branch.
+    it('reports nothing for a paused PR that only closes the issue', () => {
+      expect(
+        rules.resumeTargetFor({
+          pipeline: null,
+          closers: [pausedPr(740, 'pipeline/feature-730-32642264036')],
+        })
+      ).toBeNull();
     });
 
     it('reports nothing when no open PR is paused', () => {
