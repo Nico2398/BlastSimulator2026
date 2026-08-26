@@ -26,10 +26,13 @@ const LABEL_GATED_JOBS: { label: string; jobNamePrefix: string }[] = [
 
 /** Gated labels whose job did not fully report `success` among `jobs`. */
 export function missingGatedJobs(labels: string[], jobs: WorkflowJob[]): string[] {
-  void labels;
-  void jobs;
-  void LABEL_GATED_JOBS;
-  throw new Error('not implemented');
+  const wanted = LABEL_GATED_JOBS.filter((g) => labels.includes(g.label));
+  return wanted
+    .filter((g) => {
+      const matches = jobs.filter((j) => j.name.startsWith(g.jobNamePrefix));
+      return matches.length === 0 || !matches.every((j) => j.conclusion === 'success');
+    })
+    .map((g) => g.label);
 }
 
 /**
@@ -43,6 +46,5 @@ export function missingGatedJobs(labels: string[], jobs: WorkflowJob[]): string[
  * this whole check exists to close.
  */
 export function wantedGatedLabels(labels: string[]): string[] {
-  void labels;
-  throw new Error('not implemented');
+  return LABEL_GATED_JOBS.filter((g) => labels.includes(g.label)).map((g) => g.label);
 }

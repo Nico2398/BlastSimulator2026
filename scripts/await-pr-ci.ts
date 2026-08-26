@@ -49,137 +49,12 @@
  * @module await-pr-ci
  */
 
-import { execFileSync } from 'child_process';
 import { dropPhantomCancelledRuns, type WorkflowRun, type WorkflowJob } from './lib/phantom-cancelled-runs.js';
+import { verdictOf, latestRunPerWorkflow, isMachineryWorkflow, RUN_FAILURES } from './lib/workflow-verdict.js';
+import { missingGatedJobs, wantedGatedLabels } from './lib/label-gated-jobs.js';
+import { resolvePr, runsOnHead, jobsForRun, type PullRequest } from './lib/github-ci-fetch.js';
 
 export type { WorkflowRun, WorkflowJob } from './lib/phantom-cancelled-runs.js';
-
-export type Verdict = 'green' | 'red' | 'pending';
-
-/**
- * A label that gates a job (`full-ci` -> the interaction-mode shards,
- * `build-check` -> the production build) makes a CI run's own `success`
- * conclusion insufficient evidence on its own: the run reports `success` the
- * moment every job in it either passed or was skipped, and a job skipped
- * because its `if:` guard was evaluated before the label existed is
- * indistinguishable from that at the run level. PR #615 merged exactly that
- * way. Kept in step with the same-named check in
- * `.github/actions/agentic-auto-merge/action.yml` — the two decide whether a
- * PR may end a run and whether it may merge, and must not disagree about it.
- */
-const LABEL_GATED_JOBS: { label: string; jobNamePrefix: string }[] = [
-  { label: 'full-ci', jobNamePrefix: 'Scenarios (interaction mode)' },
-  { label: 'build-check', jobNamePrefix: 'Production build' },
-];
-
-/** Gated labels whose job did not fully report `success` among `jobs`. */
-export function missingGatedJobs(labels: string[], jobs: WorkflowJob[]): string[] {
-  const wanted = LABEL_GATED_JOBS.filter((g) => labels.includes(g.label));
-  return wanted
-    .filter((g) => {
-      const matches = jobs.filter((j) => j.name.startsWith(g.jobNamePrefix));
-      return matches.length === 0 || !matches.every((j) => j.conclusion === 'success');
-    })
-    .map((g) => g.label);
-}
-
-/**
- * Which of `LABEL_GATED_JOBS`' labels a PR carries — the fail-closed answer
- * for when no `ci.yml` run exists on the head at all to ask `missingGatedJobs`
- * about (a workflow-file syntax error, or a run not yet indexed by the runs
- * API). Mirrors `agentic-auto-merge/action.yml`'s own `ciRuns.length === 0`
- * branch, which already treats "no run found" as every wanted label missing
- * rather than as a pass — the two must not disagree about it, and reporting
- * green on a run that never happened is exactly the absence-of-evidence gap
- * this whole check exists to close.
- */
-export function wantedGatedLabels(labels: string[]): string[] {
-  return LABEL_GATED_JOBS.filter((g) => labels.includes(g.label)).map((g) => g.label);
-}
-
-/**
- * Conclusions that mean nothing is going to repeat this run. `cancelled` and
- * `stale` sit with the failures because the dedup below already drops a
- * superseded run — one that survives it was cancelled for good. `skipped` and
- * `neutral` are not failures: `claude-code-review.yml` reports `skipped` on
- * every pipeline PR, and `Production build` does the same without `build-check`.
- *
- * Kept in step with `RUN_FAILURES` in `.github/actions/agentic-auto-merge`: the
- * action decides whether the PR merges, this script decides whether the run
- * that opened it may end, and the two must not disagree about what red means.
- */
-const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale']);
-
-/**
- * Workflows that are the merge machinery rather than a verification channel.
- *
- * `agentic-auto-merge.yml` runs on `workflow_run`, so its own run carries the
- * head SHA of the CI run that woke it and shows up in this list. Counting it
- * would be circular twice over: it is pending until CI has been read, and it
- * fails the step on a marked PR it could not arm — which is a report about the
- * merge, not about the code. The runners are here for the sharper version of
- * the same circularity: this script runs *inside* the runner job, so counting
- * that job's own run would make every wait pend until the 360-minute timeout.
- *
- * **Named one by one, never by prefix.** This was `/^\.github\/workflows\/
- * (agentic-|auto-assign-next|handle-failure)/` and it failed open: every new
- * workflow whose file happened to start with `agentic-` exempted itself from
- * the verdict by its name alone. `agentic-closing-keyword-guard.yml` (#765) is
- * a verification check that did exactly that, and PR #773 is the bill — its
- * guard job failed at 23:52, this script read GREEN at 00:06 because the run
- * was filtered out here, the session ended having done everything it was told,
- * and the pull request sat `unstable` and unmergeable with nobody watching.
- *
- * So the direction is inverted: a workflow counts as a channel unless it is
- * named below. A new verification workflow is read with no edit here; a new
- * machinery workflow that forgets this list costs a wait, which is the safe
- * half of the mistake.
- */
-const MACHINERY_WORKFLOWS: ReadonlySet<string> = new Set([
-  'agentic-auto-merge.yml',
-  'agentic-ci-failure.yml',
-  'agentic-intake.yml',
-  'agentic-trigger.yml',
-  'agentic-watchdog.yml',
-  'auto-assign-next.yml',
-  'claude-runner.yml',
-  'handle-failure.yml',
-  'opencode-runner.yml',
-]);
-
-export const isMachineryWorkflow = (path: string): boolean =>
-  MACHINERY_WORKFLOWS.has(path.replace(/^\.github\/workflows\//, ''));
-
-/**
- * One run per workflow: the newest. CI declares `cancel-in-progress: true`, so a
- * pushed fix leaves the superseded run on the same head, `cancelled` forever. Read
- * without this dedup, every fix a run pushes makes its own PR permanently red.
- */
-export function latestRunPerWorkflow(runs: WorkflowRun[]): WorkflowRun[] {
-  const latest = new Map<number, WorkflowRun>();
-  for (const run of runs) {
-    if (isMachineryWorkflow(run.path)) continue;
-    const seen = latest.get(run.workflow_id);
-    if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
-  }
-  return [...latest.values()];
-}
-
-/**
- * `pending` on an empty list, deliberately. A head read in the second before its
- * CI run is created has nothing failing and nothing running, and calling that
- * green reports a pass on channels no machine ever ran — the same trap
- * `agentic-auto-merge`'s `total === 0` guard exists for.
- */
-export function verdictOf(runs: WorkflowRun[]): Verdict {
-  const latest = latestRunPerWorkflow(runs);
-  if (latest.length === 0) return 'pending';
-  if (latest.some((run) => run.status === 'completed' && RUN_FAILURES.has(run.conclusion ?? ''))) {
-    return 'red';
-  }
-  if (latest.some((run) => run.status !== 'completed')) return 'pending';
-  return 'green';
-}
 
 export interface Options {
   pr?: number;
@@ -221,49 +96,6 @@ export function parseArgs(argv: string[]): Options | { error: string } {
     return { error: 'pass --pr <number> or --head <branch>' };
   }
   return options;
-}
-
-/** `gh api` output, parsed. Throws with gh's own stderr, which names the real problem. */
-function gh<T>(args: string[]): T {
-  const out = execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-  return JSON.parse(out) as T;
-}
-
-interface PullRequest {
-  number: number;
-  state: string;
-  merged_at: string | null;
-  draft: boolean;
-  head: { ref: string; sha: string };
-  labels: { name: string }[];
-}
-
-function resolvePr(options: Options): PullRequest | undefined {
-  if (options.pr !== undefined) {
-    return gh<PullRequest>(['api', `repos/{owner}/{repo}/pulls/${options.pr}`]);
-  }
-  const { owner } = gh<{ owner: { login: string } }>(['repo', 'view', '--json', 'owner']);
-  const open = gh<PullRequest[]>([
-    'api',
-    `repos/{owner}/{repo}/pulls?state=open&head=${owner.login}:${options.head}&per_page=10`,
-  ]);
-  return open[0];
-}
-
-function runsOnHead(sha: string): WorkflowRun[] {
-  const page = gh<{ workflow_runs: WorkflowRun[] }>([
-    'api',
-    `repos/{owner}/{repo}/actions/runs?head_sha=${sha}&per_page=100`,
-  ]);
-  return page.workflow_runs ?? [];
-}
-
-function jobsForRun(runId: number): WorkflowJob[] {
-  const page = gh<{ jobs: WorkflowJob[] }>([
-    'api',
-    `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100&filter=latest`,
-  ]);
-  return page.jobs ?? [];
 }
 
 /** Failing jobs, so the caller reads what to fix rather than that something broke. */

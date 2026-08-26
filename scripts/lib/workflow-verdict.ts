@@ -60,11 +60,8 @@ const MACHINERY_WORKFLOWS: ReadonlySet<string> = new Set([
   'opencode-runner.yml',
 ]);
 
-export const isMachineryWorkflow = (path: string): boolean => {
-  void path;
-  void MACHINERY_WORKFLOWS;
-  throw new Error('not implemented');
-};
+export const isMachineryWorkflow = (path: string): boolean =>
+  MACHINERY_WORKFLOWS.has(path.replace(/^\.github\/workflows\//, ''));
 
 /**
  * One run per workflow: the newest. CI declares `cancel-in-progress: true`, so a
@@ -72,8 +69,13 @@ export const isMachineryWorkflow = (path: string): boolean => {
  * without this dedup, every fix a run pushes makes its own PR permanently red.
  */
 export function latestRunPerWorkflow(runs: WorkflowRun[]): WorkflowRun[] {
-  void runs;
-  throw new Error('not implemented');
+  const latest = new Map<number, WorkflowRun>();
+  for (const run of runs) {
+    if (isMachineryWorkflow(run.path)) continue;
+    const seen = latest.get(run.workflow_id);
+    if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
+  }
+  return [...latest.values()];
 }
 
 /**
@@ -83,6 +85,11 @@ export function latestRunPerWorkflow(runs: WorkflowRun[]): WorkflowRun[] {
  * `agentic-auto-merge`'s `total === 0` guard exists for.
  */
 export function verdictOf(runs: WorkflowRun[]): Verdict {
-  void runs;
-  throw new Error('not implemented');
+  const latest = latestRunPerWorkflow(runs);
+  if (latest.length === 0) return 'pending';
+  if (latest.some((run) => run.status === 'completed' && RUN_FAILURES.has(run.conclusion ?? ''))) {
+    return 'red';
+  }
+  if (latest.some((run) => run.status !== 'completed')) return 'pending';
+  return 'green';
 }

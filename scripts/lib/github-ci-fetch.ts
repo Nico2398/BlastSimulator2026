@@ -11,9 +11,8 @@ import type { WorkflowRun, WorkflowJob } from './phantom-cancelled-runs.js';
 
 /** `gh api` output, parsed. Throws with gh's own stderr, which names the real problem. */
 function gh<T>(args: string[]): T {
-  void args;
-  void execFileSync;
-  throw new Error('not implemented');
+  const out = execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  return JSON.parse(out) as T;
 }
 
 export interface PullRequest {
@@ -26,17 +25,29 @@ export interface PullRequest {
 }
 
 export function resolvePr(options: { pr?: number; head?: string }): PullRequest | undefined {
-  void options;
-  void gh;
-  throw new Error('not implemented');
+  if (options.pr !== undefined) {
+    return gh<PullRequest>(['api', `repos/{owner}/{repo}/pulls/${options.pr}`]);
+  }
+  const { owner } = gh<{ owner: { login: string } }>(['repo', 'view', '--json', 'owner']);
+  const open = gh<PullRequest[]>([
+    'api',
+    `repos/{owner}/{repo}/pulls?state=open&head=${owner.login}:${options.head}&per_page=10`,
+  ]);
+  return open[0];
 }
 
 export function runsOnHead(sha: string): WorkflowRun[] {
-  void sha;
-  throw new Error('not implemented');
+  const page = gh<{ workflow_runs: WorkflowRun[] }>([
+    'api',
+    `repos/{owner}/{repo}/actions/runs?head_sha=${sha}&per_page=100`,
+  ]);
+  return page.workflow_runs ?? [];
 }
 
 export function jobsForRun(runId: number): WorkflowJob[] {
-  void runId;
-  throw new Error('not implemented');
+  const page = gh<{ jobs: WorkflowJob[] }>([
+    'api',
+    `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100&filter=latest`,
+  ]);
+  return page.jobs ?? [];
 }
