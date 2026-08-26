@@ -269,3 +269,206 @@ describe('tutorial-interactive.json — outer step timeout covers every inner wa
     });
   });
 });
+
+// ──────────────────────────────────────────────
+// 13. tutorial-interactive.json — post-blast waitForTutorialStep beats need
+// real wall-clock slack, not just the bare formula minimum (issue #776).
+//
+// Two independent interaction-mode browser runs both timed out
+// deterministically at the "hire-manager" step (`employee hire
+// role:manager`, then `waitForTutorialStep(stepId:"contract-accept")`),
+// which sits right after the blast sequence (steps 24-31: drill, charge,
+// sequence, fire) and the consultant event-resolve step (32). Both real
+// actions (hire manager, tutorial advance to "contract-accept") actually
+// succeeded in-browser before the outer deadline fired — this is not a
+// logic bug, it's a timeout-budget bug: `effectiveStepTimeoutMs` computes
+// exactly `max(30000, 30000 + TIMEOUT_MARGIN_MS) = 35000ms` for this step
+// (formula-correct, same shape the #730 test above already covers), but
+// 35000ms of real wall-clock time is not enough for this specific beat —
+// page.evaluate round-trips are still comparatively slow right after the
+// blast/event stretch. Same root cause as #758 (fixed in PR #740): a
+// step's formula-correct budget was empirically too tight for its
+// real-world beat, and the fix there was to widen the step's own declared
+// `timeout`, not the shared formula or margin constant.
+//
+// This test encodes the requirement the #730 loop above cannot see: that
+// this step has genuine slack above the bare minimum, not merely a budget
+// that satisfies the formula. The floor chosen (60000ms) is double the
+// current 35000ms effective budget — the same order-of-magnitude margin
+// #758/#740 aimed for — comfortably absorbing render-frame jitter in the
+// tick immediately following a blast without being a placeholder that
+// passes trivially. Locates the step by its actual shape (hires a manager,
+// then waits for the "contract-accept" tutorial step) rather than a bare
+// index, so it keeps finding the right step if earlier steps are ever
+// inserted/removed.
+// ──────────────────────────────────────────────
+describe('tutorial-interactive.json — post-blast waitForTutorialStep steps have real wall-clock margin, not just the formula minimum', () => {
+  const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
+
+  // Minimum acceptable effective timeout for this beat. Chosen as 2x the
+  // current (too-tight) 35000ms effective budget that produced #776's
+  // observed timeouts — a generous, concrete floor rather than the exact
+  // formula minimum this bug already clears.
+  const POST_BLAST_BEAT_MIN_TIMEOUT_MS = 60000;
+
+  // Located via the shared `forEachActionOfType` scaffold rather than a
+  // hand-rolled `findIndex`/type-guard/cast (#776 review finding) — filters
+  // down to the one step whose command hires a manager and whose
+  // waitForTutorialStep action targets "contract-accept", skipping every
+  // other waitForTutorialStep invocation in the scenario.
+  let matchedStepIndex = -1;
+  let matchedStepObj: ScenarioStepDef | undefined;
+  forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
+    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
+    if (stepObj.command !== 'employee hire role:manager') return;
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('contract-accept')) return;
+    matchedStepIndex = stepIndex;
+    matchedStepObj = stepObj;
+  });
+
+  it('step hiring the manager and waiting for tutorial step "contract-accept" has effectiveStepTimeoutMs >= 60000ms', () => {
+    expect(
+      matchedStepIndex,
+      'expected to find a step with command "employee hire role:manager" whose interaction array waits for tutorial step "contract-accept" — tutorial-interactive.json may have changed shape',
+    ).toBeGreaterThanOrEqual(0);
+
+    const stepObj = matchedStepObj as ScenarioStepDef;
+    const outerMs = effectiveStepTimeoutMs(stepObj, 60);
+
+    expect(
+      outerMs,
+      `step[${matchedStepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
+        `too tight for the real-world post-blast beat (issue #776: two independent interaction-mode runs both ` +
+        `timed out here at 35000ms even though the underlying actions succeeded). Needs real wall-clock slack ` +
+        `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
+    ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
+  });
+
+  // Step 35's beat (issue #776 follow-up): two fresh independent
+  // interaction-mode runs both cleared the "contract-accept" beat above
+  // cleanly, then timed out identically at the very next
+  // waitForTutorialStep beat — accepting the rubble_disposal contract and
+  // waiting for the tutorial to advance to "hire-driver". Same shape as
+  // the manager/contract-accept case above: the click succeeds in-browser
+  // (state dump shows activeContractCount: 1 and the tutorial card visibly
+  // reads "Hire Driver — 21/31") but the harness's poll times out first,
+  // because this step's declared "timeout": 30 in the JSON produces the
+  // same too-tight ~35000ms effectiveStepTimeoutMs budget. Located via the
+  // same forEachActionOfType scaffold, not a hand-rolled locator.
+  let driverStepIndex = -1;
+  let driverStepObj: ScenarioStepDef | undefined;
+  forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
+    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
+    if (stepObj.command !== 'contract accept type:rubble_disposal') return;
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('hire-driver')) return;
+    driverStepIndex = stepIndex;
+    driverStepObj = stepObj;
+  });
+
+  it('step accepting the rubble_disposal contract and waiting for tutorial step "hire-driver" has effectiveStepTimeoutMs >= 60000ms', () => {
+    expect(
+      driverStepIndex,
+      'expected to find a step with command "contract accept type:rubble_disposal" whose interaction array waits for tutorial step "hire-driver" — tutorial-interactive.json may have changed shape',
+    ).toBeGreaterThanOrEqual(0);
+
+    const stepObj = driverStepObj as ScenarioStepDef;
+    const outerMs = effectiveStepTimeoutMs(stepObj, 60);
+
+    expect(
+      outerMs,
+      `step[${driverStepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
+        `too tight for the real-world post-blast beat (issue #776: two independent interaction-mode runs both ` +
+        `timed out here at ~35000ms even though the underlying actions succeeded). Needs real wall-clock slack ` +
+        `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
+    ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
+  });
+
+  // Step 36's beat (issue #776 second follow-up): two fresh independent
+  // interaction-mode runs both cleared the "hire-driver" beat above (step
+  // 35) cleanly, then timed out identically at the very next
+  // waitForTutorialStep beat — hiring a driver and waiting for the
+  // tutorial to advance to "vehicle-buy-assign". Same shape as the two
+  // cases above: the real hire action succeeds in-browser but the
+  // harness's poll times out first, because this step's declared
+  // "timeout": 30 in the JSON produces the same too-tight ~35000ms
+  // effectiveStepTimeoutMs budget. A planner audit of the rest of the file
+  // (steps 37-46) found no other step with this same tight-margin shape —
+  // this is the last one needing the fix. Located via the same
+  // forEachActionOfType scaffold, not a hand-rolled locator.
+  let driverAssignStepIndex = -1;
+  let driverAssignStepObj: ScenarioStepDef | undefined;
+  forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
+    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
+    if (stepObj.command !== 'employee hire role:driver') return;
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('vehicle-buy-assign')) return;
+    driverAssignStepIndex = stepIndex;
+    driverAssignStepObj = stepObj;
+  });
+
+  it('step hiring the driver and waiting for tutorial step "vehicle-buy-assign" has effectiveStepTimeoutMs >= 60000ms', () => {
+    expect(
+      driverAssignStepIndex,
+      'expected to find a step with command "employee hire role:driver" whose interaction array waits for tutorial step "vehicle-buy-assign" — tutorial-interactive.json may have changed shape',
+    ).toBeGreaterThanOrEqual(0);
+
+    const stepObj = driverAssignStepObj as ScenarioStepDef;
+    const outerMs = effectiveStepTimeoutMs(stepObj, 60);
+
+    expect(
+      outerMs,
+      `step[${driverAssignStepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
+        `too tight for the real-world post-blast beat (issue #776: two independent interaction-mode runs both ` +
+        `timed out here at ~35000ms even though the underlying actions succeeded). Needs real wall-clock slack ` +
+        `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
+    ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
+  });
+});
+
+// ──────────────────────────────────────────────
+// 14. tutorial-interactive.json — every post-blast step (indices 32-46)
+// declares a 90s timeout floor, regardless of action type (issue #776,
+// third follow-up).
+//
+// The three describe blocks above (12 and 13) only assert on steps that
+// carry a `waitForTutorialStep` action, via `effectiveStepTimeoutMs`. That
+// missed step 37 (`employee assign_skill 4 skill:driving.truck level:3`,
+// a plain `command` action with no `waitForTutorialStep` at all) — it kept
+// its tight default `timeout: 30` and stalled interaction-mode CI a fourth
+// time. A planner audit of the whole post-blast window (steps 32-46)
+// concluded the underlying cost isn't specific to any one action type: the
+// scenario-wide `shots: ["overview","birdseye"]` setting captures 2
+// screenshots + a state dump after *every* step, and the muck pile spawned
+// by the blast at step 31 (994 fragments) plausibly never fully clears
+// within this scenario's remaining steps — hauling only starts at step 39,
+// and total delivered ore is far less than 994 fragments' worth. So every
+// step from 32 through 46 pays the heavy-scene screenshot cost, whether or
+// not it happens to wait on a tutorial card.
+//
+// This test asserts the simpler, broader invariant directly against the
+// JSON's own declared `timeout` field (not the derived
+// `effectiveStepTimeoutMs`) for every step in that index range, matching
+// this file's own established "safe" precedent of 90s already used for
+// steps 31, 34, 39, 41, 42. It intentionally does not replace tests 12/13
+// above — those assert a different thing (outer/inner margin) and remain
+// valid on their own.
+// ──────────────────────────────────────────────
+describe('tutorial-interactive.json — every post-blast step (32-46) has a declared timeout floor of 90s', () => {
+  const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
+
+  const POST_BLAST_WINDOW_START = 32;
+  const POST_BLAST_WINDOW_END = 46; // inclusive
+
+  for (let i = POST_BLAST_WINDOW_START; i <= POST_BLAST_WINDOW_END; i++) {
+    it(`step[${i}] has timeout >= 90`, () => {
+      const step = scenario.steps[i];
+      if (typeof step === 'string') return; // bare-string steps carry no declared timeout; skip per file's own ScenarioStepDef cast pattern
+      const stepObj = step as ScenarioStepDef;
+      expect(
+        stepObj.timeout,
+        `step[${i}] ("${stepObj.description ?? stepObj.command}") must declare a timeout >= 90s — ` +
+          `every step in the post-blast window (32-46) renders a heavy muck-pile scene under this file's ` +
+          `"shots": ["overview","birdseye"] setting (issue #776).`,
+      ).toBeGreaterThanOrEqual(90);
+    });
+  }
+});
