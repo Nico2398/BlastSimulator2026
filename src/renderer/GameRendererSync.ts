@@ -4,7 +4,7 @@
 // the already-built scene" step shared by syncFromContext() and finishLevelLoad().
 
 import type { GameState } from '../core/state/GameState.js';
-import type { VoxelGrid } from '../core/world/VoxelGrid.js';
+import { computeVoxelColumnSurfaceY, type VoxelGrid } from '../core/world/VoxelGrid.js';
 import type { WeatherCycleState, WeatherState } from '../core/weather/WeatherCycle.js';
 import type { ZoneBounds } from '../core/entities/Zone.js';
 import { isInZone } from '../core/entities/Zone.js';
@@ -160,6 +160,11 @@ export function syncGameRendererEntities(deps: SyncDeps): SyncResult {
 /**
  * Convert GameState.surveyResults into overlay options. Returns null when
  * there are no survey results or no grid is bound.
+ *
+ * skeleton-writer (#770): no skeleton changes needed — reconciling this
+ * existing, already-exported buildSurveyOverlayOptions against the existing,
+ * already-exported computeVoxelColumnSurfaceY (src/core/world/VoxelGrid.ts)
+ * happens in the TDD implementer step.
  */
 export function buildSurveyOverlayOptions(
   state: GameState,
@@ -178,17 +183,12 @@ export function buildSurveyOverlayOptions(
       const x = parts[0]!;
       const z = parts[1]!;
 
-      // Surface Y = topmost solid voxel + 1
-      let surfaceY = 0;
-      const clampedX = Math.max(grid.minX, Math.min(grid.maxX - 1, Math.floor(x)));
-      const clampedZ = Math.max(grid.minZ, Math.min(grid.maxZ - 1, Math.floor(z)));
-      for (let y = grid.sizeY - 1; y >= 0; y--) {
-        const voxel = grid.getVoxel(clampedX, y, clampedZ);
-        if (voxel && voxel.density > 0) {
-          surfaceY = y + 1;
-          break;
-        }
-      }
+      // Surface Y = topmost solid voxel + 1. Delegates to the canonical scan
+      // (VoxelGrid.computeVoxelColumnSurfaceY) instead of duplicating it with
+      // a different, stale threshold — the overlay uses the same "solid
+      // enough to stand on" bar (density >= 0.5 / isSolidAt) as gameplay,
+      // navmesh, and every other surface-height call site (#770).
+      const surfaceY = computeVoxelColumnSurfaceY(grid, x, z) + 1;
 
       points.push({
         x,
