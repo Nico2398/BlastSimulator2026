@@ -344,14 +344,22 @@ async function assessCandidate(api, issue) {
   // Refusing it here would make the partial work unreachable forever — the issue
   // would sit `ready` behind a PR nobody is coming back to.
   //
-  // Fail closed on the mix: if any open deliverable PR is *not* paused, that one
-  // is a live run and the collision reasoning above still applies. A read that
-  // could not produce labels yields `[]`, which lands here too.
+  // The exception is exactly one pull request wide, and it is *this* issue's own
+  // handover — `resumeTargetFor` below, which reads only the branch family this
+  // issue's runs build on. A `paused` pull request that merely writes `Closes
+  // #N` from another issue's branch is that issue's handover; exempting it here
+  // would put two issues on one branch, which is the #730/#758 collision the
+  // resume rule below describes.
+  //
+  // Fail closed on the rest: every other open deliverable pull request is a live
+  // run and the collision reasoning above still applies. A read that could not
+  // produce labels yields `[]`, which is not the handover and lands here too.
   const openPrs = [
     ...(deliverable.pipeline && !deliverable.pipeline.merged ? [deliverable.pipeline] : []),
     ...deliverable.closers.filter((pr) => !pr.merged),
   ];
-  const live = openPrs.find((pr) => !(pr.labels || []).includes(PAUSED));
+  const handover = resumeTargetFor(deliverable);
+  const live = openPrs.find((pr) => pr.number !== handover?.number);
   if (live) {
     return no(`pull request #${live.number} is already open against it`);
   }
@@ -369,16 +377,31 @@ async function assessCandidate(api, issue) {
  * `pipeline/feature-<N>-<runId>` from `main` would silently abandon the work the
  * pause existed to save.
  *
+ * Only the `pipeline` entry can be that handover, never a closer. `pipeline` is
+ * the pull request opened from this issue's own `pipeline/feature-<N>[-<runId>]`
+ * branch, head-matched by `deliverableFor`, so it cannot be another issue's
+ * work. A closer is any pull request whose body writes `Closes #N`, which says
+ * nothing at all about the branch it sits on.
+ *
+ * Issue #730 is the incident, on 25 Aug 2026. Its paused handover, PR #740,
+ * carried `Closes #758` for a defect the same run had fixed in passing. When
+ * #758 came up for assignment, this function answered with #730's handover, and
+ * the assignment comment told that run — in the words this function's caller
+ * writes — that "a previous run on this issue" had left its work on
+ * `pipeline/feature-730-32642264036`. The run obeyed: it finished on #730's
+ * branch, took `paused` off #730's pull request and marked it ready for review.
+ * That removed the one label holding #730's carve-out open, so every assignment
+ * afterwards skipped #730 with "pull request #740 is already open against it"
+ * and took a different issue instead, with nothing anywhere reporting it.
+ *
  * @param {{pipeline: object|null, closers: object[]}} deliverable from `deliverableFor`
  * @returns {{number: number, head: string|null}|null}
  */
 function resumeTargetFor(deliverable) {
-  const openPrs = [
-    ...(deliverable?.pipeline && !deliverable.pipeline.merged ? [deliverable.pipeline] : []),
-    ...(deliverable?.closers || []).filter((pr) => !pr.merged),
-  ];
-  const paused = openPrs.find((pr) => (pr.labels || []).includes(PAUSED));
-  return paused ? { number: paused.number, head: paused.head || null } : null;
+  const pipeline = deliverable?.pipeline;
+  if (!pipeline || pipeline.merged) return null;
+  if (!(pipeline.labels || []).includes(PAUSED)) return null;
+  return { number: pipeline.number, head: pipeline.head || null };
 }
 
 /**
