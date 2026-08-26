@@ -9,6 +9,7 @@ import {
   createGridPlan, addHole, removeHole, resetHoleIds,
   computeDrillHoleDurationTicks,
 } from '../../core/mining/DrillPlan.js';
+import type { DrillHole } from '../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
 import { createCharge, batchCharge, computeChargeHoleDurationTicks } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
@@ -421,7 +422,7 @@ function dispatchChargeAction(
  */
 function dispatchDrillHoleAction(
   ctx: MiningContext,
-  hole: { id: string; x: number; z: number; depth: number; diameter: number },
+  hole: DrillHole,
 ): void {
   const durationTicks = computeDrillHoleDurationTicks(hole.depth, hole.diameter);
   const actionId = ctx.state!.nextPendingActionId++;

@@ -134,6 +134,40 @@ describe('blast_plan list', () => {
   });
 });
 
+// ── blast_plan validate (#790: no prior coverage — validate shares
+// assembleValidBlastPlan with blastCommand/blastPreviewCommand but has its
+// own header text and its own success message) ──────────────────────────
+
+describe('blastPlanCommand — validate subcommand', () => {
+  it('validate reports "Validation issues" when the plan has errors', () => {
+    const ctx = makeMiningContext();
+    // Holes drilled but never charged — validateBlastPlan reports a missing
+    // charge for each hole (mirrors blastPreviewCommand's own "incomplete
+    // plan" test above).
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+
+    const result = blastPlanCommand(ctx, ['validate'], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output.startsWith('Validation issues:')).toBe(true);
+  });
+
+  it('validate reports the plan is ready to blast when there are no errors', () => {
+    const ctx = makeMiningContext();
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+
+    const result = blastPlanCommand(ctx, ['validate'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('Plan is valid and ready to blast.');
+  });
+});
+
 // ── drill_plan remove ────────────────────────────────────────────────────────
 
 describe('drillPlanCommand — remove subcommand', () => {
