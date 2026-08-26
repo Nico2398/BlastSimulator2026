@@ -1175,6 +1175,38 @@ describe('GameRenderer — ghost/terrain resync dirty-check gating (#761)', () =
     syncSpy.mockRestore();
   });
 
+  it("clearAll()'s reset moves a stale lastSyncedTerrainRevision to -1, independent of the ghost-half reset (#774)", () => {
+    const sm = makeMockSceneManager();
+    const renderer = new GameRenderer(sm as any);
+    const ctx = makeCtx();
+    renderer.syncFromContext(ctx); // real load
+
+    // Pin the ghost half inert: match lastGhostRevision to the fresh
+    // context's own ghostPreviewsRevision, so the ghost-half reset line
+    // in clearAll() — present or not — leaves lastGhostRevisionSynced
+    // unchanged across this call. Only the terrain path below can move
+    // this test's needle. Self-derive rather than hardcode, so this stays
+    // correct if makeCtx()'s default ever changes.
+    (renderer as any).lastGhostRevision = ctx.state!.ghostPreviewsRevision;
+
+    // Poke a stale lastSyncedTerrainRevision that DIFFERS from -1 — unlike
+    // the #769 test above, which pre-matches -1 and so cannot tell "the
+    // reset ran" from "the reset never ran". Any value other than -1
+    // discriminates; 5 is arbitrary.
+    (renderer as any).lastSyncedTerrainRevision = 5;
+
+    (renderer as any).clearAll(); // the real #761 call site
+
+    // Fails if `deps.lastSyncedTerrainRevision = -1;` is removed from
+    // clearAll() while the ghost-half reset line stays intact:
+    // lastTerrainRevisionSynced would stay at the poked 5 instead of
+    // becoming -1.
+    expect(renderer.lastTerrainRevisionSynced).toBe(-1);
+    // Ghost half still resets too — the pin above only fixed the value
+    // going in, not whether clearAll()'s ghost reset line runs.
+    expect(renderer.lastGhostRevisionSynced).toBe(-1);
+  });
+
   it('a real level swap (different seed) still resyncs ghost previews for the newly-loaded GameState (#769, end-to-end companion)', () => {
     const sm = makeMockSceneManager();
     const renderer = new GameRenderer(sm as any);
