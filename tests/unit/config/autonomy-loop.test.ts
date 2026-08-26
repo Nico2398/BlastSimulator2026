@@ -853,7 +853,7 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
 });
 
 // The two LABEL_GATED_JOBS array literals -- one real TS
-// (scripts/await-pr-ci.ts, exported and unit-tested directly), one inline
+// (scripts/lib/label-gated-jobs.ts, exported and unit-tested directly), one inline
 // github-script JS (this same action.yml, extracted above for its own tests)
 // -- can drift with nothing in either test suite noticing, since each only
 // proves its own copy's behavior. That drift already produced a real
@@ -861,7 +861,7 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
 // case reading GREEN where this action's own equivalent reads every gated
 // label missing) before this test existed. Comparing the two literals
 // directly is what would have caught it before the behavior ever diverged.
-describe('LABEL_GATED_JOBS stays identical between await-pr-ci.ts and this action', () => {
+describe('LABEL_GATED_JOBS stays identical between scripts/lib/label-gated-jobs.ts and this action', () => {
   it('the two array literals are the same value, not just similarly shaped', () => {
     const actionSource = readFileSync(
       join(ROOT, '.github/actions/agentic-auto-merge/action.yml'), 'utf8'
@@ -870,7 +870,7 @@ describe('LABEL_GATED_JOBS stays identical between await-pr-ci.ts and this actio
     const actionEnd = actionSource.indexOf('];', actionStart) + 2;
     const actionArray = new Function(`${actionSource.slice(actionStart, actionEnd)} return LABEL_GATED_JOBS;`)();
 
-    const tsSource = readFileSync(join(ROOT, 'scripts/await-pr-ci.ts'), 'utf8');
+    const tsSource = readFileSync(join(ROOT, 'scripts/lib/label-gated-jobs.ts'), 'utf8');
     const tsStart = tsSource.indexOf('const LABEL_GATED_JOBS');
     const tsEnd = tsSource.indexOf('];', tsStart) + 2;
     // Strip the TS-only type annotation the YAML copy has no equivalent for.
@@ -1304,7 +1304,7 @@ describe('the machinery list is one list, in three copies', () => {
   // The guard is the workflow that proved a prefix rule fails open: it named
   // itself `agentic-` and exempted itself from every reader at once.
   it.each([
-    ['scripts/await-pr-ci.ts', 'const MACHINERY_WORKFLOWS'],
+    ['scripts/lib/workflow-verdict.ts', 'const MACHINERY_WORKFLOWS'],
     ['.github/workflows/agentic-ci-failure.yml', 'const MACHINERY = new Set(['],
     ['.github/workflows/agentic-watchdog.yml', 'const MACHINERY = new Set(['],
   ])('%s lists the same set, and never the closing-keyword guard', (path, marker) => {

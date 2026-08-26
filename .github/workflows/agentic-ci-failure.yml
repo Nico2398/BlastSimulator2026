@@ -96,7 +96,7 @@ jobs:
             // the issue number is group 1 either way.
             const PIPELINE_HEAD = /^pipeline\/feature-(\d+)(?:-\d+)?$/;
 
-            // Kept in shape with `MACHINERY_WORKFLOWS` in `scripts/await-pr-ci.ts`
+            // Kept in shape with `MACHINERY_WORKFLOWS` in `scripts/lib/workflow-verdict.ts`
             // and with the watchdog's own copy: a workflow run on the head is a
             // verification channel unless it is named here. Inline rather than
             // imported because this job has no checkout, and pinned across all
