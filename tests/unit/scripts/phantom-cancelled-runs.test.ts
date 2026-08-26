@@ -98,7 +98,7 @@ describe('dropping a phantom cancelled run (#772)', () => {
     expect(dropped.map((r) => r.id).sort((a, b) => a - b)).toEqual([10, 11]);
   });
 
-  it('keeps a genuinely cancelled run red when it has no sibling to fall back on', () => {
+  it('keeps a genuinely cancelled run when it has no sibling to fall back on', () => {
     const soloRun = run({ id: 40, workflow_id: 70, status: 'completed', conclusion: 'cancelled' });
     const realJobs = [
       job({ conclusion: 'cancelled', started_at: '2026-01-01T00:00:00.000Z', completed_at: '2026-01-01T00:00:45.000Z' }),
