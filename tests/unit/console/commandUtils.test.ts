@@ -1,9 +1,125 @@
-import { describe, it } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { requireGame, NO_EMPLOYEES_MSG, parseStaffedFlag } from '../../../src/console/commands/commandUtils.js';
+import { setLocale } from '../../../src/core/i18n/I18n.js';
+import type { GameContext } from '../../../src/console/commands/world.js';
 
 // #795: commandUtils' static, user-facing guard messages (requireGame's
 // "No game loaded" text, NO_EMPLOYEES_MSG, and parseStaffedFlag's invalid-value
-// message) now route through t() — see src/core/i18n/I18n.ts. Real test cases
-// land in the tests phase; this file is the skeleton-phase scaffold only.
-describe('commandUtils', () => {
-  it.todo('covers requireGame, NO_EMPLOYEES_MSG, and parseStaffedFlag through t()');
+// message) route through t() — see src/core/i18n/I18n.ts. Every test below
+// pins the exact English literal (must stay byte-identical) and proves the
+// output actually changes under a French locale, rather than being a
+// hardcoded string that happens to sit in en.json too.
+
+const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
+const NO_EMPLOYEES_EN = 'No employees.';
+
+function makeEmptyContext(): GameContext {
+  return {
+    state: null,
+    grid: null,
+    landscape: null,
+    playableArea: null,
+    emitter: new EventEmitter(),
+  };
+}
+
+afterEach(() => setLocale('en'));
+
+describe('requireGame', () => {
+  it('returns null when a game is loaded', () => {
+    const ctx = makeEmptyContext();
+    ctx.state = {} as GameContext['state'];
+    expect(requireGame(ctx)).toBeNull();
+  });
+
+  it('returns the exact English guard message when no game is loaded', () => {
+    const ctx = makeEmptyContext();
+    const result = requireGame(ctx);
+    expect(result).not.toBeNull();
+    expect(result!.success).toBe(false);
+    expect(result!.output).toBe(NO_GAME_LOADED_EN);
+  });
+
+  it('returns a French-translated guard message under locale fr, differing from the English literal', () => {
+    const ctx = makeEmptyContext();
+    setLocale('fr');
+
+    const result = requireGame(ctx);
+
+    expect(result).not.toBeNull();
+    expect(result!.success).toBe(false);
+    expect(result!.output).not.toBe(NO_GAME_LOADED_EN);
+  });
+});
+
+describe('NO_EMPLOYEES_MSG', () => {
+  it('is the exact English literal by default', () => {
+    expect(NO_EMPLOYEES_MSG).toBe(NO_EMPLOYEES_EN);
+  });
+
+  // NO_EMPLOYEES_MSG is a module-level constant, computed once when
+  // commandUtils.ts first loads — t()'s currentLocale at that moment decides
+  // its value for the lifetime of the module instance. Proving it is wired
+  // through i18n (rather than a hardcoded literal that happens to match
+  // en.json) requires re-evaluating that top-level assignment under a
+  // different locale, which means forcing a fresh module instance: reset the
+  // module registry, re-import i18n first and switch it to 'fr', then import
+  // commandUtils fresh so its top-level `t('console.no_employees')` call
+  // resolves against the already-French instance.
+  it('is computed via t() at module load — a module freshly loaded under fr differs from the English literal', async () => {
+    vi.resetModules();
+    const freshI18n = await import('../../../src/core/i18n/I18n.js');
+    freshI18n.setLocale('fr');
+
+    const freshCommandUtils = await import('../../../src/console/commands/commandUtils.js');
+
+    expect(freshCommandUtils.NO_EMPLOYEES_MSG).not.toBe(NO_EMPLOYEES_EN);
+
+    vi.resetModules();
+  });
+});
+
+describe('parseStaffedFlag', () => {
+  it('returns staffed:false, error:null when raw is undefined (flag omitted)', () => {
+    expect(parseStaffedFlag(undefined)).toEqual({ staffed: false, error: null });
+  });
+
+  it('returns staffed:true, error:null for raw "true"', () => {
+    expect(parseStaffedFlag('true')).toEqual({ staffed: true, error: null });
+  });
+
+  it('returns staffed:false, error:null for raw "false"', () => {
+    expect(parseStaffedFlag('false')).toEqual({ staffed: false, error: null });
+  });
+
+  it('returns the exact English error message for an unrecognized value', () => {
+    const result = parseStaffedFlag('maybe');
+    expect(result.staffed).toBe(false);
+    expect(result.error).toBe('Invalid staffed value: "maybe". Use staffed:true or staffed:false.');
+  });
+
+  it('interpolates the raw value into the English error message', () => {
+    const result = parseStaffedFlag('yes');
+    expect(result.error).toBe('Invalid staffed value: "yes". Use staffed:true or staffed:false.');
+  });
+
+  it('returns a French-translated error message under locale fr, differing from the English literal', () => {
+    setLocale('fr');
+
+    const result = parseStaffedFlag('maybe');
+
+    expect(result.staffed).toBe(false);
+    expect(result.error).not.toBeNull();
+    expect(result.error).not.toBe('Invalid staffed value: "maybe". Use staffed:true or staffed:false.');
+  });
+
+  it('still interpolates the raw value into the French-translated error message', () => {
+    setLocale('fr');
+
+    const result = parseStaffedFlag('nope');
+
+    expect(result.error).not.toBeNull();
+    expect(result.error).toContain('nope');
+  });
 });
