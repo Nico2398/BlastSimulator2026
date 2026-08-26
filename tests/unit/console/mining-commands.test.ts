@@ -22,7 +22,7 @@ import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 import * as EventEngineModule from '../../../src/core/events/EventEngine.js';
 import { RAMP_COST_PER_METER, carveRampSegment } from '../../../src/core/mining/Ramp.js';
 import { TUBING_COST } from '../../../src/core/mining/Tubing.js';
-import { MIN_STEMMING_M } from '../../../src/core/config/balance.js';
+import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH } from '../../../src/core/config/balance.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { completePendingAction } from '../../../src/core/engine/TaskDispatch.js';
@@ -204,6 +204,121 @@ describe('drillPlanCommand — clear subcommand', () => {
 
     expect(result.success).toBe(true);
     expect(ctx.state!.drillHoles).toEqual([]);
+  });
+});
+
+// ── drill_plan grid — bounds (#572) ─────────────────────────────────────────
+// A crafted `drill_plan grid --rows/--cols` currently builds the full
+// rows×cols hole array (and dispatches a drill_hole action per hole) before
+// any claim or cost check runs — unbounded console input straight into a
+// double loop, same failure class as #558/#569's claimArea bridge-walk fix.
+// These tests pin the guard the plan calls for: reject before
+// createGridPlan ever builds the grid.
+describe('drillPlanCommand — grid subcommand bounds (#572)', () => {
+  it('rejects non-finite rows with a positive-whole-number message, leaving the plan untouched', () => {
+    const ctx = makeMiningContext();
+    const holesBefore = ctx.state!.plannedDrillHoles.length;
+
+    const result = drillPlanCommand(ctx, ['grid'], { rows: 'abc', cols: '3', spacing: '3', depth: '6' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('rows');
+    expect(result.output).toContain('cols');
+    expect(result.output.toLowerCase()).toContain('positive whole number');
+    expect(ctx.state!.plannedDrillHoles.length).toBe(holesBefore);
+  });
+
+  it('rejects non-finite cols with a positive-whole-number message, leaving the plan untouched', () => {
+    const ctx = makeMiningContext();
+    const holesBefore = ctx.state!.plannedDrillHoles.length;
+
+    const result = drillPlanCommand(ctx, ['grid'], { rows: '3', cols: 'xyz', spacing: '3', depth: '6' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('positive whole number');
+    expect(ctx.state!.plannedDrillHoles.length).toBe(holesBefore);
+  });
+
+  it('rejects rows:0, leaving the plan untouched', () => {
+    const ctx = makeMiningContext();
+    const holesBefore = ctx.state!.plannedDrillHoles.length;
+
+    const result = drillPlanCommand(ctx, ['grid'], { rows: '0', cols: '3', spacing: '3', depth: '6' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.plannedDrillHoles.length).toBe(holesBefore);
+  });
+
+  it('rejects a negative cols, leaving the plan untouched', () => {
+    const ctx = makeMiningContext();
+    const holesBefore = ctx.state!.plannedDrillHoles.length;
+
+    const result = drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '-2', spacing: '3', depth: '6' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.plannedDrillHoles.length).toBe(holesBefore);
+  });
+
+  it('rejects a grid whose rows*cols exceeds MAX_DRILL_GRID_HOLES, naming the computed count and the limit', () => {
+    const ctx = makeMiningContext();
+    const holesBefore = ctx.state!.plannedDrillHoles.length;
+    // 101 * 100 = 10,100 — one row over the limit.
+    const rows = 101, cols = 100;
+
+    const result = drillPlanCommand(ctx, ['grid'], {
+      rows: String(rows), cols: String(cols), spacing: '0.01', depth: '6',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('too large');
+    expect(result.output).toMatch(/10,?100/);
+    expect(result.output).toMatch(/10,?000/);
+    expect(ctx.state!.plannedDrillHoles.length).toBe(holesBefore);
+  });
+
+  it('accepts a grid exactly at MAX_DRILL_GRID_HOLES (boundary)', () => {
+    const ctx = makeMiningContext();
+    // 100 * 100 = 10,000 exactly. Tiny spacing keeps the whole grid on the
+    // already-generated site so no expansion/claim bridging is involved —
+    // isolates the rows*cols bound from claimArea's own bound (#558/#569).
+    const result = drillPlanCommand(ctx, ['grid'], {
+      rows: '100', cols: '100', spacing: '0.01', depth: '6',
+    });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedDrillHoles.length).toBe(MAX_DRILL_GRID_HOLES);
+  });
+
+  it('rejects a grid one hole over MAX_DRILL_GRID_HOLES (rows*cols === MAX_DRILL_GRID_HOLES + 1)', () => {
+    const ctx = makeMiningContext();
+    const holesBefore = ctx.state!.plannedDrillHoles.length;
+
+    const result = drillPlanCommand(ctx, ['grid'], {
+      rows: '10001', cols: '1', spacing: '0.01', depth: '6',
+    });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.plannedDrillHoles.length).toBe(holesBefore);
+  });
+
+  it('refuses an astronomically large grid in bounded time, not by building rows*cols holes (#572)', () => {
+    // rows:100000 cols:100000 is 10^10 holes — an unbounded implementation
+    // would exhaust memory or hang well past the threshold below building
+    // the array (and dispatching one drill_hole action per hole) before ever
+    // reaching a claim or cost check. Mirrors PlayableArea.test.ts's #558
+    // "refuses an astronomically distant target ... in bounded time" test.
+    const ctx = makeMiningContext();
+    const holesBefore = ctx.state!.plannedDrillHoles.length;
+
+    const start = Date.now();
+    const result = drillPlanCommand(ctx, ['grid'], {
+      rows: '100000', cols: '100000', spacing: '3', depth: '6',
+    });
+    const elapsed = Date.now() - start;
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.plannedDrillHoles.length).toBe(holesBefore);
+    expect(elapsed).toBeLessThan(200);
   });
 });
 
@@ -1121,6 +1236,165 @@ describe('buildRampCommand', () => {
     const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '5' });
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
+  });
+});
+
+// ── build_ramp — length bounds (#572) ───────────────────────────────────────
+// `length` (direct --length, or derived from --start/--end as
+// Math.abs(Math.round(dx or dz))) has no Number.isFinite check and no upper
+// bound before rampFootprint/cellsInRect build the footprint — unbounded
+// console input straight into a double loop, same failure class as the grid
+// bound above and #558/#569's claimArea bridge-walk fix.
+describe('buildRampCommand — length bounds (#572)', () => {
+  it('rejects a non-finite length derived from --start/--end producing Infinity', () => {
+    // "Infinity" is a valid Number() literal: Number('Infinity') === Infinity.
+    // dx = Infinity - 0, so length = Math.abs(Math.round(Infinity)) = Infinity —
+    // the specific Number.isFinite gap the issue calls out.
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10_000_000;
+    ctx.state!.finances.cash = 10_000_000;
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const result = buildRampCommand(ctx, [], { start: '0,10', end: 'Infinity,10', depth: '8' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('finite');
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+  });
+
+  it('rejects length:0 with a positive-length message, no cash deducted', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '0', depth: '8' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('positive');
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+  });
+
+  it('rejects a negative length with a positive-length message, no cash deducted', () => {
+    const ctx = makeMiningContext();
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '-5', depth: '8' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('positive');
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+  });
+
+  it('rejects a direct --length exceeding MAX_RAMP_LENGTH, naming the length and the limit', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10_000_000;
+    ctx.state!.finances.cash = 10_000_000;
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'east', length: '5000', depth: '8' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('too long');
+    expect(result.output).toContain('5000');
+    expect(result.output).toMatch(/1,?000/);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+  });
+
+  it('rejects a --start/--end delta exceeding MAX_RAMP_LENGTH, naming the length and the limit', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10_000_000;
+    ctx.state!.finances.cash = 10_000_000;
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const result = buildRampCommand(ctx, [], { start: '0,10', end: '5000,10', depth: '8' });
+
+    expect(result.success).toBe(false);
+    expect(result.output.toLowerCase()).toContain('too long');
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+  });
+
+  it('accepts a ramp exactly at MAX_RAMP_LENGTH (boundary)', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10_000_000;
+    ctx.state!.finances.cash = 10_000_000;
+
+    // Extend the site east in bridgeable (<=384 voxel) steps first — a bare
+    // 1000m ramp from an untouched 32-voxel site would be refused as
+    // too_far by claimArea's own bound (#558/#569), which is a different
+    // limit than the one under test here.
+    for (const x of [16, 380, 750, 1010]) {
+      const claimResult = drillPlanCommand(ctx, ['add'], { x: String(x), z: '10', depth: '1' });
+      expect(claimResult.success).toBe(true);
+    }
+
+    const result = buildRampCommand(ctx, [], { origin: '0,10', direction: 'east', length: '1000', depth: '8' });
+
+    expect(result.success).toBe(true);
+    expect(ctx.state!.plannedRamps[ctx.state!.plannedRamps.length - 1]!.def.length).toBe(MAX_RAMP_LENGTH);
+  });
+
+  it('rejects a ramp one metre over MAX_RAMP_LENGTH (length === MAX_RAMP_LENGTH + 1)', () => {
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10_000_000;
+    ctx.state!.finances.cash = 10_000_000;
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const result = buildRampCommand(ctx, [], { origin: '0,10', direction: 'east', length: '1001', depth: '8' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+  });
+
+  it('refuses an astronomically long direct --length in bounded time, no cash deducted, no ramp queued (#572)', () => {
+    // --length 100000000 mirrors PlayableArea.test.ts's #558 bounded-time
+    // test: an unbounded implementation builds a length x RAMP_WIDTH
+    // footprint (cellsInRect) before any claim or cost check, exhausting
+    // memory well past the threshold below.
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10_000_000_000;
+    ctx.state!.finances.cash = 10_000_000_000;
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const start = Date.now();
+    const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'east', length: '100000000', depth: '8' });
+    const elapsed = Date.now() - start;
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+    expect(elapsed).toBeLessThan(200);
+  });
+
+  it('refuses a --start/--end delta producing an astronomical finite length in bounded time (#572)', () => {
+    // 1e300 is finite (well under Number.MAX_VALUE) but astronomically over
+    // MAX_RAMP_LENGTH — proves the bound catches a huge *finite* derived
+    // length, not just the Infinity case above.
+    const ctx = makeMiningContext();
+    ctx.state!.cash = 10_000_000_000;
+    ctx.state!.finances.cash = 10_000_000_000;
+    const cashBefore = ctx.state!.cash;
+    const rampsBefore = ctx.state!.plannedRamps.length;
+
+    const start = Date.now();
+    const result = buildRampCommand(ctx, [], { start: '0,0', end: '1e300,0', depth: '8' });
+    const elapsed = Date.now() - start;
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedRamps.length).toBe(rampsBefore);
+    expect(elapsed).toBeLessThan(200);
   });
 });
 
