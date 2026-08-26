@@ -9,10 +9,12 @@ import {
   createGridPlan, addHole, removeHole, resetHoleIds,
   computeDrillHoleDurationTicks,
 } from '../../core/mining/DrillPlan.js';
+import type { DrillHole } from '../../core/mining/DrillPlan.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
 import { createCharge, batchCharge, computeChargeHoleDurationTicks } from '../../core/mining/ChargePlan.js';
 import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
+import type { BlastPlan, ValidationError } from '../../core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH } from '../../core/config/balance.js';
@@ -74,6 +76,23 @@ export interface MiningContext extends GameContext {
 function requireGame(ctx: MiningContext): string | null {
   if (!ctx.state || !ctx.grid) return 'No game loaded. Use new_game first.';
   return null;
+}
+
+/**
+ * Shared preamble for every *Command function that requires an active
+ * game and then dispatches on a subcommand (args[0]) — the no-game-loaded
+ * guard and the subcommand extraction were duplicated identically across
+ * drillPlanCommand, sequenceCommand, blastPlanCommand, tubingCommand, and
+ * surveyCommand (#790). Returns the CommandResult to return immediately
+ * on failure, or the extracted subcommand to continue with.
+ */
+function requireGameWithSub(
+  ctx: MiningContext,
+  args: string[],
+): { error: CommandResult } | { error: null; sub: string | undefined } {
+  const err = requireGame(ctx);
+  if (err) return { error: { success: false, output: err } };
+  return { error: null, sub: args[0] };
 }
 
 /** Payload carried by a queued `drill_hole` PendingAction (#553). */
@@ -238,10 +257,9 @@ export function drillPlanCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  const err = requireGame(ctx);
-  if (err) return { success: false, output: err };
-
-  const sub = args[0];
+  const preamble = requireGameWithSub(ctx, args);
+  if (preamble.error) return preamble.error;
+  const sub = preamble.sub;
 
   if (sub === 'grid') {
     const origin = (named['origin'] ?? named['start'] ?? '0,0').split(',').map(Number);
@@ -282,26 +300,7 @@ export function drillPlanCommand(
     clearDrillPlan(ctx);
 
     for (const hole of planned) {
-      const durationTicks = computeDrillHoleDurationTicks(hole.depth, hole.diameter);
-      const actionId = ctx.state!.nextPendingActionId++;
-      // skipQualificationCheck (#553, mirrors HaulDispatch.ts's #552
-      // syncHaulDispatch): a drill plan must queue silently even when nobody
-      // on the roster currently holds 'blasting' or a drill_rig licence —
-      // rejecting it outright here would make ordering holes depend on
-      // hiring order instead of eventually being drillable once qualified.
-      dispatchPendingAction(ctx.state!, {
-        id: actionId,
-        type: 'drill_hole',
-        requiredSkill: 'blasting',
-        requiredVehicleRole: 'drill_rig',
-        targetX: hole.x,
-        targetZ: hole.z,
-        targetY: 0,
-        payload: {
-          holeId: hole.id, x: hole.x, z: hole.z, depth: hole.depth, diameter: hole.diameter, durationTicks,
-        } satisfies DrillHoleActionPayload,
-        targetEmployeeId: null,
-      }, { skipQualificationCheck: true });
+      dispatchDrillHoleAction(ctx, hole);
       ctx.state!.plannedDrillHoles.push(hole);
     }
 
@@ -321,21 +320,7 @@ export function drillPlanCommand(
 
     // Additive — unlike 'grid' above, does not clear the existing plan.
     const hole = addHole(ctx.state!.plannedDrillHoles, x, z, depth, diameter);
-    const durationTicks = computeDrillHoleDurationTicks(hole.depth, hole.diameter);
-    const actionId = ctx.state!.nextPendingActionId++;
-    dispatchPendingAction(ctx.state!, {
-      id: actionId,
-      type: 'drill_hole',
-      requiredSkill: 'blasting',
-      requiredVehicleRole: 'drill_rig',
-      targetX: hole.x,
-      targetZ: hole.z,
-      targetY: 0,
-      payload: {
-        holeId: hole.id, x: hole.x, z: hole.z, depth: hole.depth, diameter: hole.diameter, durationTicks,
-      } satisfies DrillHoleActionPayload,
-      targetEmployeeId: null,
-    }, { skipQualificationCheck: true });
+    dispatchDrillHoleAction(ctx, hole);
 
     return { success: true, output: `Added hole ${hole.id} at (${x}, ${z}), depth ${depth}m` };
   }
@@ -427,6 +412,40 @@ function dispatchChargeAction(
   state.plannedChargesByHole[hole.id] = { explosiveId, amountKg, stemmingM };
 }
 
+/**
+ * Queue a `drill_hole` PendingAction for `hole` — the per-hole dispatch
+ * built independently by drill_plan grid's loop and drill_plan add's
+ * single-hole path (#790, mirrors dispatchChargeAction's #554
+ * extraction for charge_hole). Does not touch plannedDrillHoles: grid's
+ * caller pushes the hole itself; add's caller already got it pushed by
+ * addHole.
+ */
+function dispatchDrillHoleAction(
+  ctx: MiningContext,
+  hole: DrillHole,
+): void {
+  const durationTicks = computeDrillHoleDurationTicks(hole.depth, hole.diameter);
+  const actionId = ctx.state!.nextPendingActionId++;
+  // skipQualificationCheck (#553, mirrors HaulDispatch.ts's #552
+  // syncHaulDispatch): a drill order must queue silently even when nobody
+  // on the roster currently holds 'blasting' or a drill_rig licence —
+  // rejecting it outright here would make ordering holes depend on
+  // hiring order instead of eventually being drillable once qualified.
+  dispatchPendingAction(ctx.state!, {
+    id: actionId,
+    type: 'drill_hole',
+    requiredSkill: 'blasting',
+    requiredVehicleRole: 'drill_rig',
+    targetX: hole.x,
+    targetZ: hole.z,
+    targetY: 0,
+    payload: {
+      holeId: hole.id, x: hole.x, z: hole.z, depth: hole.depth, diameter: hole.diameter, durationTicks,
+    } satisfies DrillHoleActionPayload,
+    targetEmployeeId: null,
+  }, { skipQualificationCheck: true });
+}
+
 export function chargeCommand(
   ctx: MiningContext,
   _args: string[],
@@ -494,10 +513,9 @@ export function sequenceCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  const err = requireGame(ctx);
-  if (err) return { success: false, output: err };
-
-  const sub = args[0];
+  const preamble = requireGameWithSub(ctx, args);
+  if (preamble.error) return preamble.error;
+  const sub = preamble.sub;
 
   if (sub === 'auto') {
     const step = parseFloat((named['delay_step'] ?? '25').replace('ms', ''));
@@ -526,6 +544,55 @@ export function sequenceCommand(
 
 // ── Blast commands ──
 
+/**
+ * Assemble the current drill/charge/sequence state into a BlastPlan —
+ * the same three GameState fields passed to assembleBlastPlan at every
+ * call site (blastCommand, blastPlanCommand's validate, previewCommand,
+ * blastPreviewCommand) (#790).
+ */
+function assembleCurrentBlastPlan(state: GameState): BlastPlan {
+  return assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
+}
+
+/**
+ * Validate the current blast plan against the current set of
+ * still-loading charge orders — the second GameState field
+ * (plannedChargesByHole) every validate-then-refuse call site reads
+ * identically (#790).
+ */
+function validateCurrentBlastPlan(state: GameState, plan: BlastPlan): ValidationError[] {
+  return validateBlastPlan(plan, new Set(Object.keys(state.plannedChargesByHole)));
+}
+
+/**
+ * Render blast-plan validation errors as the multi-line message every
+ * validate-then-refuse call site built identically, varying only in
+ * header text ("Invalid plan" vs "Validation issues") (#790).
+ */
+function formatBlastPlanErrors(errors: ValidationError[], header: string): string {
+  return `${header}:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}`;
+}
+
+/**
+ * Assemble the current blast plan and validate it, returning either the
+ * CommandResult to return immediately on validation failure or the valid
+ * plan to proceed with — the assemble+validate+early-return sequence
+ * duplicated identically at every command that must refuse to blast an
+ * invalid plan (blastCommand, blastPlanCommand's validate sub,
+ * blastPreviewCommand) (#790).
+ */
+function assembleValidBlastPlan(
+  state: GameState,
+  header: string,
+): { error: CommandResult } | { error: null; plan: BlastPlan } {
+  const plan = assembleCurrentBlastPlan(state);
+  const errors = validateCurrentBlastPlan(state, plan);
+  if (errors.length > 0) {
+    return { error: { success: false, output: formatBlastPlanErrors(errors, header) } };
+  }
+  return { error: null, plan };
+}
+
 export function blastCommand(
   ctx: MiningContext,
   _args: string[],
@@ -534,11 +601,9 @@ export function blastCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
-  const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
-  if (errors.length > 0) {
-    return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}` };
-  }
+  const assembled = assembleValidBlastPlan(ctx.state!, 'Invalid plan');
+  if (assembled.error) return assembled.error;
+  const plan = assembled.plan;
 
   // ctx.weatherCycle may not exist yet (created lazily by the `weather`
   // command, eagerly by main.ts on new_game/campaign start/sandbox start —
@@ -681,10 +746,9 @@ export function blastPlanCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  const err = requireGame(ctx);
-  if (err) return { success: false, output: err };
-
-  const sub = args[0];
+  const preamble = requireGameWithSub(ctx, args);
+  if (preamble.error) return preamble.error;
+  const sub = preamble.sub;
 
   if (sub === 'save') {
     const name = named['name'] ?? 'default';
@@ -707,10 +771,9 @@ export function blastPlanCommand(
   }
 
   if (sub === 'validate') {
-    const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
-    const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
-    if (errors.length === 0) return { success: true, output: 'Plan is valid and ready to blast.' };
-    return { success: false, output: `Validation issues:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}` };
+    const assembled = assembleValidBlastPlan(ctx.state!, 'Validation issues');
+    if (assembled.error) return assembled.error;
+    return { success: true, output: 'Plan is valid and ready to blast.' };
   }
 
   if (sub === 'list') {
@@ -732,7 +795,7 @@ export function previewCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
+  const plan = assembleCurrentBlastPlan(ctx.state!);
   const tier = ctx.state!.softwareTier;
   const sub = args[0];
 
@@ -777,11 +840,9 @@ export function blastPreviewCommand(
     return { success: false, output: 'No drill plan. Create one with drill_plan grid or drill_plan add.' };
   }
 
-  const plan = assembleBlastPlan(ctx.state!.drillHoles, ctx.state!.chargesByHole, ctx.state!.sequenceDelays);
-  const errors = validateBlastPlan(plan, new Set(Object.keys(ctx.state!.plannedChargesByHole)));
-  if (errors.length > 0) {
-    return { success: false, output: `Invalid plan:\n${errors.map(e => `  ${e.holeId}: ${t(e.issue)}`).join('\n')}` };
-  }
+  const assembled = assembleValidBlastPlan(ctx.state!, 'Invalid plan');
+  if (assembled.error) return assembled.error;
+  const plan = assembled.plan;
 
   const tier = ctx.state!.softwareTier;
   const energyPreview = previewEnergy(plan, ctx.grid!, tier);
@@ -1096,10 +1157,9 @@ export function tubingCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  const err = requireGame(ctx);
-  if (err) return { success: false, output: err };
-
-  const sub = args[0];
+  const preamble = requireGameWithSub(ctx, args);
+  if (preamble.error) return preamble.error;
+  const sub = preamble.sub;
 
   if (sub === 'buy') {
     const amount = parseInt(named['amount'] ?? '1', 10);
@@ -1127,10 +1187,9 @@ export function surveyCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  const err = requireGame(ctx);
-  if (err) return { success: false, output: err };
-
-  const sub = args[0];
+  const preamble = requireGameWithSub(ctx, args);
+  if (preamble.error) return preamble.error;
+  const sub = preamble.sub;
 
   if (sub === 'show') {
     const pending = ctx.state!.pendingActions.filter(a => a.type === 'survey');
