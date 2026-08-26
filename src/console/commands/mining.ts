@@ -15,7 +15,7 @@ import { setDelay, autoVPattern } from '../../core/mining/Sequence.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { executeBlast, buildBlastReport } from '../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
-import { MIN_STEMMING_M } from '../../core/config/balance.js';
+import { MIN_STEMMING_M, MAX_DRILL_GRID_HOLES, MAX_RAMP_LENGTH } from '../../core/config/balance.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../core/economy/Logistics.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
@@ -217,6 +217,9 @@ export function drillPlanCommand(
     const spacing = parseFloat(named['spacing'] ?? '3');
     const depth = parseFloat(named['depth'] ?? '8');
     const diameter = parseFloat(named['diameter'] ?? '0.15');
+
+    // TODO(#572): guard rows*cols against MAX_DRILL_GRID_HOLES before createGridPlan builds the grid.
+    void MAX_DRILL_GRID_HOLES;
 
     resetHoleIds();
     const planned = createGridPlan(
@@ -901,6 +904,9 @@ export function buildRampCommand(
     direction = (named['direction'] ?? 'south') as RampDirection;
     length = parseInt(named['length'] ?? '10', 10);
   }
+
+  // TODO(#572): guard length (direct or derived from start/end) against MAX_RAMP_LENGTH before rampFootprint builds the footprint.
+  void MAX_RAMP_LENGTH;
 
   const footprint = rampFootprint(originX, originZ, direction, length);
   const rampClaim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp');
