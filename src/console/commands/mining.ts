@@ -218,8 +218,15 @@ export function drillPlanCommand(
     const depth = parseFloat(named['depth'] ?? '8');
     const diameter = parseFloat(named['diameter'] ?? '0.15');
 
-    // TODO(#572): guard rows*cols against MAX_DRILL_GRID_HOLES before createGridPlan builds the grid.
-    void MAX_DRILL_GRID_HOLES;
+    if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1) {
+      return { success: false, output: 'Invalid drill grid: rows and cols must be positive whole numbers.' };
+    }
+    if (rows * cols > MAX_DRILL_GRID_HOLES) {
+      return {
+        success: false,
+        output: `Drill grid too large: ${rows}×${cols} = ${rows * cols} holes exceeds the ${MAX_DRILL_GRID_HOLES}-hole limit per plan.`,
+      };
+    }
 
     resetHoleIds();
     const planned = createGridPlan(
@@ -905,8 +912,15 @@ export function buildRampCommand(
     length = parseInt(named['length'] ?? '10', 10);
   }
 
-  // TODO(#572): guard length (direct or derived from start/end) against MAX_RAMP_LENGTH before rampFootprint builds the footprint.
-  void MAX_RAMP_LENGTH;
+  if (!Number.isFinite(length) || length < 1) {
+    return { success: false, output: 'Invalid ramp length: length must be a finite positive number.' };
+  }
+  if (length > MAX_RAMP_LENGTH) {
+    return {
+      success: false,
+      output: `Ramp too long: ${length}m exceeds the ${MAX_RAMP_LENGTH}m limit per ramp.`,
+    };
+  }
 
   const footprint = rampFootprint(originX, originZ, direction, length);
   const rampClaim = claimForAction(ctx, cellsInRect(footprint.minX, footprint.minZ, footprint.maxX, footprint.maxZ), 'build a ramp');
