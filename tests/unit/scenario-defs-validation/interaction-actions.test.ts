@@ -397,3 +397,52 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
     ).toBeGreaterThanOrEqual(POST_BLAST_BEAT_MIN_TIMEOUT_MS);
   });
 });
+
+// ──────────────────────────────────────────────
+// 14. tutorial-interactive.json — every post-blast step (indices 32-46)
+// declares a 90s timeout floor, regardless of action type (issue #776,
+// third follow-up).
+//
+// The three describe blocks above (12 and 13) only assert on steps that
+// carry a `waitForTutorialStep` action, via `effectiveStepTimeoutMs`. That
+// missed step 37 (`employee assign_skill 4 skill:driving.truck level:3`,
+// a plain `command` action with no `waitForTutorialStep` at all) — it kept
+// its tight default `timeout: 30` and stalled interaction-mode CI a fourth
+// time. A planner audit of the whole post-blast window (steps 32-46)
+// concluded the underlying cost isn't specific to any one action type: the
+// scenario-wide `shots: ["overview","birdseye"]` setting captures 2
+// screenshots + a state dump after *every* step, and the muck pile spawned
+// by the blast at step 31 (994 fragments) plausibly never fully clears
+// within this scenario's remaining steps — hauling only starts at step 39,
+// and total delivered ore is far less than 994 fragments' worth. So every
+// step from 32 through 46 pays the heavy-scene screenshot cost, whether or
+// not it happens to wait on a tutorial card.
+//
+// This test asserts the simpler, broader invariant directly against the
+// JSON's own declared `timeout` field (not the derived
+// `effectiveStepTimeoutMs`) for every step in that index range, matching
+// this file's own established "safe" precedent of 90s already used for
+// steps 31, 34, 39, 41, 42. It intentionally does not replace tests 12/13
+// above — those assert a different thing (outer/inner margin) and remain
+// valid on their own.
+// ──────────────────────────────────────────────
+describe('tutorial-interactive.json — every post-blast step (32-46) has a declared timeout floor of 90s', () => {
+  const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
+
+  const POST_BLAST_WINDOW_START = 32;
+  const POST_BLAST_WINDOW_END = 46; // inclusive
+
+  for (let i = POST_BLAST_WINDOW_START; i <= POST_BLAST_WINDOW_END; i++) {
+    it(`step[${i}] has timeout >= 90`, () => {
+      const step = scenario.steps[i];
+      if (typeof step === 'string') return; // bare-string steps carry no declared timeout; skip per file's own ScenarioStepDef cast pattern
+      const stepObj = step as ScenarioStepDef;
+      expect(
+        stepObj.timeout,
+        `step[${i}] ("${stepObj.description ?? stepObj.command}") must declare a timeout >= 90s — ` +
+          `every step in the post-blast window (32-46) renders a heavy muck-pile scene under this file's ` +
+          `"shots": ["overview","birdseye"] setting (issue #776).`,
+      ).toBeGreaterThanOrEqual(90);
+    });
+  }
+});
