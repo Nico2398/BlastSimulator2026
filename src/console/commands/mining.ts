@@ -142,6 +142,39 @@ function cancelOutstandingChargeAction(state: GameState, holeId: string): void {
 }
 
 /**
+ * Resolve a user-supplied hole spec (`named['hole']`) to a canonical hole
+ * id: the exact id if it already names a real hole, otherwise the legacy
+ * `hole_N` fallback format. `includePlanned` controls whether an ordered-
+ * but-not-yet-drilled hole counts as "real" for this purpose — drill_plan
+ * remove and charge must see planned holes; sequence set and tubing install
+ * must not, since they only ever act on an already-drilled hole (#634).
+ */
+function resolveHoleId(
+  state: GameState,
+  holeSpec: string,
+  includePlanned: boolean = true,
+): string {
+  const found = includePlanned
+    ? (state.drillHoles.find(h => h.id === holeSpec) || state.plannedDrillHoles.find(h => h.id === holeSpec))
+    : state.drillHoles.find(h => h.id === holeSpec);
+  return found
+    ? holeSpec
+    : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+}
+
+/**
+ * Drop every per-hole charge/sequence record for `holeId` — called when a
+ * hole leaves the plan (drilled or still-ordered branch of drill_plan
+ * remove) so no stale charge or delay survives under an id nothing
+ * references anymore (#634).
+ */
+function clearHoleCharges(state: GameState, holeId: string): void {
+  delete state.chargesByHole[holeId];
+  delete state.plannedChargesByHole[holeId];
+  delete state.sequenceDelays[holeId];
+}
+
+/**
  * Removes a cancelled `drill_hole`/`charge_hole` action's own ghost from the
  * "ordered but not yet landed" pool it was tracked in (`plannedDrillHoles`/
  * `plannedChargesByHole`) — `cancelAction` (`TaskDispatch.ts`) only removes
@@ -315,15 +348,11 @@ export function drillPlanCommand(
   if (sub === 'remove') {
     const state = ctx.state!;
     const holeSpec = named['hole'] ?? '';
-    const holeId = (state.drillHoles.find(h => h.id === holeSpec) || state.plannedDrillHoles.find(h => h.id === holeSpec))
-      ? holeSpec
-      : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+    const holeId = resolveHoleId(state, holeSpec);
 
     if (removeHole(state.drillHoles, holeId)) {
       cancelOutstandingChargeAction(state, holeId);
-      delete state.chargesByHole[holeId];
-      delete state.plannedChargesByHole[holeId];
-      delete state.sequenceDelays[holeId];
+      clearHoleCharges(state, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 
@@ -333,9 +362,7 @@ export function drillPlanCommand(
       if (action) cancelAction(state, action.id);
       cancelOutstandingChargeAction(state, holeId);
       state.plannedDrillHoles.splice(plannedIdx, 1);
-      delete state.chargesByHole[holeId];
-      delete state.plannedChargesByHole[holeId];
-      delete state.sequenceDelays[holeId];
+      clearHoleCharges(state, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 
@@ -445,9 +472,7 @@ export function chargeCommand(
   }
 
   // Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format
-  const holeId = (ctx.state!.drillHoles.find(h => h.id === holeSpec) || ctx.state!.plannedDrillHoles.find(h => h.id === holeSpec))
-    ? holeSpec
-    : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+  const holeId = resolveHoleId(ctx.state!, holeSpec);
   const hole = ctx.state!.drillHoles.find(h => h.id === holeId);
   if (!hole) {
     const planned = ctx.state!.plannedDrillHoles.find(h => h.id === holeId);
@@ -483,9 +508,7 @@ export function sequenceCommand(
   if (sub === 'set') {
     const hole = named['hole'] ?? '';
     const delay = parseFloat((named['delay'] ?? '0').replace('ms', ''));
-    const holeId = ctx.state!.drillHoles.find(h => h.id === hole)
-      ? hole
-      : (hole.startsWith('hole_') ? hole : `hole_${hole}`);
+    const holeId = resolveHoleId(ctx.state!, hole, false);
     setDelay(ctx.state!.sequenceDelays, holeId, delay);
     return { success: true, output: `Set ${holeId} delay: ${delay}ms` };
   }
@@ -1089,9 +1112,7 @@ export function tubingCommand(
 
   if (sub === 'install') {
     const holeSpec = named['hole'] ?? '';
-    const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
-      ? holeSpec
-      : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+    const holeId = resolveHoleId(ctx.state!, holeSpec, false);
     const result = installTubing(ctx.state!.tubingState, holeId);
     return { success: result.success, output: result.message };
   }
