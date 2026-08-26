@@ -912,6 +912,10 @@ export function buildRampCommand(
     length = parseInt(named['length'] ?? '10', 10);
   }
 
+  // Pre-check runs before rampFootprint/cellsInRect build the array (the cost this
+  // bounds), and therefore also before validateRampOrder's own length<=0 check below —
+  // that check stays as a safety net for any other caller of buildRamp/validateRampOrder,
+  // but on this call path it is now unreachable for length<1.
   if (!Number.isFinite(length) || length < 1) {
     return { success: false, output: 'Invalid ramp length: length must be a finite positive number.' };
   }
