@@ -154,11 +154,12 @@ function resolveHoleId(
   holeSpec: string,
   includePlanned: boolean = true,
 ): string {
-  void state;
-  void holeSpec;
-  void includePlanned;
-  // TODO(#634): implementer fills in — see plan for exact ternary logic
-  throw new Error('not implemented');
+  const found = includePlanned
+    ? (state.drillHoles.find(h => h.id === holeSpec) || state.plannedDrillHoles.find(h => h.id === holeSpec))
+    : state.drillHoles.find(h => h.id === holeSpec);
+  return found
+    ? holeSpec
+    : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
 }
 
 /**
@@ -168,18 +169,10 @@ function resolveHoleId(
  * references anymore (#634).
  */
 function clearHoleCharges(state: GameState, holeId: string): void {
-  void state;
-  void holeId;
-  // TODO(#634): implementer fills in — see plan for exact delete triple
-  throw new Error('not implemented');
+  delete state.chargesByHole[holeId];
+  delete state.plannedChargesByHole[holeId];
+  delete state.sequenceDelays[holeId];
 }
-
-// Not yet called anywhere (#634 skeleton phase: existing call sites in this
-// file stay on their inline ternary/delete-triple until the implementer
-// phase wires them in) — referenced here only so `noUnusedLocals` doesn't
-// flag these as dead code before that wiring lands.
-void resolveHoleId;
-void clearHoleCharges;
 
 /**
  * Removes a cancelled `drill_hole`/`charge_hole` action's own ghost from the
@@ -355,15 +348,11 @@ export function drillPlanCommand(
   if (sub === 'remove') {
     const state = ctx.state!;
     const holeSpec = named['hole'] ?? '';
-    const holeId = (state.drillHoles.find(h => h.id === holeSpec) || state.plannedDrillHoles.find(h => h.id === holeSpec))
-      ? holeSpec
-      : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+    const holeId = resolveHoleId(state, holeSpec);
 
     if (removeHole(state.drillHoles, holeId)) {
       cancelOutstandingChargeAction(state, holeId);
-      delete state.chargesByHole[holeId];
-      delete state.plannedChargesByHole[holeId];
-      delete state.sequenceDelays[holeId];
+      clearHoleCharges(state, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 
@@ -373,9 +362,7 @@ export function drillPlanCommand(
       if (action) cancelAction(state, action.id);
       cancelOutstandingChargeAction(state, holeId);
       state.plannedDrillHoles.splice(plannedIdx, 1);
-      delete state.chargesByHole[holeId];
-      delete state.plannedChargesByHole[holeId];
-      delete state.sequenceDelays[holeId];
+      clearHoleCharges(state, holeId);
       return { success: true, output: `Removed hole ${holeId}` };
     }
 
@@ -485,9 +472,7 @@ export function chargeCommand(
   }
 
   // Resolve holeId: accept either the exact ID (H1) or the legacy hole_N format
-  const holeId = (ctx.state!.drillHoles.find(h => h.id === holeSpec) || ctx.state!.plannedDrillHoles.find(h => h.id === holeSpec))
-    ? holeSpec
-    : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+  const holeId = resolveHoleId(ctx.state!, holeSpec);
   const hole = ctx.state!.drillHoles.find(h => h.id === holeId);
   if (!hole) {
     const planned = ctx.state!.plannedDrillHoles.find(h => h.id === holeId);
@@ -523,9 +508,7 @@ export function sequenceCommand(
   if (sub === 'set') {
     const hole = named['hole'] ?? '';
     const delay = parseFloat((named['delay'] ?? '0').replace('ms', ''));
-    const holeId = ctx.state!.drillHoles.find(h => h.id === hole)
-      ? hole
-      : (hole.startsWith('hole_') ? hole : `hole_${hole}`);
+    const holeId = resolveHoleId(ctx.state!, hole, false);
     setDelay(ctx.state!.sequenceDelays, holeId, delay);
     return { success: true, output: `Set ${holeId} delay: ${delay}ms` };
   }
@@ -1129,9 +1112,7 @@ export function tubingCommand(
 
   if (sub === 'install') {
     const holeSpec = named['hole'] ?? '';
-    const holeId = ctx.state!.drillHoles.find(h => h.id === holeSpec)
-      ? holeSpec
-      : (holeSpec.startsWith('hole_') ? holeSpec : `hole_${holeSpec}`);
+    const holeId = resolveHoleId(ctx.state!, holeSpec, false);
     const result = installTubing(ctx.state!.tubingState, holeId);
     return { success: result.success, output: result.message };
   }
