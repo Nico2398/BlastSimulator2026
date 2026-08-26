@@ -103,11 +103,16 @@ describe('the merge machinery is not a verification channel', () => {
   // `agentic-auto-merge.yml` runs on `workflow_run`, so it carries the head SHA
   // of the CI run that woke it. It is pending until CI has been read and it
   // fails on a PR it could not arm, so counting it makes the wait circular.
+  // The runners are the same circularity, sharper: this script runs inside the
+  // runner job, so its own run is never `completed` while it is being read.
   it.each([
     '.github/workflows/agentic-auto-merge.yml',
+    '.github/workflows/agentic-ci-failure.yml',
     '.github/workflows/agentic-watchdog.yml',
     '.github/workflows/auto-assign-next.yml',
     '.github/workflows/handle-failure.yml',
+    '.github/workflows/claude-runner.yml',
+    '.github/workflows/opencode-runner.yml',
   ])('ignores %s', (path) => {
     expect(isMachineryWorkflow(path)).toBe(true);
     expect(verdictOf([run({ path, conclusion: 'failure' })])).toBe('pending');
@@ -119,6 +124,26 @@ describe('the merge machinery is not a verification channel', () => {
   ])('reads %s', (path) => {
     expect(isMachineryWorkflow(path)).toBe(false);
     expect(verdictOf([run({ path })])).toBe('green');
+  });
+
+  // PR #773, exactly. `agentic-closing-keyword-guard.yml` is a verification
+  // check whose *name* used to exempt it from the verdict, under a
+  // `^agentic-` prefix rule. Its job failed, this script reported GREEN, the
+  // session ended as instructed, and the PR sat unmergeable with nobody
+  // watching. A check is a check whatever its file is called.
+  it('reads the closing-keyword guard, whose name starts with `agentic-`', () => {
+    const path = '.github/workflows/agentic-closing-keyword-guard.yml';
+    expect(isMachineryWorkflow(path)).toBe(false);
+    expect(verdictOf([run({ path, conclusion: 'failure' })])).toBe('red');
+  });
+
+  // The direction of the rule, stated as a test: an unknown workflow is a
+  // channel. Fail-closed — forgetting to declare new machinery costs a wait,
+  // forgetting to declare a new channel used to cost a silent merge failure.
+  it('counts an unrecognised workflow as a channel rather than machinery', () => {
+    const path = '.github/workflows/some-future-check.yml';
+    expect(isMachineryWorkflow(path)).toBe(false);
+    expect(verdictOf([run({ path, conclusion: 'failure' })])).toBe('red');
   });
 });
 

@@ -202,8 +202,28 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const PIPELINE_HEAD = /^pipeline\/feature-\d+$/;
+            // The `-<runId>` suffix every branch has carried since #554. Anchored
+            // without it, this matched no real pipeline head and the sweep swept
+            // nothing — see the same note in `agentic-ci-failure.yml`.
+            const PIPELINE_HEAD = /^pipeline\/feature-\d+(?:-\d+)?$/;
             const RUN_FAILURES = ['failure', 'cancelled', 'timed_out', 'startup_failure', 'stale'];
+
+            // Kept in shape with `scripts/await-pr-ci.ts` and the fail-safe's own
+            // copy: a run on the head is a channel unless it is named here. Read
+            // as a path list rather than a `ci.yml` lookup because a red check
+            // blocks the merge whichever workflow emitted it (PR #773's was the
+            // closing-keyword guard, with `ci.yml` green).
+            const MACHINERY = new Set([
+              '.github/workflows/agentic-auto-merge.yml',
+              '.github/workflows/agentic-ci-failure.yml',
+              '.github/workflows/agentic-intake.yml',
+              '.github/workflows/agentic-trigger.yml',
+              '.github/workflows/agentic-watchdog.yml',
+              '.github/workflows/auto-assign-next.yml',
+              '.github/workflows/claude-runner.yml',
+              '.github/workflows/handle-failure.yml',
+              '.github/workflows/opencode-runner.yml',
+            ]);
 
             const open = await github.paginate(github.rest.pulls.list, {
               owner, repo, state: 'open', per_page: 100
@@ -219,16 +239,25 @@ jobs:
               const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
                 owner, repo, head_sha: pr.head.sha, per_page: 100
               });
-              const ci = runs
-                .filter((run) => run.path === '.github/workflows/ci.yml')
-                .sort((a, b) => b.id - a.id)[0];
+              // One run per workflow, newest: `cancel-in-progress` leaves
+              // superseded runs on the head, and counting those would re-raise a
+              // failure a pushed fix already answered.
+              const latest = new Map();
+              for (const run of runs) {
+                if (MACHINERY.has(run.path)) continue;
+                const seen = latest.get(run.workflow_id);
+                if (!seen || run.id > seen.id) latest.set(run.workflow_id, run);
+              }
+              const red = [...latest.values()].find(
+                (run) => run.status === 'completed' && RUN_FAILURES.includes(run.conclusion)
+              );
 
-              if (!ci || ci.status !== 'completed' || !RUN_FAILURES.includes(ci.conclusion)) continue;
+              if (!red) continue;
 
               // Every other decision — is a session live, has this commit
               // already been asked about, is the attempt limit spent — belongs
               // to the fail-safe and is made there, once, on the current state.
-              core.warning(`#${pr.number}: CI \`${ci.conclusion}\` on ${pr.head.sha.slice(0, 7)} — re-raising the fail-safe.`);
+              core.warning(`#${pr.number}: \`${red.name}\` ${red.conclusion} on ${pr.head.sha.slice(0, 7)} — re-raising the fail-safe.`);
               await github.rest.actions.createWorkflowDispatch({
                 owner, repo,
                 workflow_id: 'agentic-ci-failure.yml',

@@ -33,11 +33,34 @@ const fs = require('fs');
 const CLOSING_KEYWORD_RE = /\b(close[sd]?|fix(?:es|ed)?|resolve[sd]?)\s+#(\d+)\b/gi;
 
 /**
- * The one exempt shape: a line whose entire (trimmed) content is a closing
- * directive, optionally followed by a single trailing `.` or `,`. Matches the
- * pipeline's `Closes #<N>` convention and its `Fixes`/`Resolves` synonyms.
+ * The conventional-commit types this repo emits, as a subject prefix. Deliberately
+ * a closed list: it is what makes the exemption below a recognised *shape* rather
+ * than "any word before a colon", so a narrating line like `note: fixes #99` is
+ * still a violation.
  */
-const SANCTIONED_LINE_RE = /^(close[sd]?|fix(?:es|ed)?|resolve[sd]?)\s+#(\d+)[.,]?$/i;
+const COMMIT_TYPE_PREFIX = '(?:feat|fix|refactor|docs|test|chore|perf|build|ci|style|revert)(?:\\([^)]*\\))?!?:\\s+';
+
+/**
+ * The exempt shape: a line whose entire (trimmed) content is a closing directive,
+ * optionally behind a conventional-commit type prefix, optionally followed by a
+ * single trailing `.` or `,`. Matches the pipeline's `Closes #<N>` body convention,
+ * its `Fixes`/`Resolves` synonyms, and the PR title `agentic-pipeline-finalization`
+ * mandates — `<type>: Resolve #<N>`.
+ *
+ * That title had to be admitted, and admitting it is not a softening. The guard
+ * landed (#765) while `open-pr` was already required to write exactly that title,
+ * so the two shipped in direct contradiction: PR #773 — the first pipeline PR
+ * opened after the guard merged — failed this check on its own mandated title,
+ * and every pipeline PR after it would have failed the same way. Both are
+ * deliberate directives about the issue the PR exists to close; neither is the
+ * prose the postmortem is about. What stays flagged is unchanged: a closing
+ * keyword inside a *sentence*, which is what every incident on #707 actually was,
+ * and which no amount of naming the right issue number excuses.
+ */
+const SANCTIONED_LINE_RE = new RegExp(
+  `^(?:${COMMIT_TYPE_PREFIX})?(close[sd]?|fix(?:es|ed)?|resolve[sd]?)\\s+#(\\d+)[.,]?$`,
+  'i'
+);
 
 /**
  * Blanks out fenced code blocks and inline code spans without shifting any
@@ -133,8 +156,9 @@ function main() {
     console.error('');
     console.error(
       'Fix: rephrase so the keyword and the number are not adjacent, or wrap the whole phrase in a' +
-        ' code span. The one exempt shape is a line that is exactly `Closes #<N>` (or Fixes/Resolves) —' +
-        ' nothing else on that line.'
+        ' code span. The exempt shape is a line that is exactly `Closes #<N>` (or Fixes/Resolves),' +
+        ' optionally behind a conventional-commit type — `fix: Resolve #<N>`, the PR title the' +
+        ' pipeline mandates. Nothing else on that line.'
     );
     process.exitCode = 1;
     return;
@@ -149,6 +173,7 @@ if (require.main === module) {
 
 module.exports = {
   CLOSING_KEYWORD_RE,
+  COMMIT_TYPE_PREFIX,
   SANCTIONED_LINE_RE,
   findClosingKeywordViolations,
   stripCodeSpans,

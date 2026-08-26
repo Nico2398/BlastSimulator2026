@@ -133,11 +133,38 @@ const RUN_FAILURES = new Set(['failure', 'cancelled', 'timed_out', 'startup_fail
  * head SHA of the CI run that woke it and shows up in this list. Counting it
  * would be circular twice over: it is pending until CI has been read, and it
  * fails the step on a marked PR it could not arm — which is a report about the
- * merge, not about the code. The channels are CI's to report on.
+ * merge, not about the code. The runners are here for the sharper version of
+ * the same circularity: this script runs *inside* the runner job, so counting
+ * that job's own run would make every wait pend until the 360-minute timeout.
+ *
+ * **Named one by one, never by prefix.** This was `/^\.github\/workflows\/
+ * (agentic-|auto-assign-next|handle-failure)/` and it failed open: every new
+ * workflow whose file happened to start with `agentic-` exempted itself from
+ * the verdict by its name alone. `agentic-closing-keyword-guard.yml` (#765) is
+ * a verification check that did exactly that, and PR #773 is the bill — its
+ * guard job failed at 23:52, this script read GREEN at 00:06 because the run
+ * was filtered out here, the session ended having done everything it was told,
+ * and the pull request sat `unstable` and unmergeable with nobody watching.
+ *
+ * So the direction is inverted: a workflow counts as a channel unless it is
+ * named below. A new verification workflow is read with no edit here; a new
+ * machinery workflow that forgets this list costs a wait, which is the safe
+ * half of the mistake.
  */
-const MACHINERY = /^\.github\/workflows\/(agentic-|auto-assign-next|handle-failure)/;
+const MACHINERY_WORKFLOWS: ReadonlySet<string> = new Set([
+  'agentic-auto-merge.yml',
+  'agentic-ci-failure.yml',
+  'agentic-intake.yml',
+  'agentic-trigger.yml',
+  'agentic-watchdog.yml',
+  'auto-assign-next.yml',
+  'claude-runner.yml',
+  'handle-failure.yml',
+  'opencode-runner.yml',
+]);
 
-export const isMachineryWorkflow = (path: string): boolean => MACHINERY.test(path);
+export const isMachineryWorkflow = (path: string): boolean =>
+  MACHINERY_WORKFLOWS.has(path.replace(/^\.github\/workflows\//, ''));
 
 /**
  * One run per workflow: the newest. CI declares `cancel-in-progress: true`, so a
