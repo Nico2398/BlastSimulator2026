@@ -151,6 +151,7 @@ describe('blastPlanCommand — validate subcommand', () => {
 
     expect(result.success).toBe(false);
     expect(result.output.startsWith('Validation issues:')).toBe(true);
+    expect(result.output).toContain('Missing charge');
   });
 
   it('validate reports the plan is ready to blast when there are no errors', () => {
