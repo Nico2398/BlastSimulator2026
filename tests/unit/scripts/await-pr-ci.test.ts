@@ -37,14 +37,14 @@ const run = (over: Partial<WorkflowRun> = {}): WorkflowRun => {
 };
 
 /**
- * `started_at`/`completed_at` default to `undefined` so every pre-existing
- * call site (which never passed them) stays valid unchanged.
+ * `started_at`/`completed_at` are omitted by default (rather than set to
+ * `undefined`) so every pre-existing call site — which never passed them —
+ * stays valid unchanged, and so this satisfies `exactOptionalPropertyTypes`:
+ * `T | null` accepts a missing key or an explicit `null`, never `undefined`.
  */
 const job = (over: Partial<WorkflowJob> = {}): WorkflowJob => ({
   name: 'Scenarios (interaction mode) — shard 1/4',
   conclusion: 'success',
-  started_at: undefined,
-  completed_at: undefined,
   ...over,
 });
 
@@ -453,10 +453,10 @@ describe('isPhantomCancelledRun', () => {
   // way to exercise its "treat as 0 duration" branch from here.
   it('treats a job with a missing timestamp as zero duration — phantom if cancelled', () => {
     expect(isPhantomCancelledRun([
-      job({ conclusion: 'cancelled', started_at: undefined, completed_at: '2026-01-01T00:01:00.000Z' }),
+      job({ conclusion: 'cancelled', completed_at: '2026-01-01T00:01:00.000Z' }),
     ])).toBe(true);
     expect(isPhantomCancelledRun([
-      job({ conclusion: 'cancelled', started_at: '2026-01-01T00:00:00.000Z', completed_at: undefined }),
+      job({ conclusion: 'cancelled', started_at: '2026-01-01T00:00:00.000Z' }),
     ])).toBe(true);
   });
 });
