@@ -285,29 +285,33 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep step has 
   // formula minimum this bug already clears.
   const POST_BLAST_BEAT_MIN_TIMEOUT_MS = 60000;
 
-  it('step hiring the manager and waiting for tutorial step "contract-accept" has effectiveStepTimeoutMs >= 60000ms', () => {
-    const stepIndex = scenario.steps.findIndex((step) => {
-      if (typeof step === 'string') return false;
-      const stepObj = step as ScenarioStepDef;
-      if (stepObj.command !== 'employee hire role:manager') return false;
-      return (stepObj.interaction ?? []).some(
-        (action) =>
-          action.type === 'waitForTutorialStep' &&
-          (Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('contract-accept'),
-      );
-    });
+  // Located via the shared `forEachActionOfType` scaffold rather than a
+  // hand-rolled `findIndex`/type-guard/cast (#776 review finding) — filters
+  // down to the one step whose command hires a manager and whose
+  // waitForTutorialStep action targets "contract-accept", skipping every
+  // other waitForTutorialStep invocation in the scenario.
+  let matchedStepIndex = -1;
+  let matchedStepObj: ScenarioStepDef | undefined;
+  forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
+    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
+    if (stepObj.command !== 'employee hire role:manager') return;
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('contract-accept')) return;
+    matchedStepIndex = stepIndex;
+    matchedStepObj = stepObj;
+  });
 
+  it('step hiring the manager and waiting for tutorial step "contract-accept" has effectiveStepTimeoutMs >= 60000ms', () => {
     expect(
-      stepIndex,
+      matchedStepIndex,
       'expected to find a step with command "employee hire role:manager" whose interaction array waits for tutorial step "contract-accept" — tutorial-interactive.json may have changed shape',
     ).toBeGreaterThanOrEqual(0);
 
-    const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
+    const stepObj = matchedStepObj as ScenarioStepDef;
     const outerMs = effectiveStepTimeoutMs(stepObj, 60);
 
     expect(
       outerMs,
-      `step[${stepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
+      `step[${matchedStepIndex}] ("${stepObj.description ?? stepObj.command}") effectiveStepTimeoutMs is ${outerMs}ms — ` +
         `too tight for the real-world post-blast beat (issue #776: two independent interaction-mode runs both ` +
         `timed out here at 35000ms even though the underlying actions succeeded). Needs real wall-clock slack ` +
         `above the bare formula minimum, e.g. by raising this step's declared "timeout" in the JSON.`,
