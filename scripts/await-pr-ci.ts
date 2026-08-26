@@ -235,8 +235,8 @@ export function dropPhantomCancelledRuns(
 
     if (phantomRuns.length === group.length) {
       console.error(
-        `await-pr-ci: every run of workflow_id ${workflowId} looks phantom-cancelled `
-        + '(no jobs ever ran) — keeping all of them since none has real data to fall back on.'
+        `await-pr-ci: every run of workflow "${group[0].name}" (workflow_id ${workflowId}) looks `
+        + 'phantom-cancelled (no jobs ever ran) — keeping all of them since none has real data to fall back on.'
       );
       continue;
     }
