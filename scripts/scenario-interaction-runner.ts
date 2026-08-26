@@ -112,7 +112,10 @@ export async function runScenarioInteraction(
       // specific error; this covers the residual case where several actions'
       // combined time — none individually stalling — exceeds the outer budget.
       let lastProgress = 'no interaction action has started yet';
-      const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
+      const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT, {
+        enabled: enableScreenshots,
+        shotsCount: shots.length,
+      });
       const timeoutPromise = new Promise<void>((_, reject) =>
         setTimeout(() => {
           timedOut = true;

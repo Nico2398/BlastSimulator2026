@@ -161,6 +161,15 @@ export function formatScenarioViolations<V extends ScenarioViolation>(
 export const TIMEOUT_MARGIN_MS = 5000;
 
 /**
+ * Per-frame cost of screenshot/frame capture under software rasterization
+ * (no GPU), documented in `.claude/CLAUDE.md`. Used by `effectiveStepTimeoutMs`
+ * to raise a step's effective floor when `--screenshots` is active, so a step
+ * with a low declared `timeout` doesn't false-timeout purely from capture
+ * overhead the runners themselves impose.
+ */
+export const SOFTWARE_RASTER_FRAME_COST_MS = 6000;
+
+/**
  * Effective inner deadline when an action's own `timeoutMs` is absent. Must
  * match what each executor actually applies — `waitUntil` has none (the
  * field is required); `resolveEventIfPending` defaults to 30000
@@ -179,6 +188,20 @@ const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], nu
   focusTile: 6000,
   clickEntity: 6000,
 };
+
+/**
+ * Capture-cost floor (ms) for interaction-mode `--screenshots`: the base
+ * step-end capture plus every inline `screenshot` action plus the scenario's
+ * own `shots` count plus `step.frames`, each at `SOFTWARE_RASTER_FRAME_COST_MS`
+ * under software rasterization (#725). Exported so
+ * `tests/unit/scenario-defs-validation/interaction-actions.test.ts`'s #725
+ * regression check calls the real formula instead of reimplementing it by
+ * hand, which would otherwise silently drift out of sync with this file.
+ */
+export function captureCostFloorMs(step: ScenarioStepDef, shotsCount: number): number {
+  const screenshotActionCount = (step.interaction ?? []).filter(a => a.type === 'screenshot').length;
+  return (1 + screenshotActionCount + shotsCount + (step.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
+}
 
 /**
  * A step's own outer `timeout` (seconds) and an inner action's `timeoutMs`
@@ -200,8 +223,19 @@ const DEFAULT_INNER_TIMEOUT_MS: Partial<Record<InteractionStepAction['type'], nu
  * value the runners actually race against; that test catches a scenario
  * file whose *declared* `timeout` reads as misleadingly low to a human
  * editing it, even though the runners themselves no longer act on it alone.
+ *
+ * @param capture When provided with `enabled: true`, the returned deadline is
+ * also raised to cover interaction-mode `--screenshots` capture cost — base
+ * capture plus inline `screenshot` actions plus `capture.shotsCount` plus
+ * `step.frames`, at `SOFTWARE_RASTER_FRAME_COST_MS` per unit, via
+ * `captureCostFloorMs` (#725). Omitted or `enabled: false` leaves the return
+ * value unchanged from the pre-#725 behavior.
  */
-export function effectiveStepTimeoutMs(step: ScenarioStepDef, defaultOuterSeconds: number): number {
+export function effectiveStepTimeoutMs(
+  step: ScenarioStepDef,
+  defaultOuterSeconds: number,
+  capture?: { enabled: boolean; shotsCount: number },
+): number {
   const declaredMs = (step.timeout ?? defaultOuterSeconds) * 1000;
 
   let maxInnerMs = 0;
@@ -227,5 +261,9 @@ export function effectiveStepTimeoutMs(step: ScenarioStepDef, defaultOuterSecond
     maxInnerMs = Math.max(maxInnerMs, explicit ?? fallback ?? 0);
   }
 
-  return maxInnerMs === 0 ? declaredMs : Math.max(declaredMs, maxInnerMs + TIMEOUT_MARGIN_MS);
+  const base = maxInnerMs === 0 ? declaredMs : Math.max(declaredMs, maxInnerMs + TIMEOUT_MARGIN_MS);
+
+  if (!capture?.enabled) return base;
+
+  return Math.max(base, captureCostFloorMs(step, capture.shotsCount));
 }

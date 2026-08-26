@@ -331,6 +331,7 @@
     },
     {
       "command": "tick 50",
+      "timeout": 90,
       "description": "#553: drain the ordered plan — the staffed driller/drill_rig lands all 4 holes well inside this pad (sandbox-measured landing at tick 41).",
       "interaction": [
         {

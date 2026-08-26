@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:3000000",
-      "timeout": 15,
+      "timeout": 40,
       "interaction": [
         {
           "type": "command",
@@ -309,7 +309,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 70,
       "frames": 6,
       "interval": 50,
       "interaction": [
@@ -704,7 +704,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 70,
       "frames": 6,
       "interval": 50,
       "interaction": [
@@ -1170,7 +1170,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 70,
       "frames": 6,
       "interval": 50,
       "interaction": [
@@ -2814,7 +2814,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 80,
       "frames": 8,
       "interval": 50,
       "interaction": [
@@ -3112,7 +3112,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 70,
       "frames": 6,
       "interval": 50,
       "description": "#560: this step's own default post-step screenshot (plus the 6 extra frames above) is the proof artifact for this cycle -- inspect it for a closed boundary/skirt wall around the crater at the site's true edge, no see-through gap to whatever lies beyond (59,59)-(61,61).",

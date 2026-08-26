@@ -145,49 +145,9 @@ describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole 
   }
 });
 
-// ──────────────────────────────────────────────
-// 18. blast-visual-full.json's step timeouts cover interaction-mode
-// --screenshots capture cost (issue #704).
-//
-// Step timeouts were set without accounting for interaction-mode
-// --screenshots capture cost (1 base render + 4 `shots` angles per step,
-// plus any per-step `frames`, each costing several seconds under software
-// rasterization with no GPU). This locks in that each step's timeout budget
-// actually covers its capture cost.
-//
-// See scripts/scenario-defs/blast-visual-full.json and its top-level
-// `shots` array (4 camera angles captured after every step).
-// ──────────────────────────────────────────────
-describe('blast-visual-full.json step timeouts cover screenshot capture cost (#704)', () => {
-  // Per-frame capture cost under software rasterization (no GPU). Not an
-  // exported named constant anywhere in source as of #704 — hardcoded here.
-  // .claude/CLAUDE.md states this cost twice with two different figures
-  // ("~6s/frame" in one section, "~6.4s/frame" in another, same #475 root
-  // cause); using the lower figure still leaves comfortable margin at both
-  // fixed timeouts.
-  const SOFTWARE_RASTER_FRAME_COST_MS = 6000;
-
-  const scenario = loadScenarioDef('blast-visual-full', SCENARIO_DIR);
-  const shotsCount = scenario.shots?.length ?? 0;
-
-  it('step 0 timeout covers base + shots capture cost under software rasterization', () => {
-    const step = scenario.steps.find(s => s.command === 'new_game seed:42 cash:200000');
-    expect(step, 'expected step 0 to be "new_game seed:42 cash:200000"').toBeDefined();
-
-    // floor = (1 base capture + shots.length + step.frames) * per-frame cost
-    const floorMs = (1 + shotsCount + (step!.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
-    const declaredMs = (step!.timeout ?? 60) * 1000;
-
-    expect(declaredMs).toBeGreaterThanOrEqual(floorMs);
-  });
-
-  it('step 36 (blast) timeout covers base + frames + shots capture cost', () => {
-    const blastStep = scenario.steps.find(s => s.command === 'blast');
-    expect(blastStep, 'expected a step with command "blast" in blast-visual-full.json').toBeDefined();
-
-    const floorMs = (1 + shotsCount + (blastStep!.frames ?? 0)) * SOFTWARE_RASTER_FRAME_COST_MS;
-    const declaredMs = (blastStep!.timeout ?? 60) * 1000;
-
-    expect(declaredMs).toBeGreaterThanOrEqual(floorMs);
-  });
-});
+// Issue #704's blast-visual-full.json-only capture-cost timeout lock was
+// generalized to every scenario file by issue #725 — see
+// `tests/unit/scenario-defs-validation/interaction-actions.test.ts`'s
+// "declared step timeout covers interaction-mode --screenshots capture-cost
+// floor (#725)" check, which covers blast-visual-full.json too (it is a
+// member of VISUAL_SCENARIO_NAMES ⊂ ALL_SCENARIO_NAMES).

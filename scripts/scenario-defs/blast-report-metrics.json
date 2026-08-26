@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 staffed:true",
-      "timeout": 10,
+      "timeout": 30,
       "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open -- #553's automatic drill dispatch needs both to ever land an ordered hole.",
       "interaction": [
         {

@@ -176,7 +176,10 @@ async function benchInteraction(names: string[], port: number, screenshots: bool
 
       for (let s = 0; s < steps.length; s++) {
         const step = steps[s]!;
-        const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT);
+        const stepTimeout = effectiveStepTimeoutMs(step, DEFAULT_STEP_TIMEOUT, {
+          enabled: screenshots,
+          shotsCount: 0,
+        });
         // See scenario-interaction-runner.ts's own copy of this comment
         // (PR #616 review round, item 5).
         let lastProgress = 'no interaction action has started yet';

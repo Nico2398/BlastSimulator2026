@@ -471,7 +471,7 @@
     },
     {
       "command": "blast",
-      "timeout": 30,
+      "timeout": 70,
       "frames": 6,
       "interval": 50,
       "description": "#554-followup (issue #586 CI): restored to a real click sequence (execute -> confirm -> report close), same reason as the steps above -- matches blast-basic.json's own execute flow.",
