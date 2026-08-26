@@ -781,8 +781,8 @@
     },
     {
       "command": "event choose 0",
-      "timeout": 60,
-      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, outcome read, then dismissed",
+      "timeout": 90,
+      "description": "event-fire-resolve complete: the consultant dialog is answered through its own buttons, outcome read, then dismissed. #776: raised to 90s -- this and the following post-blast steps (blast at step 31 leaves a 994-fragment muck pile this scenario never fully clears) each pay for this file's own shots:[\"overview\",\"birdseye\"] (2 screenshot renders + a state dump) under software-rasterization cost; step 37 below already failed on shot-capture cost alone with its actual command succeeding, so raised to the file's own established 90s precedent (steps 31/39/41/42) rather than retuning each step individually.",
       "role": "player",
       "interaction": [
         {
@@ -817,8 +817,8 @@
     },
     {
       "command": "employee hire role:manager",
-      "timeout": 60,
-      "description": "hire-manager complete: manager hired now that the event is resolved. #776: raised from 30s to 60s -- this step lands right after the blast sequence (steps 24-31) when the scene is heaviest, and effectiveStepTimeoutMs's formula-correct 35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out at exactly 35000ms with the real hire + tutorial advance to contract-accept already having succeeded before the deadline fired.",
+      "timeout": 90,
+      "description": "hire-manager complete: manager hired now that the event is resolved. #776: raised from 30s to 60s -- this step lands right after the blast sequence (steps 24-31) when the scene is heaviest, and effectiveStepTimeoutMs's formula-correct 35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out at exactly 35000ms with the real hire + tutorial advance to contract-accept already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand.",
       "role": "player",
       "interaction": [
         {
@@ -861,8 +861,8 @@
     },
     {
       "command": "contract accept type:rubble_disposal",
-      "timeout": 60,
-      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this file's sibling scenarios the accept click is scoped to `[data-contract-type]`/`[data-contract-material]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. #653 review round (Finding 2): this step used to stay unscoped, reasoning that tutorialStages.ts's own 'contract-accept' stage declares its live target as the bare `#bs-contract-panel .bs-contract-accept` and that scoping raced the offer pool's own refresh clock (REFRESH_INTERVAL=20 ticks, Contract.ts) -- but an unscoped click accepts whichever offer leads the DOM, which is only rubble_disposal at some tick landings and a different type at others (replay-verified at varied timing), silently accepting the wrong contract while the later deliver step (scoped to `[data-contract-type=\"rubble_disposal\"]`) then finds nothing to deliver and times out. Scoped now, matching contract-negotiation.json/contract-panel-visual.json's own accept steps: a `waitForSelector` on the scoped selector ahead of the click gives the refresh cycle time to surface the right card instead of assuming it's there instantly, and `expect.equals` on `activeContractCount` proves the right contract landed rather than merely some contract. #653: retargeted from `type:ore_sale material:gloomium` to `type:rubble_disposal` (no `material:` -- rubble_disposal contracts carry `materialId: ''`), because the ore_sale/gloomium contract this step used to accept could never actually be delivered later (see the deliver step's own note below) -- the debris hauler this tutorial buys only ever fills storage with excavation spoil, never an ore-bearing fragment. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg`, which the hauler does fill, making this the first contract type in this run the later deliver step can genuinely complete. Live-verified landing under real render load is ~100 extra ticks reaching this point (tick 332 vs command mode's tick 232), not the 300+ an earlier round of this file assumed. issue #585 (merge, agrees independently): a hardcoded id here is exactly as fragile as the DOM-scoped click above and for the same reason -- the contract pool's ids increment off total elapsed ticks (Contract.ts) -- reaching the same `type:rubble_disposal` selector via a separate trace before #653 landed. #776: raised from 30s to 60s -- this step lands right after the blast/event/hire-manager stretch above, and effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real accept + tutorial advance to hire-driver already having succeeded before the deadline fired -- same shape as the hire-manager step's own #776 fix above.",
+      "timeout": 90,
+      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this file's sibling scenarios the accept click is scoped to `[data-contract-type]`/`[data-contract-material]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. #653 review round (Finding 2): this step used to stay unscoped, reasoning that tutorialStages.ts's own 'contract-accept' stage declares its live target as the bare `#bs-contract-panel .bs-contract-accept` and that scoping raced the offer pool's own refresh clock (REFRESH_INTERVAL=20 ticks, Contract.ts) -- but an unscoped click accepts whichever offer leads the DOM, which is only rubble_disposal at some tick landings and a different type at others (replay-verified at varied timing), silently accepting the wrong contract while the later deliver step (scoped to `[data-contract-type=\"rubble_disposal\"]`) then finds nothing to deliver and times out. Scoped now, matching contract-negotiation.json/contract-panel-visual.json's own accept steps: a `waitForSelector` on the scoped selector ahead of the click gives the refresh cycle time to surface the right card instead of assuming it's there instantly, and `expect.equals` on `activeContractCount` proves the right contract landed rather than merely some contract. #653: retargeted from `type:ore_sale material:gloomium` to `type:rubble_disposal` (no `material:` -- rubble_disposal contracts carry `materialId: ''`), because the ore_sale/gloomium contract this step used to accept could never actually be delivered later (see the deliver step's own note below) -- the debris hauler this tutorial buys only ever fills storage with excavation spoil, never an ore-bearing fragment. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg`, which the hauler does fill, making this the first contract type in this run the later deliver step can genuinely complete. Live-verified landing under real render load is ~100 extra ticks reaching this point (tick 332 vs command mode's tick 232), not the 300+ an earlier round of this file assumed. issue #585 (merge, agrees independently): a hardcoded id here is exactly as fragile as the DOM-scoped click above and for the same reason -- the contract pool's ids increment off total elapsed ticks (Contract.ts) -- reaching the same `type:rubble_disposal` selector via a separate trace before #653 landed. #776: raised from 30s to 60s -- this step lands right after the blast/event/hire-manager stretch above, and effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real accept + tutorial advance to hire-driver already having succeeded before the deadline fired -- same shape as the hire-manager step's own #776 fix above. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand.",
       "role": "player",
       "interaction": [
         {
@@ -892,8 +892,8 @@
     },
     {
       "command": "employee hire role:driver",
-      "timeout": 60,
-      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and contract-accept steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired.",
+      "timeout": 90,
+      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and contract-accept steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand.",
       "role": "player",
       "interaction": [
         {
@@ -915,8 +915,8 @@
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
-      "timeout": 30,
-      "description": "Test-only bootstrap, not a tutorial stage \u2014 see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically.",
+      "timeout": 90,
+      "description": "Test-only bootstrap, not a tutorial stage \u2014 see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically. #776: raised to 90s -- confirmed the actual command succeeded and only the shot-capture cost (this scenario's shots:[\"overview\",\"birdseye\"]) exceeded the tight 30s default on this and the surrounding post-blast steps; floored to the file's own established 90s precedent (steps 31/39/41/42) instead of retuning each step individually.",
       "interaction": [
         {
           "type": "command",
@@ -927,8 +927,8 @@
     },
     {
       "command": "vehicle buy debris_hauler",
-      "timeout": 30,
-      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface",
+      "timeout": 90,
+      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "player",
       "interaction": [
         {
@@ -972,8 +972,8 @@
     },
     {
       "command": "build freight_warehouse at:6,6",
-      "timeout": 60,
-      "description": "build-storage complete: warehouse placed by clicking the step's outlined tile (6,6) in the Build panel picker",
+      "timeout": 90,
+      "description": "build-storage complete: warehouse placed by clicking the step's outlined tile (6,6) in the Build panel picker. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "player",
       "interaction": [
         {
@@ -1074,8 +1074,8 @@
     },
     {
       "command": "set_policy mode:shift_8h",
-      "timeout": 60,
-      "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) \u2014 the form mirrors the policy in force, and applying it unchanged still counts",
+      "timeout": 90,
+      "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) \u2014 the form mirrors the policy in force, and applying it unchanged still counts. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "player",
       "interaction": [
         {
@@ -1110,8 +1110,8 @@
     },
     {
       "command": "tick 6",
-      "timeout": 60,
-      "description": "tick-advance complete: the tutorial's own clock runs \u2014 the whole point of this step \u2014 until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the retired playtest's own beat, which was `letTimePass` only.",
+      "timeout": 90,
+      "description": "tick-advance complete: the tutorial's own clock runs \u2014 the whole point of this step \u2014 until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the retired playtest's own beat, which was `letTimePass` only. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "player",
       "interaction": [
         {
@@ -1132,8 +1132,8 @@
     },
     {
       "command": "campaign complete",
-      "timeout": 30,
-      "description": "victory complete: level ends, card shows Tutorial Complete. Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action \u2014 `campaign` is on the reused setup allowlist.",
+      "timeout": 90,
+      "description": "victory complete: level ends, card shows Tutorial Complete. Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action \u2014 `campaign` is on the reused setup allowlist. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "setup",
       "interaction": [
         {
@@ -1153,8 +1153,8 @@
     },
     {
       "command": "campaign status",
-      "timeout": 30,
-      "description": "Final: the congratulations card dismisses itself and the game is unpaused",
+      "timeout": 90,
+      "description": "Final: the congratulations card dismisses itself and the game is unpaused. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "setup",
       "interaction": [
         {
