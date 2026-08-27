@@ -15,11 +15,8 @@ import {
 import { negotiateContract } from '../../core/economy/Negotiation.js';
 import { getFragmentCounts, consumeStoredOre } from '../../core/economy/Logistics.js';
 import { Random } from '../../core/math/Random.js';
-
-function requireGame(ctx: GameContext): CommandResult | null {
-  if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
-  return null;
-}
+import { t } from '../../core/i18n/I18n.js';
+import { requireGame } from './commandUtils.js';
 
 // ── finances command ──
 
@@ -146,7 +143,7 @@ export function contractCommand(
     }
 
     case 'accept': {
-      const usage = 'Usage: contract accept <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]';
+      const usage = t('economy.contract.usage_accept');
       const resolved = resolveContract(state.contracts.available, args, named, usage);
       if ('success' in resolved) return resolved;
       const contract = acceptContract(state.contracts, resolved.id, state.tickCount);
@@ -155,7 +152,7 @@ export function contractCommand(
     }
 
     case 'decline': {
-      const usage = 'Usage: contract decline <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]';
+      const usage = t('economy.contract.usage_decline');
       const resolved = resolveContract(state.contracts.available, args, named, usage);
       if ('success' in resolved) return resolved;
       state.contracts.available = state.contracts.available.filter(c => c.id !== resolved.id);
@@ -179,7 +176,7 @@ export function contractCommand(
     }
 
     case 'deliver': {
-      const usage = 'Usage: contract deliver <id> amount:<kg> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>] amount:<kg>';
+      const usage = t('economy.contract.usage_deliver');
       const amount = parseFloat(named['amount'] ?? '0');
       if (!Number.isFinite(amount) || amount <= 0) {
         return { success: false, output: usage };
@@ -215,7 +212,7 @@ export function contractCommand(
     }
 
     case 'negotiate': {
-      const usage = 'Usage: contract negotiate <id> | material:<materialId> [type:<ore_sale|rubble_disposal|supply>]';
+      const usage = t('economy.contract.usage_negotiate');
       const resolved = resolveContract(state.contracts.available, args, named, usage);
       if ('success' in resolved) return resolved;
       const id = resolved.id;
@@ -230,7 +227,7 @@ export function contractCommand(
     }
 
     default:
-      return { success: false, output: 'Usage: contract (list|accept|decline|status|deliver|negotiate) [id] [amount:X]' };
+      return { success: false, output: t('economy.contract.usage_combined') };
   }
 }
 
@@ -261,5 +258,5 @@ export function fragmentsCommand(
     };
   }
 
-  return { success: false, output: 'Usage: fragments status' };
+  return { success: false, output: t('economy.fragments.usage') };
 }

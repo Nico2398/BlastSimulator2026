@@ -284,7 +284,7 @@ export function drillPlanCommand(
     const diameter = parseFloat(named['diameter'] ?? '0.15');
 
     if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1) {
-      return { success: false, output: 'Invalid drill grid: rows and cols must be positive whole numbers.' };
+      return { success: false, output: t('mining.drill_plan.invalid_grid') };
     }
     if (rows * cols > MAX_DRILL_GRID_HOLES) {
       return {
@@ -626,7 +626,7 @@ export function blastCommand(
   // state is always 'sunny' regardless of seed.
   const wetHoleIds = new Set(wetHoles(ctx.state!, ctx.weatherCycle?.current ?? 'sunny'));
   const result = executeBlast(plan, ctx.grid!, [], undefined, ctx.state!.buildings, ctx.emitter, wetHoleIds);
-  if (!result) return { success: false, output: 'Blast execution failed.' };
+  if (!result) return { success: false, output: t('mining.blast.execution_failed') };
 
   // Store fragment data for renderer (localized remesh + mesh spawning)
   ctx.lastBlastFragments = result.fragments.map(f => f.position);
@@ -787,7 +787,7 @@ export function blastPlanCommand(
   if (sub === 'validate') {
     const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.validation_issues_header'));
     if (assembled.error) return assembled.error;
-    return { success: true, output: 'Plan is valid and ready to blast.' };
+    return { success: true, output: t('mining.blast_plan.valid') };
   }
 
   if (sub === 'list') {
@@ -1015,7 +1015,7 @@ export function buildRampCommand(
   // that check stays as a safety net for any other caller of buildRamp/validateRampOrder,
   // but on this call path it is now unreachable for length<1.
   if (!Number.isFinite(length) || length < 1) {
-    return { success: false, output: 'Invalid ramp length: length must be a finite positive number.' };
+    return { success: false, output: t('mining.build_ramp.invalid_length') };
   }
   if (length > MAX_RAMP_LENGTH) {
     return {
@@ -1273,7 +1273,7 @@ export function surveyCommand(
   const x = parseInt(named['x'], 10);
   const z = parseInt(named['z'], 10);
   if (isNaN(x) || isNaN(z)) {
-    return { success: false, output: 'Invalid coordinates: x and z must be integers.' };
+    return { success: false, output: t('mining.survey.invalid_coordinates') };
   }
 
   const claim = claimForAction(ctx, cellsInDisc(x, z, SURVEY_COVERAGE_RADIUS[method]), 'survey');
@@ -1286,9 +1286,9 @@ export function surveyCommand(
       return { success: false, output: `Insufficient funds. ${method} survey costs $${SURVEY_COSTS[method]}.` };
     }
     if (result.error === 'no_surveyor') {
-      return { success: false, output: 'No available surveyor. Hire an employee with geology qualification.' };
+      return { success: false, output: t('mining.survey.no_surveyor') };
     }
-    return { success: false, output: 'Survey failed.' };
+    return { success: false, output: t('mining.survey.failed') };
   }
 
   return {

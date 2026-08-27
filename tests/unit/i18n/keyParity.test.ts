@@ -158,16 +158,25 @@ describe('en.json / fr.json — key-set parity', () => {
     // survey.usage, survey.unknown_method, survey.none_pending,
     // survey.ore_report_header, survey.ore_report_unavailable) — 24 new keys
     // total, both locales translated.
-    // Baseline is now 3309 (up from 3307): #556 added 2 new ui.build.* keys
+    // Baseline is now 3322 (up from 3307): #797 added 15 new keys covering
+    // the remaining hardcoded strings in the mining, economy, policy, and
+    // state console command modules — mining.drill_plan.invalid_grid,
+    // mining.blast.execution_failed, mining.blast_plan.valid,
+    // mining.build_ramp.invalid_length, mining.survey.invalid_coordinates,
+    // mining.survey.no_surveyor, mining.survey.failed,
+    // economy.contract.usage_accept, economy.contract.usage_decline,
+    // economy.contract.usage_deliver, economy.contract.usage_negotiate,
+    // economy.contract.usage_combined, economy.fragments.usage,
+    // policy.usage, state.usage — both locales translated.
+    // Baseline is now 3323 (up from 3322): #556 added 2 new ui.build.* keys
     // (ordered, under_construction_count) for the order-then-build
-    // construction-site flow, both locales translated.
-    // Baseline is now 3308 (down from 3309): #556 review removed the orphaned
-    // ui.build.placed key — BuildMenu.ts uses ui.build.ordered instead, and
-    // nothing in src/ referenced ui.build.placed anymore.
+    // construction-site flow, both locales translated, and removed the
+    // orphaned ui.build.placed key — BuildMenu.ts uses ui.build.ordered
+    // instead, and nothing in src/ referenced ui.build.placed anymore.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3308);
+    expect(Object.keys(en).length).toBe(3323);
   });
 });
 
