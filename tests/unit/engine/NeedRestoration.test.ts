@@ -7,6 +7,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { tickNeedRestoration, tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
 import { tickEmployees } from '../../../src/core/engine/EmployeeDispatch.js';
+import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
