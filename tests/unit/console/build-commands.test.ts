@@ -32,6 +32,43 @@ function tickUntilConstructionDone(ctx: MiningContext, maxTicks = 300): void {
   }
 }
 
+describe('build command — ordered ids (#556)', () => {
+  it('numbers buildings in the order they were ordered, not the order they finish', () => {
+    const ctx = makeCtx();
+    ctx.state!.buildings.unlockedTiers.freight_warehouse = 3;
+    // Two orders back to back, far enough apart that the staffed crew builds
+    // them in parallel and finishes them in whichever order it reaches them.
+    expect(buildCommand(ctx, ['management_office'], { at: '20,20' }).success).toBe(true);
+    expect(buildCommand(ctx, ['freight_warehouse'], { at: '2,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+
+    const office = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!;
+    const warehouse = ctx.state!.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
+    expect(office.id).toBe(1);
+    expect(warehouse.id).toBe(2);
+  });
+
+  it('keeps the building list ordered by id whichever site completes first', () => {
+    const ctx = makeCtx();
+    ctx.state!.buildings.unlockedTiers.freight_warehouse = 3;
+    expect(buildCommand(ctx, ['management_office'], { at: '20,20' }).success).toBe(true);
+    expect(buildCommand(ctx, ['freight_warehouse'], { at: '2,2' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+
+    const ids = ctx.state!.buildings.buildings.map(b => b.id);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+  });
+
+  it('claims the finished building id at order time', () => {
+    const ctx = makeCtx();
+    expect(buildCommand(ctx, ['management_office'], { at: '0,0' }).success).toBe(true);
+    const order = ctx.state!.plannedBuildings[0]!;
+    expect(order.buildingId).toBe(1);
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings[0]!.id).toBe(order.buildingId);
+  });
+});
+
 describe('build command — tier placement', () => {
   it('places a T1 building by default', () => {
     const ctx = makeCtx();

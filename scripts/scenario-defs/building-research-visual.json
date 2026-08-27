@@ -3,21 +3,22 @@
   "description": "Visual check of research center building at all three tiers for technology advancement",
   "steps": [
     {
-      "command": "new_game seed:42 cash:280000 staffed:true",
+      "command": "new_game seed:42 cash:300000 staffed:true",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:280000 staffed:true"
+          "command": "new_game seed:42 cash:300000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 280000,
+          "cash": 300000,
           "buildingCount": 0
         }
-      }
+      },
+      "description": "Opening cash raised 280000 -> 300000 (#556): the two research centers below are queued construction now, and the staffed roster draws salary across the ticks that build them — which used to leave the tier-3 centre short of its own $120,000."
     },
     {
       "command": "build research_center at:5,5",
@@ -196,9 +197,31 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 1,
+          "buildingCount": 1
         },
         "note": "tier 2 now buildable — real unlock, not just a queued task. cash uses decreased not equals since this follows a tick step (Finding #12)"
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
+        }
       }
     },
     {
@@ -262,9 +285,31 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 3
+          "orderedBuildingCount": 1,
+          "buildingCount": 2
         },
         "note": "tier 3 now buildable — full T1→T2→T3 progression completes as this file's own description promises, unlike its sibling building-research-progression-visual.json (Finding #20)"
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
+        }
       }
     },
     {

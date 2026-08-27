@@ -3,12 +3,12 @@
   "description": "Visual check of training buildings: driving center, blasting academy, management office, and geology lab",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000 staffed:true",
+      "command": "new_game seed:42 cash:150000",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000 staffed:true"
+          "command": "new_game seed:42 cash:150000"
         }
       ],
       "role": "setup",
@@ -18,6 +18,56 @@
           "buildingCount": 0
         }
       }
+    },
+    {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      },
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1500
+        },
+        "equals": {
+          "employeeCount": 2
+        }
+      },
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
     },
     {
       "command": "build driving_center at:5,5",
@@ -53,7 +103,7 @@
           "cash": -12000
         },
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       }
     },
@@ -87,7 +137,7 @@
           "cash": -15000
         },
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 2
         }
       }
     },
@@ -121,7 +171,7 @@
           "cash": -8000
         },
         "equals": {
-          "buildingCount": 3
+          "orderedBuildingCount": 3
         }
       }
     },
@@ -154,7 +204,7 @@
         "changedBy": {
           "cash": -12000
         },
-        "note": "Confirming placement only queues a construction site (#556) \u2014 the next step waits for all four orders above to actually land before anything below refers to a building by id."
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for all four orders above to actually land before anything below refers to a building by id."
       }
     },
     {
@@ -187,54 +237,6 @@
         }
       ],
       "role": "observe"
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -1000
-        },
-        "equals": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -1500
-        },
-        "equals": {
-          "employeeCount": 2
-        }
-      }
     },
     {
       "command": "employee list",
@@ -295,7 +297,7 @@
         "equals": {
           "trainingCount": 1
         },
-        "note": "training takes 20 ticks \u2014 still in progress at 10"
+        "note": "training takes 20 ticks — still in progress at 10"
       }
     },
     {
@@ -307,6 +309,17 @@
         }
       ],
       "role": "observe"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Ordering the four buildings is queued construction now (#556), so the crew spends build ticks before the training block and a random event can fall due inside it — an unresolved event halts the very next `tick`. Resolved through the event dialog’s own buttons; whether an event is pending is decided from game state, not from whether the modal has rendered.",
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "tick 25",
@@ -322,7 +335,7 @@
           "trainingCount": 0,
           "proficiencyTotal": 3
         },
-        "note": "35 ticks total now past the 20-tick training duration \u2014 driving.excavator gained (proficiencyTotal 2\u21923), training slot freed"
+        "note": "35 ticks total now past the 20-tick training duration — driving.excavator gained (proficiencyTotal 2→3), training slot freed"
       }
     },
     {

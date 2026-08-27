@@ -3,19 +3,19 @@
   "description": "Visual check of the research tier-gate and the full T1 -> T2 -> T3 progression: Tier 1 Research Center placed, a direct Tier 2 attempt rejected before research, Tier 2 researched instantly (cost-only), an early Tier 3 attempt rejected by the conditions gate, then Tier 2 built for real once researched, Tier 3 research queued and progressed over its 50-tick duration, and finally a Tier 3 Research Center built. Starting cash is a setup cheat sized to cover the whole chain ($25,000 + $5,000 + $60,000 + $12,000 + $120,000 = $222,000 plus upkeep), the same treatment its sibling building-research-visual.json uses — every purchase here is one the player could genuinely afford and click.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:280000 staffed:true",
-      "description": "Setup cheat: the whole T1->T2->T3 chain costs $222,000 in construction and research, so the default $50,000 start cannot reach the end of this file. $230,000 funds every purchase legitimately — the console refuses what a player could not afford, so an underfunded start would stop this scenario at the Tier 2 build.",
+      "command": "new_game seed:42 cash:300000 staffed:true",
+      "description": "Setup cheat: the whole T1->T2->T3 chain costs $222,000 in construction and research, so the default $50,000 start cannot reach the end of this file. $230,000 funds every purchase legitimately — the console refuses what a player could not afford, so an underfunded start would stop this scenario at the Tier 2 build. Opening cash raised 280000 -> 300000 (#556): the two research centers below are queued construction now, and the staffed roster draws salary across the ticks that build them — which used to leave the tier-3 centre short of its own $120,000.",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:280000 staffed:true"
+          "command": "new_game seed:42 cash:300000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 280000,
+          "cash": 300000,
           "buildingCount": 0
         }
       }
@@ -246,9 +246,31 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 1,
+          "buildingCount": 1
         },
         "note": "tier 2 now buildable — real unlock. cash uses decreased not equals since this follows a tick step (Finding #12)"
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
+        }
       }
     },
     {
@@ -359,9 +381,31 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 3
+          "orderedBuildingCount": 1,
+          "buildingCount": 2
         },
         "note": "tier 3 built for real — the progression completes, matching this file's own name"
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
+        }
       }
     },
     {

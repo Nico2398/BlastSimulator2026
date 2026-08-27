@@ -106,8 +106,13 @@ export function orderBuildingCommand(
     targetEmployeeId: null,
   }, { skipQualificationCheck: true });
 
+  // Claim the finished building's id now, not when the site completes: sites are
+  // built in parallel and land in whatever order the crew reaches them, so
+  // numbering at completion would hand the player ids in an order they never
+  // chose (and make `build destroy 1` name a different building each run).
   const plannedBuilding: PlannedBuilding = {
-    id: buildingOrderId, type, tier, x, z, actionId, cost: def.constructionCost,
+    id: buildingOrderId, buildingId: state.buildings.nextId++,
+    type, tier, x, z, actionId, cost: def.constructionCost,
   };
   state.plannedBuildings.push(plannedBuilding);
 

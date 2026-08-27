@@ -182,6 +182,9 @@ export function isPlacementBlockedByResearch(
  * `originX`/`originZ` its west/north edges — which are no longer always 0,
  * since a site that has been claimed westward or northward starts at negative
  * coordinates (#473).
+ *
+ * `reservedId`, when given, is the id already claimed for this building at order
+ * time (#556); omitted, the next id is allocated here as it always was.
  */
 export function placeBuilding(
   state: BuildingState,
@@ -193,6 +196,7 @@ export function placeBuilding(
   tier: BuildingTier = 1,
   originX: number = 0,
   originZ: number = 0,
+  reservedId?: number,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
 
@@ -209,14 +213,26 @@ export function placeBuilding(
   }
 
   const building: Building = {
-    id: state.nextId++,
+    // `reservedId` is the id claimed when the building was ORDERED (#556). Sites
+    // are built in parallel and finish in whatever order the crew reaches them,
+    // so allocating here would number buildings by completion rather than by the
+    // order the player placed them — two orders back to back could come out with
+    // their ids swapped, and every id the player then typed (`build destroy 1`,
+    // `employee train … building:1`) would name the other building.
+    id: reservedId ?? state.nextId++,
     type,
     tier,
     x, z,
     hp: def.maxHp,
     active: true,
   };
-  state.buildings.push(building);
+  // Keep the array ordered by id. With ids claimed at order time (#556) and
+  // sites finishing in whatever order the crew reaches them, a plain push would
+  // leave `buildings` in completion order — so `build list` and the Build panel,
+  // which both just walk the array, would show the player 2, 1, 4, 3.
+  const at = state.buildings.findIndex(b => b.id > building.id);
+  if (at === -1) state.buildings.push(building);
+  else state.buildings.splice(at, 0, building);
 
   return { success: true, building, cost: def.constructionCost };
 }

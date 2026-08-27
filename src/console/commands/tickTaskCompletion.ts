@@ -162,6 +162,7 @@ export function resolveTaskCompletion(
         const result = placeBuilding(
           state.buildings, order.type, order.x, order.z,
           bounds.width, bounds.depth, order.tier, bounds.originX, bounds.originZ,
+          order.buildingId,
         );
 
         if (result.success) {

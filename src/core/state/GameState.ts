@@ -185,6 +185,12 @@ export interface PlannedRamp {
  */
 export interface PlannedBuilding {
   id: number;
+  /**
+   * The id the finished building will carry, claimed from `BuildingState.nextId`
+   * at order time so buildings are numbered in the order the player placed them
+   * rather than in the order the crew happened to finish them.
+   */
+  buildingId: number;
   type: BuildingType;
   tier: BuildingTier;
   x: number;
