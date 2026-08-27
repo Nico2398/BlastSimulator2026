@@ -138,7 +138,12 @@ function migrateV12ToV13(obj: Record<string, unknown>): Record<string, unknown> 
  * yet implemented — filled in during the implementation phase.
  */
 function migrateV13ToV14(obj: Record<string, unknown>): Record<string, unknown> {
-  // TODO: implement — default plannedBuildings to [] and nextPlannedBuildingId to 1.
+  if (!Array.isArray(obj['plannedBuildings'])) {
+    obj['plannedBuildings'] = [];
+  }
+  if (typeof obj['nextPlannedBuildingId'] !== 'number') {
+    obj['nextPlannedBuildingId'] = 1;
+  }
   return obj;
 }
 

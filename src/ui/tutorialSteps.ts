@@ -434,7 +434,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 14: build-storage ──
-  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:6,6'], TOOLBAR_TARGET.build),
+  // #556: placing a building is no longer instant -- confirming the order
+  // queues a `place_building` action (BUILDING_CONSTRUCTION_BASE_DURATION_TICKS
+  // = 40 ticks for a tier-1 warehouse) that an employee has to walk to and
+  // work before the freight_warehouse count actually moves. Without
+  // waitsOnWork the rail's clock-hold (tutorialGuide.ts's decideClock) treats
+  // the step as already resolved and stalls waiting on a count that hasn't
+  // changed yet -- same gap 'drill-plan'/'charge'/'sequence' document above.
+  // tickBudget 60 comfortably clears the 40-tick build plus walk time.
+  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:6,6'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
 
   // ── Step 14b: haul-debris ──
   // Fires when stored mass increases — the same "value went up" pattern every

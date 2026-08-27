@@ -195,18 +195,17 @@ export function placeBuilding(
   originZ: number = 0,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
-  const { sizeX, sizeZ } = getDefSize(def);
 
   if (isPlacementBlockedByResearch(state, type, tier)) {
     return { success: false, error: `Tier ${tier} ${type} is not researched — research required before placement.` };
   }
 
-  if (x < originX || z < originZ || x + sizeX > originX + gridSizeX || z + sizeZ > originZ + gridSizeZ) {
-    return { success: false, error: 'Out of bounds' };
-  }
-
-  if (isOccupied(state, x, z, sizeX, sizeZ)) {
-    return { success: false, error: 'Space is occupied' };
+  const check = checkFootprintPlacement(
+    state.buildings.map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
+    type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ,
+  );
+  if (!check.valid) {
+    return { success: false, error: check.error! };
   }
 
   const building: Building = {
@@ -286,15 +285,12 @@ export function moveBuilding(
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
 
-  const def = getBuildingDef(building.type, building.tier);
-  const { sizeX, sizeZ } = getDefSize(def);
-
-  if (newX < originX || newZ < originZ || newX + sizeX > originX + gridSizeX || newZ + sizeZ > originZ + gridSizeZ) {
-    return { success: false, error: 'Out of bounds' };
-  }
-
-  if (isOccupied(state, newX, newZ, sizeX, sizeZ, building.id)) {
-    return { success: false, error: 'Space is occupied' };
+  const check = checkFootprintPlacement(
+    state.buildings.filter(b => b.id !== buildingId).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
+    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ,
+  );
+  if (!check.valid) {
+    return { success: false, error: check.error! };
   }
 
   building.x = newX;
@@ -383,37 +379,33 @@ export interface FootprintOccupant {
  * here from `placeBuilding`'s inline bounds/`isOccupied` calls.
  */
 export function checkFootprintPlacement(
-  _occupants: ReadonlyArray<FootprintOccupant>,
-  _type: BuildingType,
-  _x: number,
-  _z: number,
-  _tier: BuildingTier,
-  _gridSizeX: number,
-  _gridSizeZ: number,
-  _originX: number,
-  _originZ: number,
+  occupants: ReadonlyArray<FootprintOccupant>,
+  type: BuildingType,
+  x: number,
+  z: number,
+  tier: BuildingTier,
+  gridSizeX: number,
+  gridSizeZ: number,
+  originX: number,
+  originZ: number,
 ): { valid: boolean; error?: string } {
-  return { valid: false, error: 'not implemented' };
-}
+  const def = getBuildingDef(type, tier);
+  const { sizeX, sizeZ } = getDefSize(def);
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+  if (x < originX || z < originZ || x + sizeX > originX + gridSizeX || z + sizeZ > originZ + gridSizeZ) {
+    return { valid: false, error: 'Out of bounds' };
+  }
 
-function isOccupied(
-  state: BuildingState,
-  x: number, z: number,
-  sizeX: number, sizeZ: number,
-  excludeId?: number,
-): boolean {
-  for (const b of state.buildings) {
-    if (excludeId !== undefined && b.id === excludeId) continue;
-    const def = getBuildingDef(b.type, b.tier);
-    const { sizeX: bSX, sizeZ: bSZ } = getDefSize(def);
-    if (x < b.x + bSX && x + sizeX > b.x &&
-        z < b.z + bSZ && z + sizeZ > b.z) {
-      return true;
+  for (const occ of occupants) {
+    const occDef = getBuildingDef(occ.type, occ.tier);
+    const { sizeX: oSX, sizeZ: oSZ } = getDefSize(occDef);
+    if (x < occ.x + oSX && x + sizeX > occ.x &&
+        z < occ.z + oSZ && z + sizeZ > occ.z) {
+      return { valid: false, error: 'Space is occupied' };
     }
   }
-  return false;
+
+  return { valid: true };
 }
 
 // ── Re-exports from sub-modules ──────────────────────────────────────────────

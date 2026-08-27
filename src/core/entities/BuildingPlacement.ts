@@ -49,11 +49,6 @@ export function buildPlacementGrid(
   buildingState: BuildingState,
   plannedBuildings: ReadonlyArray<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [],
 ): PlacementGrid {
-  // Marking plannedBuildings-occupied cells BUSY is implementation-phase work
-  // (#556) — referenced here only to keep the stub's new param from tripping
-  // noUnusedParameters while the signature settles.
-  void plannedBuildings;
-
   const grid: PlacementGrid = [];
 
   for (let z = 0; z < voxelGrid.sizeZ; z++) {
@@ -70,6 +65,21 @@ export function buildPlacementGrid(
     for (const [dx, dz] of def.footprint) {
       const cx = building.x + dx;
       const cz = building.z + dz;
+      const row = grid[cz];
+      if (row !== undefined && cx >= 0 && cx < row.length) {
+        const cell = row[cx];
+        if (cell !== undefined) cell.surfaceY = BUSY;
+      }
+    }
+  }
+
+  // Mark every cell under a construction site's footprint as BUSY too, so a
+  // second order can't be placed on top of a site still under construction.
+  for (const planned of plannedBuildings) {
+    const def = getBuildingDef(planned.type, planned.tier);
+    for (const [dx, dz] of def.footprint) {
+      const cx = planned.x + dx;
+      const cz = planned.z + dz;
       const row = grid[cz];
       if (row !== undefined && cx >= 0 && cx < row.length) {
         const cell = row[cx];

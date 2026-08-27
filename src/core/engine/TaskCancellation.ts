@@ -169,6 +169,10 @@ function clearHolderWalkFields(emp: Employee): void {
  */
 function actionOrderCost(action: PendingAction): number {
   if (action.type === 'dig_ramp_segment') return (action.payload['segmentCost'] as number) ?? 0;
+  // A building order is one atomic unit, not segmented like a ramp — the
+  // FULL construction cost was charged at order time (buildOrder.ts) and is
+  // refunded in full on cancellation (#556), unlike a ramp's per-segment cost.
+  if (action.type === 'place_building') return (action.payload['cost'] as number) ?? 0;
   if (action.type !== 'survey') return 0;
   const method = action.payload['method'];
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;

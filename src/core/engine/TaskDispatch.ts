@@ -65,6 +65,12 @@ export function dispatchPendingAction(
   // Full record constructed here — every dispatch starts life queued and
   // unheld (#547); callers no longer supply status/holderId themselves.
   state.pendingActions.push({ ...action, status: 'queued', holderId: null });
+  // A `place_building` ghost carries its real footprint (#556) so the
+  // renderer can draw the full site outline instead of a single point —
+  // every other action type's ghost is unaffected, footprint stays undefined.
+  const footprint = action.type === 'place_building'
+    ? (action.payload['footprint'] as ReadonlyArray<readonly [number, number]> | undefined)
+    : undefined;
   state.ghostPreviews.push({
     id: action.id,
     type: action.type,
@@ -72,6 +78,7 @@ export function dispatchPendingAction(
     targetZ: action.targetZ,
     targetY: action.targetY,
     claimed: false,
+    ...(footprint !== undefined ? { footprint } : {}),
   });
   state.ghostPreviewsRevision++;
   return { success: true };

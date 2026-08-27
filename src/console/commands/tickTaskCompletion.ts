@@ -15,6 +15,9 @@ import { landDrilledHole } from '../../core/mining/DrillPlan.js';
 import { landLoadedCharge } from '../../core/mining/ChargePlan.js';
 import { carveRampSegment, type RampSegmentDef } from '../../core/mining/Ramp.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
+import { placeBuilding, getDefSize, getBuildingDef } from '../../core/entities/Building.js';
+import { addIncome } from '../../core/economy/Finance.js';
+import { makeFootprintRegion, siteBounds, patchNavGrid as patchBuildingNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
 
 export function resolveTaskCompletion(
   ctx: GameContext,
@@ -137,6 +140,44 @@ export function resolveTaskCompletion(
         if (ramp.segments.every(s => s.done)) {
           const rampIdx = state.plannedRamps.findIndex(r => r.id === rampId);
           if (rampIdx !== -1) state.plannedRamps.splice(rampIdx, 1);
+        }
+      }
+    }
+
+    // A completed 'place_building' task lands here — the site becomes a real
+    // building only once construction has actually finished, not the instant
+    // the order was confirmed (#556, mirrors the 'dig_ramp_segment' branch
+    // above). The footprint stays reserved for the order's whole lifetime
+    // (checkFootprintPlacement counts every PlannedBuilding as an occupant),
+    // so placeBuilding failing here should be unreachable — defensive-only,
+    // mirroring how tick.ts refunds a Research Center task cancelled
+    // mid-flight (destroyed while its task was still queued).
+    if (progress.actionType === 'place_building' && progress.actionPayload) {
+      const buildingOrderId = progress.actionPayload['buildingOrderId'] as number;
+      const orderIdx = state.plannedBuildings.findIndex(pb => pb.id === buildingOrderId);
+      const order = orderIdx !== -1 ? state.plannedBuildings[orderIdx] : undefined;
+
+      if (order) {
+        const bounds = siteBounds(ctx);
+        const result = placeBuilding(
+          state.buildings, order.type, order.x, order.z,
+          bounds.width, bounds.depth, order.tier, bounds.originX, bounds.originZ,
+        );
+
+        if (result.success) {
+          state.plannedBuildings.splice(orderIdx, 1);
+          refreshLogisticsCapacity(state);
+          if (ctx.grid) {
+            const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
+            patchBuildingNavGrid(state, ctx.grid, makeFootprintRegion(order.x, order.z, sizeX, sizeZ));
+          }
+          lines.push(`[tick ${state.tickCount}] Built ${order.type} T${order.tier} #${result.building!.id} at (${order.x}, ${order.z}).`);
+        } else {
+          state.cash += order.cost;
+          addIncome(state.finances, order.cost, 'refund',
+            `Construction cancelled: ${order.type} T${order.tier} (${result.error})`, state.tickCount);
+          state.plannedBuildings.splice(orderIdx, 1);
+          lines.push(`[tick ${state.tickCount}] Construction of ${order.type} T${order.tier} failed at (${order.x}, ${order.z}): ${result.error}. $${order.cost} refunded.`);
         }
       }
     }

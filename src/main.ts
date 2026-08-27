@@ -563,6 +563,10 @@ window.__gameState = () => {
     orderedRampSegmentCount: s.plannedRamps.reduce(
       (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
     ),
+    // Buildings ordered but not yet built (state.plannedBuildings.length) --
+    // mirrors serializeGameState's own field (console-api.ts), same
+    // rationale as orderedHoleCount/orderedRampSegmentCount above (#556).
+    orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
     surveyCount: s.surveyResults.length,

@@ -13,52 +13,21 @@ import {
   getDemolishCost,
   getUpgradeCost,
   isPlacementBlockedByResearch,
-  getStorageCapacity,
   type BuildingType,
   type BuildingTier,
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { syncLogisticsCapacity } from '../../core/economy/Logistics.js';
-import { NavGrid } from '../../core/nav/NavGrid.js';
-import type { BlastRegion } from '../../core/mining/BlastExecution.js';
 import { defineZone, clearZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
-import type { GameState } from '../../core/state/GameState.js';
-import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
-import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
+import { makeFootprintRegion, siteBounds, patchNavGrid, refreshLogisticsCapacity } from './buildingHelpers.js';
+import { orderBuildingCommand } from './buildOrder.js';
 
 // The employee command moved to ./employees.ts; re-exported so existing imports
 // and the runner registration keep resolving from here.
 export { employeeCommand } from './employees.js';
-
-function makeFootprintRegion(x: number, z: number, sizeX: number, sizeZ: number): BlastRegion {
-  return { minX: x, maxX: x + sizeX - 1, minZ: z, maxZ: z + sizeZ - 1 };
-}
-
-/**
- * The site's live bounding box, as `placeBuilding`/`moveBuilding` want it.
- * Falls back to a 64 m square at the origin only when no grid exists — which
- * `requireGame` already rules out for every caller here.
- */
-function siteBounds(ctx: GameContext): { width: number; depth: number; originX: number; originZ: number } {
-  const grid = ctx.grid;
-  if (!grid) return { width: DEFAULT_GRID_SIZE, depth: DEFAULT_GRID_SIZE, originX: 0, originZ: 0 };
-  return { width: grid.sizeX, depth: grid.sizeZ, originX: grid.minX, originZ: grid.minZ };
-}
-
-function patchNavGrid(state: GameState, grid: VoxelGrid, region: BlastRegion): void {
-  if (state.navGrid) {
-    NavGrid.patchNavGrid(state.navGrid, grid, state.buildings.buildings, state.drillHoles, region);
-  }
-}
-
-/** Re-derive logistics storage capacity from the current warehouse total. Call after any building mutation (build/destroy/upgrade/move). */
-function refreshLogisticsCapacity(state: GameState): void {
-  syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
-}
 
 // ── build command ──
 
@@ -202,7 +171,11 @@ export function buildCommand(
       return { success: true, output: lines.join('\n') };
     }
     default: {
-      // Try to place: build <type> at:x,z [tier:N]
+      // Try to order: build <type> at:x,z [tier:N]
+      // #556: placement is no longer instant — orderBuildingCommand validates
+      // and charges exactly as this case used to, then queues a
+      // `place_building` action and a PlannedBuilding instead of creating the
+      // building here. See buildOrder.ts.
       const type = sub as BuildingType;
       if (!getAllBuildingTypes().includes(type)) {
         return { success: false, output: `Unknown subcommand or building type: "${sub}". Use: build (list|destroy|upgrade|move|types|<type> at:x,z [tier:N])` };
@@ -213,58 +186,7 @@ export function buildCommand(
       }
       const tierParam = parseInt(named['tier'] ?? '1', 10);
       const tier = ([1, 2, 3].includes(tierParam) ? tierParam : 1) as BuildingTier;
-      // BuildMenu gates the catalog buy button on
-      // `cash < def.constructionCost || locked` — both terms are decided
-      // before the player ever picks a tile, and only then does placement
-      // check the location. The console mirrors that two-stage order here:
-      // research gate, then funds, then (inside claimForAction/placeBuilding)
-      // bounds and occupancy.
-      //
-      // Both checks sit ahead of claimForAction and placeBuilding because both
-      // of those *mutate*: the first claims off-site land and rebuilds the
-      // navgrid, the second pushes the building and bumps nextId before it can
-      // report a cost. Refusing later would leave land bought for a building
-      // that was never placed.
-      //
-      // Research before cash follows the precedence `research queue` already
-      // documents — cash is checked only once every other precondition passes,
-      // so a refusal names the reason the player can actually act on. The
-      // message is identical to the one placeBuilding produces, which still
-      // holds the same check as a backstop.
-      if (isPlacementBlockedByResearch(state.buildings, type, tier)) {
-        return { success: false, output: `Tier ${tier} ${type} is not researched — research required before placement.` };
-      }
-      // Same cost source as the UI: `getBuildingDef(type, tier).constructionCost`
-      // is exactly the `cost` placeBuilding goes on to report.
-      const placeDef = getBuildingDef(type, tier);
-      if (state.cash < placeDef.constructionCost) {
-        return {
-          success: false,
-          output: `Insufficient funds: need $${formatMoney(placeDef.constructionCost)}, have $${formatMoney(state.cash)}`,
-        };
-      }
-      const { sizeX: footprintX, sizeZ: footprintZ } = getDefSize(placeDef);
-      const placeClaim = claimForAction(
-        ctx,
-        cellsInRect(atCoords[0]!, atCoords[1]!, atCoords[0]! + footprintX - 1, atCoords[1]! + footprintZ - 1),
-        'build',
-      );
-      if (!placeClaim.ok) return { success: false, output: placeClaim.output! };
-      const placeBounds = siteBounds(ctx);
-      const result = placeBuilding(
-        state.buildings, type, atCoords[0]!, atCoords[1]!,
-        placeBounds.width, placeBounds.depth, tier, placeBounds.originX, placeBounds.originZ,
-      );
-      if (!result.success) return { success: false, output: result.error! };
-      state.cash -= result.cost!;
-      addExpense(state.finances, result.cost!, 'construction', `Build ${type} T${tier}`, state.tickCount);
-      refreshLogisticsCapacity(state);
-      // Patch NavGrid for new building footprint
-      if (ctx.grid) {
-        const { sizeX, sizeZ } = getDefSize(getBuildingDef(type, tier));
-        patchNavGrid(state, ctx.grid, makeFootprintRegion(atCoords[0]!, atCoords[1]!, sizeX, sizeZ));
-      }
-      return { success: true, output: `Built ${type} T${tier} #${result.building!.id} at (${atCoords[0]},${atCoords[1]}). Cost: $${result.cost}` };
+      return orderBuildingCommand(ctx, type, atCoords[0]!, atCoords[1]!, tier);
     }
   }
 }
