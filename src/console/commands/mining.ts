@@ -74,7 +74,7 @@ export interface MiningContext extends GameContext {
 }
 
 function requireGame(ctx: MiningContext): string | null {
-  if (!ctx.state || !ctx.grid) return 'No game loaded. Use new_game first.';
+  if (!ctx.state || !ctx.grid) return t('console.no_game_loaded');
   return null;
 }
 
@@ -357,7 +357,7 @@ export function drillPlanCommand(
   if (sub === 'show') {
     const state = ctx.state!;
     if (state.drillHoles.length === 0 && state.plannedDrillHoles.length === 0) {
-      return { success: true, output: 'No drill holes. Use drill_plan grid or drill_plan add.' };
+      return { success: true, output: t('mining.drill_plan.none') };
     }
     const orderedLines = state.plannedDrillHoles.map(h =>
       `  ${h.id}: (${h.x}, ${h.z}) depth=${h.depth}m dia=${h.diameter}m [ORDERED]`,
@@ -369,7 +369,7 @@ export function drillPlanCommand(
     return { success: true, output: `Drill plan (${lines.length} holes):\n${lines.join('\n')}` };
   }
 
-  return { success: false, output: 'Usage: drill_plan grid|add|remove|clear|show [options]' };
+  return { success: false, output: t('mining.drill_plan.usage') };
 }
 
 // ── Charge commands ──
@@ -457,7 +457,7 @@ export function chargeCommand(
   if (_args[0] === 'show') {
     const orderedEntries = Object.entries(ctx.state!.plannedChargesByHole);
     const loadedEntries = Object.entries(ctx.state!.chargesByHole);
-    if (orderedEntries.length === 0 && loadedEntries.length === 0) return { success: true, output: 'No charges set.' };
+    if (orderedEntries.length === 0 && loadedEntries.length === 0) return { success: true, output: t('mining.charge.none_set') };
     const orderedLines = orderedEntries.map(([id, c]) =>
       `  ${id}: ${c.explosiveId} ${c.amountKg}kg, stemming ${c.stemmingM}m [ORDERED]`,
     );
@@ -472,7 +472,7 @@ export function chargeCommand(
   const amount = parseFloat((named['amount'] ?? '0').replace('kg', ''));
   const stemming = parseFloat((named['stemming'] ?? String(MIN_STEMMING_M)).replace('m', ''));
 
-  if (!explosiveId) return { success: false, output: 'Missing explosive. Usage: charge hole:1 explosive:boomite amount:5kg stemming:2m' };
+  if (!explosiveId) return { success: false, output: t('mining.charge.missing_explosive') };
 
   if (holeSpec === '*') {
     const holeIds = ctx.state!.drillHoles.map(h => h.id);
@@ -533,13 +533,13 @@ export function sequenceCommand(
 
   if (sub === 'show') {
     const entries = Object.entries(ctx.state!.sequenceDelays);
-    if (entries.length === 0) return { success: true, output: 'No sequence set.' };
+    if (entries.length === 0) return { success: true, output: t('mining.sequence.none_set') };
     const lines = entries.sort(([, a], [, b]) => a - b)
       .map(([id, d]) => `  ${id}: ${d}ms`);
     return { success: true, output: `Sequence:\n${lines.join('\n')}` };
   }
 
-  return { success: false, output: 'Usage: sequence auto|set|show [options]' };
+  return { success: false, output: t('mining.sequence.usage') };
 }
 
 // ── Blast commands ──
@@ -601,7 +601,7 @@ export function blastCommand(
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
 
-  const assembled = assembleValidBlastPlan(ctx.state!, 'Invalid plan');
+  const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.invalid_plan_header'));
   if (assembled.error) return assembled.error;
   const plan = assembled.plan;
 
@@ -721,7 +721,7 @@ export function blastCommand(
   return {
     success: true,
     output: [
-      `=== BLAST REPORT ===`,
+      t('mining.blast.report_header'),
       `Rating: ${result.rating.toUpperCase()}`,
       `Cleared voxels: ${result.clearedVoxels}`,
       `Cracked voxels: ${result.crackedVoxels}`,
@@ -771,18 +771,18 @@ export function blastPlanCommand(
   }
 
   if (sub === 'validate') {
-    const assembled = assembleValidBlastPlan(ctx.state!, 'Validation issues');
+    const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.validation_issues_header'));
     if (assembled.error) return assembled.error;
     return { success: true, output: 'Plan is valid and ready to blast.' };
   }
 
   if (sub === 'list') {
     const names = Object.keys(ctx.state!.savedPlans);
-    if (names.length === 0) return { success: true, output: 'No saved plans.' };
+    if (names.length === 0) return { success: true, output: t('mining.blast_plan.none_saved') };
     return { success: true, output: `Saved plans:\n${names.map(n => `  ${n}`).join('\n')}` };
   }
 
-  return { success: false, output: 'Usage: blast_plan save|load|list|validate name:plan1' };
+  return { success: false, output: t('mining.blast_plan.usage') };
 }
 
 // ── Preview commands ──
@@ -820,7 +820,7 @@ export function previewCommand(
     return { success: true, output: `Vibration preview: max=${result.maxVibration.toFixed(4)}` };
   }
 
-  return { success: false, output: 'Usage: preview energy|fragments|projections|vibrations' };
+  return { success: false, output: t('mining.preview.usage') };
 }
 
 /**
@@ -837,10 +837,10 @@ export function blastPreviewCommand(
   if (err) return { success: false, output: err };
 
   if (ctx.state!.drillHoles.length === 0) {
-    return { success: false, output: 'No drill plan. Create one with drill_plan grid or drill_plan add.' };
+    return { success: false, output: t('mining.blast.no_drill_plan') };
   }
 
-  const assembled = assembleValidBlastPlan(ctx.state!, 'Invalid plan');
+  const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.invalid_plan_header'));
   if (assembled.error) return assembled.error;
   const plan = assembled.plan;
 
@@ -872,7 +872,7 @@ export function blastPreviewCommand(
       : null,
   };
 
-  const lines: string[] = ['=== BLAST PREVIEW ==='];
+  const lines: string[] = [t('mining.blast.preview_header')];
 
   lines.push('');
   if (energyPreview) {
@@ -964,7 +964,7 @@ export function buildRampCommand(
 
   if (args[0] === 'cancel') {
     const rampId = parseInt(args[1] ?? named['id'] ?? '', 10);
-    if (isNaN(rampId)) return { success: false, output: 'Usage: build_ramp cancel id:<ramp-id>' };
+    if (isNaN(rampId)) return { success: false, output: t('mining.build_ramp.cancel_usage') };
     return cancelRampCommand(ctx, rampId);
   }
 
@@ -1140,7 +1140,7 @@ export function weatherCommand(
     if (!target || !ALL_WEATHER_STATES.includes(target)) {
       return {
         success: false,
-        output: `Usage: weather set <state>. Valid: ${ALL_WEATHER_STATES.join(', ')}`,
+        output: t('mining.weather.set_usage', { valid: ALL_WEATHER_STATES.join(', ') }),
       };
     }
     setWeather(ctx.weatherCycle, target);
@@ -1193,7 +1193,7 @@ export function surveyCommand(
 
   if (sub === 'show') {
     const pending = ctx.state!.pendingActions.filter(a => a.type === 'survey');
-    if (pending.length === 0) return { success: true, output: 'No pending surveys.' };
+    if (pending.length === 0) return { success: true, output: t('mining.survey.none_pending') };
     // payload['method'] is Record<string, unknown> — String() narrows to a printable value
     const lines = pending.map(
       a => `  [${a.id}] ${String(a.payload['method'])} at (${a.targetX}, ${a.targetZ})`,
@@ -1224,7 +1224,7 @@ export function surveyCommand(
     );
 
     const lines = [
-      '=== ORE REPORT ===',
+      t('mining.survey.ore_report_header'),
       ...(oreLines.length > 0 ? oreLines : ['  (no ore recovered)']),
       `Total yield: ${report.totalYieldKg.toFixed(1)}kg`,
       `Estimated yield: ${report.estimatedYieldKg.toFixed(1)}kg`,
@@ -1237,12 +1237,12 @@ export function surveyCommand(
   }
 
   if (!sub) {
-    return { success: false, output: 'Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>' };
+    return { success: false, output: t('mining.survey.usage') };
   }
   if (!(SURVEY_METHODS as string[]).includes(sub)) {
     return {
       success: false,
-      output: `Unknown method "${sub}". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>`,
+      output: t('mining.survey.unknown_method', { method: sub }),
     };
   }
 
@@ -1252,7 +1252,7 @@ export function surveyCommand(
   if (named['x'] === undefined || named['z'] === undefined) {
     return {
       success: false,
-      output: 'Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>',
+      output: t('mining.survey.usage'),
     };
   }
 
