@@ -3316,7 +3316,7 @@
   "mining.survey.usage": "Utilisation : survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.unknown_method": "Méthode \"{method}\" inconnue. Utilisation : survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.invalid_coordinates": "Coordonnées invalides : x et z doivent être des entiers.",
-  "mining.survey.no_surveyor": "Aucun géomètre disponible. Embauchez un employé qualifié en géologie.",
+  "mining.survey.no_surveyor": "Aucun prospecteur disponible. Embauchez un employé qualifié en géologie.",
   "mining.survey.none_pending": "Aucune prospection en attente.",
   "mining.survey.ore_report_header": "=== RAPPORT DE MINERAI ===",
   "mining.survey.ore_report_unavailable": "Aucun rapport de minerai de tir disponible pour l'instant. Effectuez d'abord un tir de mine.",
