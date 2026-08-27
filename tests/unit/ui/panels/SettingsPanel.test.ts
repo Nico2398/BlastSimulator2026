@@ -261,9 +261,8 @@ describe('SettingsPanel', () => {
       const { container, panel } = mount();
       panel.update(createGame({ seed: 1, mineType: 'desert' }));
       panel.show();
-      let requested: ConfirmModalConfig | null = null;
       let returned = false;
-      panel.setConfirmHandler((config) => { requested = config; });
+      panel.setConfirmHandler(() => {});
       panel.setReturnToMenuHandler(() => { returned = true; });
 
       const btn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === t('ui.settings.return_to_menu'))!;

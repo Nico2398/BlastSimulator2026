@@ -1,7 +1,7 @@
 // CameraController — pure-logic tests (no DOM, no Three.js renderer)
 // We verify the math/constraints without needing a real canvas.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 
 // Mock canvas element for CameraController

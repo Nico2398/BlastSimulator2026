@@ -1,6 +1,6 @@
 // BlastEffects — unit tests
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { BlastEffects, type BlastEffectConfig } from '../../../src/renderer/BlastEffects.js';
 
@@ -55,7 +55,7 @@ describe('BlastEffects', () => {
   });
 
   it('stop cleans up all lights and particles', () => {
-    const { scene, be } = makeSetup();
+    const { be } = makeSetup();
     be.trigger(makeConfig(3));
     be.stop();
     expect(be.active).toBe(false);

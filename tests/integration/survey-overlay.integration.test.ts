@@ -2,7 +2,7 @@
 // Tests the end-to-end pipeline: GameState with survey results → SurveyConfidencePoint[]
 // → SurveyConfidenceOverlay rendering. All tests must FAIL before implementation.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
@@ -14,7 +14,6 @@ import {
   SurveyConfidenceOverlay,
   TerrainMesh,
   type SurveyConfidencePoint,
-  type SurveyConfidenceOverlayOptions,
 } from '../../src/renderer/TerrainMesh.js';
 import {
   estimateSurveyResult,
@@ -24,7 +23,7 @@ import {
 } from '../../src/core/mining/SurveyCalc.js';
 import { isSurveyStale } from '../../src/core/mining/SurveyCalc.js';
 
-import { SURVEY_STALE_TICKS, SURVEY_COVERAGE_RADIUS } from '../../src/core/config/balance.js';
+import { SURVEY_STALE_TICKS } from '../../src/core/config/balance.js';
 
 // ─── Fixture helpers ──────────────────────────────────────────────────────────
 
@@ -971,7 +970,6 @@ describe('TerrainMesh.getSurveyOverlay — game state integration', () => {
     const freshPoints = surveyResultsToConfidencePoints(state.surveyResults, grid, 50);
     overlay.show({ points: freshPoints, opacity: 0.5 });
 
-    const group = scene.children[0] as THREE.Group;
     // All points should be fresh
     for (const p of freshPoints) {
       expect(p.fresh).toBe(true);

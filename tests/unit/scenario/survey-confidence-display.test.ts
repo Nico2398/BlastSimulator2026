@@ -14,7 +14,6 @@ import {
 } from '../../../src/renderer/SurveyConfidenceOverlay.js';
 import type {
   SurveyConfidencePoint,
-  SurveyConfidenceOverlayOptions,
 } from '../../../src/renderer/SurveyConfidenceOverlay.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));

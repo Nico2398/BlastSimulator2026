@@ -194,7 +194,6 @@ describe('NavGrid.buildNavGrid — cell type derivation', () => {
   it('marks all-solid columns as walkable with moveCost 1.0', () => {
     const grid = makeSolidGrid(5, 10, 5, 3);
     const nav = NavGrid.buildNavGrid(grid, [], []);
-    const types = cellTypeMap(nav);
     for (let z = 0; z < 5; z++) {
       for (let x = 0; x < 5; x++) {
         expect(nav.cells[z]![x]!.type).toBe('walkable');

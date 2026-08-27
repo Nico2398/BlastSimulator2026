@@ -16,15 +16,12 @@ import {
   tickNeedRestoration,
   // ── 7.6: tickCollapse ──
   tickCollapse,
-  type CollapseResult,
   // ── 7.7: autoInsertNeedTasks ──
   autoInsertNeedTasks,
-  type NeedInsertionResult,
   // ── 7.8: deductRestCost ──
   deductRestCost,
   // ── 7.9: shift cycle ──
   processShiftCycle,
-  type ShiftCycleResult,
   // ── tickGeneralRestCompletion ──
   tickGeneralRestCompletion,
   type GeneralRestCompletionResult,
@@ -44,25 +41,23 @@ import { releaseVehicleOnCompletion } from '../../../src/core/engine/VehicleRese
 import { isRampSegmentClaimable } from '../../../src/core/engine/ActionSelection.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import {
-  hireEmployee, assignSkill, checkCollapse, getNeedMultiplier, computeTaskDuration,
+  hireEmployee, assignSkill, getNeedMultiplier, computeTaskDuration,
 } from '../../../src/core/entities/Employee.js';
 import { computeXpPerTick } from '../../../src/core/entities/EmployeeXpRules.js';
-import type { NeedKey } from '../../../src/core/entities/Employee.js';
 import type { PendingAction, PlannedRamp, RampSegmentTracker } from '../../../src/core/state/GameState.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { landDrilledHole, type PlannedHole } from '../../../src/core/mining/DrillPlan.js';
-import { landLoadedCharge, type PlannedCharge } from '../../../src/core/mining/ChargePlan.js';
+import { landLoadedCharge } from '../../../src/core/mining/ChargePlan.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
 import type { EventContext } from '../../../src/core/events/EventPool.js';
 import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { setupEvents } from '../../../src/core/events/index.js';
-import { clearEvents, registerEvents } from '../../../src/core/events/EventPool.js';
+import { clearEvents } from '../../../src/core/events/EventPool.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../src/core/entities/BuildingWellbeing.js';
 import {
   NEED_REST_DURATIONS,
-  NEED_REST_BUILDING_TYPES,
   NEED_WARNING_THRESHOLDS,
   NEED_REST_COSTS,
   WORK_DURATION_TICKS,

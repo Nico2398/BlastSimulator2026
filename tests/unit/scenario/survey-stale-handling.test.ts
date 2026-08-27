@@ -11,7 +11,6 @@ import * as THREE from 'three';
 import { SurveyConfidenceOverlay } from '../../../src/renderer/SurveyConfidenceOverlay.js';
 import type {
   SurveyConfidencePoint,
-  SurveyConfidenceOverlayOptions,
 } from '../../../src/renderer/SurveyConfidenceOverlay.js';
 import { isSurveyStale } from '../../../src/core/mining/SurveyCalc.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';

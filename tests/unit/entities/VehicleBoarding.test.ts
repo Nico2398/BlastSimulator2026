@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { requestBoardVehicle } from '../../../src/core/entities/VehicleBoarding.js';

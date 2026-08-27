@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   vec3, add, sub, scale, normalize, distance, squaredDistance,
-  dot, cross, length, lerp, clamp, equals,
+  dot, cross, length, lerp, clamp,
 } from '../../../src/core/math/Vec3.js';
 
 describe('Vec3 — basic operations', () => {

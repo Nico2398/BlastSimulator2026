@@ -44,7 +44,7 @@ describe('createRunner', () => {
 
   it('multiple runner instances are independent', () => {
     const { runner: r1, ctx: c1 } = createRunner();
-    const { runner: r2, ctx: c2 } = createRunner();
+    const { ctx: c2 } = createRunner();
 
     r1.run('new_game mine_type:desert seed:1');
     // r2 state should still be null

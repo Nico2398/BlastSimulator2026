@@ -30,16 +30,13 @@ import {
   checkCollapse,
   type SkillQualification,
   type SkillCategory,
-  type NeedKey,
   ROLE_STARTING_QUALIFICATION,
 } from '../../../src/core/entities/Employee.js';
 import {
   XP_THRESHOLDS,
   QUALIFICATION_SALARY_BONUS,
   // ── 3.10: need-meter balance constants ──
-  MORALE_THRESHOLDS,
   NEED_DRAIN_RATES,
-  NEED_THRESHOLDS,
   NEED_PRODUCTIVITY_MULTIPLIERS,
   NEED_MORALE_PENALTIES,
   NEED_MORALE_DRAIN_MULTIPLIERS,
@@ -122,7 +119,6 @@ describe('Employee system', () => {
   });
 
   it('unionized employee cannot be fired (returns error)', () => {
-    const state = createEmployeeState();
     // Find a seed that produces a unionized employee
     for (let seed = 0; seed < 100; seed++) {
       const s = createEmployeeState();
