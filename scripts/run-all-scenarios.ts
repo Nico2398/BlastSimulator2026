@@ -115,6 +115,32 @@ function selectShard(names: string[], shard: ShardSpec): string[] {
   return names.filter((_, i) => i % shard.total === shard.index - 1);
 }
 
+/**
+ * Builds the `ScenarioResult` for a scenario whose own load/run threw before
+ * producing a real per-step result (bad scenario JSON, an uncaught exception
+ * escaping the step loop) — as opposed to a scenario that ran to completion
+ * and already carries its own totalSteps/failed/error. Logs the same
+ * `[name] FAILED — msg` line both call sites printed before this refactor
+ * (#800), so a caller only needs `results.push(buildScenarioLoadFailure(name, err))`.
+ */
+export function buildScenarioLoadFailure(name: string, err: unknown): ScenarioResult {
+  void name;
+  void err;
+  throw new Error('not implemented');
+}
+
+function logBatchProgress(results: ScenarioResult[], index: number, total: number, startTime: number): void {
+  void results;
+  void index;
+  void total;
+  void startTime;
+  throw new Error('not implemented');
+}
+// Not wired into any call site yet — this skeleton commit (#800) only
+// establishes the type surface; the implementer wires it in on a separate
+// branch. Referenced here so it doesn't trip noUnusedLocals in the meantime.
+void logBatchProgress;
+
 async function runBatchInteraction(
   names: string[],
   port: number,
