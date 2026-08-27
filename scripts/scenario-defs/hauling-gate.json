@@ -53,7 +53,7 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       }
     },
@@ -114,6 +114,27 @@
         "equals": {
           "orderedHoleCount": 0,
           "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "The warehouse ordered above is built by the idle roster during the drilling block, so this asserts the site actually landed rather than paying for it in ticks (#556) — keeping the blast and haul beats below on the tick trajectory this file measured them at.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },

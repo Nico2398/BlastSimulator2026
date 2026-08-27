@@ -20,6 +20,31 @@
       }
     },
     {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      },
+      "description": "Hired before the offices are ordered (#556): a build order is queued work now, so the site needs someone on the roster to walk over and build it. This is the same driller the dispatch below paths around those offices."
+    },
+    {
       "command": "build management_office at:5,5",
       "interaction": [
         {
@@ -51,7 +76,7 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       }
     },
@@ -83,7 +108,7 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 2
         }
       }
     },
@@ -115,31 +140,28 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 3
+          "orderedBuildingCount": 3
         }
       }
     },
     {
-      "command": "employee hire role:driller",
+      "command": "wait_until field:buildingCount equals:3 max_ticks:600",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 190,
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 600,
+          "timeoutMs": 180000
         }
       ],
-      "role": "player",
+      "role": "setup",
       "expect": {
-        "decreased": ["cash"],
         "equals": {
-          "employeeCount": 1
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
         }
       }
     },

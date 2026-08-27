@@ -217,8 +217,9 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
-        }
+          "orderedBuildingCount": 1
+        },
+        "note": "Ordering a building now queues a construction site instead of placing it (#556). The order charges the full construction cost the same tick, which is what this economy-display step is actually about; the site is left standing as a site because a 40-tick build does not fit in this file’s 25 ticks, and forcing it in would push the accepted contract past its own deadline and end the wellBeing recovery these steps assert."
       }
     },
     {
@@ -349,9 +350,10 @@
         "equals": {
           "employeeCount": 3,
           "vehicleCount": 1,
-          "buildingCount": 1,
-          "activeContractCount": 1
-        }
+          "activeContractCount": 1,
+          "orderedBuildingCount": 1
+        },
+        "note": "buildingCount stays 0 / orderedBuildingCount 1 (#556): the freight warehouse above is an ordered construction site, not a standing building. A building actually completing is covered by building-placement-visual and the building-* files."
       }
     }
   ],
