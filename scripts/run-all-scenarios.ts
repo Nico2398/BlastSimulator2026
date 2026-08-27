@@ -115,6 +115,27 @@ function selectShard(names: string[], shard: ShardSpec): string[] {
   return names.filter((_, i) => i % shard.total === shard.index - 1);
 }
 
+/**
+ * Builds the `ScenarioResult` for a scenario whose own load/run threw before
+ * producing a real per-step result (bad scenario JSON, an uncaught exception
+ * escaping the step loop) — as opposed to a scenario that ran to completion
+ * and already carries its own totalSteps/failed/error. Logs the same
+ * `[name] FAILED — msg` line both call sites printed before this refactor
+ * (#800), so a caller only needs `results.push(buildScenarioLoadFailure(name, err))`.
+ */
+export function buildScenarioLoadFailure(name: string, err: unknown): ScenarioResult {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(`\n[${name}] FAILED — ${msg}`);
+  return { name, totalSteps: 0, failed: true, error: msg };
+}
+
+function logBatchProgress(results: ScenarioResult[], index: number, total: number, startTime: number): void {
+  const passed = results.filter(r => !r.failed).length;
+  const failed = results.filter(r => r.failed).length;
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`  Progress: ${index + 1}/${total} (${passed} passed, ${failed} failed) [${elapsed}s]`);
+}
+
 async function runBatchInteraction(
   names: string[],
   port: number,
@@ -126,13 +147,6 @@ async function runBatchInteraction(
 
   const results: ScenarioResult[] = [];
   const startTime = Date.now();
-
-  const printProgress = (i: number) => {
-    const passed = results.filter(r => !r.failed).length;
-    const failed = results.filter(r => r.failed).length;
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`  Progress: ${i + 1}/${names.length} (${passed} passed, ${failed} failed) [${elapsed}s]`);
-  };
 
   try {
     for (let i = 0; i < names.length; i++) {
@@ -264,12 +278,10 @@ async function runBatchInteraction(
           ...(failed ? { error: errorMsg } : {}),
         });
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`\n[${name}] FAILED — ${msg}`);
-        results.push({ name: name!, totalSteps: 0, failed: true, error: msg });
+        results.push(buildScenarioLoadFailure(name!, err));
       }
 
-      printProgress(i);
+      logBatchProgress(results, i, names.length, startTime);
     }
   } finally {
     await browser.close();
@@ -313,15 +325,10 @@ async function main(): Promise<void> {
         const result = runScenario(engine, name!, steps, SCREENSHOT_DIR, reportDrift);
         results.push(result);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`\n[${name}] FAILED — ${msg}`);
-        results.push({ name: name!, totalSteps: 0, failed: true, error: msg });
+        results.push(buildScenarioLoadFailure(name!, err));
       }
 
-      const passed = results.filter(r => !r.failed).length;
-      const failed = results.filter(r => r.failed).length;
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log(`  Progress: ${i + 1}/${names.length} (${passed} passed, ${failed} failed) [${elapsed}s]`);
+      logBatchProgress(results, i, names.length, startTime);
     }
   }
 
