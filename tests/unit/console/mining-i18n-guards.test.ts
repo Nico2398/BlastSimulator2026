@@ -383,6 +383,11 @@ describe('mining.ts empty-state messages — English literal + fr divergence', (
       englishLiteral: 'No drill plan. Create one with drill_plan grid or drill_plan add.',
       run: (ctx) => blastPreviewCommand(ctx, [], {}),
     },
+    {
+      name: 'survey ore_report — no report available',
+      englishLiteral: 'No blast ore report available yet. Run a blast first.',
+      run: (ctx) => surveyCommand(ctx, ['ore_report'], {}),
+    },
   ];
 
   for (const { name, englishLiteral, run } of cases) {
