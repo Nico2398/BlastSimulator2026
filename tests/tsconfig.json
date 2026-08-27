@@ -10,17 +10,19 @@
   "exclude": [
     "node_modules",
     "../dist",
-    // Pre-existing type errors as of 2026-08-23 (324 errors across 118 files) --
-    // tracked in a follow-up issue (filed alongside this PR). These are a mix of
-    // mechanical unused-locals/params (TS6133/6192/6196) and real fixture-vs-interface
-    // drift (test object literals built against Employee/Vehicle/GameState/etc. that
-    // have since grown required fields). Excluded here so `tsc --noEmit` on tests/
-    // can be enabled now without blocking on fixing all of them at once. The
-    // tests/integration/full-level/*.ts entries below also include every sibling
-    // that imports the broken helpers.ts, since TS still type-checks an excluded
-    // file's errors when a non-excluded file imports it transitively.
-    // #743's mechanical sweep removed 29 of the mechanical-only entries (131 -> 102);
-    // the remainder still need the fixture-vs-interface drift fixed before re-inclusion.
+    // Pre-existing type errors as of 2026-08-23 (277 errors across 89 files remain
+    // excluded, across 102 entries below) -- tracked in a follow-up issue (filed
+    // alongside this PR). These are a mix of mechanical unused-locals/params
+    // (TS6133/6192/6196) and real fixture-vs-interface drift (test object literals
+    // built against Employee/Vehicle/GameState/etc. that have since grown required
+    // fields). Excluded here so `tsc --noEmit` on tests/ can be enabled now without
+    // blocking on fixing all of them at once. The tests/integration/full-level/*.ts
+    // entries below also include every sibling that imports the broken helpers.ts,
+    // since TS still type-checks an excluded file's errors when a non-excluded file
+    // imports it transitively.
+    // #743's mechanical sweep fixed 47 errors across 29 files, removing those 29
+    // mechanical-only entries (131 -> 102, 324 -> 277 errors); the remainder still
+    // need the fixture-vs-interface drift fixed before re-inclusion.
     "./integration/blast-enhanced.integration.test.ts",
     "./integration/blast-flyrock-danger.integration.test.ts",
     "./integration/blast-oversized-boulders.integration.test.ts",
