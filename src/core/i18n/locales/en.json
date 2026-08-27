@@ -3304,5 +3304,6 @@
   "mining.survey.usage": "Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.unknown_method": "Unknown method \"{method}\". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z>",
   "mining.survey.none_pending": "No pending surveys.",
-  "mining.survey.ore_report_header": "=== ORE REPORT ==="
+  "mining.survey.ore_report_header": "=== ORE REPORT ===",
+  "mining.survey.ore_report_unavailable": "No blast ore report available yet. Run a blast first."
 }

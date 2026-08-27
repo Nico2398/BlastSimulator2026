@@ -1215,7 +1215,7 @@ export function surveyCommand(
     if (!report) {
       return {
         success: false,
-        output: 'No blast ore report available yet. Run a blast first.',
+        output: t('mining.survey.ore_report_unavailable'),
       };
     }
 

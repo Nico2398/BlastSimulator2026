@@ -4,7 +4,10 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 
-export const NO_EMPLOYEES_MSG = t('console.no_employees');
+/** Re-evaluates on every call so a runtime language switch (Settings) is reflected. */
+export function noEmployeesMessage(): string {
+  return t('console.no_employees');
+}
 
 /** Guard every command that needs a loaded game. */
 export function requireGame(ctx: GameContext): CommandResult | null {

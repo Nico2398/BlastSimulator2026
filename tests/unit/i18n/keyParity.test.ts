@@ -146,22 +146,22 @@ describe('en.json / fr.json — key-set parity', () => {
     // blast.validation.* keys (charge_loading, missing_charge, missing_delay,
     // protected_position) so ValidationError.issue in BlastPlan.ts can carry
     // translation keys instead of raw English prose, both locales translated.
-    // Baseline is now 3306 (up from 3283): #795 wired static console-command
-    // guard/usage/header strings through t() instead of raw English prose --
-    // 3 new console.* keys (no_game_loaded, no_employees,
-    // invalid_staffed_flag) and 19 new mining.* keys (drill_plan.usage,
-    // drill_plan.none, charge.missing_explosive, charge.none_set,
-    // sequence.usage, sequence.none_set, blast.report_header,
-    // blast.preview_header, blast.no_drill_plan, blast_plan.usage,
-    // blast_plan.none_saved, blast_plan.invalid_plan_header,
-    // blast_plan.validation_issues_header, preview.usage,
-    // build_ramp.cancel_usage, weather.set_usage, survey.usage,
-    // survey.unknown_method, survey.none_pending, survey.ore_report_header),
-    // both locales translated.
+    // Baseline is now 3307 (up from 3283): #795 wired the last raw-literal
+    // console command guard/usage/report strings through t() — 3 console.*
+    // keys (no_game_loaded, no_employees, invalid_staffed_flag) and 21
+    // mining.* keys (drill_plan.usage, drill_plan.none,
+    // charge.missing_explosive, charge.none_set, sequence.usage,
+    // sequence.none_set, blast.report_header, blast.preview_header,
+    // blast.no_drill_plan, blast_plan.usage, blast_plan.none_saved,
+    // blast_plan.invalid_plan_header, blast_plan.validation_issues_header,
+    // preview.usage, build_ramp.cancel_usage, weather.set_usage,
+    // survey.usage, survey.unknown_method, survey.none_pending,
+    // survey.ore_report_header, survey.ore_report_unavailable) — 24 new keys
+    // total, both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3306);
+    expect(Object.keys(en).length).toBe(3307);
   });
 });
 

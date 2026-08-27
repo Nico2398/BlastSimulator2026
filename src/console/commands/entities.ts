@@ -26,7 +26,7 @@ import { defineZone, clearZone, isZoneClear, type ZoneBounds } from '../../core/
 import type { GameState } from '../../core/state/GameState.js';
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 
-import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
+import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 
@@ -280,7 +280,7 @@ export function needsCommand(
   if (err) return err;
   const state = ctx.state!;
   if (state.employees.employees.length === 0) {
-    return { success: true, output: NO_EMPLOYEES_MSG };
+    return { success: true, output: noEmployeesMessage() };
   }
   const lines = ['Employee Needs:'];
   for (const e of state.employees.employees) {

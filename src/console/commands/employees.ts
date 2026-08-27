@@ -24,7 +24,7 @@ import { addExpense } from '../../core/economy/Finance.js';
 import { dispatchPendingAction, cancelAction } from '../../core/engine/TaskDispatch.js';
 import { releasePlannedHoleForCancelledAction } from './mining.js';
 import { Random } from '../../core/math/Random.js';
-import { requireGame, NO_EMPLOYEES_MSG } from './commandUtils.js';
+import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
 
 const VALID_SKILL_CATEGORIES: SkillCategory[] = [
@@ -45,7 +45,7 @@ export function employeeCommand(
   switch (sub) {
     case 'list': {
       if (state.employees.employees.length === 0) {
-        return { success: true, output: NO_EMPLOYEES_MSG };
+        return { success: true, output: noEmployeesMessage() };
       }
       const lines = ['Employees:'];
       for (const e of state.employees.employees) {
