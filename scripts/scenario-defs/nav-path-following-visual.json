@@ -286,6 +286,12 @@
     {
       "command": "employee dispatch 1 x:20 z:20",
       "description": "Re-dispatched to the same unreachable target (#556). The crew builds the offices now instead of them appearing on confirm, so by this point Walt’s own need drain has him claiming a rest and dropping the impossible walk — the state this file measures is the walled-off route, so it is re-issued rather than allowed to lapse.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:20 z:20"
+        }
+      ],
       "role": "bootstrap",
       "expect": {
         "changedBy": {

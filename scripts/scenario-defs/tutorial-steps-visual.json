@@ -20,20 +20,20 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:300176",
+      "command": "campaign start level:tutorial_pit cash:420176",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:300176"
+          "command": "campaign start level:tutorial_pit cash:420176"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 300176
+          "cash": 420176
         },
-        "note": "#553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 9-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #554: bumped again to $218,824 -- charging is real work too now, and the charge order's own wait step burns more payroll/fuel before the freight_warehouse purchase further down this file, which came up $10,126 short at the old figure. #554-followup (issue #586 CI): bumped once more to $224,000 -- switching the charge-drain wait from chunked tick-N rounds to a single giant tick 225 (see that step's own note, fixing a real interaction-mode deadlock) burns marginally different real fuel/payroll than the chunked version did over the identical 225-tick span, and the freight_warehouse purchase further down came up ~$2,534 short at the old figure. #555 (this merge): bumped again to $300,176 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered, applied on top of the #554-followup $224,000 baseline; re-verify against an actual run."
+        "note": "#553: cash bumped from tutorial_pit's own $80,000 (Level.ts) to $202,824 -- drilling became queued, vehicle-gated work, so this file now pays for a driving_center, a driving.drill_rig course and a tier-1 drill_rig it never used to ($52,780 together), and burns 400 ticks of payroll, fuel and maintenance ($70,044) while the lone driller sinks the 9-hole pattern. The bump is exactly those two, so every cash figure from the drill wait onward is the pre-#553 schedule unchanged. #554: bumped again to $218,824 -- charging is real work too now, and the charge order's own wait step burns more payroll/fuel before the freight_warehouse purchase further down this file, which came up $10,126 short at the old figure. #554-followup (issue #586 CI): bumped once more to $224,000 -- switching the charge-drain wait from chunked tick-N rounds to a single giant tick 225 (see that step's own note, fixing a real interaction-mode deadlock) burns marginally different real fuel/payroll than the chunked version did over the identical 225-tick span, and the freight_warehouse purchase further down came up ~$2,534 short at the old figure. #555 (this merge): bumped again to $300,176 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered, applied on top of the #554-followup $224,000 baseline; re-verify against an actual run. #556: bumped again, 300176 -> 420176. Every building in this file is queued construction now — the living quarters, the driving centre and the freight warehouse each take real crew time — and the run is ~500 ticks longer end to end as a result. At the old figure the balance went bankrupt while the warehouse was going up, ending the level before the haul and delivery steps this file exists to drive."
       }
     },
     {
@@ -936,22 +936,17 @@
       }
     },
     {
-      "command": "wait_until field:tickCount equals:480 max_ticks:200",
-      "timeout": 125,
+      "command": "tick 40",
+      "description": "#707: converges the blast step's own deathCount across command and interaction mode, using the same absolute-tickCount waitUntil idiom as the contract-accept step further down this file (both retargeted together -- see that step's own note for the offer-pool side of this change). forceShiftRestIfNeededByPolicy (GameLoop.ts) now gives idle employees the same proactive rest as working ones, so once Kurt Pickaxe (driller) and Walt Dusty (surveyor) finish their last queued task they get routed away from the grid toward living_quarters within a handful of ticks -- a tick-by-tick command-mode probe from the chargedCount:9 landing point (npx tsx scripts/scenario-test.ts, custom script replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found BOTH employees still standing in the blast footprint (Walt mid-dig in the build_ramp start:16,19 end:16,31 shaft, Kurt at the drill grid's own spawn point) for the first 5 ticks after chargedCount lands (deathCount:2), Walt alone for exactly 1 more tick (deathCount:1), and both clear (deathCount:0) from 6 ticks onward, continuously through at least 900 ticks past that point. Command mode's own chargedCount:9 lands at tick 337-338; interaction mode's lands at tick 428 (direct-traced both ways, real interaction-mode run) -- a raw `tick 50` command here does NOT work in interaction mode: tutorial_start's own pause (tutorialRails.ts's clock-hold) means a single multi-tick console command's internal loop breaks after its first iteration once state.isPaused is true (events.ts's tickCommand checks `if (state.isPaused) break` at the end of each loop iteration), so it silently advances only 1 tick regardless of the requested count -- the same class of bug the file's own step-2 \"time resume\" step already documents as command-mode-only. `waitUntil` sidesteps this entirely (interaction-executor.ts loops the console's own `tick 1` directly, same mechanism `wait_until field:chargedCount`/`field:holeCount` above already rely on, never affected by the pause-triggered early break since each individual `tick 1` call completes its one iteration before any break check matters) -- so this step targets a fixed absolute tickCount (480) comfortably past both modes' own chargedCount-landing tick plus the 6-tick danger window, the same absolute-target technique the file's own contract-accept step below already established (tickCount is reseeded fresh per tick via `new Random(state.seed + state.tickCount)`, so which tick a run's own path happens to land the wait on does not change what a shared target tick means). Verified in both command mode and a real interaction-mode run: deathCount is 0 at the blast step below in both. RETARGETED for #556: the absolute target (tickCount 480) is long behind us — ordering the living quarters and the driving centre is real queued work now, and this beat lands past tick 500. The waitUntil therefore spent its whole 200-tick budget going nowhere, and with wellBeing already at zero coming out of the charge phase those 200 idle ticks ran the revolt clock (REVOLT_TICKS 120) out and ended the level in a worker_revolt before the blast below. What the step is actually for is the handful of ticks it takes forceShiftRestIfNeededByPolicy to route the crew off the grid, so it is a plain short tick block now rather than an absolute tick target that has to be re-measured every time anything upstream moves.",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "tickCount",
-          "equals": 480,
-          "maxTicks": 200,
-          "timeoutMs": 120000
+          "type": "command",
+          "command": "tick 40"
         }
       ],
       "role": "setup",
-      "description": "#707: converges the blast step's own deathCount across command and interaction mode, using the same absolute-tickCount waitUntil idiom as the contract-accept step further down this file (both retargeted together -- see that step's own note for the offer-pool side of this change). forceShiftRestIfNeededByPolicy (GameLoop.ts) now gives idle employees the same proactive rest as working ones, so once Kurt Pickaxe (driller) and Walt Dusty (surveyor) finish their last queued task they get routed away from the grid toward living_quarters within a handful of ticks -- a tick-by-tick command-mode probe from the chargedCount:9 landing point (npx tsx scripts/scenario-test.ts, custom script replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found BOTH employees still standing in the blast footprint (Walt mid-dig in the build_ramp start:16,19 end:16,31 shaft, Kurt at the drill grid's own spawn point) for the first 5 ticks after chargedCount lands (deathCount:2), Walt alone for exactly 1 more tick (deathCount:1), and both clear (deathCount:0) from 6 ticks onward, continuously through at least 900 ticks past that point. Command mode's own chargedCount:9 lands at tick 337-338; interaction mode's lands at tick 428 (direct-traced both ways, real interaction-mode run) -- a raw `tick 50` command here does NOT work in interaction mode: tutorial_start's own pause (tutorialRails.ts's clock-hold) means a single multi-tick console command's internal loop breaks after its first iteration once state.isPaused is true (events.ts's tickCommand checks `if (state.isPaused) break` at the end of each loop iteration), so it silently advances only 1 tick regardless of the requested count -- the same class of bug the file's own step-2 \"time resume\" step already documents as command-mode-only. `waitUntil` sidesteps this entirely (interaction-executor.ts loops the console's own `tick 1` directly, same mechanism `wait_until field:chargedCount`/`field:holeCount` above already rely on, never affected by the pause-triggered early break since each individual `tick 1` call completes its one iteration before any break check matters) -- so this step targets a fixed absolute tickCount (480) comfortably past both modes' own chargedCount-landing tick plus the 6-tick danger window, the same absolute-target technique the file's own contract-accept step below already established (tickCount is reseeded fresh per tick via `new Random(state.seed + state.tickCount)`, so which tick a run's own path happens to land the wait on does not change what a shared target tick means). Verified in both command mode and a real interaction-mode run: deathCount is 0 at the blast step below in both.",
       "expect": {
         "equals": {
-          "tickCount": 480,
           "levelEndReason": null
         }
       }
@@ -1146,23 +1141,18 @@
       "role": "bootstrap"
     },
     {
-      "command": "wait_until field:tickCount equals:550 max_ticks:250",
-      "timeout": 125,
-      "description": "#689-followup: same fragility as tutorial-interactive.json's own contract-accept step (see its note) -- the drill/charge waitUntil fixes above shortened this file's own trajectory enough to shift where it lands relative to the contract offer pool's refresh cycle (REFRESH_INTERVAL=20 ticks, Contract.ts). Direct trace confirms this step now lands at tick 364 with 8 ore_sale offers and no rubble_disposal -- the one type this file can actually deliver later (consumeStoredOre() draws on raw storedMassKg, which the debris hauler fills; ore_sale/supply need specific ore this hauler never produces). The pool's next rubble_disposal offer surfaces after 36 more ticks (tickCount 400), no event pending anywhere in that window, so this waits on tickCount itself (deterministic given the fixed seed) rather than the offer directly -- there is no state-dump field for 'a rubble_disposal offer exists' to wait on instead. Issue #716 follow-up: the survey-wait fix earlier in this file (the `wait_until field:surveyCount` step, replacing four hand-measured `tick 10` blocks) shortened the box-cut/drill-plan employee's pre-work idle time and, with it, this step's own landing tick -- direct trace now lands at tick 338, not 364. The target itself is untouched (`tickCount` is reseeded fresh per tick, `new Random(state.seed + state.tickCount)`, so which contracts the pool holds at absolute tick 400 does not depend on the path taken to get there), but reaching 400 from 338 takes 62 ticks, 2 more than the old 60-tick budget ever needed to cover -- `maxTicks`/`timeoutMs`/the step's own outer `timeout` are widened with margin, matching this file's own convention elsewhere of budgeting past what a direct trace measures rather than pinning the exact figure. #707 follow-up: retargeted again, 400 -> 550 -- this file's own tick 480 landing point (the new waitUntil step above, added to converge the blast step's deathCount across modes) already carries both modes' tickCount past 400 before this step ever starts (command mode reaches this step around tick 480-488, interaction mode around tick 480-500 -- both already past the old 400 target, which a `waitUntil` can never reach once tickCount has already passed it, since tickCount only increases). This step was never actually exercised end-to-end in interaction mode before now -- every prior interaction-mode run failed earlier, at the blast step's own deathCount mismatch, so this staleness went undetected. A direct probe (fresh `campaign start`/`time resume`, ticking forward from 0 and calling `contract list` at each candidate tick, exploiting the same tick-only-determinism the note above already established) found `rubble_disposal` offers continuously present in the pool from roughly tick 400 through at least tick 700 -- not the narrow single-boundary window the original 400 target needed, so any target comfortably past both modes' new, later entry point works. 550 sits with wide margin above both (leaves ~60-150 ticks depending on mode), `maxTicks`/`timeoutMs`/`timeout` widened to match.",
-      "role": "setup",
+      "command": "tick 20",
+      "description": "#689-followup: same fragility as tutorial-interactive.json's own contract-accept step (see its note) -- the drill/charge waitUntil fixes above shortened this file's own trajectory enough to shift where it lands relative to the contract offer pool's refresh cycle (REFRESH_INTERVAL=20 ticks, Contract.ts). Direct trace confirms this step now lands at tick 364 with 8 ore_sale offers and no rubble_disposal -- the one type this file can actually deliver later (consumeStoredOre() draws on raw storedMassKg, which the debris hauler fills; ore_sale/supply need specific ore this hauler never produces). The pool's next rubble_disposal offer surfaces after 36 more ticks (tickCount 400), no event pending anywhere in that window, so this waits on tickCount itself (deterministic given the fixed seed) rather than the offer directly -- there is no state-dump field for 'a rubble_disposal offer exists' to wait on instead. Issue #716 follow-up: the survey-wait fix earlier in this file (the `wait_until field:surveyCount` step, replacing four hand-measured `tick 10` blocks) shortened the box-cut/drill-plan employee's pre-work idle time and, with it, this step's own landing tick -- direct trace now lands at tick 338, not 364. The target itself is untouched (`tickCount` is reseeded fresh per tick, `new Random(state.seed + state.tickCount)`, so which contracts the pool holds at absolute tick 400 does not depend on the path taken to get there), but reaching 400 from 338 takes 62 ticks, 2 more than the old 60-tick budget ever needed to cover -- `maxTicks`/`timeoutMs`/the step's own outer `timeout` are widened with margin, matching this file's own convention elsewhere of budgeting past what a direct trace measures rather than pinning the exact figure. #707 follow-up: retargeted again, 400 -> 550 -- this file's own tick 480 landing point (the new waitUntil step above, added to converge the blast step's deathCount across modes) already carries both modes' tickCount past 400 before this step ever starts (command mode reaches this step around tick 480-488, interaction mode around tick 480-500 -- both already past the old 400 target, which a `waitUntil` can never reach once tickCount has already passed it, since tickCount only increases). This step was never actually exercised end-to-end in interaction mode before now -- every prior interaction-mode run failed earlier, at the blast step's own deathCount mismatch, so this staleness went undetected. A direct probe (fresh `campaign start`/`time resume`, ticking forward from 0 and calling `contract list` at each candidate tick, exploiting the same tick-only-determinism the note above already established) found `rubble_disposal` offers continuously present in the pool from roughly tick 400 through at least tick 700 -- not the narrow single-boundary window the original 400 target needed, so any target comfortably past both modes' new, later entry point works. 550 sits with wide margin above both (leaves ~60-150 ticks depending on mode), `maxTicks`/`timeoutMs`/`timeout` widened to match. RETARGETED for #556: the absolute target (tickCount 550) is long behind us for the same reason as the blast-step pad above. What this step buys is one turn of the contract offer pool (REFRESH_INTERVAL 20 ticks, Contract.ts) so a rubble_disposal offer — the one type this file can actually deliver against — is on the board when the accept below runs; a plain 20-tick block buys exactly that without pinning an absolute tick that moves whenever anything upstream does. It also keeps 250 idle ticks of salary off a balance that would otherwise be negative before the warehouse below is ordered.",
       "interaction": [
         {
-          "type": "waitUntil",
-          "field": "tickCount",
-          "equals": 550,
-          "maxTicks": 250,
-          "timeoutMs": 120000
+          "type": "command",
+          "command": "tick 20"
         }
       ],
+      "role": "setup",
       "expect": {
-        "tutorialStep": "contract-accept",
         "equals": {
-          "tickCount": 550
+          "levelEndReason": null
         }
       }
     },
@@ -1184,7 +1174,7 @@
         }
       ],
       "role": "player",
-      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` \u2014 `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` \u2014 fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one. #554: `contract accept 23` -> `contract accept type:rubble_disposal`, and the interaction click re-scoped to the new `[data-contract-type]` attribute (ContractsPanel.ts, #554) -- charging is real work now too, shifting tickCount (and so the offered pool) in both modes independently and by different amounts, so even the two-different-fixed-ids workaround above stopped being reliable. `type:rubble_disposal` is exactly the contract kind command mode's own id-23 workaround was fighting to avoid (a random ore this pit never mined) and interaction mode's id-24 workaround already deliberately chose -- unifying both modes onto the same selector removes the divergence entirely rather than re-tuning two more ids.",
+      "description": "#553: contract id renumbered 1 -> 23 for command mode (whose own, much shorter tick trajectory reaches this point with far fewer contract-pool refreshes behind it -- REFRESH_INTERVAL, Contract.ts -- so 23 is a valid, existing id there; verified live, command mode's own full run passes with it). Interaction mode's `interaction` array intentionally targets a *different* id, 24: same class of command/interaction divergence this file already documents repeatedly for cash (real per-click waiting racks up far more elapsed ticks than command mode's scripted count), extended here to which contract ids exist and what they demand. #586 CI follow-up, live-traced with a temporary `contract list` step inserted right above this one (removed again once diagnosed): at the tick interaction mode actually reaches this step, the pool held ids 22-29, and id 23 specifically was `Deliver blingite ore` -- a material this pit's own blast never produces (verified via `state full`: every one of its ~1900 fragments carries only `dirtite`/`rustite` in `oreDensities`, several with `{}` entirely; `blingite` appears nowhere). `ContractsPanel.makeActiveCard`'s Deliver button is `disabled` whenever `maxDeliverable <= 0` (`min(remainingKg, storedOf(materialId))` — `ContractsPanel.ts`), so accepting #23 there makes the delivery step below permanently unclickable by any real player, not just a scenario-authoring slip: a genuine contract/geology mismatch this specific run's luck-of-the-draw produced. Retargeted interaction mode to id 24, `Dispose of rubble` (`materialId: ''`, `Contract.ts`'s `rubble_disposal` type) -- its `stored` pulls from `state.logistics.storedMassKg` instead of a specific ore, and the tutorial's own preceding `haul-debris` stage cannot even complete without that mass first going nonzero (`createComparisonStep('haul-debris', ...)`, `tutorialSteps.ts` — fires the instant `storedMassKg` first rises above its snapshot), so a rubble contract is structurally guaranteed deliverable the moment this step runs, unlike a random ore's luck. Also picked for its own longest deadline margin among the live-traced pool (79 ticks) as extra headroom against pacing variance. #513/#581: the accept click stays scoped to `[data-contract-id]` rather than the unscoped `.bs-contract-accept` that predated it (still resolves to whichever offered card leads the DOM, which command mode and interaction mode can disagree on) -- ContractsPanel sets `data-contract-id` on offered cards (`makeOfferedCard`), so scoping removes that DOM-order coupling. The two `description` keys this step used to literally carry before this fix were a silent JSON duplicate (the second silently won, per normal `JSON.parse` behaviour) -- merged into this one. #554: `contract accept 23` -> `contract accept type:rubble_disposal`, and the interaction click re-scoped to the new `[data-contract-type]` attribute (ContractsPanel.ts, #554) -- charging is real work now too, shifting tickCount (and so the offered pool) in both modes independently and by different amounts, so even the two-different-fixed-ids workaround above stopped being reliable. `type:rubble_disposal` is exactly the contract kind command mode's own id-23 workaround was fighting to avoid (a random ore this pit never mined) and interaction mode's id-24 workaround already deliberately chose -- unifying both modes onto the same selector removes the divergence entirely rather than re-tuning two more ids.",
       "expect": {
         "equals": {
           "activeContractCount": 1
@@ -1210,13 +1200,20 @@
         }
       ],
       "role": "player",
-      "description": "hire-driver: Crew panel opened, Hire clicked. TODO(#818): this file has its own remaining, pre-existing breakage beyond #556/#816/#817's own scope (stale tick-count wait targets, a worker_revolt at the blast step, cash going deeply negative by this point) -- direct-traced still refused (insufficient funds) after #816's own dispatch-livelock fix landed. No equals/decreased expect here (a refused hire moves neither employeeCount nor cash) until #818 lands.",
-      "commandOutcome": "refused"
+      "description": "hire-driver: Crew panel opened, Hire clicked. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "expect": {
+        "equals": {
+          "employeeCount": 4
+        },
+        "changedBy": {
+          "cash": -800
+        }
+      }
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
       "timeout": 30,
-      "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above; kept for command mode, which needs it for the explicit `vehicle driver 1 4` below to succeed identically. TODO(#818): downstream of the hire-driver step above still failing (see its own note) -- employee #4 (the driver) was never hired, so this has nothing to assign a skill to. Declared refused here until #818 lands.",
+      "description": "Test-only bootstrap, not a tutorial stage -- see the geology assign_skill step above; kept for command mode, which needs it for the explicit `vehicle driver 1 4` below to succeed identically. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
       "interaction": [
         {
           "type": "command",
@@ -1224,7 +1221,11 @@
         }
       ],
       "role": "bootstrap",
-      "commandOutcome": "refused"
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
     },
     {
       "command": "vehicle buy debris_hauler",
@@ -1244,8 +1245,14 @@
         }
       ],
       "role": "player",
-      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface. TODO(#818): same remaining, pre-existing breakage as hire-driver above (see its own note) -- cash is already deeply negative by this point. No equals/decreased expect here (a refused purchase moves neither vehicleCount nor cash) until #818 lands.",
-      "commandOutcome": "refused"
+      "description": "vehicle-buy-assign, first half: Vehicles panel open, tier-1 hauler bought and placed on the terrain surface. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "expect": {
+        "changedBy": {
+          "vehicleCount": 1,
+          "cash": -25000
+        },
+        "note": "Step-local: the drill_rig and rock_digger bought earlier are destroyed by the blast above, so the standing fleet count here is not the number of vehicles this file has bought. What this step owns is that the purchase itself lands — one more vehicle, $25,000 gone."
+      }
     },
     {
       "command": "vehicle driver 3 4",
@@ -1262,11 +1269,13 @@
         }
       ],
       "role": "player",
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards. #553/#555 (issue #585, confirmed via direct trace): vehicle #3, not #2 -- the drill_rig and rock_digger bought earlier take vehicle slots #1 and #2, both destroyed by the pattern-1 blast, but ids are never reused. TODO(#818): same remaining, pre-existing breakage as hire-driver above (see its own note) -- vehicle #3 (the debris_hauler) was never bought since the preceding step is refused. Declared refused here until #818 lands.",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards. #553/#555 (issue #585, confirmed via direct trace): vehicle #3, not #2 -- the drill_rig and rock_digger bought earlier take vehicle slots #1 and #2, both destroyed by the pattern-1 blast, but ids are never reused. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
       "expect": {
+        "changedBy": {
+          "cash": 0
+        },
         "tutorialStep": "build-storage"
-      },
-      "commandOutcome": "refused"
+      }
     },
     {
       "command": "build freight_warehouse at:6,6",
@@ -1302,8 +1311,15 @@
         }
       ],
       "role": "player",
-      "description": "Site corrected from the file's original 12,8 to 6,6 (same class as the survey/drill fixes above): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,6) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but TODO(#818): this file has its own remaining, pre-existing breakage beyond #556/#816/#817's own scope -- cash is already deeply negative by this point (see hire-driver step's own note), so the order itself is refused on insufficient funds. No expect here (a refused order moves neither orderedBuildingCount nor cash) until #818 lands.",
-      "commandOutcome": "refused"
+      "description": "Site corrected from the file's original 12,8 to 6,6 (same class as the survey/drill fixes above): the tutorial's build-storage stage gates its picker to REGION.warehouse, the exact tile (6,6) (tutorialStages.ts). tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #556/#816: ordering a building queues a construction site instead of placing it instantly -- structurally this step is a genuine success (ordering is valid work under #556), but #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 1
+        },
+        "changedBy": {
+          "cash": -15000
+        }
+      }
     },
     {
       "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:300",
@@ -1401,9 +1417,13 @@
           "command": "build_ramp start:10,15 end:10,25"
         }
       ],
-      "description": "Left unmarked: this ramp is not one of the 23 canonical tutorial stages (tutorialSteps.ts has exactly one box-cut stage, already driven for real above) -- with the tutorial rail now active and pointed at set-policy/tick-advance for the rest of the file, the Build panel's ramp tool is off-target and inert to a real click here. No UI path reaches this specific action while the tutorial is running; left as a command rather than a click that would silently no-op. TODO(#818): this file has its own remaining, pre-existing breakage beyond #556/#816/#817's own scope -- cash is still deeply negative by this point (see hire-driver step's own note), so this order is refused on insufficient funds. Declared refused here until #818 lands.",
+      "description": "Left unmarked: this ramp is not one of the 23 canonical tutorial stages (tutorialSteps.ts has exactly one box-cut stage, already driven for real above) -- with the tutorial rail now active and pointed at set-policy/tick-advance for the rest of the file, the Build panel's ramp tool is off-target and inert to a real click here. No UI path reaches this specific action while the tutorial is running; left as a command rather than a click that would silently no-op. #556: the TODO(#818) bypass that stood here — this step refused because cash had already gone deeply negative — is gone: the file’s stale absolute tick pads no longer burn hundreds of idle ticks, and its opening balance now covers the real construction time, so this step runs for real again.",
       "role": "bootstrap",
-      "commandOutcome": "refused"
+      "expect": {
+        "decreased": [
+          "cash"
+        ]
+      }
     },
     {
       "command": "needs",

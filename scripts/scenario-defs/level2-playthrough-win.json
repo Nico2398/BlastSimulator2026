@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-win",
-  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 2 real blasts and 2 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory. Interaction-mode finding, this file's own: once levelEndReason turns non-null at tick 132, LevelEndScreen's full-viewport overlay (z-index 9999, every panel/toolbar control sits at z 100-200) covers the whole screen for the rest of the run and never clears -- no player click reaches ANY panel again after that tick, including blast 1's own charge/sequence/execute and every contract-accept/drill-plan-grid step that follows. Every step past tick 132 that mutates state now runs its command directly (role:'guard' + expect.blocked, same convention this file already used for its phantom blasts) instead of pretending a click still lands. #593 (GameLoop.ts's autoInsertNeedTasks no longer preempting an employee's own interrupted work the instant their rest completes, and VehicleReservation.ts's releaseVehicleReservation now syncing a dismounting driver's real position) changes the trajectory this file records: pattern 1 lands only 23 of its 24 holes before blast 1 fires (2 deaths, not 4, since one driller/rig pair is still short of its hole), which leaves one drill_rig alive to fully drill pattern 2 (25/25) for a second real blast (3 more deaths, 5 total) before patterns 3 and 4 revert to genuinely phantom (both rigs destroyed by blast 2, never replaced). Final balance: -$1,282,536 (#591: updated from -$1,271,073 -- staffed-fleet spawn spacing and vehicle occupancy reroute shift exact pathing/payroll timing without changing the trajectory in kind).",
+  "description": "Level 2 (Grumpstone Ridge): 3 surveys, 2 real blasts and 2 phantom ones, and 5 contract acceptances against a mine that goes formally bankrupt before the first blast ever fires -- named for a $250k win, but `campaign start level:grumpstone_ridge` fails outright (locked) and, under #553's queued, vehicle-gated drilling, the $150,000 budget can no longer fund the 12-person roster staffed:true adds through even the first drilling wait. BANKRUPTCY! The mine is seized. fires at tick 132, 205 ticks before blast 1 and long before the operator (per this file's own command sequence) notices or stops; see the pattern-1 drill-wait step and Findings #59-#60 for the full trajectory. Interaction-mode finding, this file's own: once levelEndReason turns non-null at tick 132, LevelEndScreen's full-viewport overlay (z-index 9999, every panel/toolbar control sits at z 100-200) covers the whole screen for the rest of the run and never clears -- no player click reaches ANY panel again after that tick, including blast 1's own charge/sequence/execute and every contract-accept/drill-plan-grid step that follows. Every step past tick 132 that mutates state now runs its command directly (role:'guard' + expect.blocked, same convention this file already used for its phantom blasts) instead of pretending a click still lands. #593 (GameLoop.ts's autoInsertNeedTasks no longer preempting an employee's own interrupted work the instant their rest completes, and VehicleReservation.ts's releaseVehicleReservation now syncing a dismounting driver's real position) changes the trajectory this file records: pattern 1 lands only 23 of its 24 holes before blast 1 fires (2 deaths, not 4, since one driller/rig pair is still short of its hole), which leaves one drill_rig alive to fully drill pattern 2 (25/25) for a second real blast (3 more deaths, 5 total) before patterns 3 and 4 revert to genuinely phantom (both rigs destroyed by blast 2, never replaced). Final balance: -$1,282,536 (#591: updated from -$1,271,073 -- staffed-fleet spawn spacing and vehicle occupancy reroute shift exact pathing/payroll timing without changing the trajectory in kind). #556: the freight warehouse is ordered rather than placed, so it stands ~45 ticks into the run instead of at tick 32, and the closing checkpoints have been re-measured against the real run — cash -982,294, tickCount 2990, and scores that sit at different points on the same trajectory (nuisance back at its 50 baseline, safety 15.3, wellBeing 0). What the file exists to pin is unchanged: 12 employees, 8 deaths, 3 surveys, five blast patterns, and a mine already legally bankrupt before the last of them fires.",
   "steps": [
     {
       "command": "new_game seed:2277 cash:150000 staffed:true",
@@ -1470,7 +1470,7 @@
           "tickCount": 0
         }
       },
-      "description": "#553-followup (issue #586 CI): the preceding `tick 6` makes zero progress (\"Pending event! Resolve it first\", tickCount stays 440, sandbox-confirmed) -- a lucky_strike event (+$10,000, same fixed-bonus type as level1-win-efficient.json/level3-playthrough-win.json) genuinely pends the instant this step runs, unlike the file's other post-blast tick/event pairs which are harmless no-ops. Was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast/tariff-event steps elsewhere in this file. `resolveEventIfPending`'s own `page.click('#bs-event-dialog .bs-event-choice')` has no `describeUnclickable` wrapper, so Puppeteer's bare 'Node is either not clickable or not an Element' surfaced with no selector named. Converted to guard + expect.blocked; the command still runs directly so cash still gains the $10,000 (-$340,052 \u2192 -$330,052, sandbox-confirmed). Update: EventModal now also defers behind LevelEndScreen once the level has ended (UIManager.update, matching BlastReportModal's own fix for the same z-index gap) -- its .bs-event-choice buttons are never rendered at all in that state rather than rendered-but-covered, so probing for them reports 'absent', which expect.blocked itself rejects as unprovable (scenario-goal.ts/interaction-driver.ts). Reassigned to #bs-event-dialog, the dialog's own outer overlay -- created once in EventModal's constructor and left in the DOM at display:none, so it is the one still-present, genuinely-hidden control left to assert against.",
+      "description": "#553-followup (issue #586 CI): the preceding `tick 6` makes zero progress (\"Pending event! Resolve it first\", tickCount stays 440, sandbox-confirmed) -- a lucky_strike event (+$10,000, same fixed-bonus type as level1-win-efficient.json/level3-playthrough-win.json) genuinely pends the instant this step runs, unlike the file's other post-blast tick/event pairs which are harmless no-ops. Was role:player driving `resolveEventIfPending`'s real click -- state.levelEndReason has read 'bankruptcy' since tick 132 (308 ticks before this step), and the event dialog's own overlay class (`.bs-confirm-overlay`, EventModal.ts) sits at z-index 600, far below `--bsx-z-menu` (9999) that LevelEndScreen's full-viewport overlay has owned since then -- same class of bug as the Charge/Sequence/blast/tariff-event steps elsewhere in this file. `resolveEventIfPending`'s own `page.click('#bs-event-dialog .bs-event-choice')` has no `describeUnclickable` wrapper, so Puppeteer's bare 'Node is either not clickable or not an Element' surfaced with no selector named. Converted to guard + expect.blocked; the command still runs directly so cash still gains the $10,000 (-$340,052 → -$330,052, sandbox-confirmed). Update: EventModal now also defers behind LevelEndScreen once the level has ended (UIManager.update, matching BlastReportModal's own fix for the same z-index gap) -- its .bs-event-choice buttons are never rendered at all in that state rather than rendered-but-covered, so probing for them reports 'absent', which expect.blocked itself rejects as unprovable (scenario-goal.ts/interaction-driver.ts). Reassigned to #bs-event-dialog, the dialog's own outer overlay -- created once in EventModal's constructor and left in the DOM at display:none, so it is the one still-present, genuinely-hidden control left to assert against.",
       "commandOutcome": "either"
     },
     {
@@ -2643,7 +2643,7 @@
           "tickCount"
         ]
       },
-      "description": "CI reported \"Step 98 timed out after 60000ms\" \u2014 the same CPU-bound cost spike as step 96 (see that step's note): this step drains the rest of the same 30-hole drill_plan dispatch/pathfinding backlog from step 95, right after step 96 already paid the first half of that cost. Same fix: raise this step's own timeout to 120s.",
+      "description": "CI reported \"Step 98 timed out after 60000ms\" — the same CPU-bound cost spike as step 96 (see that step's note): this step drains the rest of the same 30-hole drill_plan dispatch/pathfinding backlog from step 95, right after step 96 already paid the first half of that cost. Same fix: raise this step's own timeout to 120s.",
       "timeout": 120
     },
     {
@@ -3118,7 +3118,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 14.300000000000004,
+          "wellBeing": 0,
           "safety": 0,
           "ecology": 50,
           "nuisance": 50
@@ -3757,7 +3757,7 @@
         "equals": {
           "deathCount": 8,
           "employeeCount": 12,
-          "activeContractCount": 1,
+          "activeContractCount": 0,
           "surveyCount": 3
         },
         "blocked": "#bs-toolbar [data-panel=\"contracts\"]",
@@ -3798,7 +3798,7 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "cash": -935426.9901130896
+          "cash": -982294.1623782984
         },
         "changedBy": {
           "tickCount": 0
@@ -3821,10 +3821,10 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 2.299999999999999,
-          "safety": 0,
+          "wellBeing": 0,
+          "safety": 15.300000000000004,
           "ecology": 50,
-          "nuisance": 40.29999999999998
+          "nuisance": 50
         },
         "changedBy": {
           "tickCount": 0
@@ -3846,10 +3846,10 @@
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 2.299999999999999,
-          "safety": 0,
+          "wellBeing": 0,
+          "safety": 15.300000000000004,
           "ecology": 50,
-          "nuisance": 40.29999999999998
+          "nuisance": 50
         },
         "changedBy": {
           "tickCount": 0
@@ -3867,15 +3867,15 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 2988,
+          "tickCount": 2990,
           "deathCount": 8,
           "employeeCount": 12,
           "activeContractCount": 0,
           "surveyCount": 3,
-          "wellBeing": 2.299999999999999,
-          "safety": 0,
+          "wellBeing": 0,
+          "safety": 15.300000000000004,
           "ecology": 50,
-          "nuisance": 40.29999999999998,
+          "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
           "levelEndReason": "bankruptcy"
