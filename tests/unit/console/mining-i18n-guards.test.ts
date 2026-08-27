@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
@@ -17,6 +17,8 @@ import {
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
+import * as BlastExecutionModule from '../../../src/core/mining/BlastExecution.js';
+import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 
 // #795: mining.ts's own static, non-per-item strings (its local requireGame,
 // formatBlastPlanErrors' two headers, every "Usage:" string, the three "==="
@@ -404,4 +406,161 @@ describe('mining.ts empty-state messages — English literal + fr divergence', (
       expect(result.output).not.toBe(englishLiteral);
     });
   }
+});
+
+// ── #797: mining.ts's remaining hardcoded per-outcome strings ──────────────
+// (drill_plan grid's invalid-grid rejection, build_ramp's invalid-length
+// rejection, survey's invalid-coordinates/no-surveyor rejections) route
+// through t() the same way #795's strings above already do. Each case below
+// pins the exact English literal and proves the output changes under
+// locale 'fr'.
+
+describe('mining.ts #797 remaining rejection strings — English literal + fr divergence', () => {
+  const cases: Array<{
+    name: string;
+    englishLiteral: string;
+    run: (ctx: MiningContext) => { success: boolean; output: string };
+  }> = [
+    {
+      name: 'drill_plan grid — invalid rows/cols',
+      englishLiteral: 'Invalid drill grid: rows and cols must be positive whole numbers.',
+      run: (ctx) => drillPlanCommand(ctx, ['grid'], { rows: '0', cols: '3', spacing: '3', depth: '8' }),
+    },
+    {
+      name: 'build_ramp — invalid length',
+      englishLiteral: 'Invalid ramp length: length must be a finite positive number.',
+      run: (ctx) => buildRampCommand(ctx, [], { origin: '5,5', direction: 'south', length: '0' }),
+    },
+    {
+      name: 'survey — invalid coordinates',
+      englishLiteral: 'Invalid coordinates: x and z must be integers.',
+      run: (ctx) => surveyCommand(ctx, ['seismic'], { x: 'abc', z: '10' }),
+    },
+    {
+      name: 'survey — no available surveyor',
+      // makeMiningContext() staffs the site via STARTING_SITE_STAFFED_COMPOSITION
+      // (balance.ts), which carries no 'geology' qualification — so a plain
+      // staffed context always hits the no_surveyor branch here.
+      englishLiteral: 'No available surveyor. Hire an employee with geology qualification.',
+      run: (ctx) => surveyCommand(ctx, ['seismic'], { x: '10', z: '10' }),
+    },
+  ];
+
+  for (const { name, englishLiteral, run } of cases) {
+    it(`${name} — matches the exact English literal by default`, () => {
+      const ctx = makeMiningContext();
+      const result = run(ctx);
+      expect(result.success).toBe(false);
+      expect(result.output).toBe(englishLiteral);
+    });
+
+    it(`${name} — differs from the English literal under locale fr`, () => {
+      const ctx = makeMiningContext();
+      setLocale('fr');
+      const result = run(ctx);
+      expect(result.success).toBe(false);
+      expect(result.output).not.toBe(englishLiteral);
+    });
+  }
+});
+
+describe('mining.ts #797 survey failed (runSurvey mocked past no_surveyor/insufficient_funds) — English literal + fr divergence', () => {
+  const SURVEY_FAILED_EN = 'Survey failed.';
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('matches the exact English literal by default', () => {
+    const ctx = makeMiningContext();
+    vi.spyOn(SurveyCalcModule, 'runSurvey').mockReturnValue({ success: false });
+
+    const result = surveyCommand(ctx, ['seismic'], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(SURVEY_FAILED_EN);
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeMiningContext();
+    vi.spyOn(SurveyCalcModule, 'runSurvey').mockReturnValue({ success: false });
+    setLocale('fr');
+
+    const result = surveyCommand(ctx, ['seismic'], { x: '10', z: '10' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(SURVEY_FAILED_EN);
+  });
+});
+
+describe('mining.ts #797 blast execution failed (executeBlast mocked to null) — English literal + fr divergence', () => {
+  const BLAST_EXECUTION_FAILED_EN = 'Blast execution failed.';
+
+  function makeChargedPlan(ctx: MiningContext): void {
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('matches the exact English literal by default', () => {
+    const ctx = makeMiningContext();
+    makeChargedPlan(ctx);
+    vi.spyOn(BlastExecutionModule, 'executeBlast').mockReturnValue(null);
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).toBe(BLAST_EXECUTION_FAILED_EN);
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeMiningContext();
+    makeChargedPlan(ctx);
+    vi.spyOn(BlastExecutionModule, 'executeBlast').mockReturnValue(null);
+    setLocale('fr');
+
+    const result = blastCommand(ctx, [], {});
+
+    expect(result.success).toBe(false);
+    expect(result.output).not.toBe(BLAST_EXECUTION_FAILED_EN);
+  });
+});
+
+describe('mining.ts #797 blast_plan validate success message — English literal + fr divergence', () => {
+  const BLAST_PLAN_VALID_EN = 'Plan is valid and ready to blast.';
+
+  function makeFullPlan(ctx: MiningContext): void {
+    drillPlanCommand(ctx, ['grid'], { rows: '1', cols: '1', spacing: '3', depth: '8' });
+    driveDrillPlanToCompletion(ctx);
+    chargeCommand(ctx, [], { hole: 'H1', explosive: 'boomite', amount: '5kg', stemming: '2m' });
+    driveChargePlanToCompletion(ctx);
+    sequenceCommand(ctx, ['set'], { hole: 'H1', delay: '0ms' });
+  }
+
+  it('matches the exact English literal by default', () => {
+    const ctx = makeMiningContext();
+    makeFullPlan(ctx);
+
+    const result = blastPlanCommand(ctx, ['validate'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(BLAST_PLAN_VALID_EN);
+  });
+
+  it('differs from the English literal under locale fr', () => {
+    const ctx = makeMiningContext();
+    makeFullPlan(ctx);
+    setLocale('fr');
+
+    const result = blastPlanCommand(ctx, ['validate'], {});
+
+    expect(result.success).toBe(true);
+    expect(result.output).not.toBe(BLAST_PLAN_VALID_EN);
+  });
 });
