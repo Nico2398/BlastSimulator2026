@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { requireGame, NO_EMPLOYEES_MSG, parseStaffedFlag } from '../../../src/console/commands/commandUtils.js';
+import { requireGame, noEmployeesMessage, parseStaffedFlag } from '../../../src/console/commands/commandUtils.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../../src/console/commands/world.js';
 
@@ -53,30 +53,24 @@ describe('requireGame', () => {
   });
 });
 
-describe('NO_EMPLOYEES_MSG', () => {
+describe('noEmployeesMessage', () => {
   it('is the exact English literal by default', () => {
-    expect(NO_EMPLOYEES_MSG).toBe(NO_EMPLOYEES_EN);
+    expect(noEmployeesMessage()).toBe(NO_EMPLOYEES_EN);
   });
 
-  // NO_EMPLOYEES_MSG is a module-level constant, computed once when
-  // commandUtils.ts first loads — t()'s currentLocale at that moment decides
-  // its value for the lifetime of the module instance. Proving it is wired
-  // through i18n (rather than a hardcoded literal that happens to match
-  // en.json) requires re-evaluating that top-level assignment under a
-  // different locale, which means forcing a fresh module instance: reset the
-  // module registry, re-import i18n first and switch it to 'fr', then import
-  // commandUtils fresh so its top-level `t('console.no_employees')` call
-  // resolves against the already-French instance.
-  it('is computed via t() at module load — a module freshly loaded under fr differs from the English literal', async () => {
-    vi.resetModules();
-    const freshI18n = await import('../../../src/core/i18n/I18n.js');
-    freshI18n.setLocale('fr');
+  // noEmployeesMessage() re-evaluates t('console.no_employees') on every call
+  // rather than freezing a value at module load, so a runtime language switch
+  // (Settings) is reflected without needing a fresh module instance.
+  it('returns the currently-active locale translation on each call, without needing a fresh module instance', () => {
+    expect(noEmployeesMessage()).toBe(NO_EMPLOYEES_EN);
 
-    const freshCommandUtils = await import('../../../src/console/commands/commandUtils.js');
+    setLocale('fr');
+    const frResult = noEmployeesMessage();
 
-    expect(freshCommandUtils.NO_EMPLOYEES_MSG).not.toBe(NO_EMPLOYEES_EN);
+    expect(frResult).not.toBe(NO_EMPLOYEES_EN);
 
-    vi.resetModules();
+    setLocale('en');
+    expect(noEmployeesMessage()).toBe(NO_EMPLOYEES_EN);
   });
 });
 
