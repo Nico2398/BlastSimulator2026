@@ -1145,3 +1145,140 @@ describe('ghostPreviewsRevision — bumped by exactly the four ghostPreviews-mut
     expect(state.ghostPreviewsRevision).toBe(before + 3);
   });
 });
+
+// ── Section 9: dispatchPendingAction copies footprint onto the ghost (#556) ──
+//   A `place_building` action's payload carries a `footprint` (cell offsets
+//   from targetX/targetZ) so the ghost renders the real building's outline
+//   (GhostMesh.ts) instead of a single point. Every other action type's ghost
+//   must NOT carry a footprint, even when its payload happens to have a field
+//   by that name.
+
+describe('dispatchPendingAction — copies place_building footprint onto the ghost (#556)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('a dispatched place_building action with payload.footprint gets a matching GhostPreview.footprint', () => {
+    addQualifiedEmployee(state, 'blasting', SEED); // requiredSkill: null below — any alive employee qualifies
+    const footprint: Array<[number, number]> = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    const action = makePendingAction({
+      id: 200, requiredSkill: null, targetX: 5, targetZ: 6,
+      payload: { buildingOrderId: 1, cost: 8000, footprint, durationTicks: 40 },
+    });
+    (action as any).type = 'place_building';
+
+    dispatchPendingAction(state, action);
+
+    const ghost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 200);
+    expect(ghost).toBeDefined();
+    expect(ghost.footprint).toEqual(footprint);
+  });
+
+  it('a dispatched non-place_building action never carries a footprint on its ghost, even with a payload.footprint field', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({
+      id: 201, requiredSkill: 'blasting',
+      payload: { footprint: [[0, 0], [1, 0]] },
+    });
+    (action as any).type = 'general_work';
+
+    dispatchPendingAction(state, action);
+
+    const ghost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 201);
+    expect(ghost).toBeDefined();
+    expect(ghost.footprint).toBeUndefined();
+  });
+
+  it('every other action type dispatched alongside a place_building one keeps footprint: undefined on its own ghost', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const footprint: Array<[number, number]> = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    const buildAction = makePendingAction({
+      id: 202, requiredSkill: null, payload: { footprint },
+    });
+    (buildAction as any).type = 'place_building';
+    const drillAction = makePendingAction({ id: 203, requiredSkill: 'blasting', payload: {} });
+    (drillAction as any).type = 'drill_hole';
+
+    dispatchPendingAction(state, buildAction);
+    dispatchPendingAction(state, drillAction);
+
+    const buildGhost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 202);
+    const drillGhost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 203);
+    expect(buildGhost.footprint).toEqual(footprint);
+    expect(drillGhost.footprint).toBeUndefined();
+  });
+
+  it('a place_building action whose payload has no footprint leaves the ghost footprint undefined (boundary)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({ id: 204, requiredSkill: null, payload: { cost: 5000 } });
+    (action as any).type = 'place_building';
+
+    dispatchPendingAction(state, action);
+
+    const ghost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 204);
+    expect(ghost.footprint).toBeUndefined();
+  });
+});
+
+// ── Section 10: cancelAction refunds a queued place_building action (#556) ──
+//   Mirrors dig_ramp_segment's segmentCost refund (Section 6 above) — a
+//   cancelled construction site refunds its payload's `cost` in full via
+//   actionOrderCost (TaskCancellation.ts).
+
+describe('cancelAction — refunds a queued place_building action in full (#556)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = makeGame();
+  });
+
+  it('refunds payload.cost and credits state.cash for a queued place_building action', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const beforeCash = state.cash;
+    const action = makePendingAction({
+      id: 300, requiredSkill: null,
+      payload: { buildingOrderId: 1, cost: 15000, footprint: [[0, 0]], durationTicks: 40 },
+    });
+    (action as any).type = 'place_building';
+    dispatchPendingAction(state, action);
+
+    const result = cancelAction(state, 300);
+
+    expect(result.success).toBe(true);
+    expect(result.refunded).toBe(15000);
+    expect(state.cash).toBe(beforeCash + 15000);
+    const refundTx = state.finances.transactions.find(t => t.category === 'refund');
+    expect(refundTx).toBeDefined();
+    expect(refundTx!.amount).toBe(15000);
+  });
+
+  it('refunds 0 when payload.cost is absent (boundary — no charge to give back)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const beforeCash = state.cash;
+    const action = makePendingAction({ id: 301, requiredSkill: null, payload: {} });
+    (action as any).type = 'place_building';
+    dispatchPendingAction(state, action);
+
+    const result = cancelAction(state, 301);
+
+    expect(result.success).toBe(true);
+    expect(result.refunded).toBe(0);
+    expect(state.cash).toBe(beforeCash);
+  });
+
+  it('removes the plannedBuilding\'s pendingAction and ghost on cancel, same as any other action type', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const action = makePendingAction({
+      id: 302, requiredSkill: null, payload: { cost: 9000, footprint: [[0, 0]] },
+    });
+    (action as any).type = 'place_building';
+    dispatchPendingAction(state, action);
+
+    cancelAction(state, 302);
+
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 302)).toBeUndefined();
+    expect((state as any).ghostPreviews.find((g: { id: number }) => g.id === 302)).toBeUndefined();
+  });
+});

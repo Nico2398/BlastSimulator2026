@@ -527,6 +527,100 @@ describe('deserialize — v12→v13 migration for ScoreState.decayRate (#555)', 
   });
 });
 
+// ── v13→v14 migration for GameState.plannedBuildings (#556) ──────────────────
+// SAVE_VERSION bumped 13→14 for `plannedBuildings: PlannedBuilding[]` and
+// `nextPlannedBuildingId: number` — ordering a building queues a
+// `place_building` PendingAction instead of creating the building instantly,
+// mirroring #553/#554/#555's own version bumps for plannedDrillHoles/
+// plannedChargesByHole/plannedRamps.
+
+describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#556)', () => {
+  it('a v13 save without plannedBuildings/nextPlannedBuildingId migrates to plannedBuildings: [] and nextPlannedBuildingId: 1', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 13;
+    delete parsed['plannedBuildings'];
+    delete parsed['nextPlannedBuildingId'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.plannedBuildings).toEqual([]);
+    expect(restored.nextPlannedBuildingId).toBe(1);
+  });
+
+  it('a pre-v13 save (missing every planned-work field back through plannedDrillHoles) migrates cleanly through the full chain to plannedBuildings: []', () => {
+    const state = createGame({ seed: 42 });
+    const json = serialize(state);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    parsed['version'] = 10;
+    delete parsed['plannedDrillHoles'];
+    delete parsed['plannedChargesByHole'];
+    delete parsed['plannedRamps'];
+    delete parsed['nextPlannedRampId'];
+    delete parsed['plannedBuildings'];
+    delete parsed['nextPlannedBuildingId'];
+
+    const restored = deserialize(JSON.stringify(parsed));
+
+    expect(restored.plannedDrillHoles).toEqual([]);
+    expect(restored.plannedChargesByHole).toEqual({});
+    expect(restored.plannedRamps).toEqual([]);
+    expect(restored.plannedBuildings).toEqual([]);
+    expect(restored.nextPlannedBuildingId).toBe(1);
+  });
+
+  it('a v14+ save with plannedBuildings populated round-trips serialize/deserialize unchanged, including its in-flight PendingAction', () => {
+    const state = createGame({ seed: 42 });
+    state.plannedBuildings.push({
+      id: 1, type: 'freight_warehouse', tier: 1, x: 5, z: 5, actionId: 100, cost: 15000,
+    });
+    state.pendingActions.push({
+      id: 100, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 5, targetZ: 5, targetY: 0,
+      payload: { buildingOrderId: 1, cost: 15000, footprint: [[0, 0], [1, 0], [0, 1], [1, 1]], durationTicks: 40 },
+      targetEmployeeId: null, status: 'in_progress', holderId: 7,
+    });
+    state.nextPlannedBuildingId = 2;
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.plannedBuildings).toEqual([
+      { id: 1, type: 'freight_warehouse', tier: 1, x: 5, z: 5, actionId: 100, cost: 15000 },
+    ]);
+    expect(restored.nextPlannedBuildingId).toBe(2);
+
+    const restoredAction = restored.pendingActions.find(a => a.id === 100);
+    expect(restoredAction).toBeDefined();
+    expect(restoredAction!.status).toBe('in_progress');
+    expect(restoredAction!.holderId).toBe(7);
+    expect(restoredAction!.payload).toEqual({
+      buildingOrderId: 1, cost: 15000, footprint: [[0, 0], [1, 0], [0, 1], [1, 1]], durationTicks: 40,
+    });
+  });
+
+  it('an empty v14+ save (no buildings under construction) round-trips to an empty array (boundary)', () => {
+    const state = createGame({ seed: 42 });
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.plannedBuildings).toEqual([]);
+    expect(restored.nextPlannedBuildingId).toBe(1);
+  });
+
+  it('a v14+ save with nextPlannedBuildingId already advanced is left untouched by the migration (regression)', () => {
+    const state = createGame({ seed: 42 });
+    state.nextPlannedBuildingId = 9;
+
+    const json = serialize(state);
+    const restored = deserialize(json);
+
+    expect(restored.nextPlannedBuildingId).toBe(9);
+  });
+});
+
 describe('serialize / deserialize', () => {
   it('round-trip produces an equivalent state', () => {
     const state = createGame({ seed: 42 });

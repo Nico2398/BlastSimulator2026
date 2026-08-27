@@ -368,4 +368,128 @@ describe('GhostMesh', () => {
       gm.dispose();
     });
   });
+
+  // ── #556: construction-site ghosts span their full footprint ────────────
+  // A `place_building` preview carries `footprint` (cell offsets from
+  // targetX/targetZ) so the ghost reads as the real building's outline
+  // instead of a single fixed-size marker box.
+
+  describe('footprint rendering — construction site ghost spans its full footprint (#556)', () => {
+    it('renders a mesh whose world-space extent covers every footprint cell, not the old fixed-size box', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      // 3-wide (x) by 2-deep (z) footprint, offsets from targetX/targetZ.
+      const footprint: ReadonlyArray<readonly [number, number]> = [
+        [0, 0], [1, 0], [2, 0],
+        [0, 1], [1, 1], [2, 1],
+      ];
+      gm.sync([makePreview(1, { type: 'place_building', targetX: 10, targetZ: 20, footprint })]);
+
+      const mesh = scene.children[0] as THREE.Mesh;
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+
+      // The old fixed GHOST_SIZE box is 0.9m on a side — a footprint-aware
+      // ghost must be visibly larger, covering the full 3x2 cell area.
+      expect(size.x).toBeGreaterThanOrEqual(2.5);
+      expect(size.z).toBeGreaterThanOrEqual(1.5);
+      gm.dispose();
+    });
+
+    it('a preview with no footprint still renders the old fixed-size box (regression)', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1, { targetX: 5, targetZ: 5 })]);
+
+      const mesh = scene.children[0] as THREE.Mesh;
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+
+      // Must NOT have grown to cover a multi-cell area just because
+      // footprint-aware code exists elsewhere for other previews.
+      expect(size.x).toBeLessThan(1.5);
+      expect(size.z).toBeLessThan(1.5);
+      gm.dispose();
+    });
+
+    it('a single-cell footprint still covers at least one whole grid cell', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      gm.sync([makePreview(1, { type: 'place_building', targetX: 0, targetZ: 0, footprint: [[0, 0]] })]);
+
+      const mesh = scene.children[0] as THREE.Mesh;
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+
+      expect(size.x).toBeGreaterThanOrEqual(0.9);
+      expect(size.z).toBeGreaterThanOrEqual(0.9);
+      gm.dispose();
+    });
+
+    it('a footprint ghost is positioned so it covers the footprint cells relative to targetX/targetZ, not centred purely on the target point', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      const footprint: ReadonlyArray<readonly [number, number]> = [
+        [0, 0], [1, 0], [2, 0], [3, 0],
+        [0, 1], [1, 1], [2, 1], [3, 1],
+      ]; // 4-wide x 2-deep, matches freight_warehouse T1 scale
+      gm.sync([makePreview(1, { type: 'place_building', targetX: 0, targetZ: 0, footprint })]);
+
+      const mesh = scene.children[0] as THREE.Mesh;
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+
+      // The box must extend forward from the origin far enough to cover cell
+      // (3,1) — i.e. its max corner reaches at least x=3, z=1 (footprint
+      // cells are unit-size, matching the voxel grid).
+      expect(box.max.x).toBeGreaterThanOrEqual(3);
+      expect(box.max.z).toBeGreaterThanOrEqual(1);
+      gm.dispose();
+    });
+
+    it('claimed vs unclaimed footprint ghosts still read distinctly (dimmer when claimed), same as non-footprint ghosts', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      const footprint: ReadonlyArray<readonly [number, number]> = [[0, 0], [1, 0], [0, 1], [1, 1]];
+      gm.sync([
+        makePreview(1, { type: 'place_building', targetX: 0, targetZ: 0, footprint, claimed: false }),
+        makePreview(2, { type: 'place_building', targetX: 10, targetZ: 10, footprint, claimed: true }),
+      ]);
+
+      const unclaimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 0) as THREE.Mesh;
+      const claimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 10) as THREE.Mesh;
+      expect(unclaimedMesh).toBeDefined();
+      expect(claimedMesh).toBeDefined();
+
+      let unclaimedMax = -Infinity;
+      let claimedMax = -Infinity;
+      for (let i = 0; i < 180; i++) {
+        gm.update(1 / 60);
+        unclaimedMax = Math.max(unclaimedMax, (unclaimedMesh.material as THREE.MeshPhongMaterial).opacity);
+        claimedMax = Math.max(claimedMax, (claimedMesh.material as THREE.MeshPhongMaterial).opacity);
+      }
+      expect(claimedMax).toBeLessThan(unclaimedMax);
+      gm.dispose();
+    });
+
+    it('removing a footprint preview from the sync input removes its mesh', () => {
+      const scene = new THREE.Scene();
+      const gm = new GhostMesh(scene);
+      const footprint: ReadonlyArray<readonly [number, number]> = [[0, 0], [1, 0], [0, 1], [1, 1]];
+      gm.sync([makePreview(1, { type: 'place_building', footprint })]);
+      expect(gm.count).toBe(1);
+
+      gm.sync([]);
+
+      expect(gm.count).toBe(0);
+      expect(scene.children.length).toBe(0);
+      gm.dispose();
+    });
+  });
 });

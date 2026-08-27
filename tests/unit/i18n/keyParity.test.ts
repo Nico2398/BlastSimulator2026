@@ -158,10 +158,13 @@ describe('en.json / fr.json — key-set parity', () => {
     // survey.usage, survey.unknown_method, survey.none_pending,
     // survey.ore_report_header, survey.ore_report_unavailable) — 24 new keys
     // total, both locales translated.
+    // Baseline is now 3309 (up from 3307): #556 added 2 new ui.build.* keys
+    // (ordered, under_construction_count) for the order-then-build
+    // construction-site flow, both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3307);
+    expect(Object.keys(en).length).toBe(3309);
   });
 });
 

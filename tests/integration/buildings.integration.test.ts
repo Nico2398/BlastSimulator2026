@@ -5,6 +5,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
+import { tickCommand } from '../../src/console/commands/events.js';
+import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createBuildingState,
@@ -12,6 +14,8 @@ import {
   destroyBuilding,
   demolishBuilding,
   getStorageCapacity,
+  getBuildingScoreEffects,
+  hasActiveResearchCenter,
   hasExplosivesForBlast,
   storeExplosives,
   consumeExplosives,
@@ -22,6 +26,11 @@ import {
   type BuildingType,
 } from '../../src/core/entities/Building.js';
 import { createLogisticsState, syncLogisticsCapacity } from '../../src/core/economy/Logistics.js';
+import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
+import {
+  BUILDING_CONSTRUCTION_BASE_DURATION_TICKS,
+  BUILDING_CONSTRUCTION_TIER_MULTIPLIER,
+} from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -30,6 +39,24 @@ function makeCtx(): GameContext {
   const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
+}
+
+/**
+ * Same as makeCtx() but with a free, pre-hired roster (#551) so a construction
+ * site's `place_building` action — unskilled, `requiredSkill: null` (#556) —
+ * has someone idle to walk to it and work it.
+ */
+function makeStaffedCtx(): GameContext {
+  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', staffed: 'true' });
+  return ctx;
+}
+
+/** Tick until every ordered building has landed (or maxTicks is exhausted). */
+function tickUntilConstructionDone(ctx: GameContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    tickCommand(ctx, ['1'], {});
+  }
 }
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
@@ -322,5 +349,215 @@ describe('Buildings lifecycle', () => {
     const overConsume = consumeExplosives(bs, 50);
     expect(overConsume).toBe(false);
     expect(hasExplosivesForBlast(bs)).toBe(false);
+  });
+});
+
+// ── Construction sites — order-then-build (#556) ─────────────────────────────
+// Ordering a building creates a construction site instead of an instant
+// building: confirming placement validates and charges exactly as before,
+// then queues a `place_building` action at the target. Nothing the building
+// provides counts until an employee has actually finished the work.
+
+describe('Construction sites — order-then-build (#556)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeStaffedCtx();
+  });
+
+  it('ordering a freight_warehouse charges cash and queues a site instead of placing the building instantly', () => {
+    const cashBefore = ctx.state!.cash;
+    const storageBefore = getStorageCapacity(ctx.state!.buildings);
+    const def = getBuildingDef('freight_warehouse', 1);
+
+    const result = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    // No building exists yet — nothing it provides is live either.
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(getStorageCapacity(ctx.state!.buildings)).toBe(storageBefore);
+
+    // Cash was charged in full at order time, same as an instant build.
+    expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
+
+    // A construction site is queued instead.
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+    const planned = ctx.state!.plannedBuildings[0]!;
+    expect(planned.type).toBe('freight_warehouse');
+    expect(planned.tier).toBe(1);
+    expect(planned.x).toBe(5);
+    expect(planned.z).toBe(5);
+    expect(planned.cost).toBe(def.constructionCost);
+
+    // One place_building PendingAction was dispatched for it, unskilled.
+    const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId);
+    expect(action).toBeDefined();
+    expect(action!.type).toBe('place_building');
+    expect(action!.requiredSkill).toBeNull();
+
+    // A blue ghost matching the real footprint appears at the site.
+    const ghost = ctx.state!.ghostPreviews.find(g => g.id === planned.actionId);
+    expect(ghost).toBeDefined();
+    expect(ghost!.footprint).toEqual(def.footprint);
+  });
+
+  it('a tier-1 order carries payload.durationTicks === BUILDING_CONSTRUCTION_BASE_DURATION_TICKS (multiplier 1)', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId)!;
+    const payload = action.payload as PlaceBuildingActionPayload;
+
+    expect(payload.durationTicks).toBe(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS);
+  });
+
+  it('a tier-2 order carries payload.durationTicks scaled by BUILDING_CONSTRUCTION_TIER_MULTIPLIER[2]', () => {
+    // Tier 2 requires research to be unlocked first (same gate as direct placement).
+    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+
+    const result = buildCommand(ctx, ['management_office'], { at: '5,5', tier: '2' });
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId)!;
+    const payload = action.payload as PlaceBuildingActionPayload;
+
+    expect(payload.durationTicks).toBe(
+      BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[2],
+    );
+  });
+
+  it('drives the order to completion: the site lands as a real building and its effects apply', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    const built = ctx.state!.buildings.buildings[0]!;
+    expect(built.type).toBe('freight_warehouse');
+    expect(built.x).toBe(5);
+    expect(built.z).toBe(5);
+    expect(getStorageCapacity(ctx.state!.buildings)).toBe(getBuildingDef('freight_warehouse', 1).capacity);
+
+    // The completed action and its ghost are gone.
+    expect(ctx.state!.pendingActions.find(a => a.type === 'place_building')).toBeUndefined();
+    expect(ctx.state!.ghostPreviews).toHaveLength(0);
+  });
+
+  it('living_quarters well-being effect only applies once construction completes, not at order time', () => {
+    buildCommand(ctx, ['living_quarters'], { at: '5,5' });
+    expect(getBuildingScoreEffects(ctx.state!.buildings).wellBeing).toBe(0);
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(getBuildingScoreEffects(ctx.state!.buildings).wellBeing).toBeGreaterThan(0);
+  });
+
+  it('research_center only gates research once construction completes, not at order time', () => {
+    buildCommand(ctx, ['research_center'], { at: '5,5' });
+    expect(hasActiveResearchCenter(ctx.state!.buildings)).toBe(false);
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(hasActiveResearchCenter(ctx.state!.buildings)).toBe(true);
+  });
+
+  it('rejects the order when funds are insufficient, charging nothing and queuing nothing', () => {
+    ctx.state!.cash = 10;
+
+    const result = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(10);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  it('rejects ordering an unresearched tier, same gate as direct placement', () => {
+    const result = buildCommand(ctx, ['living_quarters'], { at: '5,5', tier: '2' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/research/i);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+  });
+
+  it('rejects an out-of-bounds order, same gate as direct placement', () => {
+    const result = buildCommand(ctx, ['freight_warehouse'], { at: '60,60' }); // 32x32 grid
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+  });
+
+  it('a second order overlapping a site under construction is refused, like an overlapping real building', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' }); // freight_warehouse T1 is 4x4 -> (5,5)-(8,8)
+
+    const second = buildCommand(ctx, ['management_office'], { at: '6,6' });
+
+    expect(second.success).toBe(false);
+    expect(second.output).toMatch(/occupied/i);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  it('an order succeeds and queues even with no employees hired yet (mirrors #553/#554/#555 silent-queue pattern)', () => {
+    const freshCtx = makeCtx(); // NOT staffed
+    expect(freshCtx.state!.employees.employees).toHaveLength(0);
+
+    const result = buildCommand(freshCtx, ['freight_warehouse'], { at: '5,5' });
+
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(freshCtx.state!.plannedBuildings).toHaveLength(1);
+    expect(freshCtx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  it('cancelling an ordered site removes it and refunds the full construction cost', () => {
+    const cashBefore = ctx.state!.cash;
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const def = getBuildingDef('freight_warehouse', 1);
+    expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
+    const plannedId = ctx.state!.plannedBuildings[0]!.id;
+
+    const cancelResult = buildCommand(ctx, ['cancel', String(plannedId)], {});
+
+    expect(cancelResult.success, JSON.stringify(cancelResult)).toBe(true);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.ghostPreviews).toHaveLength(0);
+  });
+
+  it('cancelling an unknown site id fails without touching cash or any in-flight order', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const cashAfterOrder = ctx.state!.cash;
+
+    const result = buildCommand(ctx, ['cancel', '9999'], {});
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashAfterOrder);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+  });
+
+  it('save/load round-trips a site under construction, preserving its remaining work', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    // Let the site partially progress before saving.
+    for (let i = 0; i < 5; i++) tickCommand(ctx, ['1'], {});
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+
+    const json = serialize(ctx.state!);
+    const restored = deserialize(json);
+
+    expect(restored.plannedBuildings).toEqual(ctx.state!.plannedBuildings);
+    expect(restored.buildings.buildings).toHaveLength(0);
+    const restoredAction = restored.pendingActions.find(
+      a => a.id === ctx.state!.plannedBuildings[0]!.actionId,
+    );
+    expect(restoredAction).toBeDefined();
+    expect(restoredAction!.type).toBe('place_building');
   });
 });
