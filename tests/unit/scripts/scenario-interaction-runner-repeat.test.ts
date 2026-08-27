@@ -23,6 +23,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
+import type { Page } from 'puppeteer';
+import type { InteractionGoal } from '../../../scripts/shared/interaction-types.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -61,7 +63,12 @@ const {
     suspendDrawingMock: vi.fn(async () => {}),
     waitOneFrameMock: vi.fn(async () => {}),
     captureFrameMock: vi.fn(async () => {}),
-    checkGoalMock: vi.fn(async () => {}),
+    checkGoalMock: vi.fn(async (
+      _page: Page,
+      _goal: InteractionGoal,
+      _before: Record<string, unknown>,
+      _after?: Record<string, unknown>,
+    ) => {}),
     gameStateMock: vi.fn(async () => ({})),
   };
 });
@@ -212,5 +219,18 @@ describe('runScenarioInteraction — repeat: N step multiplier (#696)', () => {
 
     expect(executeInteractionActionsMock).toHaveBeenCalledTimes(1);
     expect(results[0]!.error).toMatch(/player-marked/);
+  });
+
+  it('repeat combined with a waitUntil interaction action on the same step is rejected before the first iteration, naming both constructs', async () => {
+    const results = await runOneStep(repeatStep({
+      role: 'setup',
+      repeat: 2,
+      interaction: [{ type: 'waitUntil', field: 'tickCount', equals: 3, maxTicks: 10, timeoutMs: 30000 }],
+    }));
+
+    expect(executeInteractionActionsMock).not.toHaveBeenCalled();
+    expect(results[0]!.error).toBeDefined();
+    expect(results[0]!.error).toMatch(/repeat/i);
+    expect(results[0]!.error).toMatch(/waitUntil/i);
   });
 });

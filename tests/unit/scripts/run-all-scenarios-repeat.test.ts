@@ -34,6 +34,7 @@
 // DO NOT implement anything here — only add implementation to scripts/.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { resolve } from 'path';
 import type { ScenarioDef, ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 
@@ -107,10 +108,16 @@ vi.mock('../../../scripts/shared/puppeteer-utils.js', () => ({
   SCREENSHOT_DIR: '/tmp/bs2026-run-all-scenarios-repeat-fixture-screenshots',
 }));
 
-vi.mock('../../../scripts/shared/interaction-driver.js', () => ({
-  checkGoal: checkGoalMock,
-  gameState: gameStateMock,
-}));
+vi.mock('../../../scripts/shared/interaction-driver.js', () => {
+  class InteractionFailure extends Error {
+    diagnosis = '';
+  }
+  return {
+    checkGoal: checkGoalMock,
+    gameState: gameStateMock,
+    InteractionFailure,
+  };
+});
 
 /** Registers a fixture scenario file at the exact path loadScenarioDef (unmocked, real) will resolve for FIXTURE_NAME. */
 async function registerFixtureScenario(steps: ScenarioStepDef[]): Promise<void> {
@@ -122,7 +129,7 @@ async function registerFixtureScenario(steps: ScenarioStepDef[]): Promise<void> 
 const ORIGINAL_ARGV = process.argv;
 
 describe('run-all-scenarios.ts batch interaction loop honors repeat: N (#696)', () => {
-  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let exitSpy: MockInstance<Parameters<typeof process.exit>, ReturnType<typeof process.exit>>;
 
   beforeEach(() => {
     vi.resetModules();
@@ -173,5 +180,28 @@ describe('run-all-scenarios.ts batch interaction loop honors repeat: N (#696)', 
     await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
 
     expect(executeInteractionActionsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('repeat combined with a waitUntil interaction action on the same step is rejected before the first iteration, naming both constructs', async () => {
+    await registerFixtureScenario([
+      {
+        command: 'wait_until field:tickCount equals:3 max_ticks:10',
+        role: 'setup',
+        repeat: 2,
+        interaction: [{ type: 'waitUntil', field: 'tickCount', equals: 3, maxTicks: 10, timeoutMs: 30000 }],
+      },
+    ]);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await import('../../../scripts/run-all-scenarios.js');
+    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
+
+    expect(executeInteractionActionsMock).not.toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const logged = logSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(logged).toMatch(/repeat/i);
+    expect(logged).toMatch(/waitUntil/i);
+
+    logSpy.mockRestore();
   });
 });
