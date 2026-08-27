@@ -30,6 +30,8 @@ function makeMiningContext(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
+    landscape: null,
+    playableArea: null,
     emitter: new EventEmitter(),
   };
   // Staffed: several assertions below need a hole to actually land in
@@ -74,14 +76,26 @@ describe('mining.ts requireGame guard', () => {
   const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 
   it('returns the exact English literal when no game is loaded', () => {
-    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: MiningContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     const result = chargeCommand(ctx, [], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('differs from the English literal under locale fr', () => {
-    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: MiningContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     setLocale('fr');
 
     const result = chargeCommand(ctx, [], {});
