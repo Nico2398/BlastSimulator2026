@@ -231,6 +231,17 @@ export function captureCostFloorMs(step: ScenarioStepDef, shotsCount: number): n
  * `captureCostFloorMs` (#725). Omitted or `enabled: false` leaves the return
  * value unchanged from the pre-#725 behavior.
  */
+/**
+ * Resolves a step's `repeat` field to a concrete iteration count:
+ * absent -> 1; a positive integer -> itself. Throws an Error naming the step
+ * (step.description ?? step.command) and the offending value for anything
+ * else (0, negative, non-integer, NaN) - both runners call this once, before
+ * running any iteration, so an invalid `repeat` fails the step immediately.
+ */
+export function resolveRepeatCount(_step: ScenarioStepDef): number {
+  throw new Error('not implemented');
+}
+
 export function effectiveStepTimeoutMs(
   step: ScenarioStepDef,
   defaultOuterSeconds: number,
