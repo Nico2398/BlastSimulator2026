@@ -59,6 +59,48 @@ function tickUntilConstructionDone(ctx: GameContext, maxTicks = 300): void {
   }
 }
 
+/**
+ * Tick a staffed `place_building` order past arrival and into genuine
+ * mid-work — the employee holding `actionId` has a non-null
+ * `taskTicksRemaining` that has already decremented below the duration it
+ * was seeded with. Arrival alone isn't enough: `tick.ts` runs
+ * `tickTaskProgress` before `tickArrivalGate` each tick, so the tick an
+ * employee arrives only seeds `taskTicksRemaining` to the full duration —
+ * one further tick is needed to observe it actually counting down (#556
+ * review finding — "preserving remaining work" tests must prove work is
+ * actually in flight, not just that a static PendingAction shape survives).
+ * Throws if the order never reaches this state within `maxTicks`.
+ */
+function tickUntilBuildingMidWork(
+  ctx: GameContext,
+  actionId: number,
+  maxTicks = 60,
+): { employeeId: number; ticksRemaining: number; durationTicks: number } {
+  const findHolder = () => {
+    const action = ctx.state!.pendingActions.find(a => a.id === actionId);
+    if (!action || action.holderId === null) return null;
+    return ctx.state!.employees.employees.find(e => e.id === action.holderId) ?? null;
+  };
+
+  let holder = findHolder();
+  for (let i = 0; i < maxTicks && (!holder || holder.taskTicksRemaining === null); i++) {
+    tickCommand(ctx, ['1'], {});
+    holder = findHolder();
+  }
+  if (!holder || holder.taskTicksRemaining === null) {
+    throw new Error('Setup: place_building order never reached in-progress work before maxTicks');
+  }
+  const durationTicks = holder.taskTicksRemaining;
+
+  tickCommand(ctx, ['1'], {});
+  holder = findHolder();
+  if (!holder || holder.taskTicksRemaining === null) {
+    throw new Error('Setup: employee left in-progress work unexpectedly');
+  }
+
+  return { employeeId: holder.id, ticksRemaining: holder.taskTicksRemaining, durationTicks };
+}
+
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'driving_center',
   'blasting_academy',
@@ -317,6 +359,31 @@ describe('Buildings lifecycle', () => {
     expect(ctx.state!.buildings.buildings[0]!.z).toBe(20);
   });
 
+  it('refuses to move a building onto a site still under construction', () => {
+    // Existing, finished building to move.
+    buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+
+    // A second order queues a site management_office is 3x3 -> reserves (30,30)-(32,32).
+    const order = buildCommand(ctx, ['management_office'], { at: '30,30' });
+    expect(order.success, JSON.stringify(order)).toBe(true);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+
+    // Moving the finished building onto the reserved, still-under-construction
+    // site must be refused up front, not silently accepted and corrected later
+    // by tickTaskCompletion.ts's defensive refund branch.
+    const moveResult = buildCommand(ctx, ['move', '1'], { to: '30,30' });
+
+    expect(moveResult.success).toBe(false);
+    expect(moveResult.output).toMatch(/occupied/i);
+
+    // Nothing moved, and the pending site is untouched.
+    expect(ctx.state!.buildings.buildings[0]!.x).toBe(10);
+    expect(ctx.state!.buildings.buildings[0]!.z).toBe(10);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+  });
+
   // ── 10. Freight warehouse storage + logistics sync ──────────────────────────
 
   it('freight warehouse adds storage capacity', () => {
@@ -563,6 +630,36 @@ describe('Construction sites — order-then-build (#556)', () => {
     expect(ctx.state!.ghostPreviews).toHaveLength(0);
   });
 
+  it('cancelling a site whose employee is already mid-work still refunds the full cost, not a prorated amount', () => {
+    // TaskCancellation.ts's actionOrderCost refund is unconditional (a
+    // building isn't segmented like a ramp, so there's no partial-progress
+    // deduction to apply) — this proves it holds once the employee has
+    // actually arrived and burned some of the work timer, not just while the
+    // order is still queued/pre-walk (every other cancel test here cancels
+    // immediately after ordering).
+    const cashBefore = ctx.state!.cash;
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const def = getBuildingDef('freight_warehouse', 1);
+    expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const actionId = planned.actionId;
+
+    const midWork = tickUntilBuildingMidWork(ctx, actionId);
+    expect(midWork.ticksRemaining).toBeLessThan(midWork.durationTicks);
+
+    // Ticking to mid-work spends employee upkeep along the way, so cash by
+    // now is already below cashBefore for reasons unrelated to the refund —
+    // what's under test is that the cancel refund itself is the FULL
+    // construction cost, not prorated down for the ticks already worked.
+    const cashBeforeCancel = ctx.state!.cash;
+    const cancelResult = employeeCommand(ctx, ['cancel', String(actionId)], {});
+
+    expect(cancelResult.success, JSON.stringify(cancelResult)).toBe(true);
+    expect(ctx.state!.cash).toBe(cashBeforeCancel + def.constructionCost);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  });
+
   it('cancelling an unknown site id fails without touching cash or any in-flight order', () => {
     buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
     const cashAfterOrder = ctx.state!.cash;
@@ -591,5 +688,25 @@ describe('Construction sites — order-then-build (#556)', () => {
     );
     expect(restoredAction).toBeDefined();
     expect(restoredAction!.type).toBe('place_building');
+  });
+
+  it('save/load preserves the actual remaining work of a site whose employee is mid-construction', () => {
+    // The test above only proves the static PendingAction/PlannedBuilding
+    // shape survives a JSON round trip — it ticks before the employee has
+    // arrived, so taskTicksRemaining is still null throughout. This drives
+    // the order until an employee has actually arrived and started counting
+    // down, then asserts THAT number survives, unchanged, across save/load.
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const midWork = tickUntilBuildingMidWork(ctx, planned.actionId);
+
+    const json = serialize(ctx.state!);
+    const restored = deserialize(json);
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === midWork.employeeId);
+    expect(restoredEmployee).toBeDefined();
+    expect(restoredEmployee!.taskTicksRemaining).toBe(midWork.ticksRemaining);
+    expect(restored.plannedBuildings).toEqual(ctx.state!.plannedBuildings);
+    expect(restored.buildings.buildings).toHaveLength(0);
   });
 });

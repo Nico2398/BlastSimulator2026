@@ -400,6 +400,52 @@ describe('moveBuilding() cost matches getMoveCost()', () => {
   });
 });
 
+// ── moveBuilding — plannedOccupants (#556 review finding 2) ──────────────────
+// A move must be refused up front when it would land on a site still under
+// construction, the same way an overlapping real building already refuses it
+// — not silently accepted and corrected later by tickTaskCompletion.ts's
+// defensive completion-time refund.
+
+describe('moveBuilding() — plannedOccupants (sites under construction)', () => {
+  it('refuses a move onto a site reserved by a plannedOccupant, "Space is occupied"', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const moverId = state.buildings[0]!.id;
+    const plannedOccupants: FootprintOccupant[] = [{ type: 'freight_warehouse', tier: 1, x: 20, z: 20 }];
+
+    const result = moveBuilding(state, moverId, 20, 20, 64, 64, 0, 0, plannedOccupants);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Space is occupied');
+    // Building must not have moved.
+    expect(state.buildings[0]!.x).toBe(0);
+    expect(state.buildings[0]!.z).toBe(0);
+  });
+
+  it('allows a move that overlaps no plannedOccupant', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const moverId = state.buildings[0]!.id;
+    const plannedOccupants: FootprintOccupant[] = [{ type: 'freight_warehouse', tier: 1, x: 40, z: 40 }];
+
+    const result = moveBuilding(state, moverId, 20, 20, 64, 64, 0, 0, plannedOccupants);
+
+    expect(result.success).toBe(true);
+    expect(state.buildings[0]!.x).toBe(20);
+    expect(state.buildings[0]!.z).toBe(20);
+  });
+
+  it('defaults plannedOccupants to empty — a caller with no planned-buildings list behaves as before', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const moverId = state.buildings[0]!.id;
+
+    const result = moveBuilding(state, moverId, 20, 20, 64, 64);
+
+    expect(result.success).toBe(true);
+  });
+});
+
 // ── checkFootprintPlacement (#556 — construction sites) ──────────────────────
 // Shared bounds + occupancy check for the order-then-build path: `occupants`
 // covers both live Buildings AND still-under-construction PlannedBuildings —

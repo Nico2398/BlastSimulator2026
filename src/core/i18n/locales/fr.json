@@ -2420,7 +2420,6 @@
   "ui.build.cancel": "Annuler",
   "ui.build.insufficient_funds": "Fonds insuffisants",
   "ui.build.close": "Fermer",
-  "ui.build.placed": "Bâtiment placé !",
   "ui.build.select_tier": "Choisir le niveau",
   "ui.build.demolish": "Démolir",
   "ui.build.upgrade": "Améliorer",

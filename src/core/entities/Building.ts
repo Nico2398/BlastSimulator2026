@@ -271,7 +271,13 @@ export function getMoveCost(building: Building): number {
   return Math.round(getBuildingDef(building.type, building.tier).constructionCost * 0.5);
 }
 
-/** Move a building to new coordinates. Returns relocation cost (50% of construction). */
+/**
+ * Move a building to new coordinates. Returns relocation cost (50% of
+ * construction). `plannedOccupants` (#556, sites under construction —
+ * `GameState.plannedBuildings`) are checked alongside live buildings so a
+ * move cannot land on a site still being built; callers that have no
+ * planned-buildings list may omit it.
+ */
 export function moveBuilding(
   state: BuildingState,
   buildingId: number,
@@ -281,12 +287,17 @@ export function moveBuilding(
   gridSizeZ: number,
   originX: number = 0,
   originZ: number = 0,
+  plannedOccupants: ReadonlyArray<FootprintOccupant> = [],
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
 
+  const occupants: FootprintOccupant[] = [
+    ...state.buildings.filter(b => b.id !== buildingId).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
+    ...plannedOccupants,
+  ];
   const check = checkFootprintPlacement(
-    state.buildings.filter(b => b.id !== buildingId).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
+    occupants,
     building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ,
   );
   if (!check.valid) {

@@ -74,10 +74,12 @@ function bumpNewGameCash(step: ScenarioStepDef): ScenarioStepDef {
   return {
     ...step,
     command: bump(step.command),
-    interaction: step.interaction?.map(a => (a.type === 'command' ? { ...a, command: bump(a.command) } : a)),
-    expect: step.expect?.equals && 'cash' in step.expect.equals
-      ? { ...step.expect, equals: { ...step.expect.equals, cash: newCash } }
-      : step.expect,
+    ...(step.interaction
+      ? { interaction: step.interaction.map(a => (a.type === 'command' ? { ...a, command: bump(a.command) } : a)) }
+      : {}),
+    ...(step.expect?.equals && 'cash' in step.expect.equals
+      ? { expect: { ...step.expect, equals: { ...step.expect.equals, cash: newCash } } }
+      : {}),
   };
 }
 
@@ -107,11 +109,12 @@ function driveConstructionOrders(steps: ScenarioStepDef[]): ScenarioStepDef[] {
     ) {
       const targetCount = step.expect.equals['buildingCount'] as number;
       const { buildingCount: _dropped, ...restEquals } = step.expect.equals;
+      const { equals: _oldEquals, ...restExpect } = step.expect;
       out[out.length - 1] = {
         ...step,
         expect: {
-          ...step.expect,
-          ...(Object.keys(restEquals).length > 0 ? { equals: restEquals } : { equals: undefined }),
+          ...restExpect,
+          ...(Object.keys(restEquals).length > 0 ? { equals: restEquals } : {}),
         },
       };
       out.push({

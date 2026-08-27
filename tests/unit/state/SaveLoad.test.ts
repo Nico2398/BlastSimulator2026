@@ -572,6 +572,17 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
 
   it('a v14+ save with plannedBuildings populated round-trips serialize/deserialize unchanged, including its in-flight PendingAction', () => {
     const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    // holderId must reference a real employee (state.employees) for the
+    // fixture to be internally consistent — a hand-picked id with no
+    // matching employee record can't happen from real dispatch. Also gives
+    // the holder actual in-progress work fields (taskTicksRemaining,
+    // activeActionId) so the round-trip proves remaining work itself
+    // survives, not just the static PendingAction shape.
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 100;
+    employee.taskTicksRemaining = 17;
+    employee.activeTaskTotalTicks = 40;
     state.plannedBuildings.push({
       id: 1, type: 'freight_warehouse', tier: 1, x: 5, z: 5, actionId: 100, cost: 15000,
     });
@@ -579,7 +590,7 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
       id: 100, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
       targetX: 5, targetZ: 5, targetY: 0,
       payload: { buildingOrderId: 1, cost: 15000, footprint: [[0, 0], [1, 0], [0, 1], [1, 1]], durationTicks: 40 },
-      targetEmployeeId: null, status: 'in_progress', holderId: 7,
+      targetEmployeeId: null, status: 'in_progress', holderId: employee.id,
     });
     state.nextPlannedBuildingId = 2;
 
@@ -594,10 +605,16 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
     const restoredAction = restored.pendingActions.find(a => a.id === 100);
     expect(restoredAction).toBeDefined();
     expect(restoredAction!.status).toBe('in_progress');
-    expect(restoredAction!.holderId).toBe(7);
+    expect(restoredAction!.holderId).toBe(employee.id);
     expect(restoredAction!.payload).toEqual({
       buildingOrderId: 1, cost: 15000, footprint: [[0, 0], [1, 0], [0, 1], [1, 1]], durationTicks: 40,
     });
+
+    // The employee doing the work — and how much of it is left — survives too.
+    const restoredEmployee = restored.employees.employees.find(e => e.id === employee.id);
+    expect(restoredEmployee).toBeDefined();
+    expect(restoredEmployee!.activeActionId).toBe(100);
+    expect(restoredEmployee!.taskTicksRemaining).toBe(17);
   });
 
   it('an empty v14+ save (no buildings under construction) round-trips to an empty array (boundary)', () => {

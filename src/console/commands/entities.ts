@@ -146,9 +146,11 @@ export function buildCommand(
       );
       if (!moveClaim.ok) return { success: false, output: moveClaim.output! };
       const moveBounds = siteBounds(ctx);
+      const plannedOccupants = state.plannedBuildings.map(pb => ({ type: pb.type, tier: pb.tier, x: pb.x, z: pb.z }));
       const result = moveBuilding(
         state.buildings, id, toCoords[0]!, toCoords[1]!,
         moveBounds.width, moveBounds.depth, moveBounds.originX, moveBounds.originZ,
+        plannedOccupants,
       );
       if (!result.success) return { success: false, output: result.error! };
       state.cash -= result.cost!;
