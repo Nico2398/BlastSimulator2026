@@ -148,7 +148,7 @@ describe('TopBar (redesign P1)', () => {
     });
 
     it('opens on click and shows the current weather name and its real effect', () => {
-      const { topBar, container, weatherBtn } = setUp('heavy_rain');
+      const { topBar, weatherBtn } = setUp('heavy_rain');
       weatherBtn.click();
       const popover = weatherBtn.nextElementSibling as HTMLElement;
       expect(popover.style.display).not.toBe('none');

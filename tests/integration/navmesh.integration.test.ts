@@ -6,7 +6,6 @@ import { NavGrid } from '../../src/core/nav/NavGrid.js';
 import { findPath, findRampConnections, octileHeuristic } from '../../src/core/nav/Pathfinding.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { createBuildingState, placeBuilding } from '../../src/core/entities/Building.js';
-import { generateTerrain } from '../../src/core/world/TerrainGen.js';
 import { buildRamp, defineRampSegments, carveRampSegment, type RampDef } from '../../src/core/mining/Ramp.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

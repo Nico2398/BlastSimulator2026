@@ -13,7 +13,7 @@
 //   Group 9 — Waypoint validity: contiguous, includes goal, no dup start
 
 import { describe, it, expect } from 'vitest';
-import { findPath, octileHeuristic, getBenchLevel, findRampConnections, type PathRequest, type RampConnection } from '../../../src/core/nav/Pathfinding.js';
+import { findPath, octileHeuristic, getBenchLevel, findRampConnections } from '../../../src/core/nav/Pathfinding.js';
 import { NavGrid, type NavCell, type NavCellType } from '../../../src/core/nav/NavGrid.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════

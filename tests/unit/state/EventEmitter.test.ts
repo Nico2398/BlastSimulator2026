@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EventEmitter, type GameEventMap } from '../../../src/core/state/EventEmitter.js';
+import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
 describe('EventEmitter', () => {
   it('subscribing and emitting calls the handler with correct data', () => {

@@ -49,7 +49,6 @@ describe('TerrainGen — structure', () => {
 
   it('ore density is zero in the neutral border zone', () => {
     const grid = generateTerrain(makeConfig(42));
-    const borderWidth = 5;
     for (let y = 0; y < 5; y++) {
       const v = grid.getVoxel(0, y, 0)!;
       if (v.density > 0) {

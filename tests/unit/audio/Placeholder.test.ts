@@ -24,7 +24,7 @@ function makeRealAudioBuffer(sampleRate: number, durationS: number): AudioBuffer
 
 const mockCtx = {
   sampleRate: 44100,
-  createBuffer: vi.fn((channels: number, length: number, sampleRate: number) => {
+  createBuffer: vi.fn((_channels: number, length: number, sampleRate: number) => {
     return makeRealAudioBuffer(sampleRate, length / sampleRate);
   }),
 } as unknown as AudioContext;

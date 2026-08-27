@@ -11,7 +11,6 @@ import * as THREE from 'three';
 import { SurveyConfidenceOverlay } from '../../../src/renderer/SurveyConfidenceOverlay.js';
 import type {
   SurveyConfidencePoint,
-  SurveyConfidenceOverlayOptions,
 } from '../../../src/renderer/SurveyConfidenceOverlay.js';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -225,7 +224,6 @@ describe('survey-seismic-side-effects — visual rendering', () => {
       { x: 20, z: 20, surfaceY: 4, confidence: 0.85, fresh: true },
     ];
     overlay.show({ points: points1, opacity: 0.5 });
-    const count1 = (scene.children[0] as THREE.Group).children.length;
 
     // Second seismic at (30,20) — should replace, not accumulate
     const points2: SurveyConfidencePoint[] = [

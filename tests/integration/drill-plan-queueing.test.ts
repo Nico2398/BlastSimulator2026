@@ -19,7 +19,6 @@ import { NavGrid } from '../../src/core/nav/NavGrid.js';
 /** Runs `tick 1` until `predicate(state)` is true or `maxTicks` is exhausted. */
 function tickUntil(
   run: (cmd: string) => unknown,
-  state: { tickCount: number },
   predicate: () => boolean,
   maxTicks = 400,
 ): void {
@@ -68,7 +67,7 @@ describe('drill_plan grid — queues drill_hole actions instead of writing holes
     expect(state.plannedDrillHoles).toHaveLength(2);
     expect(state.drillHoles).toHaveLength(0);
 
-    tickUntil(run, state, () => state.drillHoles.length > 0);
+    tickUntil(run, () => state.drillHoles.length > 0);
 
     expect(state.drillHoles.length).toBeGreaterThan(0);
     // A hole that has landed is no longer ordered.
@@ -86,7 +85,7 @@ describe('drill_plan grid — queues drill_hole actions instead of writing holes
     expect(run('drill_plan grid rows:2 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
     const orderedIds = state.plannedDrillHoles.map(h => h.id).sort();
 
-    tickUntil(run, state, () => state.plannedDrillHoles.length === 0, 800);
+    tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
 
     expect(state.plannedDrillHoles).toHaveLength(0);
     expect(state.drillHoles).toHaveLength(4);
@@ -104,7 +103,7 @@ describe('drill_plan grid — queues drill_hole actions instead of writing holes
     expect(run('drill_plan grid rows:1 cols:2 spacing:5 depth:8 start:14,14').success).toBe(true);
     expect(state.plannedDrillHoles.map(h => h.id)).toEqual(['H1', 'H2']);
 
-    tickUntil(run, state, () => state.plannedDrillHoles.length === 0, 800);
+    tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
 
     expect(state.drillHoles.map(h => h.id).sort()).toEqual(['H1', 'H2']);
   });
@@ -126,7 +125,7 @@ describe('drill_plan grid — queues drill_hole actions instead of writing holes
     // don't exist as terrain yet, only as ordered/planned entries.
     expect(patchSpy).not.toHaveBeenCalled();
 
-    tickUntil(run, state, () => state.plannedDrillHoles.length === 0, 800);
+    tickUntil(run, () => state.plannedDrillHoles.length === 0, 800);
 
     // Exactly one patch call per landed hole, each a single-cell region.
     expect(patchSpy).toHaveBeenCalledTimes(2);

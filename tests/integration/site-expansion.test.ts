@@ -2,7 +2,7 @@
 // either grows the site or says why it cannot, and never silently no-ops.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { newGameCommand, terrainConfigOf, type GameContext } from '../../src/console/commands/world.js';
+import { newGameCommand, terrainConfigOf } from '../../src/console/commands/world.js';
 import { drillPlanCommand, buildRampCommand, surveyCommand, type MiningContext } from '../../src/console/commands/mining.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';

@@ -15,7 +15,6 @@ const mockExit = vi.fn();
 vi.stubGlobal('process', { ...process, exit: mockExit });
 
 // Set up minimal argv to prevent parseArgs from calling process.exit
-const originalArgv = process.argv;
 beforeEach(() => {
   process.argv = ['node', 'scenario-test.ts', '--commands', 'help'];
   mockExit.mockClear();

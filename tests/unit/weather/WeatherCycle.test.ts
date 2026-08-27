@@ -5,7 +5,6 @@ import {
   advanceWeather,
   forceAdvance,
   setWeather,
-  isRaining,
   forecast,
   ALL_WEATHER_STATES,
   type WeatherState,
@@ -53,7 +52,6 @@ describe('WeatherCycle', () => {
   it('forceAdvance transitions immediately', () => {
     const cycle = createWeatherCycle(99);
     const rng = new Random(99);
-    const initial = cycle.current;
 
     // Force several transitions
     const states = new Set<string>();

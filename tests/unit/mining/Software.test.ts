@@ -63,7 +63,7 @@ describe('Software — preview tiers', () => {
   });
 
   it('previewVibrations requires tier >= 4', () => {
-    const { grid, plan } = makeTestPlan();
+    const { plan } = makeTestPlan();
     const villages = [{ id: 'v1', position: vec3(100, 0, 100) }];
     expect(previewVibrations(plan, villages, 3)).toBeNull();
     const result = previewVibrations(plan, villages, 4);

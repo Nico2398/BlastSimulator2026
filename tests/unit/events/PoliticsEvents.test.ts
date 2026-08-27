@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
-import { registerEvents, clearEvents, getEventsByCategory, getEventById, type EventContext } from '../../../src/core/events/EventPool.js';
+import { registerEvents, clearEvents, getEventsByCategory, type EventContext } from '../../../src/core/events/EventPool.js';
 import { POLITICS_EVENTS_1 } from '../../../src/core/events/PoliticsEvents1.js';
 import { POLITICS_EVENTS_2 } from '../../../src/core/events/PoliticsEvents2.js';
 import { createScoreState } from '../../../src/core/scores/ScoreManager.js';

@@ -40,7 +40,7 @@ const mockCtx = {
   sampleRate: 44100,
   createGain: vi.fn(() => makeGainNode()),
   createBufferSource: vi.fn(() => makeBufferSource()),
-  createBuffer: vi.fn((channels: number, length: number, rate: number) => makeAudioBuffer(length / rate, rate)),
+  createBuffer: vi.fn((_channels: number, length: number, rate: number) => makeAudioBuffer(length / rate, rate)),
   destination: {},
   resume: vi.fn().mockResolvedValue(undefined),
   close: vi.fn().mockResolvedValue(undefined),
