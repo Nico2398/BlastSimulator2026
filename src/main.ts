@@ -569,6 +569,12 @@ window.__gameState = () => {
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
+    // Research tasks queued at a Research Center, in progress or pending --
+    // mirrors serializeGameState's own field (console-api.ts). Proves a
+    // research task actually completed (reaches 0) rather than a `tick N`
+    // pad merely running, which a spontaneous mid-window event can silently
+    // cut short.
+    researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,

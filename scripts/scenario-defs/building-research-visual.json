@@ -3,18 +3,18 @@
   "description": "Visual check of research center building at all three tiers for technology advancement",
   "steps": [
     {
-      "command": "new_game seed:42 cash:230000",
+      "command": "new_game seed:42 cash:280000 staffed:true",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:230000"
+          "command": "new_game seed:42 cash:280000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 230000,
+          "cash": 280000,
           "buildingCount": 0
         }
       }
@@ -52,8 +52,27 @@
         "changedBy": {
           "cash": -25000
         },
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before anything depends on a real building existing."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the research_center site to completion (#556) — hasActiveResearchCenter needs a real building, not just a queued order.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 1
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },

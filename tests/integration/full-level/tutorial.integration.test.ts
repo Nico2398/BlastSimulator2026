@@ -10,6 +10,7 @@ import {
   getStateSummary,
   driveDrillPlanToCompletion,
   driveChargePlanToCompletion,
+  driveConstructionToCompletion,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
@@ -217,9 +218,14 @@ describe('Tutorial Level — Full Walkthrough', () => {
     const assignDriver = vehicleCommand(ctx, ['driver', String(haulerId), '4'], {});
     expect(assignDriver.success).toBe(true);
 
-    // 21. Build a freight_warehouse at (5,5)
+    // 21. Build a freight_warehouse at (5,5). #556: confirming the order
+    // only queues a construction site — drive it to completion (the
+    // surveyor, idle since step 4, picks up the unskilled `place_building`
+    // work) before asserting a real building exists.
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
     expect(buildResult.success).toBe(true);
+    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    driveConstructionToCompletion(ctx);
     expect(ctx.state!.buildings.buildings.length).toBe(1);
 
     // 22. Deliver to the accepted contract — should generate positive payment.

@@ -3,18 +3,18 @@
   "description": "Visual check of training buildings: driving center, blasting academy, management office, and geology lab",
   "steps": [
     {
-      "command": "new_game seed:42 cash:60000",
+      "command": "new_game seed:42 cash:150000 staffed:true",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:60000"
+          "command": "new_game seed:42 cash:150000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 60000,
+          "cash": 150000,
           "buildingCount": 0
         }
       }
@@ -154,8 +154,27 @@
         "changedBy": {
           "cash": -12000
         },
+        "note": "Confirming placement only queues a construction site (#556) \u2014 the next step waits for all four orders above to actually land before anything below refers to a building by id."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:4 max_ticks:400",
+      "description": "Drive all four school/office sites to completion (#556).",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 4,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 4
+          "buildingCount": 4,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -276,7 +295,7 @@
         "equals": {
           "trainingCount": 1
         },
-        "note": "training takes 20 ticks — still in progress at 10"
+        "note": "training takes 20 ticks \u2014 still in progress at 10"
       }
     },
     {
@@ -303,7 +322,7 @@
           "trainingCount": 0,
           "proficiencyTotal": 3
         },
-        "note": "35 ticks total now past the 20-tick training duration — driving.excavator gained (proficiencyTotal 2→3), training slot freed"
+        "note": "35 ticks total now past the 20-tick training duration \u2014 driving.excavator gained (proficiencyTotal 2\u21923), training slot freed"
       }
     },
     {

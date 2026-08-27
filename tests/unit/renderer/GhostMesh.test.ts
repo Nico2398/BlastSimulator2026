@@ -462,8 +462,13 @@ describe('GhostMesh', () => {
         makePreview(2, { type: 'place_building', targetX: 10, targetZ: 10, footprint, claimed: true }),
       ]);
 
-      const unclaimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 0) as THREE.Mesh;
-      const claimedMesh = scene.children.find(c => (c as THREE.Mesh).position.x === 10) as THREE.Mesh;
+      // A footprint ghost is positioned at targetX/Z + sizeX/Z/2 (centred on
+      // its own footprint, like BuildingMesh.ts), not at targetX/Z itself —
+      // so look these two up by scene insertion order (sync() adds them in
+      // preview order into an otherwise-empty scene) rather than by an exact
+      // position.x match against the raw target coordinate.
+      const unclaimedMesh = scene.children[0] as THREE.Mesh;
+      const claimedMesh = scene.children[1] as THREE.Mesh;
       expect(unclaimedMesh).toBeDefined();
       expect(claimedMesh).toBeDefined();
 

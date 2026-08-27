@@ -48,6 +48,35 @@ function getEmployee(ctx: GameContext, id: number): Employee {
   return emp;
 }
 
+/**
+ * #556: confirming a `build` order only queues a construction site — a
+ * living_quarters used as a rest destination isn't a real building (and
+ * routing finds nothing to route to) until an idle employee actually
+ * finishes it. Hires a dedicated builder (so the test's own employee-under-
+ * test is left untouched) and ticks until every ordered site has landed in
+ * state.buildings.buildings, mirroring the equivalent helper in
+ * economy.integration.test.ts/blast-oversized-boulders.integration.test.ts.
+ */
+function buildLivingQuartersAndComplete(ctx: GameContext, at: string, maxTicks = 300): void {
+  const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
+  if (!hireBuilder.success) throw new Error(`Setup: builder hire failed — ${hireBuilder.output}`);
+
+  const build = buildCommand(ctx, ['living_quarters'], { at, tier: '1' });
+  if (!build.success) throw new Error(`Setup: living_quarters order failed — ${build.output}`);
+
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+  if (ctx.state!.plannedBuildings.length > 0) {
+    throw new Error('Setup: living_quarters construction never completed');
+  }
+}
+
 // ── Employee needs ───────────────────────────────────────────────────────────
 
 describe('Employee needs', () => {
@@ -342,11 +371,13 @@ describe('#680 regression — an employee walking toward rest drains at the idle
     // while the employee is still travelling" test above (proven safe: a few
     // ticks in, the employee is still mid-walk, not yet at (20,20)).
     state.cash = 100_000;
-    const build = buildCommand(ctx, ['living_quarters'], { at: '20,20', tier: '1' });
-    expect(build.success).toBe(true);
+    buildLivingQuartersAndComplete(ctx, '20,20');
 
     emp.x = 0;
     emp.z = 0;
+    emp.activeActionId = null;
+    emp.destinationX = null;
+    emp.destinationZ = null;
     emp.hunger = 20; // below warning threshold — triggers routing toward rest
     emp.fatigue = 100;
     emp.breakNeed = 100;
@@ -404,12 +435,14 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     const state = ctx.state!;
     const emp = getEmployee(ctx, empId);
 
-    const build = buildCommand(ctx, ['living_quarters'], { at: '5,5', tier: '1' });
-    expect(build.success).toBe(true);
-
     state.cash = 100_000;
+    buildLivingQuartersAndComplete(ctx, '5,5');
+
     emp.x = 0;
     emp.z = 0;
+    emp.activeActionId = null;
+    emp.destinationX = null;
+    emp.destinationZ = null;
     emp.hunger = 34; // just below the 35 warning threshold
     emp.fatigue = 100;
     emp.breakNeed = 100;
@@ -446,12 +479,14 @@ describe('tick command — a single threshold dip triggers a single rest', () =>
     const state = ctx.state!;
     const emp = getEmployee(ctx, empId);
 
-    const build = buildCommand(ctx, ['living_quarters'], { at: '20,20', tier: '1' });
-    expect(build.success).toBe(true);
-
     state.cash = 100_000;
+    buildLivingQuartersAndComplete(ctx, '20,20');
+
     emp.x = 0;
     emp.z = 0;
+    emp.activeActionId = null;
+    emp.destinationX = null;
+    emp.destinationZ = null;
     emp.hunger = 20; // below warning threshold — triggers routing
     emp.fatigue = 100;
     emp.breakNeed = 100;

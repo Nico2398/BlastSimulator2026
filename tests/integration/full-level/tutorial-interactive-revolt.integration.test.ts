@@ -54,9 +54,67 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { createGameEngine, runSteps } from '../../../scripts/shared/command-runner.js';
+import { runCommand } from '../../../src/console/createRunner.js';
+import type { RunnerWithContext } from '../../../src/console/createRunner.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../../scripts/shared/scenario-utils.js';
+import type { ScenarioStepDef } from '../../../scripts/shared/scenario-types.js';
 import { tickWithEvents } from './helpers.js';
 import { REVOLT_TICKS } from '../../../src/core/campaign/WorkerRevolt.js';
+
+/**
+ * #556 changed `build <type> at:x,z` from placing a building instantly to
+ * queuing a construction site that only becomes real once an idle employee
+ * finishes the work. tutorial-interactive.json's own `living_quarters` order
+ * step (shared broadly by `npm run scenarios`/`scenarios:interaction`, well
+ * outside this issue's own file list — so patched here in-memory rather than
+ * edited on disk) still asserts a completed building the instant the order
+ * returns — true under the old instant placement, no longer true here.
+ * Strips that one `buildingCount` check; driveTutorialBuildingsToCompletion
+ * below (called from the test body, not injected as a scenario step) is what
+ * actually drives both this order and the `driving_center` order right after
+ * it to completion.
+ */
+function dropInstantBuildingCountCheck(steps: ScenarioStepDef[]): ScenarioStepDef[] {
+  const livingQuartersIdx = steps.findIndex(s => s.command.startsWith('build living_quarters'));
+  if (livingQuartersIdx === -1) return steps;
+
+  return steps.map((step, i) => {
+    if (i !== livingQuartersIdx || !step.expect?.equals || !('buildingCount' in step.expect.equals)) return step;
+    const { buildingCount: _dropped, ...restEquals } = step.expect.equals;
+    return {
+      ...step,
+      expect: { ...step.expect, ...(Object.keys(restEquals).length > 0 ? { equals: restEquals } : { equals: undefined }) },
+    };
+  });
+}
+
+/**
+ * Ticks (with needs topped up every tick, same as economy/needs/blast-
+ * oversized-boulders' equivalent helpers) until every construction site
+ * ordered so far has landed in state.buildings.buildings. Deliberately NOT
+ * the same `tickWithEvents` this test uses for its own real, unforced
+ * INTERACTION_MODE_TICK_PADDING grind below — that padding is the whole
+ * point under test (realistic well-being decay leading up to a possible
+ * revolt), whereas this earlier construction phase has nothing to do with
+ * it: the driller hired just above (`requiredSkill: null` — any idle
+ * employee can build) needs to actually finish both orders before the real
+ * grind starts, and would otherwise risk a needs-driven rest loop with
+ * nowhere real to rest yet (no living_quarters exists until this phase
+ * completes) — precisely the deadlock the topped-up needs sidestep.
+ */
+function driveTutorialBuildingsToCompletion(engine: RunnerWithContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && engine.ctx.state!.plannedBuildings.length > 0; i++) {
+    for (const emp of engine.ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    runCommand(engine, 'tick 1');
+    if (engine.ctx.state!.events.pendingEvent) {
+      runCommand(engine, 'event choose 0');
+    }
+  }
+}
 
 /**
  * Interaction mode reaches chargedCount:9 ~249 ticks later than command
@@ -73,27 +131,44 @@ describe('tutorial-interactive.json — worker-revolt regression (#707)', () => 
     'does not trigger a worker_revolt before blast once interaction mode\'s ' +
       'extra grind ticks are reproduced in command mode',
     () => {
-      const steps = loadScenarioDef('tutorial-interactive', SCENARIO_DIR).steps;
+      const steps = dropInstantBuildingCountCheck(loadScenarioDef('tutorial-interactive', SCENARIO_DIR).steps);
 
-      // Locate the two structural anchors this test pads/drives around:
-      // "every ordered hole has actually landed" and "blast fired".
+      // Locate the structural anchors this test pads/drives around: the
+      // driving_center order (construction must finish before the very next
+      // step, `employee train ... driving.drill_rig`, can succeed), "every
+      // ordered hole has actually landed", and "blast fired".
+      const drivingCenterIdx = steps.findIndex(s => s.command.startsWith('build driving_center'));
       const drillPlanWaitIdx = steps.findIndex(s => s.command.startsWith('wait_until field:holeCount'));
       const blastIdx = steps.findIndex(s => s.command === 'blast');
-      expect(drillPlanWaitIdx).toBeGreaterThan(-1);
+      expect(drivingCenterIdx).toBeGreaterThan(-1);
+      expect(drillPlanWaitIdx).toBeGreaterThan(drivingCenterIdx);
       expect(blastIdx).toBeGreaterThan(drillPlanWaitIdx);
 
       const engine = createGameEngine();
       const outDir = mkdtempSync(join(tmpdir(), 'tutorial-interactive-707-'));
 
-      // Setup through "every drilled hole has landed": speed/hire/geology,
-      // survey, hire driller, living_quarters, continuous policy,
-      // driving_center, driving.drill_rig training, drill_rig purchase +
-      // assignment, driving.excavator training, rock_digger purchase +
-      // assignment, box-cut, and the 9-hole drill order itself -- exactly
-      // as tutorial-interactive.json's own command-mode replay runs it
-      // today (steps 0..drillPlanWaitIdx inclusive).
-      const setupResults = runSteps(engine, steps.slice(0, drillPlanWaitIdx + 1), outDir);
-      const setupErrors = setupResults.filter(r => r.error);
+      // Setup through "both queued construction sites are real buildings":
+      // speed/hire/geology, survey, hire driller, living_quarters order,
+      // continuous policy, driving_center order (steps 0..drivingCenterIdx
+      // inclusive).
+      const preBuildResults = runSteps(engine, steps.slice(0, drivingCenterIdx + 1), outDir);
+
+      // #556: confirming those two placements only queued construction
+      // sites — drive both to completion (needs topped up so there's no
+      // deadlock with nowhere real to rest yet) before continuing into the
+      // steps that need driving_center to actually exist.
+      driveTutorialBuildingsToCompletion(engine);
+      expect(engine.ctx.state!.buildings.buildings.length).toBe(2);
+
+      // Continue through "every drilled hole has actually landed":
+      // driving.drill_rig training, drill_rig purchase + assignment,
+      // driving.excavator training, rock_digger purchase + assignment,
+      // box-cut, and the 9-hole drill order itself -- exactly as
+      // tutorial-interactive.json's own command-mode replay runs it today
+      // (steps drivingCenterIdx+1..drillPlanWaitIdx inclusive).
+      const restOfSetupResults = runSteps(engine, steps.slice(drivingCenterIdx + 1, drillPlanWaitIdx + 1), outDir);
+
+      const setupErrors = [...preBuildResults, ...restOfSetupResults].filter(r => r.error);
       expect(setupErrors, `setup steps failed: ${JSON.stringify(setupErrors, null, 2)}`).toHaveLength(0);
       expect(engine.ctx.state).not.toBeNull();
       expect(engine.ctx.state!.levelEndReason).toBeNull();

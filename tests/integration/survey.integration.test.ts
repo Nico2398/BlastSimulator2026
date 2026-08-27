@@ -693,6 +693,11 @@ describe('Survey system — seismic building side effects', () => {
    * combination used in this describe block (worst case here: ~16 travel
    * ticks + 8 duration ticks for a seismic survey at (5,5) from a surveyor
    * spawned at (16,16)).
+   *
+   * Two tests below (#556) have their surveyor also build a construction
+   * site first — that walk + work drains enough fatigue to auto-insert a
+   * `rest` task ahead of the survey, so they pass a bigger budget to still
+   * clear rest + travel + duration inside one resolveTick() call.
    */
   function resolveTick(ticks = 30): void {
     for (let i = 0; i < ticks; i++) tickCommand(ctx, ['1'], {});
@@ -700,6 +705,18 @@ describe('Survey system — seismic building side effects', () => {
 
   function findBuilding(id: number) {
     return ctx.state!.buildings.buildings.find(b => b.id === id)!;
+  }
+
+  /**
+   * Confirming a placement only queues a construction site (#556) — drive
+   * ticks until the surveyor (the only idle employee at order time —
+   * unskilled work needs no qualification) finishes walking over and
+   * building it before these HP-side-effect tests can read a real building.
+   */
+  function resolveConstruction(maxTicks = 100): void {
+    for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+      tickCommand(ctx, ['1'], {});
+    }
   }
 
   it('applies -10 HP to a building within 5 cells of a completed seismic survey', () => {
@@ -715,11 +732,12 @@ describe('Survey system — seismic building side effects', () => {
     // T6.2 (pathfinding at scale); this sidesteps it for the test.
     const buildResult = buildCommand(ctx, ['living_quarters'], { at: '21,15' });
     expect(buildResult.success).toBe(true);
+    resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
     surveyCommand(ctx as any, ['seismic'], { x: '19', z: '14' });
-    resolveTick();
+    resolveTick(60);
 
     expect(findBuilding(building.id).hp).toBe(hpBefore - 10);
   });
@@ -729,6 +747,7 @@ describe('Survey system — seismic building side effects', () => {
     // Building at (25,25), survey center at (5,5) → distance ≈ 28 (outside 5-cell radius).
     const buildResult = buildCommand(ctx, ['living_quarters'], { at: '25,25' });
     expect(buildResult.success).toBe(true);
+    resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
@@ -742,6 +761,7 @@ describe('Survey system — seismic building side effects', () => {
     hireSurveyor();
     const buildResult = buildCommand(ctx, ['living_quarters'], { at: '12,10' });
     expect(buildResult.success).toBe(true);
+    resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
@@ -755,6 +775,7 @@ describe('Survey system — seismic building side effects', () => {
     hireSurveyor();
     const buildResult = buildCommand(ctx, ['living_quarters'], { at: '12,10' });
     expect(buildResult.success).toBe(true);
+    resolveConstruction();
     const building = ctx.state!.buildings.buildings[ctx.state!.buildings.buildings.length - 1]!;
     const hpBefore = building.hp;
 
@@ -765,6 +786,9 @@ describe('Survey system — seismic building side effects', () => {
   });
 
   it('damages every building within 5 cells when multiple are in range', () => {
+    // Two hires so both orders can be worked in parallel — each redundantly
+    // gets geology skill (hireSurveyor's job), harmless for this test.
+    hireSurveyor();
     hireSurveyor();
     // Same survey centre as the single-building test above, for the same
     // reason: the surveyor must actually walk there and stand on it (#437) or
@@ -776,13 +800,14 @@ describe('Survey system — seismic building side effects', () => {
     const b2Result = buildCommand(ctx, ['management_office'], { at: '22,11' });
     expect(b1Result.success).toBe(true);
     expect(b2Result.success).toBe(true);
+    resolveConstruction();
     const b1 = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
     const b2 = ctx.state!.buildings.buildings.find(b => b.type === 'management_office')!;
     const b1HpBefore = b1.hp;
     const b2HpBefore = b2.hp;
 
     surveyCommand(ctx as any, ['seismic'], { x: '19', z: '14' });
-    resolveTick();
+    resolveTick(60);
 
     expect(findBuilding(b1.id).hp).toBe(b1HpBefore - 10);
     expect(findBuilding(b2.id).hp).toBe(b2HpBefore - 10);

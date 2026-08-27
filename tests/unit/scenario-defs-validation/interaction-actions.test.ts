@@ -452,11 +452,24 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
 // above — those assert a different thing (outer/inner margin) and remain
 // valid on their own.
 // ──────────────────────────────────────────────
-describe('tutorial-interactive.json — every post-blast step (32-46) has a declared timeout floor of 90s', () => {
+describe('tutorial-interactive.json — every post-blast step has a declared timeout floor of 90s', () => {
   const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR);
 
-  const POST_BLAST_WINDOW_START = 32;
-  const POST_BLAST_WINDOW_END = 46; // inclusive
+  // Located dynamically rather than pinned to a literal index (#816 follow-up):
+  // the file's own step count shifts whenever an order-then-wait pair is
+  // inserted upstream of the blast (construction sites, #556) — a hardcoded
+  // 32-46 window silently started checking the wrong steps the moment that
+  // happened, rather than failing loudly. The window covers everything from
+  // the blast step onward to the end of the file, matching this test's own
+  // original intent (steps 31-46 of the pre-#556 file were exactly "the blast
+  // step through the last step").
+  const blastIndex = scenario.steps.findIndex(
+    s => typeof s !== 'string' && (s as ScenarioStepDef).command === 'blast',
+  );
+  if (blastIndex === -1) throw new Error("tutorial-interactive.json has no 'blast' step — post-blast window can't be located");
+
+  const POST_BLAST_WINDOW_START = blastIndex;
+  const POST_BLAST_WINDOW_END = scenario.steps.length - 1; // inclusive
 
   for (let i = POST_BLAST_WINDOW_START; i <= POST_BLAST_WINDOW_END; i++) {
     it(`step[${i}] has timeout >= 90`, () => {

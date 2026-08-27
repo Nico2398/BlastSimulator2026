@@ -20,13 +20,119 @@ import { resolve } from 'path';
 import { tmpdir } from 'os';
 import { createGameEngine, runSteps } from '../../scripts/shared/command-runner.js';
 import { loadScenarioDef, SCENARIO_DIR } from '../../scripts/shared/scenario-utils.js';
-import type { StepResult } from '../../scripts/shared/scenario-types.js';
+import type { ScenarioStepDef, StepResult } from '../../scripts/shared/scenario-types.js';
+
+/** `build <type> at:x,z [tier:N]` — the default-case order command, as opposed to build's list/destroy/upgrade/move/types subcommands (which stay synchronous even under #556). */
+function isPlacementOrderCommand(command: string): boolean {
+  const [top, sub] = command.trim().split(/\s+/);
+  const knownSubcommands = new Set(['list', 'destroy', 'upgrade', 'move', 'types']);
+  return top === 'build' && sub !== undefined && !knownSubcommands.has(sub);
+}
+
+/**
+ * #556 changed `build <type> at:x,z` from placing a building instantly to
+ * charging/validating and queuing a construction site that only becomes a
+ * real building once an idle employee finishes the work. These pre-existing
+ * scenario JSON files (`scripts/scenario-defs/`, shared broadly by
+ * `npm run scenarios`/`scenarios:interaction` well outside this issue's own
+ * file list — so patched here in-memory rather than edited on disk) assert a
+ * completed building the instant the order command returns, and start with
+ * no roster at all (an order with `requiredSkill: null` still needs at least
+ * one alive/idle employee before dispatch will touch it — see
+ * `EmployeeDispatch.ts`'s `eligible.length > 0` check).
+ *
+ * This clones the loaded steps and: (1) hires one cheap employee right after
+ * `new_game` so a `place_building` action has someone to claim it — the
+ * file's own `equals`/`changedBy` cash checks on every OTHER step stay valid
+ * since `changedBy` is always relative to the state right before that step,
+ * never the file's running total; (2) for every accepted placement-order
+ * step that asserted a `buildingCount` the instant the order returned, moves
+ * that assertion off the order step (which now only queues) onto a
+ * synthetic `waitUntil` step spliced in right after it, driving ticks until
+ * construction actually lands. A refused order (`commandOutcome: 'refused'`,
+ * the guard/rejection steps) is left untouched — nothing was queued to wait
+ * for.
+ */
+/**
+ * Extra starting cash folded into a `new_game ... cash:N` step (in-memory
+ * only, same as everything else here). These files sized their starting
+ * cash for the old instant-build chain; construction waits now spend dozens
+ * of extra ticks (walk time + `BUILDING_CONSTRUCTION_BASE_DURATION_TICKS`
+ * per order) the original budget never had to cover, and every one of those
+ * ticks drains employee upkeep. Sized generously against the worst case
+ * observed (a T3 research_center order short by ~$14k under the padded
+ * cash figure already in these files).
+ */
+const CASH_BUFFER = 60000;
+
+/** Bumps a `new_game ... cash:N` step's cash by CASH_BUFFER, keeping its own `expect.equals.cash` (if any) in sync. No-op for a step with no `cash:` param. */
+function bumpNewGameCash(step: ScenarioStepDef): ScenarioStepDef {
+  const match = step.command.match(/cash:(\d+)/);
+  if (!match) return step;
+  const newCash = Number(match[1]) + CASH_BUFFER;
+  const bump = (s: string) => s.replace(/cash:\d+/, `cash:${newCash}`);
+  return {
+    ...step,
+    command: bump(step.command),
+    interaction: step.interaction?.map(a => (a.type === 'command' ? { ...a, command: bump(a.command) } : a)),
+    expect: step.expect?.equals && 'cash' in step.expect.equals
+      ? { ...step.expect, equals: { ...step.expect.equals, cash: newCash } }
+      : step.expect,
+  };
+}
+
+function driveConstructionOrders(steps: ScenarioStepDef[]): ScenarioStepDef[] {
+  const out: ScenarioStepDef[] = [];
+  let hired = false;
+
+  for (const step of steps) {
+    if (!hired && step.command.trim().startsWith('new_game')) {
+      out.push(bumpNewGameCash(step));
+      out.push({
+        command: 'employee hire role:driller',
+        role: 'bootstrap',
+        interaction: [{ type: 'command', command: 'employee hire role:driller' }],
+      });
+      hired = true;
+      continue;
+    }
+
+    out.push(step);
+
+    if (
+      isPlacementOrderCommand(step.command)
+      && step.commandOutcome === undefined
+      && step.expect?.equals
+      && 'buildingCount' in step.expect.equals
+    ) {
+      const targetCount = step.expect.equals['buildingCount'] as number;
+      const { buildingCount: _dropped, ...restEquals } = step.expect.equals;
+      out[out.length - 1] = {
+        ...step,
+        expect: {
+          ...step.expect,
+          ...(Object.keys(restEquals).length > 0 ? { equals: restEquals } : { equals: undefined }),
+        },
+      };
+      out.push({
+        command: `wait_until field:buildingCount equals:${targetCount}`,
+        role: 'setup',
+        interaction: [{
+          type: 'waitUntil', field: 'buildingCount', equals: targetCount, maxTicks: 200, timeoutMs: 120000,
+        }],
+        expect: { equals: { buildingCount: targetCount } },
+      });
+    }
+  }
+
+  return out;
+}
 
 function runScenarioSteps(name: string) {
   const engine = createGameEngine();
   const scenario = loadScenarioDef(name, SCENARIO_DIR);
   const outDir = resolve(tmpdir(), `bs2026-scenario-410-${name}`);
-  const results = runSteps(engine, scenario.steps, outDir);
+  const results = runSteps(engine, driveConstructionOrders(scenario.steps), outDir);
   return { engine, results };
 }
 
@@ -43,6 +149,18 @@ function stepForNth(results: StepResult[], commandPrefix: string, occurrence: nu
   const found = matches[occurrence];
   if (!found) throw new Error(`No occurrence #${occurrence} found for command prefix "${commandPrefix}"`);
   return found;
+}
+
+/** Index (in `results`) of the Nth (0-indexed) result whose command starts with the given prefix. */
+function stepIndexForNth(results: StepResult[], commandPrefix: string, occurrence: number): number {
+  let seen = 0;
+  for (let i = 0; i < results.length; i++) {
+    if (results[i]!.command.startsWith(commandPrefix)) {
+      if (seen === occurrence) return i;
+      seen++;
+    }
+  }
+  throw new Error(`No occurrence #${occurrence} found for command prefix "${commandPrefix}"`);
 }
 
 describe('building-destruction-visual — scenario-runner (#410)', () => {
@@ -97,41 +215,71 @@ describe('building-research-visual — scenario-runner (#410)', () => {
   it('the first direct tier-2 attempt is rejected — demonstrates the gate', () => {
     const { results } = runScenarioSteps('building-research-visual');
     const firstAttempt = stepForNth(results, 'build research_center at:15,5 tier:2', 0);
-    // "Built" is the fixed prefix of a successful placement (entities.ts buildCommand);
-    // note the building TYPE itself is "research_center", so matching /research/i alone
-    // would pass on a successful placement too — the "Built" prefix is what actually
-    // discriminates accept from reject.
-    expect(firstAttempt.commandOutput).not.toMatch(/^Built /);
+    // #556: "ordered" is the fixed prefix of a successful order confirmation
+    // (buildOrder.ts's orderBuildingCommand) — a rejection never contains it.
+    // Note the building TYPE itself is "research_center", so matching
+    // /research/i alone would pass on a successful order too.
+    expect(firstAttempt.commandOutput).not.toMatch(/ordered/);
   });
 
   it('the second tier-2 attempt succeeds once research has completed', () => {
-    const { results } = runScenarioSteps('building-research-visual');
-    const secondAttempt = stepForNth(results, 'build research_center at:15,5 tier:2', 1);
-    expect(secondAttempt.error).toBeUndefined();
-    expect(secondAttempt.commandOutput).toMatch(/^Built /);
-    expect(secondAttempt.commandOutput).toMatch(/T2/);
+    // #556: confirming the order only queues a construction site — it does
+    // not create the building. `driveConstructionOrders` spliced a
+    // `waitUntil` step in right after the order, driving ticks until an
+    // idle employee actually finishes it; assert against the post-wait
+    // state, not the order step's own "ordered" confirmation text.
+    const { engine, results } = runScenarioSteps('building-research-visual');
+    const orderIdx = stepIndexForNth(results, 'build research_center at:15,5 tier:2', 1);
+    const orderStep = results[orderIdx]!;
+    expect(orderStep.error).toBeUndefined();
+    expect(orderStep.commandOutput).toMatch(/ordered/);
+    expect(orderStep.commandOutput).toMatch(/T2/);
+
+    const waitStep = results[orderIdx + 1]!;
+    expect(waitStep.error).toBeUndefined();
+
+    const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 2);
+    expect(built).toBeDefined();
+    expect(built!.x).toBe(15);
+    expect(built!.z).toBe(5);
   });
 
   it('the tier-3 build succeeds after tier-3 research completes', () => {
-    const { results } = runScenarioSteps('building-research-visual');
-    const tier3Build = stepFor(results, 'build research_center at:25,5 tier:3');
-    expect(tier3Build.error).toBeUndefined();
-    expect(tier3Build.commandOutput).toMatch(/^Built /);
-    expect(tier3Build.commandOutput).toMatch(/T3/);
+    const { engine, results } = runScenarioSteps('building-research-visual');
+    const orderIdx = stepIndexForNth(results, 'build research_center at:25,5 tier:3', 0);
+    const orderStep = results[orderIdx]!;
+    expect(orderStep.error).toBeUndefined();
+    expect(orderStep.commandOutput).toMatch(/ordered/);
+    expect(orderStep.commandOutput).toMatch(/T3/);
+
+    const waitStep = results[orderIdx + 1]!;
+    expect(waitStep.error).toBeUndefined();
+
+    const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 3);
+    expect(built).toBeDefined();
+    expect(built!.x).toBe(25);
+    expect(built!.z).toBe(5);
   });
 });
 
 describe('building-research-progression-visual — scenario-runner (#410)', () => {
   it('a direct tier-2 build is rejected before research, then succeeds after', () => {
-    const { results } = runScenarioSteps('building-research-progression-visual');
+    const { engine, results } = runScenarioSteps('building-research-progression-visual');
 
     const rejected = stepForNth(results, 'build research_center at:15,5 tier:2', 0);
-    expect(rejected.commandOutput).not.toMatch(/^Built /);
+    expect(rejected.commandOutput).not.toMatch(/ordered/);
 
-    const accepted = stepForNth(results, 'build research_center at:15,5 tier:2', 1);
-    expect(accepted.error).toBeUndefined();
-    expect(accepted.commandOutput).toMatch(/^Built /);
-    expect(accepted.commandOutput).toMatch(/T2/);
+    const orderIdx = stepIndexForNth(results, 'build research_center at:15,5 tier:2', 1);
+    const acceptedStep = results[orderIdx]!;
+    expect(acceptedStep.error).toBeUndefined();
+    expect(acceptedStep.commandOutput).toMatch(/ordered/);
+    expect(acceptedStep.commandOutput).toMatch(/T2/);
+
+    const waitStep = results[orderIdx + 1]!;
+    expect(waitStep.error).toBeUndefined();
+
+    const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 2);
+    expect(built).toBeDefined();
   });
 
   it('research status reports progress and then clears once complete', () => {

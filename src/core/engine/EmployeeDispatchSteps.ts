@@ -68,8 +68,9 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
 /**
  * Step 2 of tickEmployees: called only when `employee` is still idle after
  * step 1. Recomputes the cheapest entry from the employee's own taskQueue, or
- * — when taskQueue is empty — claims exactly one candidate from the open
- * pool (targetEmployeeId === null). Never both in the same tick.
+ * — when taskQueue is empty, or nothing in it is reachable this tick — claims
+ * exactly one candidate from the open pool (targetEmployeeId === null).
+ * Never both in the same tick.
  */
 export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, result: TickEmployeesResult): void {
   if (employee.taskQueue.length > 0) {
@@ -91,11 +92,35 @@ export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Empl
       const candidates = employee.taskQueue.map(id => state.pendingActions.find(a => a.id === id)!);
 
       const selection = selectBestActionForEmployee(state, employee, candidates);
-      if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
-
-      promoteActionToActive(state, employee, selection.action);
-      employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
-      return;
+      if (selection !== null) {
+        promoteActionToActive(state, employee, selection.action);
+        employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
+        return;
+      }
+      // #816: falls through to the open pool below instead of returning here
+      // when nothing queued is reachable this tick. A queued entry can go
+      // permanently (not just this-tick) unreachable without ever being
+      // pruned by the status/holderId check above — e.g. autoInsertNeedTasks
+      // (NeedTaskInsertion.ts) inserts a targeted 'rest' action whose target
+      // falls back to the employee's own CURRENT position when no building
+      // services the need yet ("rest in place"); if that position was a
+      // place_building construction site the employee was actively working,
+      // the site later completes and the NavGrid patch (tickTaskCompletion.ts)
+      // turns that exact tile 'blocked' — the queued rest's own target
+      // coordinate is never revisited or invalidated, so it silently becomes
+      // an unreachable goal `findPath` (Pathfinding.ts) permanently refuses.
+      // Direct-traced via tutorial-interactive.json's own `set_policy
+      // mode:continuous` sequence: an employee stuck exactly this way
+      // (taskQueue holding one permanently-unreachable rest action) never
+      // dispatched to any of 9 queued, fully-claimable drill_hole actions for
+      // 9000+ ticks — the early `return` below meant this idle employee was
+      // never even offered the open pool, since a queue-with-something-in-it
+      // (however stale) always won by construction. Retrying the stale entry
+      // every tick (never dropped here) still costs nothing beyond one failed
+      // `selectBestActionForEmployee` call — it stays available to resume
+      // automatically if its target ever becomes walkable again (a blast,
+      // e.g.), it just no longer blocks this employee from doing anything
+      // else in the meantime.
     }
   }
 

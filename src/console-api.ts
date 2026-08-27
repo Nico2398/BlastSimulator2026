@@ -46,6 +46,8 @@ export interface SerializableGameState {
   orderedBuildingCount: number;
   chargedCount: number;
   sequencedCount: number;
+  /** Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length) — proves a research task actually completed (reaches 0) rather than a `tick N` pad merely running, which a spontaneous mid-window event can silently cut short (tickCommand auto-pauses and refuses further ticks the instant one fires). */
+  researchQueueLength: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
   surveyCount: number;
   /** Queued-but-not-yet-claimed PendingActions (state.pendingActions) — includes auto-inserted rest tasks. */
@@ -119,6 +121,7 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
+    researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,

@@ -47,6 +47,29 @@
       }
     },
     {
+      "command": "employee hire role:driver",
+      "description": "#556: a dedicated, disposable builder — a `place_building` order needs an idle employee to walk over and do the work, and that must not be Walt Dusty (the driller trained below): construction time would compete with their training/drilling schedule and, worse, an idle Walt mid-tick-block can get auto-enrolled into training by a 'No Qualified Worker' event's own resolution, colliding with this file's own explicit `employee train` steps. Cheapest role (driver, $800) since this hire does no driving here. Fired once both schools are built (below) so it stops drawing salary for the rest of the file. No toolbar click here (unlike the driller hire above): the employees panel is already open from that step.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "description": "#553: without a drill_rig on site, drill_hole's vehicle gate (#550) never finds a free vehicle to claim -- the drill_plan below would sit queued forever.",
       "interaction": [
@@ -104,9 +127,19 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "buildingCount": 1
-        }
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before training depends on a real school existing."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the driving_center site to completion (#556) — the driller (only employee on site) does the building work itself before returning to train.",
+      "timeout": 95,
+      "interaction": [
+        { "type": "waitUntil", "field": "buildingCount", "equals": 1, "maxTicks": 300, "timeoutMs": 90000 }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "buildingCount": 1, "orderedBuildingCount": 0 }
       }
     },
     {
@@ -273,10 +306,47 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "buildingCount": 2
-        }
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before training depends on a real school existing."
       }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
+      "description": "Drive the blasting_academy site to completion (#556).",
+      "timeout": 95,
+      "interaction": [
+        { "type": "waitUntil", "field": "buildingCount", "equals": 2, "maxTicks": 300, "timeoutMs": 90000 }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "buildingCount": 2, "orderedBuildingCount": 0 }
+      }
+    },
+    {
+      "command": "employee fire 2",
+      "description": "#556: the dedicated builder (hired above) has done its only job — both schools are up. Firing it here stops its salary drain for the rest of the file, unless hireEmployee's 30% unionized roll (rng.chance, deterministic per seed) happened to land on this hire — a unionized employee can't be fired at all (`fireEmployee`, Employee.ts), a real, intentional refusal this scenario doesn't try to route around. Click path mirrors level1-lose-ecology.json's own `employee fire` steps.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-employee-id=\"2\"] .bs-detail-toggle",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel .bs-crew-dismiss button",
+          "timeoutMs": 2000
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": ".bs-confirm-overlay [data-action=\"confirm-yes\"]",
+          "timeoutMs": 2000
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
     },
     {
       "command": "employee train 1 skill:blasting",

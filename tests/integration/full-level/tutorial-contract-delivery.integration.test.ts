@@ -11,6 +11,7 @@ import {
   tickWithEvents,
   driveDrillPlanToCompletion,
   driveChargePlanToCompletion,
+  driveConstructionToCompletion,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
@@ -128,15 +129,18 @@ describe('Tutorial Level — Contract Delivery', () => {
    * until the driver has boarded the vehicle, and only then build the
    * freight_warehouse. Returns the vehicle and driver IDs.
    *
-   * Building the warehouse comes last, right before this function returns
-   * with no tick in between — same reasoning as executeTutorialBlast's
-   * drill_rig setup and economy.integration.test.ts's equivalent: self-
-   * dispatch (#552) can only ever start a haul_debris workflow once an
-   * active depot exists (requestHaulFragment's own depot check), so with no
-   * depot yet the hauler simply stays idle/seated across the padding below
-   * instead of auto-claiming the fragment this test's own manual haul step
-   * (in each caller, immediately after this function returns) means to
-   * exercise itself.
+   * Building the warehouse comes last — driven to completion (the surveyor,
+   * idle since its own survey step, does the unskilled `place_building`
+   * work; #556: confirming the order only queues a construction site) with
+   * no tick in between that completion and this function returning — same
+   * reasoning as executeTutorialBlast's drill_rig setup and
+   * economy.integration.test.ts's equivalent: self-dispatch (#552) can only
+   * ever start a haul_debris workflow once an active depot exists
+   * (requestHaulFragment's own depot check), and tickTaskCompletion's
+   * place_building branch (which flips the site real) runs after that same
+   * tick's own syncHaulDispatch, so self-dispatch never sees the depot
+   * active in time to race the manual haul each caller makes immediately
+   * after this function returns.
    */
   function setupHaulingFleet(): { vehicleId: number; driverId: number } {
     const hireDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
@@ -177,6 +181,8 @@ describe('Tutorial Level — Contract Delivery', () => {
     // empty). (9,13) is on the same bench without touching (16,16).
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '9,13' });
     expect(buildResult.success).toBe(true);
+    driveConstructionToCompletion(ctx);
+    expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
 
     return { vehicleId, driverId };
   }

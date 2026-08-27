@@ -167,9 +167,49 @@ export function resolveTaskCompletion(
         if (result.success) {
           state.plannedBuildings.splice(orderIdx, 1);
           refreshLogisticsCapacity(state);
+          let footprintRegion: ReturnType<typeof makeFootprintRegion> | undefined;
           if (ctx.grid) {
             const { sizeX, sizeZ } = getDefSize(getBuildingDef(order.type, order.tier));
-            patchBuildingNavGrid(state, ctx.grid, makeFootprintRegion(order.x, order.z, sizeX, sizeZ));
+            footprintRegion = makeFootprintRegion(order.x, order.z, sizeX, sizeZ);
+            patchBuildingNavGrid(state, ctx.grid, footprintRegion);
+          }
+          // The employee who just finished the work is standing on the
+          // footprint they were building — the NavGrid patch above just
+          // turned that footprint 'blocked', so their own tile is now
+          // impassable. findPath refuses ANY route whose start cell is
+          // impassable (Pathfinding.ts), so left alone they'd be
+          // permanently stuck (never redispatchable) the instant their own
+          // construction finished. Same relocate-to-nearest-reachable move
+          // hire/vehicle-spawn already use when a spawn point lands on
+          // unwalkable ground (#556 finding).
+          //
+          // #816: relocating only `emp` (the builder) left a genuine
+          // livelock — any OTHER employee who merely happened to be idling
+          // on this same tile (e.g. a freshly hired employee still parked at
+          // the default spawn point a building later lands on) was left
+          // behind on the newly-blocked footprint with nobody ever moving
+          // them off it. Every subsequent pathfind FROM their position then
+          // failed at Pathfinding.ts's start-impassable check regardless of
+          // destination — including forceShiftRestIfNeededByPolicy's own
+          // routing to the nearest living_quarters — so a proactive-rest
+          // policy (continuous mode) permanently stranded that employee the
+          // instant the footprint under them closed, direct-traced via
+          // tutorial-interactive.json's own `set_policy mode:continuous` +
+          // two-building-order sequence. Sweeping every employee standing on
+          // the new footprint (not just the one whose PendingAction just
+          // completed) closes the gap the same relocate-to-nearest-reachable
+          // move already uses, just applied to everyone it actually affects.
+          if (state.navGrid && footprintRegion) {
+            const region = footprintRegion;
+            for (const other of state.employees.employees) {
+              if (!other.alive) continue;
+              const cx = Math.round(other.x);
+              const cz = Math.round(other.z);
+              if (cx < region.minX || cx > region.maxX || cz < region.minZ || cz > region.maxZ) continue;
+              const nearest = NavGrid.findNearestReachableCell(state.navGrid, 0, 0, other.x, other.z);
+              other.x = nearest.x;
+              other.z = nearest.z;
+            }
           }
           lines.push(`[tick ${state.tickCount}] Built ${order.type} T${order.tier} #${result.building!.id} at (${order.x}, ${order.z}).`);
         } else {

@@ -234,7 +234,10 @@ describe('build <type> at: — insufficient funds guard', () => {
     const ctx = makeCtx(COST_T1);
     const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
     expect(result.success).toBe(true);
-    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    // Confirming placement only queues a construction site (#556) — the
+    // order is charged and accepted immediately, but nothing is built yet.
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
     expect(ctx.state!.cash).toBe(0);
   });
 

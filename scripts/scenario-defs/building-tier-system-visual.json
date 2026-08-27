@@ -1,27 +1,27 @@
 {
   "name": "building-tier-system-visual",
-  "description": "Visual check of building tier upgrade system from T1 to T3 and demolition, driven by clicking the real Build panel controls — placement, Queue Research, Upgrade, and Demolish — not console shortcuts",
+  "description": "Visual check of building tier upgrade system from T1 to T3 and demolition, driven by clicking the real Build panel controls \u2014 placement, Queue Research, Upgrade, and Demolish \u2014 not console shortcuts",
   "steps": [
     {
-      "command": "new_game seed:42 cash:200000",
+      "command": "new_game seed:42 cash:260000 staffed:true",
       "timeout": 40,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:200000"
+          "command": "new_game seed:42 cash:260000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 200000,
+          "cash": 260000,
           "buildingCount": 0
         }
       }
     },
     {
       "command": "build research_center at:25,15",
-      "description": "Placed first — a research_center is a hard prerequisite (#442) to queue any research task below.",
+      "description": "Placed first \u2014 a research_center is a hard prerequisite (#442) to queue any research task below.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -58,14 +58,33 @@
         "changedBy": {
           "cash": -25000
         },
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for both orders (this one and the living_quarters order below) to actually land before referring to their building ids."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the research_center site to completion (#556) before the living_quarters order below is even placed. Building ids are assigned in construction-completion order, not order-placed order (#556-followup) — without this wait, closest-hire-wins dispatch can let living_quarters finish first and take id #1, which would make every hardcoded `data-building-id`/`build upgrade N` reference below (assuming living_quarters is #2) point at the wrong building. This synthetic wait forces research_center to land as #1 deterministically.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 1
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },
     {
       "command": "build living_quarters at:5,5 tier:1",
-      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. The Build panel is already open from the research_center step above — re-clicking the toolbar toggle here would close it (UIManager.togglePanel), so this step goes straight to the catalog row.",
+      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. The Build panel is already open from the research_center step above \u2014 re-clicking the toolbar toggle here would close it (UIManager.togglePanel), so this step goes straight to the catalog row.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -98,14 +117,41 @@
         "changedBy": {
           "cash": -10000
         },
+        "note": "Confirming placement only queues a construction site (#556) \u2014 the next step waits for both orders above to actually land before referring to their building ids."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
+      "description": "Drive both the research_center and living_quarters sites to completion (#556) before anything below depends on a real, numbered building. Speeds up via a real click on the HUD's 8x button (same real control the wait leans on, not a bare tick) before waiting.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 2
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
         }
       }
     },
     {
       "command": "research queue type:living_quarters tier:2",
-      "description": "Queued by clicking the placed building's real 'Queue Research' button — the only in-game path to unlock tier 2, not a console shortcut. Building #2 (research_center placed above is #1).",
+      "description": "Queued by clicking the placed building's real 'Queue Research' button \u2014 the only in-game path to unlock tier 2, not a console shortcut. Building #2 (#556-followup: ids are assigned in construction-completion order, not order-placed order \u2014 but this test file's own `driveConstructionOrders` harness forces the research_center order above to finish and be waited on (a synthetic `wait_until buildingCount:1`) before the living_quarters order is even placed, so research_center always lands as #1 and living_quarters as #2, not the closest-hire-wins ordering a real, concurrently-staffed run would produce).",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -139,7 +185,7 @@
     },
     {
       "command": "build upgrade 2",
-      "description": "Upgraded by clicking the placed building's Upgrade button, now enabled because tier 2 finished researching.",
+      "description": "Upgraded by clicking the placed building's (living_quarters, #2 \u2014 see the research-queue step above) Upgrade button, now enabled because tier 2 finished researching.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -152,11 +198,13 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 2
         },
-        "note": "upgrade replaces the building (new id #3), it doesn't add one — buildingCount stays 2. cash uses decreased not equals since this follows a tick step (Finding #12)"
+        "note": "upgrade replaces the building (new id #3), it doesn't add one \u2014 buildingCount stays 2. cash uses decreased not equals since this follows a tick step (Finding #12)"
       }
     },
     {
@@ -178,7 +226,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"]
+        "decreased": [
+          "cash"
+        ]
       }
     },
     {
@@ -206,11 +256,13 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 2
         },
-        "note": "upgrade replaces the building again (new id #4) — buildingCount stays 2"
+        "note": "upgrade replaces the building again (new id #4) \u2014 buildingCount stays 2"
       }
     },
     {
@@ -245,9 +297,38 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
+        "note": "Confirming placement only queues a construction site (#556) \u2014 the next step waits for it to actually land before referring to its building id."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:3 max_ticks:300",
+      "description": "Drive the management_office site to completion (#556) before demolishing it by id. Speeds up via a real click on the HUD's 8x button before waiting.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
+        },
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 3
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -270,7 +351,9 @@
       ],
       "role": "player",
       "expect": {
-        "decreased": ["cash"],
+        "decreased": [
+          "cash"
+        ],
         "equals": {
           "buildingCount": 2
         },

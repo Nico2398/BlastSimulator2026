@@ -3,12 +3,12 @@
   "description": "Visual check of living quarters tiers and employee needs display with hunger and fatigue gauges",
   "steps": [
     {
-      "command": "new_game seed:42 cash:200000",
+      "command": "new_game seed:42 cash:200000 staffed:true",
       "timeout": 40,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:200000"
+          "command": "new_game seed:42 cash:200000 staffed:true"
         }
       ],
       "role": "setup",
@@ -50,12 +50,22 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "buildingCount": 1
-        },
         "changedBy": {
           "cash": -25000
-        }
+        },
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before the Queue Research click below depends on hasActiveResearchCenter seeing a real building."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the Research Center site to completion (#556).",
+      "timeout": 95,
+      "interaction": [
+        { "type": "waitUntil", "field": "buildingCount", "equals": 1, "maxTicks": 300, "timeoutMs": 90000 }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "buildingCount": 1, "orderedBuildingCount": 0 }
       }
     },
     {

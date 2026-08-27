@@ -135,6 +135,31 @@ export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): v
 }
 
 /**
+ * Ticks until every construction site ordered so far has landed in
+ * state.buildings.buildings (#556) — an idle employee must exist to claim
+ * and finish a `place_building` order (`requiredSkill: null`, but still
+ * gated on `eligible.length > 0`, EmployeeDispatch.ts). Resolves pending
+ * events and tops up employee need gauges each tick, same reasoning as
+ * driveDrillPlanToCompletion/driveChargePlanToCompletion above.
+ */
+export function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+    if (ctx.state!.events.pendingEvent) {
+      eventCommand(ctx, ['choose', '0'], {});
+    }
+    if (ctx.state!.isPaused) {
+      ctx.state!.isPaused = false;
+    }
+  }
+}
+
+/**
  * Perform a standard blast cycle: drill grid, charge all, auto-sequence, blast.
  * Uses a 2×2 grid with 4m spacing, 8m depth, boomite explosive.
  * @param ctx The game context (cast to MiningContext internally for command compatibility).

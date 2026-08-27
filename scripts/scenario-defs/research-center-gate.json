@@ -3,11 +3,11 @@
   "description": "Closes the research-center-gate playtest's #442 parity gap (docs/plans/scenario-assertions-and-playtest-removal.md): clicking Queue Research on an already-placed building must be rejected on screen — not silently accepted — while zero Research Centers exist anywhere on site, and the identical click must succeed once one is placed. building-research-visual.json/building-research-progression-visual.json only ever exercise this after a Research Center already exists, so neither covers the no_research_center precondition (getQueueBlockCode, BuildingResearch.ts) at all.",
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit",
-      "description": "Setup: load the Tutorial Pit terrain — tutorial_start is never called, so no rail restricts tile picks below.",
+      "command": "campaign start level:tutorial_pit staffed:true",
+      "description": "Setup: load the Tutorial Pit terrain — tutorial_start is never called, so no rail restricts tile picks below. Staffed (#556) so the Research Center order below has an idle employee to actually build it.",
       "role": "setup",
       "interaction": [
-        { "type": "command", "command": "campaign start level:tutorial_pit" }
+        { "type": "command", "command": "campaign start level:tutorial_pit staffed:true" }
       ],
       "expect": {
         "equals": { "cash": 290000, "buildingCount": 0 }
@@ -56,8 +56,20 @@
         { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
       ],
       "expect": {
-        "equals": { "buildingCount": 2 },
-        "changedBy": { "cash": -25000 }
+        "changedBy": { "cash": -25000 },
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before the next Queue Research click depends on hasActiveResearchCenter seeing a real building."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
+      "description": "Drive the Research Center site to completion (#556).",
+      "timeout": 95,
+      "interaction": [
+        { "type": "waitUntil", "field": "buildingCount", "equals": 2, "maxTicks": 300, "timeoutMs": 90000 }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": { "buildingCount": 2, "orderedBuildingCount": 0 }
       }
     },
     {

@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { buildCommand } from '../../../src/console/commands/entities.js';
+import { tickCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
 
@@ -14,11 +15,21 @@ function makeCtx(): MiningContext {
     grid: null,
     emitter: new EventEmitter(),
   };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
+  // Staffed (#556): confirming a placement only queues a construction site —
+  // an idle employee is needed to actually walk over and finish the
+  // `place_building` work before any of these tests can see a real building.
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', staffed: 'true' });
   // These tests exercise tier placement/upgrade mechanics directly, not the
   // research gate — pre-unlock every tier so placement isn't blocked.
   ctx.state!.buildings.unlockedTiers.management_office = 3;
   return ctx;
+}
+
+/** Tick until every ordered building has landed (or maxTicks is exhausted). */
+function tickUntilConstructionDone(ctx: MiningContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    tickCommand(ctx as any, ['1'], {});
+  }
 }
 
 describe('build command — tier placement', () => {
@@ -27,6 +38,11 @@ describe('build command — tier placement', () => {
     const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('T1');
+    // Confirming placement only queues a construction site (#556) — nothing
+    // is built yet.
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
   });
 
@@ -38,6 +54,7 @@ describe('build command — tier placement', () => {
     const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('T2');
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
   });
 
@@ -47,6 +64,7 @@ describe('build command — tier placement', () => {
     const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '3' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('T3');
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(3);
   });
 
@@ -56,6 +74,8 @@ describe('build command — tier placement', () => {
     const cashBefore = ctx.state!.cash;
     buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
     const def = getBuildingDef('management_office', 2);
+    // The order confirms and charges immediately (#556) — cost is deducted
+    // at order time, not on construction completion.
     expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
   });
 
@@ -63,7 +83,49 @@ describe('build command — tier placement', () => {
     const ctx = makeCtx();
     const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '9' });
     expect(result.success).toBe(true);
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
+  });
+
+  it('#816: relocates every employee standing on a footprint tile that just closed over them, not only the one who built it', () => {
+    const ctx = makeCtx();
+    const result = buildCommand(ctx, ['management_office'], { at: '5,5' });
+    expect(result.success).toBe(true);
+
+    // Let dispatch settle onto whichever staffed employee ends up building
+    // this (cost-based, #549 — not asserted by id, only that someone did).
+    for (let i = 0; i < 10 && ctx.state!.plannedBuildings.length > 0; i++) {
+      tickCommand(ctx as any, ['1'], {});
+    }
+    const order = ctx.state!.plannedBuildings[0]!;
+    const action = ctx.state!.pendingActions.find(a => a.id === order.actionId);
+    expect(action).toBeDefined();
+    const builderId = action!.holderId;
+    expect(builderId).not.toBeNull();
+
+    // A different, uninvolved employee happens to be standing exactly on the
+    // footprint tile — e.g. idling at a spot a later place_building order
+    // just closed over. Before #816's fix, tickTaskCompletion.ts only
+    // relocated `emp` (the one whose own PendingAction completed); any
+    // bystander here was left permanently stranded on now-blocked terrain,
+    // where every future findPath from their position fails outright
+    // (Pathfinding.ts's start-impassable check).
+    const bystander = ctx.state!.employees.employees.find(e => e.id !== builderId)!;
+    bystander.x = 5;
+    bystander.z = 5;
+    bystander.activeActionId = null;
+    bystander.destinationX = null;
+    bystander.destinationZ = null;
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    // The footprint tile is now blocked — the bystander must have been
+    // moved off it, not left sitting on now-impassable ground.
+    expect(bystander.x === 5 && bystander.z === 5).toBe(false);
+    const cell = ctx.state!.navGrid!.cellAt(Math.round(bystander.x), Math.round(bystander.z));
+    expect(cell).not.toBeNull();
+    expect(cell!.type).not.toBe('blocked');
   });
 });
 
@@ -72,6 +134,7 @@ describe('build command — upgrade', () => {
   beforeEach(() => {
     ctx = makeCtx();
     buildCommand(ctx, ['management_office'], { at: '0,0' });
+    tickUntilConstructionDone(ctx);
   });
 
   it('upgrades a T1 building to T2 and returns a new ID', () => {
@@ -137,6 +200,7 @@ describe('build command — research gate', () => {
     const ctx = makeCtx();
     ctx.state!.buildings.unlockedTiers.management_office = 1;
     buildCommand(ctx, ['management_office'], { at: '0,0' });
+    tickUntilConstructionDone(ctx);
     const id = ctx.state!.buildings.buildings[0]!.id;
 
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
@@ -150,6 +214,7 @@ describe('build command — demolish with cost', () => {
   it('deducts demolish cost and removes the building', () => {
     const ctx = makeCtx();
     buildCommand(ctx, ['management_office'], { at: '0,0' });
+    tickUntilConstructionDone(ctx);
     const b = ctx.state!.buildings.buildings[0]!;
     const cashBefore = ctx.state!.cash;
     const def = getBuildingDef(b.type, b.tier);

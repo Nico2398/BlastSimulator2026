@@ -3,17 +3,17 @@
   "description": "Tests path following and stuck state with building obstacles",
   "steps": [
     {
-      "command": "new_game seed:42",
+      "command": "new_game seed:42 cash:80000",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42"
+          "command": "new_game seed:42 cash:80000"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 80000,
           "stuckEmployeeCount": 0
         }
       }
@@ -77,51 +77,8 @@
       "role": "observe"
     },
     {
-      "command": "employee dispatch 1 x:0 z:0",
-      "description": "Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "employee dispatch 1 x:0 z:0"
-        }
-      ],
-      "expect": {
-        "changedBy": {
-          "cash": 0
-        }
-      },
-      "role": "bootstrap"
-    },
-    {
-      "command": "tick 19",
-      "description": "Let employee #1 travel most of the way toward (0,0) before the wall goes up, so it lands right at the wall once blocked.",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 19"
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "event choose 0",
-      "description": "Resolved through the event dialog's own buttons. Decides whether an event is pending from authoritative game state, not from whether the modal has rendered -- a DOM-only probe silently missed events on a no-GPU runner where a frame costs ~6s, leaving them pending so later ticks halted and the run diverged while still passing command mode.",
-      "interaction": [
-        {
-          "type": "resolveEventIfPending"
-        }
-      ],
-      "role": "player",
-      "commandOutcome": "either"
-    },
-    {
       "command": "build management_office at:2,0",
-      "description": "First wall segment: seals the east side of the (0,0) corner (x:2-3, z:0-1).",
+      "description": "First wall segment: seals the east side of the (0,0) corner (x:2-3, z:0-1). #556: confirming a placement only queues a construction site now \u2014 one of the two idle drillers hired above walks over and builds each wall segment for real; a waitUntil step below drives all three to completion before employee #1 is dispatched toward the now-sealed corner.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -223,14 +180,49 @@
         "decreased": [
           "cash"
         ],
+        "note": "Confirming placement only queues a construction site (#556) \u2014 the next step waits for all three wall segments to actually land before the corner is genuinely sealed."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:3 max_ticks:300",
+      "description": "Drive all three wall-segment sites to completion (#556) \u2014 one of the two idle drillers does the walking/building.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 3
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
         }
       }
     },
     {
+      "command": "employee dispatch 1 x:0 z:0",
+      "description": "#556: dispatched only now that the corner is already fully sealed (previously dispatched before the walls existed, mid-walk \u2014 construction is no longer instant, so a wall built out from under an already-close walker no longer happens; dispatching into an already-sealed target every re-route attempt fails immediately instead). Left unmarked: no UI control drives this exact command and none should exist -- employees.ts's own `dispatch` case comment: \"no console command currently creates one... which left the Bunkhouse shift-cycle unreachable from any player-facing flow\" -- a test hook by design, same class as `employee assign_skill`.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:0 z:0"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      },
+      "role": "bootstrap"
+    },
+    {
       "command": "tick 5",
-      "description": "Every re-route attempt now fails since (0,0) is fully enclosed — after STUCK_THRESHOLD consecutive failures employee #1 flips to the stuck state.",
+      "description": "Every re-route attempt now fails since (0,0) is fully enclosed \u2014 after STUCK_THRESHOLD consecutive failures employee #1 flips to the stuck state.",
       "interaction": [
         {
           "type": "command",
@@ -343,7 +335,7 @@
     },
     {
       "command": "build destroy 3",
-      "description": "Demolish all three wall segments — the previously stuck agent should be able to resume movement once the corner is fully open again.",
+      "description": "Demolish all three wall segments \u2014 the previously stuck agent should be able to resume movement once the corner is fully open again.",
       "interaction": [
         {
           "type": "waitForSelector",
@@ -366,7 +358,7 @@
     },
     {
       "command": "tick 15",
-      "description": "Advance ticks after demolition — the stuck agent should resume moving toward its destination.",
+      "description": "Advance ticks after demolition \u2014 the stuck agent should resume moving toward its destination.",
       "interaction": [
         {
           "type": "command",

@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
-import { buildCommand } from '../../src/console/commands/entities.js';
+import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
@@ -77,20 +77,33 @@ describe('Buildings lifecycle', () => {
   let ctx: GameContext;
 
   beforeEach(() => {
-    ctx = makeCtx();
+    // Staffed (#551): confirming a placement now only queues a construction
+    // site (#556) — an idle employee is needed to actually walk over and
+    // finish the `place_building` work before any of these lifecycle tests
+    // (destroy/upgrade/move/list) can see a real building in state.
+    ctx = makeStaffedCtx();
   });
 
   // ── 1. Place + list ─────────────────────────────────────────────────────────
 
   it('places a building and lists it', () => {
-    const placeResult = buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    const orderResult = buildCommand(ctx, ['living_quarters'], { at: '10,10' });
 
-    expect(placeResult.success).toBe(true);
-    expect(placeResult.output).toContain('Built');
-    expect(placeResult.output).toContain('living_quarters');
-    expect(placeResult.output).toContain('10,10');
+    expect(orderResult.success).toBe(true);
+    expect(orderResult.output).toContain('ordered');
+    expect(orderResult.output).toContain('living_quarters');
+    expect(orderResult.output).toContain('10,10');
+
+    // Confirming placement only queues a construction site (#556) — nothing
+    // is built yet.
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+
+    // Drive construction to completion.
+    tickUntilConstructionDone(ctx);
 
     // State should reflect the new building
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
     const b = ctx.state!.buildings.buildings[0]!;
     expect(b.type).toBe('living_quarters');
@@ -111,9 +124,11 @@ describe('Buildings lifecycle', () => {
   // ── 2. Reject overlap ───────────────────────────────────────────────────────
 
   it('rejects placement on occupied tile', () => {
-    // First placement succeeds
+    // First placement succeeds and completes.
     const first = buildCommand(ctx, ['living_quarters'], { at: '10,10' });
     expect(first.success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
 
     // Second placement at same coordinates must fail
     const second = buildCommand(ctx, ['management_office'], { at: '10,10' });
@@ -127,8 +142,9 @@ describe('Buildings lifecycle', () => {
   // ── 3. Destroy + demolish ──────────────────────────────────────────────────
 
   it('destroys a building and removes it from state', () => {
-    // Place a building
+    // Place a building and let construction finish.
     buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
 
     // Destroy it via console command
@@ -187,6 +203,7 @@ describe('Buildings lifecycle', () => {
 
     // --- Console upgrade command ---
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '1' });
+    tickUntilConstructionDone(ctx);
     const placed = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
     expect(placed.tier).toBe(1);
 
@@ -218,6 +235,7 @@ describe('Buildings lifecycle', () => {
 
   it('rejects upgrade to a tier that has not been researched', () => {
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '1' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
 
     const result = buildCommand(ctx, ['upgrade', '1'], {});
@@ -236,6 +254,7 @@ describe('Buildings lifecycle', () => {
     // placement itself is not the thing under test here (that's tests 5b/5c).
     ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '3' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(3);
 
     // Attempt upgrade — must fail
@@ -261,6 +280,7 @@ describe('Buildings lifecycle', () => {
     // Place two different buildings at distinct locations
     buildCommand(ctx, ['living_quarters'], { at: '5,5' });
     buildCommand(ctx, ['management_office'], { at: '15,5' });
+    tickUntilConstructionDone(ctx);
 
     expect(ctx.state!.buildings.buildings).toHaveLength(2);
 
@@ -284,6 +304,7 @@ describe('Buildings lifecycle', () => {
 
   it('move command updates building position', () => {
     buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.x).toBe(10);
     expect(ctx.state!.buildings.buildings[0]!.z).toBe(10);
 
@@ -487,7 +508,12 @@ describe('Construction sites — order-then-build (#556)', () => {
   });
 
   it('rejects an out-of-bounds order, same gate as direct placement', () => {
-    const result = buildCommand(ctx, ['freight_warehouse'], { at: '60,60' }); // 32x32 grid
+    // (60,60) is off the 32x32 starting site but still gets claimed by site
+    // expansion (#473) — the site can bridge up to MAX_CLAIM_BRIDGE_CHUNKS
+    // chunks (≈384 voxels) of ground to reach a claim. Go far enough that
+    // even bridging refuses it, so this exercises the same "too far" gate
+    // direct placement always went through.
+    const result = buildCommand(ctx, ['freight_warehouse'], { at: '5000,5000' });
 
     expect(result.success).toBe(false);
     expect(ctx.state!.plannedBuildings).toHaveLength(0);
@@ -516,13 +542,19 @@ describe('Construction sites — order-then-build (#556)', () => {
   });
 
   it('cancelling an ordered site removes it and refunds the full construction cost', () => {
+    // There is no `build cancel` subcommand — a queued site is cancelled the
+    // same generic way any other dispatched action is, through
+    // `employee cancel <actionId>` (mirrors the dig_ramp_segment/drill_hole
+    // order-cancellation pattern; see releasePlannedHoleForCancelledAction's
+    // place_building branch in src/console/commands/mining.ts).
     const cashBefore = ctx.state!.cash;
     buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
     const def = getBuildingDef('freight_warehouse', 1);
     expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
-    const plannedId = ctx.state!.plannedBuildings[0]!.id;
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const actionId = planned.actionId;
 
-    const cancelResult = buildCommand(ctx, ['cancel', String(plannedId)], {});
+    const cancelResult = employeeCommand(ctx, ['cancel', String(actionId)], {});
 
     expect(cancelResult.success, JSON.stringify(cancelResult)).toBe(true);
     expect(ctx.state!.cash).toBe(cashBefore);
@@ -535,7 +567,7 @@ describe('Construction sites — order-then-build (#556)', () => {
     buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
     const cashAfterOrder = ctx.state!.cash;
 
-    const result = buildCommand(ctx, ['cancel', '9999'], {});
+    const result = employeeCommand(ctx, ['cancel', '9999'], {});
 
     expect(result.success).toBe(false);
     expect(ctx.state!.cash).toBe(cashAfterOrder);

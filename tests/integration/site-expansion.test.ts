@@ -90,7 +90,10 @@ describe('site expansion — buildings and ramps', () => {
   it('places a building on freshly claimed ground', () => {
     const result = buildCommand(ctx, ['management_office'], { at: '34,10' });
     expect(result.success).toBe(true);
-    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    // Confirming placement only queues a construction site (#556) — nothing
+    // is built yet, but the ground is claimed immediately.
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
     expect(ctx.grid!.maxX).toBe(48);
   });
 

@@ -71,12 +71,16 @@ import { killEmployee } from '../../src/core/entities/Employee.js';
  * number rather than the raw per-material record because expect's
  * increased/decreased/equals/changedBy only compare flat numeric fields, and
  * a scenario can't pin which material id a real blast's RNG happened to
- * expose (#671).
+ * expose (#671). researchQueueLength (state.buildings.researchQueue.length)
+ * closes the same gap for research tracked as a single active queue entry —
+ * a scenario proving research genuinely cleared (not just "still in
+ * progress N ticks remaining") had no field to check headlessly in command
+ * mode before this.
  */
 const SERIALIZED_FIELDS = [
   'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'chargedCount',
+  'drillHoles', 'chargesByHole', 'sequenceDelays', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'researchQueueLength', 'chargedCount',
   'sequencedCount', 'surveyCount', 'pendingActionCount', 'buildingCount', 'vehicleCount', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue',
   'stuckEmployeeCount', 'activeContractCount', 'deathCount',
@@ -240,13 +244,33 @@ describe('console-api', () => {
     });
 
     it('counts an employee as stuck once boxed in by buildings, then un-stuck once demolished', () => {
-      runner.runner.run('new_game seed:42');
-      runner.runner.run('employee hire role:driller');
-      runner.runner.run('employee dispatch 1 x:0 z:0');
-      runner.runner.run('tick 19');
+      // Confirming a placement only queues a construction site (#556) — three
+      // dedicated builders (any idle employee qualifies, requiredSkill: null)
+      // each walk to and complete one management_office order, boxing in the
+      // (0,0)-(1,1) pocket (grid corner + the three offices' footprints seal
+      // every side).
+      runner.runner.run('new_game seed:42 cash:500000');
+      runner.runner.run('employee hire role:surveyor');
+      runner.runner.run('employee hire role:surveyor');
+      runner.runner.run('employee hire role:surveyor');
       runner.runner.run('build management_office at:2,0');
       runner.runner.run('build management_office at:0,2');
       runner.runner.run('build management_office at:2,2');
+      runner.runner.run('tick 150');
+      expect(runner.ctx.state!.plannedBuildings).toHaveLength(0);
+      expect(runner.ctx.state!.buildings.buildings).toHaveLength(3);
+
+      // Hiring after the pocket is sealed: `employee hire`'s spawn-placement
+      // reachability search is anchored at (0,0) (Employee hire, entities.ts),
+      // so once (0,0)'s own neighbourhood is walled off this new hire lands
+      // inside that now-isolated pocket instead of the map's main open area.
+      runner.runner.run('employee hire role:driller');
+      const drillerId = runner.ctx.state!.employees.employees.find(e => e.role === 'driller')!.id;
+      // Dispatch them toward a target well outside the sealed pocket — the
+      // walk repeatedly fails to find a path out, flipping isMoveStuck after
+      // STUCK_THRESHOLD consecutive failures (navmesh.integration.test.ts's
+      // "stuck after 3 fails").
+      runner.runner.run(`employee dispatch ${drillerId} x:20 z:20`);
       runner.runner.run('tick 5');
 
       const stuckState = serializeGameState(runner.ctx as MiningContext)!;

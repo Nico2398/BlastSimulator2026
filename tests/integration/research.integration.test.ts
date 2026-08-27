@@ -14,7 +14,7 @@ import { tickCommand } from '../../src/console/commands/events.js';
 import { researchCommand } from '../../src/console/commands/research.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import { queueResearchTask, isTierUnlocked } from '../../src/core/entities/Building.js';
+import { queueResearchTask, isTierUnlocked, placeBuilding } from '../../src/core/entities/Building.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,14 +25,18 @@ function makeCtx(): GameContext {
 }
 
 /**
- * Place an active research_center via the console build command, asserting
- * success. Coordinates must sit on the 32x32 site makeCtx creates — building
- * past its edge is refused rather than silently accepted (#473 D5).
+ * Place an already-completed, active research_center directly via the core
+ * `placeBuilding` (bypassing the #556 order-then-build queue — these tests
+ * exercise research-task behaviour, not construction, and the queue would
+ * need a staffed roster + ticks whose wage costs would pollute the exact
+ * cash-delta assertions below). Coordinates must sit on the 32x32 site
+ * makeCtx creates.
  */
 function placeResearchCenter(ctx: GameContext, at = '20,20'): void {
-  const result = buildCommand(ctx, ['research_center'], { at });
+  const [x, z] = at.split(',').map(Number) as [number, number];
+  const result = placeBuilding(ctx.state!.buildings, 'research_center', x, z, 32, 32, 1, 0, 0);
   if (!result.success) {
-    throw new Error(`test setup: failed to place research_center: ${result.output}`);
+    throw new Error(`test setup: failed to place research_center: ${result.error}`);
   }
 }
 

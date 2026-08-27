@@ -77,6 +77,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   orderedBuildingCount: { type: 'number', description: 'Buildings ordered but not yet built (state.plannedBuildings.length, #556)' },
   chargedCount: { type: 'number' },
   sequencedCount: { type: 'number' },
+  researchQueueLength: { type: 'number', description: 'Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length)' },
   surveyCount: { type: 'number', description: 'Completed survey results (state.surveyResults.length)' },
   pendingActionCount: { type: 'number', description: 'Queued-but-not-yet-claimed PendingActions, including auto-inserted rest tasks (state.pendingActions.length)' },
   buildingCount: { type: 'number' },
