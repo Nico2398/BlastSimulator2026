@@ -238,8 +238,12 @@ export function captureCostFloorMs(step: ScenarioStepDef, shotsCount: number): n
  * else (0, negative, non-integer, NaN) - both runners call this once, before
  * running any iteration, so an invalid `repeat` fails the step immediately.
  */
-export function resolveRepeatCount(_step: ScenarioStepDef): number {
-  throw new Error('not implemented');
+export function resolveRepeatCount(step: ScenarioStepDef): number {
+  const { repeat } = step;
+  if (repeat === undefined) return 1;
+  if (Number.isInteger(repeat) && repeat >= 1) return repeat;
+  const label = step.description ?? step.command;
+  throw new Error(`Invalid repeat value ${repeat} on step "${label}": must be a positive integer`);
 }
 
 export function effectiveStepTimeoutMs(

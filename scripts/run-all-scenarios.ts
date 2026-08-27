@@ -28,6 +28,7 @@ import {
   createGameEngine,
   runScenario,
   emitDriftReport,
+  findWaitUntilAction,
   type ScenarioResult,
   type DriftRecord,
 } from './shared/command-runner.js';
@@ -37,6 +38,7 @@ import {
   loadScenarioDef,
   buildScenarioReport,
   effectiveStepTimeoutMs,
+  resolveRepeatCount,
   SCENARIO_DIR,
   type ReportableStep,
 } from './shared/scenario-utils.js';
@@ -191,10 +193,20 @@ async function runBatchInteraction(
                 // measures this step's effect, not everything before it.
                 const before = step.expect ? await gameState(page) : {};
 
-                const interactionResult = await executeInteractionActions(
-                  page, step, false, outDir, paddedIdx, cmdSlug,
-                  (detail) => { lastProgress = detail; },
-                );
+                const repeatCount = resolveRepeatCount(step);
+                if (repeatCount > 1 && findWaitUntilAction(step)) {
+                  throw new Error(`repeat and waitUntil cannot combine on the same step (step ${s}, "${step.command}")`);
+                }
+
+                let interactionResult: Awaited<ReturnType<typeof executeInteractionActions>> | undefined;
+                for (let rep = 0; rep < repeatCount; rep++) {
+                  interactionResult = await executeInteractionActions(
+                    page, step, false, outDir, paddedIdx, cmdSlug,
+                    (detail) => { lastProgress = detail; },
+                  );
+                }
+                // repeatCount is always >= 1, so interactionResult is always assigned.
+                interactionResult = interactionResult!;
 
                 if (step.expect) {
                   // interactionResult.gameState is this same moment's state —

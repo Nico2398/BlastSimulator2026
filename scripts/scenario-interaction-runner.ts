@@ -12,8 +12,10 @@ import {
   formatCommandSlug,
   buildScenarioReport,
   effectiveStepTimeoutMs,
+  resolveRepeatCount,
   type ReportableStep,
 } from './shared/scenario-utils.js';
+import { findWaitUntilAction } from './shared/command-runner.js';
 import {
   initBrowser,
   executeInteractionActions,
@@ -131,11 +133,21 @@ export async function runScenarioInteraction(
             // (below) measures this step's effect and not everything before it.
             const before = step.expect ? await gameState(page) : {};
 
-            const interactionResult = await executeInteractionActions(
-              page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
-              (detail) => { lastProgress = detail; },
-            );
-            stepScreenshotPaths.push(...interactionResult.screenshotPaths);
+            const repeatCount = resolveRepeatCount(step);
+            if (repeatCount > 1 && findWaitUntilAction(step)) {
+              throw new Error(`repeat and waitUntil cannot combine on the same step (step ${i}, "${step.command}")`);
+            }
+
+            let interactionResult: Awaited<ReturnType<typeof executeInteractionActions>> | undefined;
+            for (let rep = 0; rep < repeatCount; rep++) {
+              interactionResult = await executeInteractionActions(
+                page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
+                (detail) => { lastProgress = detail; },
+              );
+              stepScreenshotPaths.push(...interactionResult.screenshotPaths);
+            }
+            // repeatCount is always >= 1, so interactionResult is always assigned.
+            interactionResult = interactionResult!;
 
             // Real DOM/tutorial checks, not just "nothing threw" — reuses
             // interaction-driver.ts's checkGoal, the same evaluator command

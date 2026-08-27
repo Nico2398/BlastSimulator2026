@@ -12,6 +12,7 @@ import {
   formatStepIndex,
   formatCommandSlug,
   buildScenarioReport,
+  resolveRepeatCount,
   type ReportableStep,
 } from './scenario-utils.js';
 import { checkGoalAgainstState, checkCommandOutcome, type GoalMismatch } from './scenario-goal.js';
@@ -199,17 +200,35 @@ export function runSteps(
     let driftMismatches: GoalMismatch[] | undefined;
 
     try {
+      const repeatCount = resolveRepeatCount(step);
+      if (repeatCount > 1 && waitUntilAction) {
+        throw new Error(`repeat and waitUntil cannot combine on the same step (step ${i}, "${step.command}")`);
+      }
+
       if (waitUntilAction) {
         const waited = runWaitUntil(engine, waitUntilAction);
         result = { success: true, output: waited.output };
         gameState = waited.gameState;
-      } else {
+
+        const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
+        if (outcomeViolation !== null) throw new Error(outcomeViolation);
+      } else if (repeatCount === 1) {
         result = runCommand(engine, step.command);
         gameState = serializeGameState(ctx) as Record<string, unknown> | null;
-      }
 
-      const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
-      if (outcomeViolation !== null) throw new Error(outcomeViolation);
+        const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
+        if (outcomeViolation !== null) throw new Error(outcomeViolation);
+      } else {
+        for (let j = 0; j < repeatCount; j++) {
+          result = runCommand(engine, step.command);
+          gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+
+          const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
+          if (outcomeViolation !== null) {
+            throw new Error(`repeat ${j + 1}/${repeatCount}: ${outcomeViolation}`);
+          }
+        }
+      }
 
       if (step.expect) {
         const goalResult = checkGoalAgainstState(step.expect, before, gameState);
