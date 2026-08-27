@@ -79,7 +79,28 @@
           "cash": -10000
         },
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -215,9 +236,9 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
-          "minFatigue"
-        ]
+          "cash"
+        ],
+        "note": "minFatigue is flat across this block rather than falling (#556): the driller spent the construction ticks above building the quarters it is now walking back to, so it crosses its auto-rest threshold here and is in transit, neither draining nor yet replenishing. cash still drains — salary plus the standing quarters’ maintenance."
       }
     },
     {
@@ -262,10 +283,12 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
+          "cash"
+        ],
+        "increased": [
           "minFatigue"
         ],
-        "note": "Finding #27: 20 total ticks pass with the employee continuously dispatched, but ticksWorked/restTicksRemaining never move — no shift cycle ever triggers since the tier-2 bunkhouse gate is never met; only ordinary need-drain is observable"
+        "note": "Finding #27 recorded that 20 ticks passed with no rest cycle observable at all — only ordinary need-drain — because the tier-2 bunkhouse gate for a real shift cycle is never met here. Ordering the quarters as queued construction (#556) puts ~45 ticks of build work in front of this window, and the driller now reaches the tier-1 quarters’ ordinary auto-rest threshold inside it: minFatigue rises as the quarters replenish it. That is the replenishment path this file existed to watch and could not previously reach; the tier-2 shift cycle itself is still out of reach and still ungated here."
       }
     },
     {

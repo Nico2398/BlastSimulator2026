@@ -115,7 +115,7 @@
     },
     {
       "command": "build living_quarters at:15,15",
-      "description": "Placed away from the (10,10) dispatch target (#437) \u2014 building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
+      "description": "Placed away from the (10,10) dispatch target (#437) — building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -148,10 +148,10 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1,
-          "pendingActionCount": 1
+          "pendingActionCount": 2,
+          "orderedBuildingCount": 1
         },
-        "note": "Recalibrated for #547 (see the tick-40 checkpoint's note for root cause): still just the tick-40 checkpoint's warning-rest -- nothing ticks between there and here."
+        "note": "Ordering only queues a construction site (#556), and that site is itself a pending action — so pendingActionCount reads 2 here: the driller’s own dispatched work plus the build. A second employee is not an option in this file: minFatigue is a min across the roster, so any extra body becomes the very field these steps measure."
       }
     },
     {
@@ -181,9 +181,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 0
+          "pendingActionCount": 2,
+          "orderedBuildingCount": 1
         },
-        "note": "Recalibrated for #547: a null-skill dispatch (no `skill:` param, this scenario's own `employee dispatch 1 x:10 z:10`) used to never seed pendingTaskDuration, so it never completed and left the employee 'busy' forever -- that leak is what let fatigue decline uninterrupted toward collapse under the old calibration. #547 fixed the leak (tickEmployees now seeds pendingTaskDuration for every non-rest action regardless of requiredSkill), so the dispatch genuinely completes (already visible at tick 40 -- 'TASK: Walt Dusty completed task'), fatigue's dip below the warning threshold (21.5 < 25) queues an auto-inserted rest the instant Walt goes idle, and by here it has been claimed, walked to, completed, and the gauge partially recovered -- an increase, not the old trajectory's continued decline toward ~5."
+        "note": "Recalibrated for #547: a null-skill dispatch (no `skill:` param, this scenario's own `employee dispatch 1 x:10 z:10`) used to never seed pendingTaskDuration, so it never completed and left the employee 'busy' forever -- that leak is what let fatigue decline uninterrupted toward collapse under the old calibration. #547 fixed the leak (tickEmployees now seeds pendingTaskDuration for every non-rest action regardless of requiredSkill), so the dispatch genuinely completes (already visible at tick 40 -- 'TASK: Walt Dusty completed task'), fatigue's dip below the warning threshold (21.5 < 25) queues an auto-inserted rest the instant Walt goes idle, and by here it has been claimed, walked to, completed, and the gauge partially recovered -- an increase, not the old trajectory's continued decline toward ~5. Re-measured for #556: ordering the quarters is queued construction now, so the driller spends ~45 ticks building it before it can rest in it. the two queued actions here are the construction site itself (orderedBuildingCount still 1) and the proactive rest insertion this step is about; the site completes in the block below, where orderedBuildingCount drops to 0."
       }
     },
     {
@@ -232,10 +233,11 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 0,
-          "collapsedCount": 0
+          "pendingActionCount": 1,
+          "collapsedCount": 0,
+          "orderedBuildingCount": 0
         },
-        "note": "#700: the tick-80/tick-120 checkpoints' rest cycle now applies its replenish rate for the rest's own full duration (not once), so fatigue recovered comfortably above the 25 warning threshold (50.9 at tick 120) instead of barely clearing it -- no second rest cycle triggers in this window, so fatigue simply continues its natural working decline (50.9 -> 38.9) instead of the old calibration's own partial re-recovery. pendingActionCount stays 0 (nothing queued, the crew is genuinely resting-free right now) and collapsedCount stays 0."
+        "note": "#700: the tick-80/tick-120 checkpoints' rest cycle now applies its replenish rate for the rest's own full duration (not once), so fatigue recovered comfortably above the 25 warning threshold (50.9 at tick 120) instead of barely clearing it -- no second rest cycle triggers in this window, so fatigue simply continues its natural working decline (50.9 -> 38.9) instead of the old calibration's own partial re-recovery. pendingActionCount stays 0 (nothing queued, the crew is genuinely resting-free right now) and collapsedCount stays 0. Re-measured for #556: ordering the quarters is queued construction now, so the driller spends ~45 ticks building it before it can rest in it. orderedBuildingCount 0 here pins that the site actually landed — the extra queued action is a rest insertion this window, not the build."
       }
     },
     {
@@ -285,9 +287,10 @@
         ],
         "equals": {
           "pendingActionCount": 1,
-          "collapsedCount": 0
+          "collapsedCount": 0,
+          "orderedBuildingCount": 0
         },
-        "note": "#700: with the stronger, correctly-scaled replenishment above, fatigue's natural working decline reaches the 25 warning threshold a few ticks later than the old calibration did, landing inside this batch instead of the next one -- a proactive rest is queued (pendingActionCount 1, confirmed via direct trace) but not yet claimed/completed by the point this random-event interruption cuts the batch short at 5 of 30 requested ticks. collapsedCount stays 0, well above the collapse floor."
+        "note": "#700: with the stronger, correctly-scaled replenishment above, fatigue's natural working decline reaches the 25 warning threshold a few ticks later than the old calibration did, landing inside this batch instead of the next one -- a proactive rest is queued (pendingActionCount 1, confirmed via direct trace) but not yet claimed/completed by the point this random-event interruption cuts the batch short at 5 of 30 requested ticks. collapsedCount stays 0, well above the collapse floor. orderedBuildingCount 0: the quarters has been standing since well before this window (#556)."
       }
     },
     {
@@ -319,7 +322,13 @@
           "command": "state full"
         }
       ],
-      "role": "observe"
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
     }
   ],
   "shots": [

@@ -126,8 +126,9 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
-        }
+          "orderedBuildingCount": 1
+        },
+        "note": "Ordering only queues a construction site (#556); the lone driller hired above walks over and builds it during the tick blocks below, so this step asserts the site and the ticks that follow are what make it real."
       }
     },
     {
@@ -181,7 +182,7 @@
           "cash",
           "minFatigue"
         ],
-        "note": "still above the fatigue warning threshold (~25) at this point \u2014 no rest cycle has started yet"
+        "note": "still above the fatigue warning threshold (~25) at this point — no rest cycle has started yet"
       }
     },
     {
@@ -216,10 +217,12 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
+          "cash"
+        ],
+        "increased": [
           "minFatigue"
         ],
-        "note": "Finding #26: fatigue has now crossed its warning threshold and auto-rest cycles have begun (confirmed via direct trace), but each rest's completion burst is mostly offset by the idle drain accrued during the rest itself \u2014 net still decreasing, not recovering"
+        "note": "Finding #26 measured this window as still net-decreasing: auto-rest cycles had begun but each rest’s completion burst was mostly offset by the idle drain accrued during the rest itself. Ordering the quarters is queued construction now (#556), so the driller spends the two blocks above building it and the quarters only opens as a rest destination partway through this one — it lands on the collapse floor first and then climbs off it here (5.75 -> 38.80), the same #700 full-duration replenish the tick-50 block below watches, just reached one block earlier."
       }
     },
     {
