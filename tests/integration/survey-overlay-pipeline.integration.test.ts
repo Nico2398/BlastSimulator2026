@@ -8,7 +8,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { GameRenderer } from '../../src/renderer/GameRenderer.js';
-import { SurveyConfidenceOverlay } from '../../src/renderer/SurveyConfidenceOverlay.js';
 import type { SurveyConfidenceOverlayOptions } from '../../src/renderer/SurveyConfidenceOverlay.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { createGame } from '../../src/core/state/GameState.js';
@@ -69,6 +68,8 @@ function makeCtx(
     state,
     grid,
     emitter: { on: vi.fn(), emit: vi.fn() } as any,
+    landscape: null,
+    playableArea: null,
   };
 }
 
@@ -88,7 +89,7 @@ describe('GameRenderer — syncSurveyOverlay pipeline (issue #386)', () => {
     const spy = vi.spyOn(renderer, 'syncSurveyOverlay');
 
     const ctx = makeCtx();
-    ctx.state.surveyResults.push({
+    ctx.state!.surveyResults.push({
       id: 1,
       method: 'seismic',
       centerX: 10,
@@ -111,7 +112,7 @@ describe('GameRenderer — syncSurveyOverlay pipeline (issue #386)', () => {
     const spy = vi.spyOn(renderer, 'syncSurveyOverlay');
 
     const ctx = makeCtx();
-    ctx.state.surveyResults.push({
+    ctx.state!.surveyResults.push({
       id: 1,
       method: 'core_sample',
       centerX: 15,
@@ -231,7 +232,7 @@ describe('GameRenderer — survey results to confidence points conversion (issue
     const renderer = new GameRenderer(sm as any);
 
     const ctx = makeCtx();
-    ctx.state.surveyResults.push({
+    ctx.state!.surveyResults.push({
       id: 1,
       method: 'seismic',
       centerX: 10,
@@ -265,7 +266,7 @@ describe('GameRenderer — survey results to confidence points conversion (issue
 
     const ctx = makeCtx({ tick: 200 });
     // Survey at tick 0 — will be stale at current tick 200
-    ctx.state.surveyResults.push({
+    ctx.state!.surveyResults.push({
       id: 1,
       method: 'seismic',
       centerX: 10,

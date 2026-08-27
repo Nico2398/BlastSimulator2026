@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { TutorialOverlay } from '../../src/ui/TutorialOverlay.js';
+import type { GameState } from '../../src/core/state/GameState.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
@@ -21,7 +22,7 @@ import { TutorialRails } from '../../src/ui/tutorialRails.js';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  return { state: null, grid: null, emitter: new EventEmitter() };
+  return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -89,15 +90,18 @@ describe('Tutorial pause behaviour (#371)', () => {
 
     // There is no skip(): the tutorial cannot be abandoned, so the only route
     // out is finishing it. The game must not be left paused either way.
-    const tutorial = new TutorialOverlay(container) as unknown as
-      TutorialOverlay & { finish: () => void };
+    const tutorial: TutorialOverlay = new TutorialOverlay(container);
     overlay = tutorial;
+    const tutorialPrivate = tutorial as unknown as {
+      start: (state: GameState) => void;
+      finish: () => void;
+    };
 
     // Start with state → game pauses
-    tutorial.start(ctx.state!);
+    tutorialPrivate.start(ctx.state!);
     expect(ctx.state!.isPaused).toBe(true);
 
-    tutorial.finish();
+    tutorialPrivate.finish();
     expect(ctx.state!.isPaused).toBe(false);
   });
 
@@ -169,7 +173,12 @@ describe('Tutorial pause behaviour (#371)', () => {
 
     const rails = new TutorialRails();
     rails.beginStep(
-      { id: step.id, highlightTarget: step.highlightTarget, tickBudget: step.tickBudget, waitsOnWork: step.waitsOnWork },
+      {
+        id: step.id,
+        ...(step.highlightTarget !== undefined ? { highlightTarget: step.highlightTarget } : {}),
+        ...(step.tickBudget !== undefined ? { tickBudget: step.tickBudget } : {}),
+        ...(step.waitsOnWork !== undefined ? { waitsOnWork: step.waitsOnWork } : {}),
+      },
       state,
     );
 

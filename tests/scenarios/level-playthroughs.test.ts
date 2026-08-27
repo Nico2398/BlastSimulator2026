@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import puppeteer from 'puppeteer';
+import type { Page } from 'puppeteer';
 import { mkdirSync, existsSync, statSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -145,14 +146,14 @@ const OUTCOME_VALIDATORS: Record<string, OutcomeValidator> = {
  * @param outDir - Directory where step screenshots will be saved
  */
 async function runCommandsOnPage(
-  page: puppeteer.Page,
+  page: Page,
   steps: string[],
   outDir: string,
 ): Promise<void> {
   for (let i = 0; i < steps.length; i++) {
-    const command = steps[i];
+    const command = steps[i]!;
     const paddedIdx = String(i).padStart(2, '0');
-    const cmdSlug = command.split(/\s+/)[0].replace(/[^a-z0-9_-]/gi, '');
+    const cmdSlug = command.split(/\s+/)[0]!.replace(/[^a-z0-9_-]/gi, '');
 
     // Execute command via the game console bridge
     try {
@@ -195,7 +196,7 @@ async function runCommandsOnPage(
  * @param page - Puppeteer page connected to a running game
  * @returns The final game state extracted from the game
  */
-async function captureFinalState(page: puppeteer.Page): Promise<FinalGameState> {
+async function captureFinalState(page: Page): Promise<FinalGameState> {
   // Execute one tick to flush any pending level-end / game-over checks
   await page.evaluate(() => (window as any).__gameConsole('tick 1'));
   await new Promise(r => setTimeout(r, 1000));
@@ -319,7 +320,7 @@ describe('Level Playthrough Scenarios', () => {
   // ── Level 1: Dusty Hollow — Win ──
   it('level1-playthrough-win — Full Level 1 profitable playthrough reaching $80k profit target', async () => {
     const finalState = await runScenario('level1-playthrough-win');
-    const validator = OUTCOME_VALIDATORS['level1-playthrough-win'];
+    const validator = OUTCOME_VALIDATORS['level1-playthrough-win']!;
 
     console.log(`  Final state: levelEndReason=${finalState.levelEndReason}, profit=${finalState.profit}, revolted=${finalState.revolted}`);
 
@@ -329,7 +330,7 @@ describe('Level Playthrough Scenarios', () => {
   // ── Level 1: Dusty Hollow — Worker Revolt ──
   it('level1-playthrough-revolt — Level 1 triggering worker revolt by neglecting well-being', async () => {
     const finalState = await runScenario('level1-playthrough-revolt');
-    const validator = OUTCOME_VALIDATORS['level1-playthrough-revolt'];
+    const validator = OUTCOME_VALIDATORS['level1-playthrough-revolt']!;
 
     console.log(`  Final state: revolted=${finalState.revolted}, levelEndReason=${finalState.levelEndReason}`);
 
@@ -339,7 +340,7 @@ describe('Level Playthrough Scenarios', () => {
   // ── Level 2: Crimson Ridge — Win ──
   it('level2-playthrough-win — Full Level 2 profitable playthrough', async () => {
     const finalState = await runScenario('level2-playthrough-win');
-    const validator = OUTCOME_VALIDATORS['level2-playthrough-win'];
+    const validator = OUTCOME_VALIDATORS['level2-playthrough-win']!;
 
     console.log(`  Final state: levelEndReason=${finalState.levelEndReason}, profit=${finalState.profit}, bankrupt=${finalState.bankrupt}`);
 
@@ -349,7 +350,7 @@ describe('Level Playthrough Scenarios', () => {
   // ── Level 2: Crimson Ridge — Bankruptcy ──
   it('level2-playthrough-bankruptcy — Level 2 triggering bankruptcy by overspending', async () => {
     const finalState = await runScenario('level2-playthrough-bankruptcy');
-    const validator = OUTCOME_VALIDATORS['level2-playthrough-bankruptcy'];
+    const validator = OUTCOME_VALIDATORS['level2-playthrough-bankruptcy']!;
 
     console.log(`  Final state: bankrupt=${finalState.bankrupt}, levelEndReason=${finalState.levelEndReason}, cash=${finalState.cash}`);
 
@@ -359,7 +360,7 @@ describe('Level Playthrough Scenarios', () => {
   // ── Level 3: Treranium Depths — Win ──
   it('level3-playthrough-win — Full Level 3 profitable playthrough', async () => {
     const finalState = await runScenario('level3-playthrough-win');
-    const validator = OUTCOME_VALIDATORS['level3-playthrough-win'];
+    const validator = OUTCOME_VALIDATORS['level3-playthrough-win']!;
 
     console.log(`  Final state: levelEndReason=${finalState.levelEndReason}, profit=${finalState.profit}, bankrupt=${finalState.bankrupt}`);
 
@@ -369,7 +370,7 @@ describe('Level Playthrough Scenarios', () => {
   // ── Level 3: Treranium Depths — Ecological Shutdown ──
   it('level3-playthrough-ecology — Level 3 ecological shutdown from unchecked blasting', async () => {
     const finalState = await runScenario('level3-playthrough-ecology');
-    const validator = OUTCOME_VALIDATORS['level3-playthrough-ecology'];
+    const validator = OUTCOME_VALIDATORS['level3-playthrough-ecology']!;
 
     console.log(`  Final state: ecologicalShutdown=${finalState.ecologicalShutdown}, levelEndReason=${finalState.levelEndReason}`);
 
@@ -379,7 +380,7 @@ describe('Level Playthrough Scenarios', () => {
   // ── Tutorial: Tutorial Pit — Win ──
   it('tutorial-playthrough — Full tutorial profitable playthrough reaching completion', async () => {
     const finalState = await runScenario('tutorial-playthrough');
-    const validator = OUTCOME_VALIDATORS['tutorial-playthrough'];
+    const validator = OUTCOME_VALIDATORS['tutorial-playthrough']!;
 
     console.log(`  Final state: levelEndReason=${finalState.levelEndReason}, profit=${finalState.profit}`);
 
