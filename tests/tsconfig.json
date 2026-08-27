@@ -10,7 +10,7 @@
   "exclude": [
     "node_modules",
     "../dist",
-    // Pre-existing type errors as of 2026-08-27 (280 errors across 92 files remain
+    // Pre-existing type errors as of 2026-08-27 (274 errors across 86 files remain
     // outstanding, across 86 entries below) -- tracked in a follow-up issue (filed
     // alongside this PR). These are a mix of mechanical unused-locals/params
     // (TS6133/6192/6196) and real fixture-vs-interface drift (test object literals
@@ -19,13 +19,13 @@
     // blocking on fixing all of them at once.
     // #743's mechanical sweep fixed 47 errors across 29 files, removing those 29
     // mechanical-only entries (131 -> 102, 324 -> 277 errors).
-    // #802 (this cluster) reintroduced the 16 tests/integration/full-level/*.ts
-    // entries into type-checking (102 -> 86 entries) to expose their real errors
-    // directly instead of hiding them behind exclude: helpers.ts (TS2739),
-    // level1-win.integration.test.ts (TS2339), and tutorial.integration.test.ts
-    // (TS6133) still fail (277 -> 280 errors, 89 -> 92 files) -- this is the
-    // intentional RED state; a follow-up step fixes those 3 errors so the cluster
-    // passes `tsc --noEmit` while no longer being excluded.
+    // #802 fixed the tests/integration/full-level/*.ts cluster: helpers.ts's
+    // shared GameContext fixture was missing required fields (TS2739), which
+    // cascaded through every sibling importing it; level1-win.integration.test.ts
+    // had its own TS2339, and tutorial.integration.test.ts an unused-import
+    // TS6133. All 3 are fixed and all 16 entries (helpers.ts + 15 siblings) are
+    // removed from exclude below (102 -> 86 entries, 277 -> 274 errors,
+    // 89 -> 86 files) -- `tsc --noEmit` is green for the whole cluster.
     // The remainder still need the fixture-vs-interface drift fixed before
     // re-inclusion.
     "./integration/blast-enhanced.integration.test.ts",
