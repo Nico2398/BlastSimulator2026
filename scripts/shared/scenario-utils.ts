@@ -231,6 +231,43 @@ export function captureCostFloorMs(step: ScenarioStepDef, shotsCount: number): n
  * `captureCostFloorMs` (#725). Omitted or `enabled: false` leaves the return
  * value unchanged from the pre-#725 behavior.
  */
+export function effectiveStepTimeoutMs(
+  step: ScenarioStepDef,
+  defaultOuterSeconds: number,
+  capture?: { enabled: boolean; shotsCount: number },
+): number {
+  const declaredMs = (step.timeout ?? defaultOuterSeconds) * 1000;
+
+  let maxInnerMs = 0;
+  for (const action of step.interaction ?? []) {
+    // `awaitUsable`/`resolveEventIfPending`/`clickIfPresent`/`waitUntil`
+    // declare a real `timeoutMs` field to read when present; `zoomOut`/
+    // `focusTile`/`clickEntity` share the same real inner deadline
+    // (interaction-driver.ts's DEFAULT_TIMEOUT_MS) but have no such field on
+    // their own type, so `explicit` stays undefined for them and the table
+    // below is the only source. An action with neither — no field and no
+    // table entry — has no timeoutMs concept and is skipped.
+    const explicit = 'timeoutMs' in action ? action.timeoutMs : undefined;
+    const fallback = DEFAULT_INNER_TIMEOUT_MS[action.type];
+    if (action.type === 'waitForTutorialStep') {
+      // Own inner deadline field is named `timeout`, not `timeoutMs`
+      // (interaction-executor.ts's `action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS`)
+      // — recognized separately from the `timeoutMs`/table branches above,
+      // sharing that same constant so the two stay in lockstep.
+      maxInnerMs = Math.max(maxInnerMs, action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS);
+      continue;
+    }
+    if (explicit === undefined && fallback === undefined) continue;
+    maxInnerMs = Math.max(maxInnerMs, explicit ?? fallback ?? 0);
+  }
+
+  const base = maxInnerMs === 0 ? declaredMs : Math.max(declaredMs, maxInnerMs + TIMEOUT_MARGIN_MS);
+
+  if (!capture?.enabled) return base;
+
+  return Math.max(base, captureCostFloorMs(step, capture.shotsCount));
+}
+
 /**
  * Resolves a step's `repeat` field to a concrete iteration count:
  * absent -> 1; a positive integer -> itself. Throws an Error naming the step
@@ -277,41 +314,4 @@ export async function runRepeatedInteraction<T>(
     last = await executeOnce();
   }
   return last!;
-}
-
-export function effectiveStepTimeoutMs(
-  step: ScenarioStepDef,
-  defaultOuterSeconds: number,
-  capture?: { enabled: boolean; shotsCount: number },
-): number {
-  const declaredMs = (step.timeout ?? defaultOuterSeconds) * 1000;
-
-  let maxInnerMs = 0;
-  for (const action of step.interaction ?? []) {
-    // `awaitUsable`/`resolveEventIfPending`/`clickIfPresent`/`waitUntil`
-    // declare a real `timeoutMs` field to read when present; `zoomOut`/
-    // `focusTile`/`clickEntity` share the same real inner deadline
-    // (interaction-driver.ts's DEFAULT_TIMEOUT_MS) but have no such field on
-    // their own type, so `explicit` stays undefined for them and the table
-    // below is the only source. An action with neither — no field and no
-    // table entry — has no timeoutMs concept and is skipped.
-    const explicit = 'timeoutMs' in action ? action.timeoutMs : undefined;
-    const fallback = DEFAULT_INNER_TIMEOUT_MS[action.type];
-    if (action.type === 'waitForTutorialStep') {
-      // Own inner deadline field is named `timeout`, not `timeoutMs`
-      // (interaction-executor.ts's `action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS`)
-      // — recognized separately from the `timeoutMs`/table branches above,
-      // sharing that same constant so the two stay in lockstep.
-      maxInnerMs = Math.max(maxInnerMs, action.timeout ?? WAIT_FOR_TUTORIAL_STEP_DEFAULT_TIMEOUT_MS);
-      continue;
-    }
-    if (explicit === undefined && fallback === undefined) continue;
-    maxInnerMs = Math.max(maxInnerMs, explicit ?? fallback ?? 0);
-  }
-
-  const base = maxInnerMs === 0 ? declaredMs : Math.max(declaredMs, maxInnerMs + TIMEOUT_MARGIN_MS);
-
-  if (!capture?.enabled) return base;
-
-  return Math.max(base, captureCostFloorMs(step, capture.shotsCount));
 }

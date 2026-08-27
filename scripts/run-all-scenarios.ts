@@ -196,6 +196,12 @@ async function runBatchInteraction(
                 // enableScreenshots is always false in this batch path, so no
                 // screenshot accumulation is needed here (unlike
                 // scenario-interaction-runner.ts's own call site).
+                //
+                // hasWaitUntil is precomputed here, not inside
+                // runRepeatedInteraction, which cannot import
+                // findWaitUntilAction itself without a circular import back to
+                // command-runner.ts (see runRepeatedInteraction's own doc
+                // comment in scenario-utils.ts).
                 const interactionResult = await runRepeatedInteraction(
                   step, s, findWaitUntilAction(step) !== undefined,
                   () => executeInteractionActions(

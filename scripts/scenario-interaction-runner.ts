@@ -133,6 +133,11 @@ export async function runScenarioInteraction(
             // (below) measures this step's effect and not everything before it.
             const before = step.expect ? await gameState(page) : {};
 
+            // Precomputed here rather than inside runRepeatedInteraction, which
+            // cannot import findWaitUntilAction itself without a circular
+            // import (command-runner.ts imports scenario-utils.ts for
+            // resolveRepeatCount) — see runRepeatedInteraction's own doc
+            // comment (scenario-utils.ts) for the full reasoning.
             const interactionResult = await runRepeatedInteraction(
               step, i, findWaitUntilAction(step) !== undefined,
               async () => {
