@@ -12,8 +12,10 @@ import {
   formatCommandSlug,
   buildScenarioReport,
   effectiveStepTimeoutMs,
+  runRepeatedInteraction,
   type ReportableStep,
 } from './shared/scenario-utils.js';
+import { findWaitUntilAction } from './shared/command-runner.js';
 import {
   initBrowser,
   executeInteractionActions,
@@ -131,11 +133,22 @@ export async function runScenarioInteraction(
             // (below) measures this step's effect and not everything before it.
             const before = step.expect ? await gameState(page) : {};
 
-            const interactionResult = await executeInteractionActions(
-              page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
-              (detail) => { lastProgress = detail; },
+            // Precomputed here rather than inside runRepeatedInteraction, which
+            // cannot import findWaitUntilAction itself without a circular
+            // import (command-runner.ts imports scenario-utils.ts for
+            // resolveRepeatCount) — see runRepeatedInteraction's own doc
+            // comment (scenario-utils.ts) for the full reasoning.
+            const interactionResult = await runRepeatedInteraction(
+              step, i, findWaitUntilAction(step) !== undefined,
+              async () => {
+                const r = await executeInteractionActions(
+                  page, step, enableScreenshots, outDir, paddedIdx, cmdSlug,
+                  (detail) => { lastProgress = detail; },
+                );
+                stepScreenshotPaths.push(...r.screenshotPaths);
+                return r;
+              },
             );
-            stepScreenshotPaths.push(...interactionResult.screenshotPaths);
 
             // Real DOM/tutorial checks, not just "nothing threw" — reuses
             // interaction-driver.ts's checkGoal, the same evaluator command

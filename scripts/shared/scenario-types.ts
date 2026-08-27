@@ -313,6 +313,33 @@ export interface ScenarioStepDef {
    *   never a blanket silencer.
    */
   commandOutcome?: 'refused' | 'either';
+  /**
+   * Run this step's command (command mode) or full `interaction` array
+   * (interaction mode) `repeat` times in immediate succession before
+   * `expect` is evaluated, instead of writing `repeat` byte-identical step
+   * objects.
+   *
+   * - Absent, or `1` — no behavior change from today.
+   * - Integer `N >= 2` — runs N times. Exactly one entry is written to the
+   *   step's report/state-dump/screenshot, carrying the LAST iteration's
+   *   command output and game state.
+   * - `0`, a negative number, or a non-integer — invalid.
+   *
+   * `commandOutcome` (command mode only) is checked after EVERY iteration
+   * independently — so iteration 5 of 24 failing is reported as iteration 5
+   * failing, not silently absorbed. `expect` itself is never evaluated per
+   * iteration: its state-goal fields (`increased`/`decreased`/`equals`/
+   * `changedBy`) are evaluated exactly ONCE per step, always — against the
+   * state captured immediately before the FIRST iteration and immediately
+   * after the LAST — never per-iteration, and NOT auto-scaled by N.
+   * `changedBy` values therefore describe the whole block's aggregate
+   * delta, not one iteration's — a `repeat: 24` block hiring one employee
+   * per iteration needs `changedBy: { employeeCount: 24 }`, not `1`.
+   *
+   * May not combine with a `waitUntil` interaction action on the same step
+   * (both are looping constructs; combining them is rejected as invalid).
+   */
+  repeat?: number;
 }
 
 /**

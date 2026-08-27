@@ -267,3 +267,51 @@ export function effectiveStepTimeoutMs(
 
   return Math.max(base, captureCostFloorMs(step, capture.shotsCount));
 }
+
+/**
+ * Resolves a step's `repeat` field to a concrete iteration count:
+ * absent -> 1; a positive integer -> itself. Throws an Error naming the step
+ * (step.description ?? step.command) and the offending value for anything
+ * else (0, negative, non-integer, NaN) - both runners call this once, before
+ * running any iteration, so an invalid `repeat` fails the step immediately.
+ */
+export function resolveRepeatCount(step: ScenarioStepDef): number {
+  const { repeat } = step;
+  if (repeat === undefined) return 1;
+  if (Number.isInteger(repeat) && repeat >= 1) return repeat;
+  const label = step.description ?? step.command;
+  throw new Error(`Invalid repeat value ${repeat} on step "${label}": must be a positive integer`);
+}
+
+/**
+ * Runs `executeOnce` `step.repeat` times in immediate succession (issue
+ * #696), returning the LAST iteration's result — the one both
+ * `scenario-interaction-runner.ts` and `run-all-scenarios.ts` write to their
+ * step report/state-dump. Shared because both independently reimplemented
+ * the identical resolve-count / reject-waitUntil-combination /
+ * loop-and-keep-last shape.
+ *
+ * `hasWaitUntil` is passed in by the caller rather than computed here (via
+ * `findWaitUntilAction`, `scripts/shared/command-runner.ts`) because
+ * importing that function into this file would import command-runner.ts,
+ * which itself imports this file for `resolveRepeatCount` — a circular
+ * import. Both call sites already import `findWaitUntilAction` for their own
+ * step-level checks, so passing the boolean through costs them nothing
+ * extra.
+ */
+export async function runRepeatedInteraction<T>(
+  step: ScenarioStepDef,
+  stepIndex: number,
+  hasWaitUntil: boolean,
+  executeOnce: () => Promise<T>,
+): Promise<T> {
+  const repeatCount = resolveRepeatCount(step);
+  if (repeatCount > 1 && hasWaitUntil) {
+    throw new Error(`repeat and waitUntil cannot combine on the same step (step ${stepIndex}, "${step.command}")`);
+  }
+  let last: T | undefined;
+  for (let rep = 0; rep < repeatCount; rep++) {
+    last = await executeOnce();
+  }
+  return last!;
+}

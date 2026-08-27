@@ -12,6 +12,7 @@ import {
   formatStepIndex,
   formatCommandSlug,
   buildScenarioReport,
+  resolveRepeatCount,
   type ReportableStep,
 } from './scenario-utils.js';
 import { checkGoalAgainstState, checkCommandOutcome, type GoalMismatch } from './scenario-goal.js';
@@ -199,17 +200,41 @@ export function runSteps(
     let driftMismatches: GoalMismatch[] | undefined;
 
     try {
+      const repeatCount = resolveRepeatCount(step);
+      if (repeatCount > 1 && waitUntilAction) {
+        throw new Error(`repeat and waitUntil cannot combine on the same step (step ${i}, "${step.command}")`);
+      }
+
       if (waitUntilAction) {
         const waited = runWaitUntil(engine, waitUntilAction);
         result = { success: true, output: waited.output };
         gameState = waited.gameState;
-      } else {
-        result = runCommand(engine, step.command);
-        gameState = serializeGameState(ctx) as Record<string, unknown> | null;
-      }
 
-      const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
-      if (outcomeViolation !== null) throw new Error(outcomeViolation);
+        const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
+        if (outcomeViolation !== null) throw new Error(outcomeViolation);
+      } else {
+        // Shared by the repeatCount===1 case and every iteration of the
+        // repeatCount>1 loop below — the two used to repeat this same
+        // 4-statement sequence verbatim, differing only in the error-message
+        // prefix. `iterationLabel` is omitted for the non-repeat case so its
+        // error message stays byte-identical to before this was extracted.
+        const runOneAttempt = (iterationLabel?: string) => {
+          result = runCommand(engine, step.command);
+          gameState = serializeGameState(ctx) as Record<string, unknown> | null;
+          const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
+          if (outcomeViolation !== null) {
+            throw new Error(iterationLabel ? `${iterationLabel}: ${outcomeViolation}` : outcomeViolation);
+          }
+        };
+
+        if (repeatCount === 1) {
+          runOneAttempt();
+        } else {
+          for (let j = 0; j < repeatCount; j++) {
+            runOneAttempt(`repeat ${j + 1}/${repeatCount}`);
+          }
+        }
+      }
 
       if (step.expect) {
         const goalResult = checkGoalAgainstState(step.expect, before, gameState);

@@ -28,6 +28,7 @@ import {
   createGameEngine,
   runScenario,
   emitDriftReport,
+  findWaitUntilAction,
   type ScenarioResult,
   type DriftRecord,
 } from './shared/command-runner.js';
@@ -37,6 +38,7 @@ import {
   loadScenarioDef,
   buildScenarioReport,
   effectiveStepTimeoutMs,
+  runRepeatedInteraction,
   SCENARIO_DIR,
   type ReportableStep,
 } from './shared/scenario-utils.js';
@@ -191,9 +193,21 @@ async function runBatchInteraction(
                 // measures this step's effect, not everything before it.
                 const before = step.expect ? await gameState(page) : {};
 
-                const interactionResult = await executeInteractionActions(
-                  page, step, false, outDir, paddedIdx, cmdSlug,
-                  (detail) => { lastProgress = detail; },
+                // enableScreenshots is always false in this batch path, so no
+                // screenshot accumulation is needed here (unlike
+                // scenario-interaction-runner.ts's own call site).
+                //
+                // hasWaitUntil is precomputed here, not inside
+                // runRepeatedInteraction, which cannot import
+                // findWaitUntilAction itself without a circular import back to
+                // command-runner.ts (see runRepeatedInteraction's own doc
+                // comment in scenario-utils.ts).
+                const interactionResult = await runRepeatedInteraction(
+                  step, s, findWaitUntilAction(step) !== undefined,
+                  () => executeInteractionActions(
+                    page, step, false, outDir, paddedIdx, cmdSlug,
+                    (detail) => { lastProgress = detail; },
+                  ),
                 );
 
                 if (step.expect) {
