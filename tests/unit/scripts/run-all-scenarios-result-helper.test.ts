@@ -157,78 +157,26 @@ describe('run-all-scenarios.ts buildScenarioLoadFailure (#800)', () => {
     process.argv = ORIGINAL_ARGV;
   });
 
-  it('Error input: returns exact ScenarioResult shape and logs the FAILED line', async () => {
+  const CASES: Array<{ label: string; name: string; err: unknown; expectedError: string }> = [
+    { label: 'Error input', name: 'my-scenario', err: new Error('boom'), expectedError: 'boom' },
+    { label: 'non-Error string thrown', name: 's', err: 'raw string', expectedError: 'raw string' },
+    { label: 'non-Error number thrown (String()-coerced, matching the original ternary)', name: 's', err: 42, expectedError: '42' },
+    { label: 'edge case: err is undefined', name: 's', err: undefined, expectedError: 'undefined' },
+    { label: 'edge case: err is null', name: 's', err: null, expectedError: 'null' },
+  ];
+
+  it.each(CASES)('$label: returns exact ScenarioResult shape and logs the FAILED line', async ({ name, err, expectedError }) => {
     await registerFixtureScenario([]);
     const module = await import('../../../scripts/run-all-scenarios.js');
     await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const result = module.buildScenarioLoadFailure('my-scenario', new Error('boom'));
+    const result = module.buildScenarioLoadFailure(name, err);
 
-    expect(result).toEqual({ name: 'my-scenario', totalSteps: 0, failed: true, error: 'boom' });
+    expect(result).toEqual({ name, totalSteps: 0, failed: true, error: expectedError });
     expect(Object.keys(result).sort()).toEqual(['error', 'failed', 'name', 'totalSteps'].sort());
-    expect(errorSpy).toHaveBeenCalledWith('\n[my-scenario] FAILED — boom');
-
-    errorSpy.mockRestore();
-  });
-
-  it('non-Error string thrown: error field is the raw string', async () => {
-    await registerFixtureScenario([]);
-    const module = await import('../../../scripts/run-all-scenarios.js');
-    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
-
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = module.buildScenarioLoadFailure('s', 'raw string');
-
-    expect(result).toEqual({ name: 's', totalSteps: 0, failed: true, error: 'raw string' });
-    expect(errorSpy).toHaveBeenCalledWith('\n[s] FAILED — raw string');
-
-    errorSpy.mockRestore();
-  });
-
-  it('non-Error number thrown: error field is String()-coerced, matching the original ternary', async () => {
-    await registerFixtureScenario([]);
-    const module = await import('../../../scripts/run-all-scenarios.js');
-    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
-
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = module.buildScenarioLoadFailure('s', 42);
-
-    expect(result).toEqual({ name: 's', totalSteps: 0, failed: true, error: '42' });
-    expect(errorSpy).toHaveBeenCalledWith('\n[s] FAILED — 42');
-
-    errorSpy.mockRestore();
-  });
-
-  it('edge case: err is undefined — totalSteps 0, failed true, error is "undefined"', async () => {
-    await registerFixtureScenario([]);
-    const module = await import('../../../scripts/run-all-scenarios.js');
-    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
-
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = module.buildScenarioLoadFailure('s', undefined);
-
-    expect(result).toEqual({ name: 's', totalSteps: 0, failed: true, error: 'undefined' });
-    expect(errorSpy).toHaveBeenCalledWith('\n[s] FAILED — undefined');
-
-    errorSpy.mockRestore();
-  });
-
-  it('edge case: err is null — totalSteps 0, failed true, error is "null"', async () => {
-    await registerFixtureScenario([]);
-    const module = await import('../../../scripts/run-all-scenarios.js');
-    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled(), { timeout: 5000 });
-
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = module.buildScenarioLoadFailure('s', null);
-
-    expect(result).toEqual({ name: 's', totalSteps: 0, failed: true, error: 'null' });
-    expect(errorSpy).toHaveBeenCalledWith('\n[s] FAILED — null');
+    expect(errorSpy).toHaveBeenCalledWith(`\n[${name}] FAILED — ${expectedError}`);
 
     errorSpy.mockRestore();
   });
