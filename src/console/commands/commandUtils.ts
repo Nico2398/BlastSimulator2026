@@ -2,12 +2,16 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import { t } from '../../core/i18n/I18n.js';
 
-export const NO_EMPLOYEES_MSG = 'No employees.';
+/** Re-evaluates on every call so a runtime language switch (Settings) is reflected. */
+export function noEmployeesMessage(): string {
+  return t('console.no_employees');
+}
 
 /** Guard every command that needs a loaded game. */
 export function requireGame(ctx: GameContext): CommandResult | null {
-  if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
+  if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };
   return null;
 }
 
@@ -45,7 +49,7 @@ function parseBooleanFlag(raw: string | undefined): boolean | undefined | null {
 export function parseStaffedFlag(raw: string | undefined): { staffed: boolean; error: null } | { staffed: false; error: string } {
   const parsed = parseBooleanFlag(raw);
   if (parsed === null) {
-    return { staffed: false, error: `Invalid staffed value: "${raw}". Use staffed:true or staffed:false.` };
+    return { staffed: false, error: t('console.invalid_staffed_flag', { value: raw! }) };
   }
   return { staffed: parsed === true, error: null };
 }
