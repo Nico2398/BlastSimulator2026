@@ -73,8 +73,14 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  *  - the record is NOT completed/removed — status returns to 'queued' and
  *    holderId/ghost.claimed clear, so any qualified employee (including this
  *    one again later) can reclaim it via tickEmployees/selectBestActionForEmployee;
- *  - targetEmployeeId is left exactly as it was — an open-pool action goes
- *    back to the open pool, a targeted one stays reserved for its target;
+ *  - targetEmployeeId is left exactly as it was for a targeted action (stays
+ *    reserved for its target) or for an open-pool action already arrived at
+ *    its target (stays open-pool — work-in-progress is preserved via
+ *    payload.durationTicks below instead, and any qualified employee can
+ *    finish it from here). An open-pool action interrupted while still
+ *    walking there is the one exception: it gets re-targeted at `employee`
+ *    instead of releasing to the open pool — see this function's own doc
+ *    comment further down for why;
  *  - the action's payload is preserved on `employee.interruptedActionPayload`
  *    before the walk/task-claim fields are cleared, mirroring the exact
  *    field-clearing cancelAction already does (clearHolderWalkFields) so the
@@ -103,6 +109,34 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  * restarting its full work duration from scratch. Without this, a single
  * needs-driven interruption on a long task could silently double its total
  * completion time.
+ *
+ * Travel progress toward a not-yet-arrived open-pool action gets the same
+ * "resume, don't restart" treatment, but by a different mechanism (#556
+ * visual-testing follow-up): there is no work-in-progress tick count to stash
+ * yet (`employee.taskTicksRemaining` is still null), but the employee is
+ * already physically partway to the target, which no payload field can
+ * capture — only THIS employee's own position reflects it. Leaving the
+ * action fully open-pool (targetEmployeeId stays null) hands it to whichever
+ * employee's dispatch turn (tickEmployees' ascending-id loop) next lands on
+ * an idle slot — on a busy roster that is almost always a *different*,
+ * still-at-base employee, since the interrupted one needs time to rest before
+ * they're idle again. That employee restarts the whole walk from base, gets
+ * interrupted at roughly the same distance, hands it to another base-camped
+ * employee, and so on forever: confirmed live via #556's
+ * building-placement-visual.json scenario, where a `place_building` order far
+ * from the only living_quarters never completed after 600+ ticks of exactly
+ * this relay, because the dispatch loop has no cross-employee cost comparison
+ * — it hands a pool action to whichever employee is idle *first*, not
+ * whichever is *closest*. Re-targeting the action at the interrupted employee
+ * takes it out of that open-pool free-for-all: claimActionsTargetedAtEmployee
+ * (step 1 of tickEmployees, exclusive and uncontested) reclaims it the
+ * instant this employee is idle again, resuming the walk from wherever they
+ * physically are instead of restarting it. Never applied to a 'rest' action
+ * itself (self-claimed by its own creator, already targeted or immediately
+ * reclaimed — see this function's own "never used for rest actions" note
+ * above) or to a vehicle-gated action (`employee.pendingTaskDuration` is only
+ * ever set by the non-vehicle branch of `promoteActionToActive`, so this
+ * condition never matches one).
  */
 export function interruptActiveAction(
   state: GameState,
@@ -117,6 +151,13 @@ export function interruptActiveAction(
 
       if (employee.taskTicksRemaining !== null && employee.taskTicksRemaining > 0) {
         action.payload = { ...action.payload, durationTicks: employee.taskTicksRemaining };
+      } else if (
+        action.targetEmployeeId === null
+        && action.type !== 'rest'
+        && employee.pendingTaskDuration !== null
+        && employee.taskTicksRemaining === null
+      ) {
+        action.targetEmployeeId = employee.id;
       }
 
       action.status = 'queued';

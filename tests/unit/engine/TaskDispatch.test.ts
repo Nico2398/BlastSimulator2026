@@ -857,9 +857,14 @@ describe('interruptActiveAction (#549)', () => {
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 30);
     expect(stored.status).toBe('queued');
     expect(stored.holderId).toBeNull();
-    // targetEmployeeId is left exactly as it was set on dispatch (null here —
-    // an open-pool action returns to the open pool).
-    expect(stored.targetEmployeeId).toBeNull();
+    // #556 visual-testing follow-up: this employee was still walking there
+    // (simulateClaimWalking, no simulateArrival) when interrupted, so the
+    // open-pool action is re-targeted at them instead of returning fully
+    // open-pool — see "re-targets a still-walking open-pool action" below for
+    // the dedicated regression test and interruptActiveAction's own doc
+    // comment for why (an unrestricted open-pool release livelocked a distant
+    // place_building order forever across a busy roster).
+    expect(stored.targetEmployeeId).toBe(empId);
 
     const ghost = (state as any).ghostPreviews.find((g: { id: number }) => g.id === 30);
     expect(ghost.claimed).toBe(false);
@@ -983,6 +988,49 @@ describe('interruptActiveAction (#549)', () => {
 
     const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 36);
     expect(stored.payload.durationTicks).toBeUndefined();
+  });
+
+  it('re-targets a still-walking open-pool action at the interrupted employee instead of releasing it fully open-pool (#556 livelock fix)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const action = makePendingAction({ id: 38, requiredSkill: 'blasting', targetX: 90, targetZ: 20 });
+    dispatchPendingAction(state, action);
+    simulateClaimWalking(state, 38, empId, {
+      targetX: 90, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    expect(emp.taskTicksRemaining).toBeNull();
+
+    interruptActiveAction(state, emp, 38);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 38);
+    expect(stored.status).toBe('queued');
+    // Re-targeted, not left open-pool: claimActionsTargetedAtEmployee (step 1
+    // of tickEmployees) reclaims it exclusively the instant this employee is
+    // idle again, resuming from wherever they physically are rather than
+    // losing the claim to whichever OTHER employee's dispatch turn comes up
+    // first — the mechanism that let a distant place_building order relay
+    // forever across a busy roster without ever completing (#556).
+    expect(stored.targetEmployeeId).toBe(empId);
+  });
+
+  it('leaves a rest action fully open-pool (never re-targets a rest action to itself)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const action: Omit<PendingAction, 'status' | 'holderId'> = {
+      id: 39, type: 'rest', requiredSkill: null, requiredVehicleRole: null,
+      targetX: 8, targetZ: 8, targetY: 0, payload: {}, targetEmployeeId: null,
+    };
+    dispatchPendingAction(state, action, { skipQualificationCheck: true });
+    simulateClaimWalking(state, 39, empId, {
+      targetX: 8, targetZ: 8, requiredSkill: null, type: 'rest', payload: {},
+    });
+
+    interruptActiveAction(state, emp, 39);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 39);
+    expect(stored.targetEmployeeId).toBeNull();
   });
 
   it('does not stash payload.durationTicks when taskTicksRemaining is exactly 0', () => {

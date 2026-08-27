@@ -3,19 +3,19 @@
   "description": "Visual check of building placement at different grid positions with list inspection after each. #556: ordering a building queues a construction site (blue ghost, no building yet) instead of placing it instantly -- every order step now asserts buildingCount unchanged + orderedBuildingCount:1, followed by a mid-build checkpoint tick and a waitUntil that drives the site to completion before the next order.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000 staffed:true",
-      "description": "#558: cash bumped from the default 50000 so the file's final step (a building on ground well outside the site) is affordable on top of the four already here. #556: staffed:true so a free roster exists to actually walk to and work each ordered site -- without it every order below would queue forever and buildingCount would never reach 1.",
+      "command": "new_game seed:42 cash:300000 staffed:true",
+      "description": "#558: cash bumped from the default 50000 so the file's final step (a building on ground well outside the site) is affordable on top of the four already here. #556: staffed:true so a free roster exists to actually walk to and work each ordered site -- without it every order below would queue forever and buildingCount would never reach 1. Bumped again to 300000 (from 150000) as part of the #556 visual-testing follow-up dispatch-livelock fix: the far (90,20) order now genuinely completes instead of stalling forever, but a small 5-person roster still burns real salary/upkeep across the ~150-170 ticks its travel and repeated need-driven rest cycles take, and 150000 ran the balance negative (briefly bankrupt) by the time it finished -- confirmed against the fixed dispatch path, not a symptom of the fix itself.",
       "timeout": 75,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000 staffed:true"
+          "command": "new_game seed:42 cash:300000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000,
+          "cash": 300000,
           "buildingCount": 0,
           "employeeCount": 5
         }
