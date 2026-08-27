@@ -61,6 +61,18 @@ Command mode has a `success: boolean` on every command result, and a step's own 
 
 A step whose command throws a real exception still fails regardless of `commandOutcome` — only a `success: false` return is a "refusal" this field can declare expected.
 
+## Step repetition (`repeat`)
+
+`repeat` (`ScenarioStepDef`, `scripts/shared/scenario-types.ts`) runs a step's command (command mode) or full `interaction` array (interaction mode) `N` times in immediate succession before `expect` is evaluated, instead of writing `N` byte-identical step objects. Absent, or `1`, is a no-op — no behavior change from a step that never used it. `0`, a negative number, or a non-integer is invalid and fails the step immediately, naming the step and the offending value.
+
+Exactly one entry lands in the step's report/state-dump/screenshot regardless of `N` — the LAST iteration's command output and game state.
+
+`expect`'s state-goal fields (`increased`/`decreased`/`equals`/`changedBy`) are **never** evaluated per iteration — always exactly ONCE per step, against the state captured immediately before the FIRST iteration and immediately after the LAST. `changedBy` describes the whole block's aggregate delta, not one iteration's: a `repeat: 24` block hiring one employee per iteration needs `changedBy: {employeeCount: 24}`, not `1`.
+
+`commandOutcome` (command mode only) is the one thing that IS checked per iteration, independently each time — an outcome violation on iteration 5 of 24 is reported as iteration 5 failing (`repeat 5/24: ...`), not silently absorbed into the block.
+
+`repeat` may not combine with a `waitUntil` interaction action on the same step — both are looping constructs, and combining them is rejected as invalid before either runs.
+
 ## Interaction actions
 
 `InteractionStepAction` (`scripts/shared/scenario-types.ts`) covers standard Puppeteer primitives (`click`, `clickSelector`, `mousedown`/`mouseup`/`mousemove`, `keypress`/`keydown`/`keyup`, `scroll`, `wheel`, `wait`, `waitForSelector`, `type`, `assert`, `viewport`, `command`, `screenshot`) plus tile-space and game-specific actions. Each variant carries its own doc comment in source — read it before using an unfamiliar one; this table is a pointer, not the full spec:

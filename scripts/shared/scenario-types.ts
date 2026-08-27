@@ -325,15 +325,16 @@ export interface ScenarioStepDef {
    *   command output and game state.
    * - `0`, a negative number, or a non-integer — invalid.
    *
-   * `expect` (and `commandOutcome`, command mode) is evaluated per
-   * iteration for outcome/refusal (so iteration 5 of 24 failing is reported
-   * as iteration 5 failing, not silently absorbed), but state-goal checks
-   * (`increased`/`decreased`/`equals`/`changedBy`) run exactly ONCE per
-   * step: against the state captured immediately before the FIRST
-   * iteration and the state immediately after the LAST. `changedBy` values
-   * therefore describe the whole block's aggregate delta, not one
-   * iteration's — a `repeat: 24` block hiring one employee per iteration
-   * needs `changedBy: { employeeCount: 24 }`, not `1`.
+   * `commandOutcome` (command mode only) is checked after EVERY iteration
+   * independently — so iteration 5 of 24 failing is reported as iteration 5
+   * failing, not silently absorbed. `expect` itself is never evaluated per
+   * iteration: its state-goal fields (`increased`/`decreased`/`equals`/
+   * `changedBy`) are evaluated exactly ONCE per step, always — against the
+   * state captured immediately before the FIRST iteration and immediately
+   * after the LAST — never per-iteration, and NOT auto-scaled by N.
+   * `changedBy` values therefore describe the whole block's aggregate
+   * delta, not one iteration's — a `repeat: 24` block hiring one employee
+   * per iteration needs `changedBy: { employeeCount: 24 }`, not `1`.
    *
    * May not combine with a `waitUntil` interaction action on the same step
    * (both are looping constructs; combining them is rejected as invalid).

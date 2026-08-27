@@ -38,7 +38,7 @@ import {
   loadScenarioDef,
   buildScenarioReport,
   effectiveStepTimeoutMs,
-  resolveRepeatCount,
+  runRepeatedInteraction,
   SCENARIO_DIR,
   type ReportableStep,
 } from './shared/scenario-utils.js';
@@ -193,20 +193,16 @@ async function runBatchInteraction(
                 // measures this step's effect, not everything before it.
                 const before = step.expect ? await gameState(page) : {};
 
-                const repeatCount = resolveRepeatCount(step);
-                if (repeatCount > 1 && findWaitUntilAction(step)) {
-                  throw new Error(`repeat and waitUntil cannot combine on the same step (step ${s}, "${step.command}")`);
-                }
-
-                let interactionResult: Awaited<ReturnType<typeof executeInteractionActions>> | undefined;
-                for (let rep = 0; rep < repeatCount; rep++) {
-                  interactionResult = await executeInteractionActions(
+                // enableScreenshots is always false in this batch path, so no
+                // screenshot accumulation is needed here (unlike
+                // scenario-interaction-runner.ts's own call site).
+                const interactionResult = await runRepeatedInteraction(
+                  step, s, findWaitUntilAction(step) !== undefined,
+                  () => executeInteractionActions(
                     page, step, false, outDir, paddedIdx, cmdSlug,
                     (detail) => { lastProgress = detail; },
-                  );
-                }
-                // repeatCount is always >= 1, so interactionResult is always assigned.
-                interactionResult = interactionResult!;
+                  ),
+                );
 
                 if (step.expect) {
                   // interactionResult.gameState is this same moment's state —

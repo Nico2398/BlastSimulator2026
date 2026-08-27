@@ -212,20 +212,26 @@ export function runSteps(
 
         const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
         if (outcomeViolation !== null) throw new Error(outcomeViolation);
-      } else if (repeatCount === 1) {
-        result = runCommand(engine, step.command);
-        gameState = serializeGameState(ctx) as Record<string, unknown> | null;
-
-        const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
-        if (outcomeViolation !== null) throw new Error(outcomeViolation);
       } else {
-        for (let j = 0; j < repeatCount; j++) {
+        // Shared by the repeatCount===1 case and every iteration of the
+        // repeatCount>1 loop below — the two used to repeat this same
+        // 4-statement sequence verbatim, differing only in the error-message
+        // prefix. `iterationLabel` is omitted for the non-repeat case so its
+        // error message stays byte-identical to before this was extracted.
+        const runOneAttempt = (iterationLabel?: string) => {
           result = runCommand(engine, step.command);
           gameState = serializeGameState(ctx) as Record<string, unknown> | null;
-
           const outcomeViolation = checkCommandOutcome(step.commandOutcome, result, step.command);
           if (outcomeViolation !== null) {
-            throw new Error(`repeat ${j + 1}/${repeatCount}: ${outcomeViolation}`);
+            throw new Error(iterationLabel ? `${iterationLabel}: ${outcomeViolation}` : outcomeViolation);
+          }
+        };
+
+        if (repeatCount === 1) {
+          runOneAttempt();
+        } else {
+          for (let j = 0; j < repeatCount; j++) {
+            runOneAttempt(`repeat ${j + 1}/${repeatCount}`);
           }
         }
       }
