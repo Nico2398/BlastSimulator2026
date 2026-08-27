@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { tickCommand, eventCommand, timeCommand } from '../../src/console/commands/events.js';
-import { employeeCommand } from '../../src/console/commands/entities.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createEventSystemState,
@@ -32,22 +31,17 @@ import {
   ECOLOGICAL_SHUTDOWN_TICKS,
   ARREST_EXPOSURE_THRESHOLD,
   REVOLT_TICKS,
+  SCORE_DECAY_RATE,
 } from '../../src/core/config/balance.js';
+import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
-}
-
-/** Hire one employee and return their numeric ID (always 1 on a fresh state). */
-function hireOne(ctx: GameContext, role = 'blaster'): number {
-  const result = employeeCommand(ctx, ['hire'], { role });
-  if (!result.success) throw new Error(`Setup: hire failed — ${result.output}`);
-  return ctx.state!.employees.employees[0]!.id;
 }
 
 /** Minimal EventContext for core-API calls that don't need a full GameState. */
@@ -56,6 +50,7 @@ function makeEventCtx(overrides: Partial<{
   safety: number;
   ecology: number;
   nuisance: number;
+  decayRate: number;
   employeeCount: number;
   deathCount: number;
   corruptionLevel: number;
@@ -69,6 +64,7 @@ function makeEventCtx(overrides: Partial<{
       safety: overrides.safety ?? 50,
       ecology: overrides.ecology ?? 50,
       nuisance: overrides.nuisance ?? 50,
+      decayRate: overrides.decayRate ?? SCORE_DECAY_RATE,
     },
     employeeCount: overrides.employeeCount ?? 0,
     deathCount: overrides.deathCount ?? 0,
@@ -105,6 +101,14 @@ function makeWaitingVehicle(
     state: 'waiting',
     payloadKg: 0,
     waitingTicks,
+    moveConsecutiveFailures: 0,
+    isMoveStuck: false,
+    haulingFragmentId: null,
+    haulingPhase: null,
+    haulingDepotBuildingId: null,
+    breakFragmentId: null,
+    breakPhase: null,
+    reservedForActionId: null,
     ...overrides,
   };
 }
@@ -641,7 +645,7 @@ describe('Event system', () => {
 
       // Should not throw
       expect(() => {
-        const result = runner.run('employee list');
+        runner.run('employee list');
         const cmdName = 'employee';
         if (ctx.state && !META_COMMANDS.includes(cmdName as typeof META_COMMANDS[number])) {
           incrementActionCount(ctx.state.events);

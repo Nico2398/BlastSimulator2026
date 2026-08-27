@@ -15,7 +15,6 @@ import {
   sequenceCommand,
   type MiningContext,
 } from '../../src/console/commands/mining.js';
-import { createTubingState } from '../../src/core/mining/Tubing.js';
 import { resetHoleIds } from '../../src/core/mining/DrillPlan.js';
 import { hireEmployee } from '../../src/core/entities/Employee.js';
 import { Random } from '../../src/core/math/Random.js';
@@ -26,8 +25,8 @@ function makeCtx(): MiningContext {
   const ctx: MiningContext = {
     state: null,
     grid: null,
-    softwareTier: 0,
-    tubingState: createTubingState(),
+    landscape: null,
+    playableArea: null,
     emitter: new EventEmitter(),
   };
   // Staffed (#553): drill_plan grid now queues one drill_hole PendingAction
