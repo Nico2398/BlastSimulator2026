@@ -1679,7 +1679,7 @@ describe('buildRampCommand — length bounds (#572)', () => {
 // (console/commands/events.ts's 'dig_ramp_segment' branch) does — carving its
 // cells via carveRampSegment and marking its RampSegmentTracker.done — rather
 // than driving a full navmesh walk through `tick`, which is exercised
-// end-to-end by GameLoop.test.ts's dig_ramp_segment describe block already.
+// end-to-end by EmployeeDispatch.test.ts's dig_ramp_segment describe block already.
 describe('build_ramp cancel / employee cancel — ramp segment cancellation (#555)', () => {
   /**
    * Marks ramp segment `index` as carved-and-done, exactly like the real
@@ -1813,7 +1813,7 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
 // way to completion through `tick` — the "build_ramp cancel" describe block
 // above deliberately completes a segment by calling carveRampSegment/
 // completePendingAction directly (see its own doc comment), and
-// GameLoop.test.ts's dig_ramp_segment describe block only covers vehicle-
+// EmployeeDispatch.test.ts's dig_ramp_segment describe block only covers vehicle-
 // gated dispatch/claim, stopping short of an actual `completed: true`
 // TaskProgressResult. So the console-layer branch that reads that result —
 // carve the segment, patch the NavGrid, mark the tracker done, and splice
