@@ -2631,6 +2631,8 @@
   "ui.build.ramp": "Creuser une rampe",
   "ui.build.ramp_depth": "Profondeur",
   "ui.build.ramp_ordered": "Rampe commandée — excavation en cours.",
+  "ui.build.ordered": "Bâtiment commandé — construction en cours.",
+  "ui.build.under_construction_count": "{count} en construction",
   "ui.policy.title": "Politique du site",
   "ui.policy.shift_mode": "Horaires de poste",
   "ui.policy.shift_8h": "Postes de 8 heures",

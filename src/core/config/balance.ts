@@ -2,7 +2,7 @@
 // All tunable game constants live here. Human can adjust these values during polish.
 // Real-world research notes are included for each value.
 
-import type { BuildingType } from '../entities/Building.js';
+import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
 import type { EmployeeRole, SkillCategory } from '../entities/Employee.js';
@@ -654,6 +654,12 @@ export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 
 /** Base excavation voxels/tick for a tier-1 rock digger (#555 ramp excavation — matches VEHICLE_BASE_STATS.rock_digger.workRate). */
 export const RAMP_DIG_VOXELS_PER_TICK_TIER1 = 8;
+
+/** Base duration (ticks) of a `place_building` action before the per-tier multiplier (#556 construction sites). */
+export const BUILDING_CONSTRUCTION_BASE_DURATION_TICKS = 40;
+
+/** Per-tier multiplier applied to BUILDING_CONSTRUCTION_BASE_DURATION_TICKS (#556 construction sites) — a bigger tier takes longer to build. */
+export const BUILDING_CONSTRUCTION_TIER_MULTIPLIER: Record<BuildingTier, number> = { 1: 1, 2: 1.6, 3: 2.4 };
 
 /** VehicleTask each role shows once its vehicle arrives at a reserved action's target and the work timer starts (#550). */
 export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {

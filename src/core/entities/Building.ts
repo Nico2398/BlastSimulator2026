@@ -361,6 +361,41 @@ export function findNearestActiveBuildingOfType(
   return nearest;
 }
 
+// ── Construction site footprint checks (#556) ────────────────────────────────
+
+/**
+ * An occupant of the placement grid for `checkFootprintPlacement` purposes —
+ * either a live `Building` or a still-under-construction `PlannedBuilding`
+ * (`GameState.ts`), reduced to the fields footprint overlap needs.
+ */
+export interface FootprintOccupant {
+  type: BuildingType;
+  tier: BuildingTier;
+  x: number;
+  z: number;
+}
+
+/**
+ * Whether a building of `type`/`tier` can be placed at (x, z) given the
+ * current occupants (live buildings AND planned-but-not-yet-built ones) —
+ * bounds + occupancy check shared by `placeBuilding` and the new
+ * order-then-build path. Stub: implementation phase moves the real checks
+ * here from `placeBuilding`'s inline bounds/`isOccupied` calls.
+ */
+export function checkFootprintPlacement(
+  _occupants: ReadonlyArray<FootprintOccupant>,
+  _type: BuildingType,
+  _x: number,
+  _z: number,
+  _tier: BuildingTier,
+  _gridSizeX: number,
+  _gridSizeZ: number,
+  _originX: number,
+  _originZ: number,
+): { valid: boolean; error?: string } {
+  return { valid: false, error: 'not implemented' };
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function isOccupied(

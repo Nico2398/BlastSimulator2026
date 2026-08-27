@@ -38,11 +38,22 @@ export type PlacementGrid = PlacementCell[][];
 /**
  * Build a placement grid by scanning every (x, z) column of the VoxelGrid for
  * its surface height, then marking cells covered by building footprints as BUSY.
+ *
+ * `plannedBuildings` (#556) additionally marks cells occupied by an
+ * ordered-but-not-yet-built construction site as BUSY, so a second building
+ * can't be placed on top of one still under construction. Defaults to `[]`
+ * so every pre-#556 call site keeps compiling unchanged.
  */
 export function buildPlacementGrid(
   voxelGrid: VoxelGrid,
   buildingState: BuildingState,
+  plannedBuildings: ReadonlyArray<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [],
 ): PlacementGrid {
+  // Marking plannedBuildings-occupied cells BUSY is implementation-phase work
+  // (#556) — referenced here only to keep the stub's new param from tripping
+  // noUnusedParameters while the signature settles.
+  void plannedBuildings;
+
   const grid: PlacementGrid = [];
 
   for (let z = 0; z < voxelGrid.sizeZ; z++) {
