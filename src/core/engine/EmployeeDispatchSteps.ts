@@ -11,7 +11,14 @@
 
 import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee } from '../entities/Employee.js';
-import type { SelectedAction } from './ActionSelection.js';
+import {
+  selectBestActionForEmployee, computeActionWorkTicks, resolveRestNeedKey, seedTaskTimerFields,
+  isRampSegmentClaimable, type SelectedAction,
+} from './ActionSelection.js';
+import { claimPendingAction } from './TaskDispatch.js';
+import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction } from './VehicleReservation.js';
+import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -22,12 +29,40 @@ export interface TickEmployeesResult {
 /**
  * Step 1 of tickEmployees: claim every still-queued action targeted
  * specifically at `employee`, up to MAX_EMPLOYEE_TASK_QUEUE_DEPTH total
- * (active + taskQueue). See GameLoop.ts's pre-#759 doc comment for the full
- * algorithm this was extracted from.
+ * (active + taskQueue). These are never contested by another employee, so no
+ * cost ranking is needed — just claim in a deterministic (id-ascending)
+ * order. The first one claimed while the employee is still idle is promoted
+ * straight to active; any further ones go onto taskQueue.
  */
 export function claimActionsTargetedAtEmployee(state: GameState, employee: Employee, result: TickEmployeesResult): void {
-  void state; void employee; void result;
-  // TODO: implement
+  const targeted = state.pendingActions
+    .filter(a => a.status === 'queued' && a.targetEmployeeId === employee.id
+      // #552: a haul_debris/fragment_debris action whose fragment is no
+      // longer on_ground, or (haul_debris only) whose mass no longer fits
+      // remaining storage room, stays queued rather than being claimed and
+      // immediately failing at pickup — mirrors the vehicle-availability
+      // check (findVehicleForClaim) just below.
+      && isHaulOrFragmentActionClaimable(state, a))
+    .sort((a, b) => a.id - b.id);
+
+  for (const action of targeted) {
+    const depth = (employee.activeActionId !== null ? 1 : 0) + employee.taskQueue.length;
+    if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) break;
+
+    const vehicleCheck = findVehicleForClaim(state, action, employee);
+    if (!vehicleCheck.ok) continue; // vehicle-gated, none free right now — stays queued, retries next tick
+
+    const claimed = claimPendingAction(state, action.id, employee.id);
+    if (!claimed) continue;
+    if (vehicleCheck.vehicle) reserveVehicle(vehicleCheck.vehicle, claimed.id);
+    result.claimed.push(action.id);
+
+    if (employee.activeActionId === null) {
+      promoteActionToActive(state, employee, action);
+    } else {
+      employee.taskQueue.push(action.id);
+    }
+  }
 }
 
 /**
@@ -37,20 +72,96 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
  * pool (targetEmployeeId === null). Never both in the same tick.
  */
 export function fillIdleEmployeeFromQueueOrPool(state: GameState, employee: Employee, result: TickEmployeesResult): void {
-  void state; void employee; void result;
-  // TODO: implement
+  if (employee.taskQueue.length > 0) {
+    // Prune stale entries first: a queued id goes stale when the action it
+    // named was claimed here (e.g. by claimActionsTargetedAtEmployee pushing
+    // a same-tick, already-busy targeted rest request onto taskQueue instead
+    // of promoting it) but then completed/was removed through a different
+    // path before this employee ever got back to it — a synchronous
+    // tickCollapse rest superseding it, for instance. Left unpruned, an
+    // empty candidates list used to short-circuit below and strand the
+    // employee idle forever, never falling through to the open pool even
+    // once genuinely nothing remained to resume.
+    employee.taskQueue = employee.taskQueue.filter(id => {
+      const a = state.pendingActions.find(entry => entry.id === id);
+      return a !== undefined && a.status === 'assigned' && a.holderId === employee.id;
+    });
+
+    if (employee.taskQueue.length > 0) {
+      const candidates = employee.taskQueue.map(id => state.pendingActions.find(a => a.id === id)!);
+
+      const selection = selectBestActionForEmployee(state, employee, candidates);
+      if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+
+      promoteActionToActive(state, employee, selection.action);
+      employee.taskQueue = employee.taskQueue.filter(id => id !== selection.action.id);
+      return;
+    }
+  }
+
+  const selection = claimOnePoolCandidate(state, employee);
+  if (selection === null) return; // nothing reachable within budget — stays idle, retries next tick
+
+  result.claimed.push(selection.action.id);
+  promoteActionToActive(state, employee, selection.action);
 }
 
 /**
  * Filter the open pool (targetEmployeeId === null, still 'queued') down to
- * candidates `employee` qualifies for, pick the cheapest reachable one, and
- * claim it. Used by both fillIdleEmployeeFromQueueOrPool and
- * reserveOnePoolActionAhead below.
+ * candidates `employee` qualifies for, pick the cheapest reachable one (via
+ * selectBestActionForEmployee), and claim it. Used by both
+ * fillIdleEmployeeFromQueueOrPool (idle employee, step 2 of tickEmployees)
+ * and reserveOnePoolActionAhead (busy employee, step 3) below — the only
+ * difference between the two call sites is what they do with the claimed
+ * action (promote to active vs. push onto taskQueue), which each leaves to
+ * the caller rather than this helper.
+ *
+ * Returns null when nothing in the pool is both reachable and claimable
+ * within budget, or (defensively — never happens single-threaded) if the
+ * selected candidate was claimed by someone else between the filter and the
+ * claim itself.
+ *
+ * Vehicle availability (findVehicleForClaim) is threaded into
+ * selectBestActionForEmployee's own isClaimable gate (#552) rather than
+ * checked only after ranking picks a single winner — the previous shape
+ * ranked by cost/distance alone, then applied the vehicle check to just that
+ * top candidate; when it failed (e.g. the nearest debris item needs a
+ * rock_fragmenter but only a debris_hauler driver is free), the employee
+ * gave up for the tick instead of falling through to the next-cheapest
+ * candidate they could actually perform. Folding the check into selection
+ * lets it fall through to the next-ranked candidate — isClaimable is applied
+ * as a pre-filter over the whole pool before ranking (#611), so it no longer
+ * shares the bounded ACTION_SELECTION_MAX_PATH_ATTEMPTS window with the
+ * reachability check; that budget is spent entirely on resolveActionCost —
+ * generalizes to any action type whose claim can fail this gate, not just
+ * haul/fragment ones.
  */
 export function claimOnePoolCandidate(state: GameState, employee: Employee): SelectedAction | null {
-  void state; void employee;
-  // TODO: implement
-  throw new Error('not implemented');
+  const poolCandidates = state.pendingActions.filter(a =>
+    a.status === 'queued' &&
+    a.targetEmployeeId === null &&
+    (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
+    // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
+    isHaulOrFragmentActionClaimable(state, a),
+  );
+
+  const selection = selectBestActionForEmployee(
+    state, employee, poolCandidates,
+    candidate => findVehicleForClaim(state, candidate, employee).ok && isRampSegmentClaimable(state, candidate),
+  );
+  if (selection === null) return null;
+
+  // Re-resolve to get the actual vehicle to reserve — selectBestActionForEmployee's
+  // isClaimable gate above only reports ok/not-ok, not which vehicle. Guaranteed
+  // to still succeed (single-threaded, nothing else ran between the two calls).
+  const vehicleCheck = findVehicleForClaim(state, selection.action, employee);
+  if (!vehicleCheck.ok) return null;
+
+  const claimed = claimPendingAction(state, selection.action.id, employee.id);
+  if (!claimed) return null;
+  if (vehicleCheck.vehicle) reserveVehicle(vehicleCheck.vehicle, claimed.id);
+
+  return selection;
 }
 
 /**
@@ -60,8 +171,17 @@ export function claimOnePoolCandidate(state: GameState, employee: Employee): Sel
  * MAX_EMPLOYEE_TASK_QUEUE_DEPTH.
  */
 export function reserveOnePoolActionAhead(state: GameState, employee: Employee, result: TickEmployeesResult): void {
-  void state; void employee; void result;
-  // TODO: implement
+  const activeAction = state.pendingActions.find(a => a.id === employee.activeActionId);
+  if (activeAction === undefined || activeAction.type === 'rest') return;
+
+  const depth = 1 + employee.taskQueue.length;
+  if (depth >= MAX_EMPLOYEE_TASK_QUEUE_DEPTH) return;
+
+  const selection = claimOnePoolCandidate(state, employee);
+  if (selection === null) return; // nothing reachable within budget — tries again next tick
+
+  result.claimed.push(selection.action.id);
+  employee.taskQueue.push(selection.action.id);
 }
 
 /**
@@ -72,6 +192,46 @@ export function reserveOnePoolActionAhead(state: GameState, employee: Employee, 
  * Also used by VehicleContinuity.ts's tryContinueVehicleGatedAction.
  */
 export function promoteActionToActive(state: GameState, employee: Employee, action: PendingAction): void {
-  void state; void employee; void action;
-  // TODO: implement
+  employee.activeActionId = action.id;
+
+  if (action.requiredVehicleRole !== null) {
+    promoteVehicleGatedAction(state, employee, action);
+    return;
+  }
+
+  employee.destinationX = action.targetX;
+  employee.destinationZ = action.targetZ;
+
+  // tickCollapse/tickNeedRestoration self-claim outside this path and, like
+  // this branch, only ever *queue* the rest via pendingRestDuration/
+  // pendingRestNeedKey. autoInsertNeedTasks pushes 'rest' actions unclaimed
+  // (busy-employee case), so this is the first point an idle employee
+  // actually starts walking to rest. Bunkhouse Tier 2+ shift-cycle rest
+  // (forceShiftRestIfNeeded) also self-claims and carries no 'needKey'
+  // payload, so resolveRestNeedKey returns null for it and this block is a
+  // no-op there.
+  if (action.type === 'rest') {
+    if (employee.restTicksRemaining === null && employee.pendingRestDuration === null) {
+      const needKey = resolveRestNeedKey(action.payload);
+      if (needKey !== null) {
+        employee.pendingRestDuration = computeActionWorkTicks(state, employee, action);
+        employee.pendingRestNeedKey = needKey;
+      }
+    }
+    return;
+  }
+
+  // Non-rest actions queue their task duration here — a skill-required
+  // action's claimed employee is guaranteed (by the qualification filters
+  // upstream) to hold requiredSkill, so computeActionWorkTicks' proficiency
+  // lookup always succeeds. requiredSkill === null (e.g. a console `employee
+  // dispatch` with no skill: param — src/console/commands/employees.ts) has
+  // no qualification to scale off, so it's treated as Rookie baseline
+  // (proficiency level 1) rather than being skipped — skipping it left
+  // pendingTaskDuration/taskTicksRemaining never seeded, so ArrivalGate could
+  // never promote the action to in_progress and it, and its ghost, leaked in
+  // state forever (#547 review). pendingActionType/pendingActionPayload stay
+  // set through to completion (tickTaskProgress clears them) so completion
+  // handling (e.g. survey resolution) still knows what work just finished.
+  seedTaskTimerFields(state, employee, action);
 }

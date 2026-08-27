@@ -8,8 +8,12 @@
 // single public surface for tick-orchestration callers.
 
 import type { GameState, PendingAction } from '../state/GameState.js';
-import type { Building, BuildingType } from '../entities/Building.js';
+import { getBuildingDef, findNearestActiveBuildingOfType, type Building, type BuildingType } from '../entities/Building.js';
+import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
+import { replenishNeed } from '../entities/EmployeeNeeds.js';
+import { addExpense } from '../economy/Finance.js';
+import { NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS } from '../config/balance.js';
 
 /**
  * Create a rest PendingAction with boilerplate fields pre-filled. Generates a
@@ -27,9 +31,19 @@ export function createRestPendingAction(
   overrides: Pick<PendingAction, 'targetX' | 'targetZ' | 'targetEmployeeId' | 'payload'>,
   claimedByEmployeeId?: number,
 ): PendingAction {
-  void state; void overrides; void claimedByEmployeeId;
-  // TODO: implement
-  throw new Error('not implemented');
+  return {
+    id: state.nextPendingActionId++,
+    type: 'rest',
+    requiredSkill: null,
+    requiredVehicleRole: null,
+    targetX: overrides.targetX,
+    targetZ: overrides.targetZ,
+    targetY: 0,
+    payload: overrides.payload,
+    targetEmployeeId: overrides.targetEmployeeId,
+    status: claimedByEmployeeId !== undefined ? 'assigned' : 'queued',
+    holderId: claimedByEmployeeId ?? null,
+  };
 }
 
 /** Find the nearest active building of `buildingType` to (empX, empZ). */
@@ -39,9 +53,7 @@ export function findNearestBuildingOfType(
   empX: number,
   empZ: number,
 ): Building | null {
-  void state; void buildingType; void empX; void empZ;
-  // TODO: implement
-  throw new Error('not implemented');
+  return findNearestActiveBuildingOfType(state.buildings, buildingType, empX, empZ);
 }
 
 /** Find the nearest active living_quarters building to (empX, empZ). */
@@ -50,9 +62,7 @@ export function findNearestLivingQuarters(
   empX: number,
   empZ: number,
 ): Building | null {
-  void state; void empX; void empZ;
-  // TODO: implement
-  throw new Error('not implemented');
+  return findNearestBuildingOfType(state, 'living_quarters', empX, empZ);
 }
 
 /**
@@ -67,9 +77,7 @@ export function resolveBuildingApproach(
   empX: number,
   empZ: number,
 ): { x: number; z: number } {
-  void state; void building; void empX; void empZ;
-  // TODO: implement
-  throw new Error('not implemented');
+  return findBuildingApproachCell(state.navGrid, building, getBuildingDef(building.type, building.tier), empX, empZ);
 }
 
 /**
@@ -80,9 +88,18 @@ export function resolveBuildingApproach(
  *          actual deduction is less than this value.
  */
 export function deductRestCost(state: GameState, needKey: NeedKey): number {
-  void state; void needKey;
-  // TODO: implement
-  throw new Error('not implemented');
+  const cost = NEED_REST_COSTS[needKey];
+  // Clamp to [0, cash]: a player already at or below 0 owes nothing more for
+  // this specific visit (rather than being charged the full cost like every
+  // other expense in the game), but — unlike the previous `Math.max(0, cash -
+  // cost)` formula — never resets pre-existing negative cash back up to 0.
+  // That old formula treated "already in debt" the same as "can afford part
+  // of this," silently erasing any debt the moment a need-rest cost fired.
+  const actualDeduction = Math.max(0, Math.min(state.cash, cost));
+
+  state.cash -= actualDeduction;
+  addExpense(state.finances, actualDeduction, 'needs', `Rest: ${needKey}`, state.tickCount);
+  return cost;
 }
 
 /**
@@ -95,6 +112,43 @@ export function deductRestCost(state: GameState, needKey: NeedKey): number {
  * dispatch. Callers own any remaining wrap-up specific to their rest source.
  */
 export function completeRestForEmployee(state: GameState, emp: Employee, needKey: NeedKey): void {
-  void state; void emp; void needKey;
-  // TODO: implement
+  const building = findNearestLivingQuarters(state, emp.x, emp.z);
+  if (building) {
+    const def = getBuildingDef(building.type, building.tier);
+    // BUILDING_REPLENISH_RATES is a per-tick rate (its own doc comment, and
+    // Employee.test.ts's "per-tick fill rate" framing), but this call site
+    // used to apply it exactly once regardless of how many ticks the rest
+    // actually spent — one tick's worth of gain for the whole visit. Against
+    // any real travel distance to and from the building, that one tick is
+    // smaller than what the round trip alone costs in drain, so an employee
+    // whose work site isn't adjacent to their living_quarters nets negative
+    // every cycle: collapse, rest, walk back barely recovered, collapse
+    // again before finishing (or even starting) the next task — confirmed
+    // live, a solo driller stuck oscillating at ~0-10 fatigue for 5000+
+    // ticks with a tier-1 living_quarters two tiles from the drill grid,
+    // never landing a single hole (#700). Scaling by the rest's own
+    // NEED_REST_DURATIONS[needKey] — the same constant that sets how many
+    // ticks the visit takes — applies the full rate for the full stay,
+    // matching the "per-tick" contract the rate was already documented as.
+    for (let i = 0; i < NEED_REST_DURATIONS[needKey]; i++) {
+      replenishNeed(emp, needKey, building.tier, def.capacity);
+    }
+  } else {
+    // No building services this need — the employee rests where they stand.
+    // That keeps them on their feet but never fully satisfies them: the gauge
+    // rises no higher than NEED_REST_NO_BUILDING_CAP, and the rest itself took
+    // NEED_REST_NO_BUILDING_DURATION_MULTIPLIER times as long to get here. A
+    // gauge already above the cap is left alone rather than pulled down to it.
+    emp[needKey] = Math.max(emp[needKey], NEED_REST_NO_BUILDING_CAP);
+  }
+
+  deductRestCost(state, needKey);
+
+  if (emp.collapsing) {
+    emp.collapsing = false;
+  }
+
+  emp.restTicksRemaining = null;
+  emp.restNeedKey = null;
+  emp.activeActionId = null;
 }
