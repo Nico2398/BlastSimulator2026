@@ -14,7 +14,13 @@ import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = {
+    state: null,
+    grid: null,
+    landscape: null,
+    playableArea: null,
+    emitter: new EventEmitter(),
+  };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '24' });
   return ctx;
 }
@@ -25,14 +31,26 @@ describe('policy.ts requireGame guard', () => {
   const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 
   it('returns the exact English literal when no game is loaded', () => {
-    const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: GameContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     const result = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('differs from the English literal under locale fr', () => {
-    const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: GameContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     setLocale('fr');
 
     const result = setPolicyCommand(ctx, [], { mode: 'shift_8h' });

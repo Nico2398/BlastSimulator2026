@@ -15,7 +15,13 @@ import { contractCommand, fragmentsCommand } from '../../../src/console/commands
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = {
+    state: null,
+    grid: null,
+    landscape: null,
+    playableArea: null,
+    emitter: new EventEmitter(),
+  };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '24' });
   return ctx;
 }
@@ -29,14 +35,26 @@ describe('economy.ts requireGame guard', () => {
   const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 
   it('contractCommand returns the exact English literal when no game is loaded', () => {
-    const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: GameContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     const result = contractCommand(ctx, ['list'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('contractCommand differs from the English literal under locale fr', () => {
-    const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: GameContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     setLocale('fr');
 
     const result = contractCommand(ctx, ['list'], {});
@@ -46,14 +64,26 @@ describe('economy.ts requireGame guard', () => {
   });
 
   it('fragmentsCommand returns the exact English literal when no game is loaded', () => {
-    const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: GameContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     const result = fragmentsCommand(ctx, ['status'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('fragmentsCommand differs from the English literal under locale fr', () => {
-    const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: GameContext = {
+      state: null,
+      grid: null,
+      landscape: null,
+      playableArea: null,
+      emitter: new EventEmitter(),
+    };
     setLocale('fr');
 
     const result = fragmentsCommand(ctx, ['status'], {});
