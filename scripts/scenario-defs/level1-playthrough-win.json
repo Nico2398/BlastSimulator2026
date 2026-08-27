@@ -280,7 +280,7 @@
       "role": "player",
       "expect": {
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         },
         "decreased": [
           "cash"
@@ -908,6 +908,27 @@
         ]
       },
       "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Run the warehouse ordered above out to a standing building (#556). Placed here rather than at the order: everything above is pinned to an exact tickCount, to the blast’s own outcome, or to the event that interrupts the tick block just before it, and the warehouse is not read until the hauling that feeds the rubble_disposal delivery below.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
     },
     {
       "command": "contract accept type:rubble_disposal",
