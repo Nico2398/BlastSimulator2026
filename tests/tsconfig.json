@@ -10,19 +10,24 @@
   "exclude": [
     "node_modules",
     "../dist",
-    // Pre-existing type errors as of 2026-08-23 (277 errors across 89 files remain
-    // excluded, across 102 entries below) -- tracked in a follow-up issue (filed
+    // Pre-existing type errors as of 2026-08-27 (274 errors across 86 files remain
+    // outstanding, across 86 entries below) -- tracked in a follow-up issue (filed
     // alongside this PR). These are a mix of mechanical unused-locals/params
     // (TS6133/6192/6196) and real fixture-vs-interface drift (test object literals
     // built against Employee/Vehicle/GameState/etc. that have since grown required
     // fields). Excluded here so `tsc --noEmit` on tests/ can be enabled now without
-    // blocking on fixing all of them at once. The tests/integration/full-level/*.ts
-    // entries below also include every sibling that imports the broken helpers.ts,
-    // since TS still type-checks an excluded file's errors when a non-excluded file
-    // imports it transitively.
+    // blocking on fixing all of them at once.
     // #743's mechanical sweep fixed 47 errors across 29 files, removing those 29
-    // mechanical-only entries (131 -> 102, 324 -> 277 errors); the remainder still
-    // need the fixture-vs-interface drift fixed before re-inclusion.
+    // mechanical-only entries (131 -> 102, 324 -> 277 errors).
+    // #802 fixed the tests/integration/full-level/*.ts cluster: helpers.ts's
+    // shared GameContext fixture was missing required fields (TS2739), which
+    // cascaded through every sibling importing it; level1-win.integration.test.ts
+    // had its own TS2339, and tutorial.integration.test.ts an unused-import
+    // TS6133. All 3 are fixed and all 16 entries (helpers.ts + 15 siblings) are
+    // removed from exclude below (102 -> 86 entries, 277 -> 274 errors,
+    // 89 -> 86 files) -- `tsc --noEmit` is green for the whole cluster.
+    // The remainder still need the fixture-vs-interface drift fixed before
+    // re-inclusion.
     "./integration/blast-enhanced.integration.test.ts",
     "./integration/blast-flyrock-danger.integration.test.ts",
     "./integration/blast-oversized-boulders.integration.test.ts",
@@ -31,22 +36,6 @@
     "./integration/economy.integration.test.ts",
     "./integration/employee-commands.test.ts",
     "./integration/events.integration.test.ts",
-    "./integration/full-level/helpers.ts",
-    "./integration/full-level/level1-lose-arrest.integration.test.ts",
-    "./integration/full-level/level1-lose-bankruptcy.integration.test.ts",
-    "./integration/full-level/level1-lose-ecology.integration.test.ts",
-    "./integration/full-level/level1-lose-revolt.integration.test.ts",
-    "./integration/full-level/level1-win.integration.test.ts",
-    "./integration/full-level/level2-lose-bankruptcy.integration.test.ts",
-    "./integration/full-level/level2-lose-revolt.integration.test.ts",
-    "./integration/full-level/level2-win.integration.test.ts",
-    "./integration/full-level/level3-lose-ecology.integration.test.ts",
-    "./integration/full-level/level3-win.integration.test.ts",
-    "./integration/full-level/tutorial-contract-delivery.integration.test.ts",
-    "./integration/full-level/tutorial-no-random-events.integration.test.ts",
-    "./integration/full-level/tutorial-interactive-revolt.integration.test.ts",
-    "./integration/full-level/tutorial-terrain-coordinates.integration.test.ts",
-    "./integration/full-level/tutorial.integration.test.ts",
     "./integration/needs.integration.test.ts",
     "./integration/policy.integration.test.ts",
     "./integration/research.integration.test.ts",

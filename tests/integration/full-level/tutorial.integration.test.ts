@@ -13,7 +13,7 @@ import {
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
-import { timeCommand, tickCommand, eventCommand } from '../../../src/console/commands/events.js';
+import { timeCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
 import { surveyCommand, drillPlanCommand, chargeCommand, sequenceCommand, blastCommand, buildRampCommand } from '../../../src/console/commands/mining.js';
 import { contractCommand } from '../../../src/console/commands/economy.js';
