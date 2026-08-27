@@ -3,6 +3,7 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { MiningContext } from './mining.js';
+import { t } from '../../core/i18n/I18n.js';
 
 /**
  * Fragments serialized verbatim before the rest collapse into counts. A
@@ -115,7 +116,7 @@ export function stateCommand(
   _named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
+    return { success: false, output: t('console.no_game_loaded') };
   }
 
   const sub = args[0] ?? 'full';
@@ -147,6 +148,6 @@ export function stateCommand(
 
   return {
     success: false,
-    output: 'Usage: state [full|summary]',
+    output: t('state.usage'),
   };
 }

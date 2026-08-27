@@ -3,16 +3,10 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
 import { type ShiftMode } from '../../core/entities/SitePolicy.js';
-
-function requireGame(ctx: GameContext): CommandResult | null {
-  if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
-  return null;
-}
+import { t } from '../../core/i18n/I18n.js';
+import { requireGame } from './commandUtils.js';
 
 const VALID_MODES: ShiftMode[] = ['shift_8h', 'shift_12h', 'continuous', 'custom'];
-
-const USAGE_MSG =
-  'Usage: set_policy mode:(shift_8h|shift_12h|continuous|custom) [hunger:N] [fatigue:N] [social:N]';
 
 export function setPolicyCommand(
   ctx: GameContext,
@@ -25,7 +19,7 @@ export function setPolicyCommand(
 
   const modeRaw = named['mode'] ?? '';
   if (!VALID_MODES.includes(modeRaw as ShiftMode)) {
-    return { success: false, output: USAGE_MSG };
+    return { success: false, output: t('policy.usage') };
   }
   const mode = modeRaw as ShiftMode;
 

@@ -21,6 +21,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { encodeVoxelGrid } from '../../core/state/VoxelGridCodec.js';
+import { t } from '../../core/i18n/I18n.js';
 
 const DEFAULT_SLOT = 'quicksave';
 
@@ -32,7 +33,7 @@ export function saveCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  if (!ctx.state) return { success: false, output: 'No game loaded. Use new_game first.' };
+  if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };
   const slot = named['slot'] ?? args[0] ?? DEFAULT_SLOT;
   if (ctx.grid && ctx.state.world) {
     ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
