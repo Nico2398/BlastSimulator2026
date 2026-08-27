@@ -140,6 +140,34 @@ describe('Step frames/interval fields are valid', () => {
 });
 
 // ──────────────────────────────────────────────
+// 7a-2. repeat field is a valid positive integer when present (#696) — same
+// pattern as frames/interval above: a real scenario file's own `repeat`
+// (once one adopts it, e.g. converting blast-execution-visual.json's 24
+// duplicate `employee hire role:driller` steps into one `repeat: 24` block)
+// must be a positive integer, checked at JSON-authoring time before any
+// runner ever loads the file. resolveRepeatCount (scenario-utils.ts) applies
+// the identical positive-integer check at run time; this is the same rule
+// caught earlier, as a lint over the files on disk.
+// ──────────────────────────────────────────────
+describe('Step repeat field is a valid positive integer when present (#696)', () => {
+  for (const name of ALL_SCENARIO_NAMES) {
+    it(`${name} — repeat is a positive integer when present`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR);
+      for (let i = 0; i < scenario.steps.length; i++) {
+        const step = scenario.steps[i];
+        if (typeof step === 'object' && step !== null) {
+          const s = step as ScenarioStepDef;
+          if (s.repeat !== undefined) {
+            expect(Number.isInteger(s.repeat), `step[${i}] repeat must be integer`).toBe(true);
+            expect(s.repeat, `step[${i}] repeat must be > 0`).toBeGreaterThan(0);
+          }
+        }
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────
 // 7b. Description is meaningful (>20 chars)
 // ──────────────────────────────────────────────
 describe('Scenario description is meaningful', () => {

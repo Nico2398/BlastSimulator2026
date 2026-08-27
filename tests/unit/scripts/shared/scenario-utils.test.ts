@@ -18,6 +18,7 @@ import {
   effectiveStepTimeoutMs,
   collectScenarioViolations,
   formatScenarioViolations,
+  resolveRepeatCount,
   SCENARIO_DIR,
   SOFTWARE_RASTER_FRAME_COST_MS,
   type ScenarioViolation,
@@ -223,6 +224,65 @@ describe('effectiveStepTimeoutMs — capture-cost floor (#725)', () => {
     const floorMs = (1 + 1 + 2 + 3) * SOFTWARE_RASTER_FRAME_COST_MS;
     expect(floorMs).toBe(42000);
     expect(result).toBe(floorMs);
+  });
+});
+
+// ──────────────────────────────────────────────
+// resolveRepeatCount (#696) — resolves a step's `repeat` field to a concrete
+// iteration count for the `repeat: N` step multiplier. Both command-mode
+// runSteps (command-runner.ts) and interaction-mode runners must call this
+// once per step, before running any iteration, so an invalid `repeat` fails
+// the step immediately naming the step and the offending value — see the
+// field's own doc comment on ScenarioStepDef (scenario-types.ts) for the full
+// contract this pins.
+// ──────────────────────────────────────────────
+describe('resolveRepeatCount', () => {
+  it('resolves an absent repeat field to 1', () => {
+    expect(resolveRepeatCount(step())).toBe(1);
+  });
+
+  it('resolves repeat: 1 to 1', () => {
+    expect(resolveRepeatCount(step({ repeat: 1 }))).toBe(1);
+  });
+
+  it('resolves a positive integer repeat to itself', () => {
+    expect(resolveRepeatCount(step({ repeat: 24 }))).toBe(24);
+  });
+
+  it('resolves repeat: 2 (the smallest genuinely-repeating value) to 2', () => {
+    expect(resolveRepeatCount(step({ repeat: 2 }))).toBe(2);
+  });
+
+  it('throws for repeat: 0', () => {
+    expect(() => resolveRepeatCount(step({ repeat: 0 }))).toThrow();
+  });
+
+  it('throws for a negative repeat', () => {
+    expect(() => resolveRepeatCount(step({ repeat: -1 }))).toThrow();
+  });
+
+  it('throws for a non-integer repeat', () => {
+    expect(() => resolveRepeatCount(step({ repeat: 1.5 }))).toThrow();
+  });
+
+  it('throws for NaN', () => {
+    expect(() => resolveRepeatCount(step({ repeat: Number.NaN }))).toThrow();
+  });
+
+  it('names the step\'s description when invalid and a description is present', () => {
+    expect(() => resolveRepeatCount(step({ repeat: 0, description: 'hire 24 drillers' })))
+      .toThrow(/hire 24 drillers/);
+  });
+
+  it('falls back to the step\'s command when invalid and no description is present', () => {
+    expect(() => resolveRepeatCount(step({ command: 'employee hire role:driller', repeat: -3 })))
+      .toThrow(/employee hire role:driller/);
+  });
+
+  it('names the offending value in the thrown message', () => {
+    expect(() => resolveRepeatCount(step({ repeat: 0 }))).toThrow(/0/);
+    expect(() => resolveRepeatCount(step({ repeat: -5 }))).toThrow(/-5/);
+    expect(() => resolveRepeatCount(step({ repeat: 1.5 }))).toThrow(/1\.5/);
   });
 });
 
