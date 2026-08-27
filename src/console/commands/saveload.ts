@@ -21,7 +21,7 @@ import type { CommandResult } from '../ConsoleRunner.js';
 import { serialize, deserialize } from '../../core/state/SaveLoad.js';
 import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { encodeVoxelGrid } from '../../core/state/VoxelGridCodec.js';
-import { t } from '../../core/i18n/I18n.js';
+import { requireGame } from './commandUtils.js';
 
 const DEFAULT_SLOT = 'quicksave';
 
@@ -33,12 +33,14 @@ export function saveCommand(
   args: string[],
   named: Record<string, string>,
 ): CommandResult {
-  if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };
+  const err = requireGame(ctx);
+  if (err) return err;
+  const state = ctx.state!;
   const slot = named['slot'] ?? args[0] ?? DEFAULT_SLOT;
-  if (ctx.grid && ctx.state.world) {
-    ctx.state.world = { ...ctx.state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(ctx.state)) };
+  if (ctx.grid && state.world) {
+    state.world = { ...state.world, voxels: encodeVoxelGrid(ctx.grid, terrainGenDatum(state)) };
   }
-  quickSaveSlots.set(slot, serialize(ctx.state));
+  quickSaveSlots.set(slot, serialize(state));
   return { success: true, output: `Saved to slot "${slot}".` };
 }
 

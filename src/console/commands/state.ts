@@ -4,6 +4,7 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { MiningContext } from './mining.js';
 import { t } from '../../core/i18n/I18n.js';
+import { requireGame } from './commandUtils.js';
 
 /**
  * Fragments serialized verbatim before the rest collapse into counts. A
@@ -115,14 +116,13 @@ export function stateCommand(
   args: string[],
   _named: Record<string, string>,
 ): CommandResult {
-  if (!ctx.state) {
-    return { success: false, output: t('console.no_game_loaded') };
-  }
+  const err = requireGame(ctx);
+  if (err) return err;
 
   const sub = args[0] ?? 'full';
 
   if (sub === 'summary') {
-    const s = ctx.state;
+    const s = ctx.state!;
     const summary = {
       seed: s.seed,
       mineType: s.mineType,
