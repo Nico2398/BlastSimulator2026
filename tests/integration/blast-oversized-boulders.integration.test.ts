@@ -31,7 +31,7 @@ import { isOversized } from '../../src/core/mining/BlastCalc.js';
  * asserts anything about money.
  */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '1000000' });
   return ctx;
 }

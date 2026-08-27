@@ -62,7 +62,7 @@ function fillMultiRock(
   rock1: string,
   rock2: string,
   splitX: number,
-  ...region: number[]
+  ...region: [number, number, number, number, number, number]
 ) {
   const [minX, maxX, minY, maxY, minZ, maxZ] = region;
   for (let z = minZ; z <= maxZ; z++) {

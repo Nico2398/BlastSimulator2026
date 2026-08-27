@@ -27,7 +27,7 @@ import { createLogisticsState, syncLogisticsCapacity } from '../../src/core/econ
 
 /** Build a fresh context with a real GameState (seed=42, desert biome, 32×32 grid). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }
