@@ -89,6 +89,26 @@ function driveChargePlanToCompletion(ctx: MiningContext, maxTicks = 200): void {
   }
 }
 
+/**
+ * Ticks the game loop until every segment of every ramp ordered by the most
+ * recent `build_ramp` has landed — `state.plannedRamps` empties only once
+ * the tick loop's own 'dig_ramp_segment' completion branch (events.ts, split
+ * onto tickTaskCompletion.ts by #695) has carved each segment's cells,
+ * patched the NavGrid, marked the segment's tracker done, and spliced the
+ * whole PlannedRamp once every segment reports done — mirroring
+ * driveDrillPlanToCompletion/driveChargePlanToCompletion above.
+ */
+function driveRampToCompletion(ctx: MiningContext, maxTicks = 400): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedRamps.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 beforeEach(() => resetHoleIds());
 afterEach(() => vi.restoreAllMocks());
 
@@ -1781,6 +1801,86 @@ describe('build_ramp cancel / employee cancel — ramp segment cancellation (#55
     // The cancelled segment's own action/ghost are gone.
     expect(ctx.state!.pendingActions.find(a => a.id === targetTracker.actionId)).toBeUndefined();
     expect(ctx.state!.ghostPreviews.find(g => g.id === targetTracker.actionId)).toBeUndefined();
+  });
+});
+
+// ── dig_ramp_segment completion via tickCommand (#695 coverage gap) ────────
+// Every other seam moved by #695's events.ts split (survey/drill_hole/
+// charge_hole landing, the 5 game-over conditions, corrupt/mafia/time) is
+// already driven end-to-end through tickCommand/eventCommand/corruptCommand/
+// mafiaCommand/timeCommand elsewhere in this repo. The one exception found
+// while verifying that coverage: nothing drives a `build_ramp` order all the
+// way to completion through `tick` — the "build_ramp cancel" describe block
+// above deliberately completes a segment by calling carveRampSegment/
+// completePendingAction directly (see its own doc comment), and
+// GameLoop.test.ts's dig_ramp_segment describe block only covers vehicle-
+// gated dispatch/claim, stopping short of an actual `completed: true`
+// TaskProgressResult. So the console-layer branch that reads that result —
+// carve the segment, patch the NavGrid, mark the tracker done, and splice
+// the whole PlannedRamp once every segment is done — was untested through
+// its real entry point. These tests are the minimal fix for that gap.
+describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () => {
+  it('drives a single-segment ramp order to completion, carving the grid and splicing the PlannedRamp', () => {
+    const ctx = makeMiningContext();
+
+    const buildResult = buildRampCommand(ctx, [], {
+      origin: '5,5', direction: 'south', length: '1', depth: '3',
+    });
+    expect(buildResult.success).toBe(true);
+    expect(ctx.state!.plannedRamps).toHaveLength(1);
+    const ramp = ctx.state!.plannedRamps[0]!;
+    const rampId = ramp.id;
+    const segmentCells = ramp.segments.flatMap(s => s.cells);
+    expect(segmentCells.length).toBeGreaterThan(0);
+
+    // Every cell the ramp will carve is still solid before completion.
+    for (const cell of segmentCells) {
+      expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBeGreaterThan(0);
+    }
+
+    driveRampToCompletion(ctx);
+
+    // The PlannedRamp is fully spliced out once its last segment lands.
+    expect(ctx.state!.plannedRamps.find(r => r.id === rampId)).toBeUndefined();
+
+    // Every one of its cells has actually been carved (density 0), not just
+    // marked done in bookkeeping.
+    for (const cell of segmentCells) {
+      expect(ctx.grid!.densityAt(cell.x, cell.y, cell.z)).toBe(0);
+    }
+
+    // No leftover dig_ramp_segment action/ghost survives for this ramp.
+    const remainingActions = ctx.state!.pendingActions.filter(
+      a => a.type === 'dig_ramp_segment' && a.payload['rampId'] === rampId,
+    );
+    expect(remainingActions).toHaveLength(0);
+  });
+
+  it('completing every segment of a multi-segment ramp patches the NavGrid so the excavated cells are no longer blocked/void', () => {
+    const ctx = makeMiningContext();
+
+    const buildResult = buildRampCommand(ctx, [], {
+      origin: '5,5', direction: 'south', length: '3', depth: '6',
+    });
+    expect(buildResult.success).toBe(true);
+    const ramp = ctx.state!.plannedRamps[0]!;
+    expect(ramp.segments.length).toBeGreaterThan(1);
+
+    driveRampToCompletion(ctx);
+
+    expect(ctx.state!.plannedRamps).toHaveLength(0);
+    expect(ctx.state!.navGrid).not.toBeNull();
+    for (const segment of ramp.segments) {
+      if (!segment.region) continue;
+      for (let z = segment.region.minZ; z <= segment.region.maxZ; z++) {
+        for (let x = segment.region.minX; x <= segment.region.maxX; x++) {
+          const cell = ctx.state!.navGrid!.cellAt(x, z);
+          expect(cell).toBeDefined();
+          expect(cell!.type).not.toBe('blocked');
+          expect(cell!.type).not.toBe('void');
+        }
+      }
+    }
   });
 });
 
