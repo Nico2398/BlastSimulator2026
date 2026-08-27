@@ -7,8 +7,6 @@ import { createGame, type GameState } from '../../../src/core/state/GameState.js
 import { Random } from '../../../src/core/math/Random.js';
 import { tickEmployeeMovement } from '../../../src/core/engine/EntityMovementTick.js';
 import { tickArrivalGate } from '../../../src/core/engine/ArrivalGate.js';
-import { tickCollapse } from '../../../src/core/engine/NeedRestoration.js';
-import { autoInsertNeedTasks } from '../../../src/core/engine/NeedTaskInsertion.js';
 import { processShiftCycle } from '../../../src/core/engine/ShiftCycle.js';
 import { tickGeneralRestCompletion } from '../../../src/core/engine/RestCompletion.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
@@ -18,10 +16,8 @@ import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
   NEED_REST_DURATIONS,
-  NEED_WARNING_THRESHOLDS,
   WORK_DURATION_TICKS,
   SHIFT_SLEEP_DURATION_TICKS,
-  NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
   SHIFT_DURATIONS_TICKS,
   BUILDING_REPLENISH_RATES,
 } from '../../../src/core/config/balance.js';

@@ -15,7 +15,6 @@ import type { FiredEvent } from '../../../src/core/events/EventSystem.js';
 import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
   NEED_REST_DURATIONS,
-  NEED_REST_COSTS,
 } from '../../../src/core/config/balance.js';
 
 

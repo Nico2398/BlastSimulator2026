@@ -14,7 +14,6 @@ import type { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import {
   NEED_REST_DURATIONS,
   NEED_WARNING_THRESHOLDS,
-  NEED_REST_COSTS,
   NEED_REST_NO_BUILDING_DURATION_MULTIPLIER,
 } from '../../../src/core/config/balance.js';
 
