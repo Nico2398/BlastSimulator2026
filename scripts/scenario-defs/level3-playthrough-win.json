@@ -1,6 +1,6 @@
 {
   "name": "level3-playthrough-win",
-  "description": "Level 3 (Treranium Depths): 3 surveys and one real 24-hole blast against a mine that is already legally bankrupt before it fires -- named for an $800k win across 5 patterns (184 holes) with all 10 hired employees dying, but `campaign start level:treranium_depths` fails outright (locked, Findings #58/#59/#61/#62) and #553's queued, vehicle-gated drilling breaks the rest of the premise for real. staffed:true's free driller+drill_rig, stacked on top of this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles total against a $220,000 budget), burns through the bankruptcy threshold before a single hole lands: 'BANKRUPTCY! The mine is seized.' fires at tick 139, 271 ticks before pattern 1's 24 holes -- drilled for real by 2 concurrent driller/drill_rig pairs -- finish landing at tick 410 (#596/#597: retimed from tick 400 by the idempotent event pool and cached cooldown-threshold fixes). The pattern blasts for real anyway (nothing halts a tick or a blast once levelEnded flips): PERFECT rating, 1,507 m3 cleared, 11 of 15 employees dead, 6 of 9 vehicles destroyed. One real contract cycle (accept + storage-empty delivery refusal, via #597's `type:rubble_disposal` stable contract selector) follows; patterns 2-5 (160 more holes, 4 more explosive types) are dropped entirely -- see the final campaign status step for the full measured trajectory.",
+  "description": "Level 3 (Treranium Depths): 3 surveys and one real 24-hole blast against a mine that is already legally bankrupt before it fires -- named for an $800k win across 5 patterns (184 holes) with all 10 hired employees dying, but `campaign start level:treranium_depths` fails outright (locked, Findings #58/#59/#61/#62) and #553's queued, vehicle-gated drilling breaks the rest of the premise for real. staffed:true's free driller+drill_rig, stacked on top of this file's own 10 hand-hires and 5 hand-bought vehicles (15 employees, 9 vehicles total against a $220,000 budget), burns through the bankruptcy threshold before a single hole lands: 'BANKRUPTCY! The mine is seized.' fires at tick 139, 271 ticks before pattern 1's 24 holes -- drilled for real by 2 concurrent driller/drill_rig pairs -- finish landing at tick 410 (#596/#597: retimed from tick 400 by the idempotent event pool and cached cooldown-threshold fixes). The pattern blasts for real anyway (nothing halts a tick or a blast once levelEnded flips): PERFECT rating, 1,507 m3 cleared, 11 of 15 employees dead, 6 of 9 vehicles destroyed. One real contract cycle (accept + storage-empty delivery refusal, via #597's `type:rubble_disposal` stable contract selector) follows; patterns 2-5 (160 more holes, 4 more explosive types) are dropped entirely -- see the final campaign status step for the full measured trajectory. #556: the closing tickCount is 469, not 464, and cash -428,821 rather than -428,646 — the file builds nothing, but the dispatch changes that came with construction sites (an idle employee now falls through to the open action pool rather than returning early on a stale queue entry) settle its one waitUntil five ticks later. Re-measured against the real run; every other checkpoint, including deathCount 12 and the three surveys, is unchanged.",
   "steps": [
     {
       "command": "new_game seed:3666 cash:220000 staffed:true",
@@ -1889,8 +1889,8 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "tickCount": 464,
-          "cash": -428646,
+          "tickCount": 469,
+          "cash": -428821,
           "deathCount": 12,
           "employeeCount": 15,
           "activeContractCount": 1,

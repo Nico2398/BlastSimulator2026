@@ -127,6 +127,27 @@ function migrateV12ToV13(obj: Record<string, unknown>): Record<string, unknown> 
 }
 
 /**
+ * v13 -> v14: GameState gained `plannedBuildings: PlannedBuilding[]` and
+ * `nextPlannedBuildingId: number` (#556 construction sites — placing a
+ * building queues one `place_building` action at the target instead of
+ * creating the building instantly). A pre-v14 save has no buildings in
+ * flight — `plannedBuildings` defaults to an empty array and
+ * `nextPlannedBuildingId` to 1, matching `createGame`'s own defaults.
+ *
+ * Stub (skeleton phase): body wired into the migration chain below but not
+ * yet implemented — filled in during the implementation phase.
+ */
+function migrateV13ToV14(obj: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(obj['plannedBuildings'])) {
+    obj['plannedBuildings'] = [];
+  }
+  if (typeof obj['nextPlannedBuildingId'] !== 'number') {
+    obj['nextPlannedBuildingId'] = 1;
+  }
+  return obj;
+}
+
+/**
  * Deserialize a JSON string back to a GameState.
  * Throws a clear error if the version is unknown.
  */
@@ -371,6 +392,11 @@ export function deserialize(json: string): GameState {
   // v12 -> v13: GameState.plannedRamps / nextPlannedRampId (#555).
   if ((obj['version'] as number) < 13) {
     migrateV12ToV13(obj);
+  }
+
+  // v13 -> v14: GameState.plannedBuildings / nextPlannedBuildingId (#556).
+  if ((obj['version'] as number) < 14) {
+    migrateV13ToV14(obj);
   }
 
   // v6: navGrid is never part of the JSON (see serialize's replacer) — always

@@ -79,7 +79,28 @@
           "cash": -10000
         },
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -215,9 +236,12 @@
       "role": "setup",
       "expect": {
         "decreased": [
-          "cash",
+          "cash"
+        ],
+        "increased": [
           "minFatigue"
-        ]
+        ],
+        "note": "minFatigue climbs across this block rather than falling (#556): the driller spent the construction ticks above building the quarters, crosses its auto-rest threshold here, and the tier-1 quarters replenishes it (39 -> 98). That is the replenishment path this file existed to watch and, per its own Finding #27 note below, could not previously reach at all."
       }
     },
     {

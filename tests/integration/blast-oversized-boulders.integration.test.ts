@@ -87,6 +87,23 @@ function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
 }
 
 /**
+ * Ticks until every construction site ordered so far has landed in
+ * state.buildings.buildings (#556), mirroring driveDrillPlanToCompletion
+ * above. A `place_building` order needs an idle employee to claim and finish
+ * it — callers of this helper are expected to have hired one first.
+ */
+function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
+/**
  * Drill+charge+sequence+blast an undercharged, wide-spacing pattern at
  * (18,19) — same origin as economy.integration.test.ts's full-loop case: it
  * sits on the same flat NavGrid bench as the vehicle spawn and warehouse, so
@@ -224,8 +241,17 @@ describe('Blast → oversized boulder → break in place (#484)', () => {
 
     // 4. Build a freight_warehouse and haul one resulting piece; stored mass
     // must grow by exactly that piece's mass.
+    // #556: confirming the order only queues a construction site — a
+    // dedicated fresh employee (not the hauler/fragmenter drivers, both
+    // already committed to their own vehicles) finishes it before the manual
+    // haul below, which needs an active depot to accept the piece at all.
+    const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
+    expect(hireBuilder.success).toBe(true);
+
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
     expect(buildResult.success).toBe(true);
+    driveConstructionToCompletion(ctx);
+    expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
 
     const piece = pieces[0]!;
     const pieceMass = piece.fragment.mass;

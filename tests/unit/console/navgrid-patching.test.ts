@@ -40,6 +40,18 @@ function makeCtx(): MiningContext {
 }
 
 /**
+ * Ticks until every ordered building has landed in state.buildings.buildings
+ * (#556) — confirming a placement only queues a construction site; an idle
+ * staffed employee needs to walk over and finish the `place_building` work
+ * before the NavGrid actually gets patched.
+ */
+function tickUntilConstructionDone(ctx: MiningContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
+/**
  * Ticks until every hole ordered by the last drill_plan add/grid has landed
  * in state.drillHoles (#553). Tops up employee need gauges each tick so an
  * unrelated needs collapse mid-drive can't derail a test of NavGrid patching
@@ -98,6 +110,7 @@ describe('NavGrid patching — building placement', () => {
     // management_office T1 has a 2×2 footprint — cells (0,0),(1,0),(0,1),(1,1)
     const result = buildCommand(ctx, ['management_office'], { at: '0,0' });
     expect(result.success).toBe(true);
+    tickUntilConstructionDone(ctx);
 
     const nav = ctx.state!.navGrid!;
 
@@ -120,6 +133,7 @@ describe('NavGrid patching — building placement', () => {
     const ctx = makeCtx();
     // Place a management_office T1 at (5,5) — footprint covers (5,5)-(6,6)
     buildCommand(ctx, ['management_office'], { at: '5,5' });
+    tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Cells under footprint are blocked
@@ -178,6 +192,7 @@ describe('NavGrid patching — building demolition', () => {
 
     // Place a building
     buildCommand(ctx, ['management_office'], { at: '0,0' });
+    tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Confirm cells are blocked after placement (this assertion fails BEFORE
@@ -223,6 +238,7 @@ describe('NavGrid patching — building upgrade', () => {
     const ctx = makeCtx();
     // management_office T1: rect(2,2) footprint at (0,0)
     buildCommand(ctx, ['management_office'], { at: '0,0' });
+    tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // T1 footprint (2×2) cells should be blocked
@@ -263,6 +279,7 @@ describe('NavGrid patching — building upgrade', () => {
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
     // Start with a T3 management_office (3×3 footprint at 10,10)
     buildCommand(ctx, ['management_office'], { at: '10,10', tier: '3' });
+    tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Verify T3 blocked some cells
@@ -288,6 +305,7 @@ describe('NavGrid patching — building move', () => {
     const ctx = makeCtx();
     // Place management_office T1 at (0,0) — 2×2 footprint
     buildCommand(ctx, ['management_office'], { at: '0,0' });
+    tickUntilConstructionDone(ctx);
     const nav = ctx.state!.navGrid!;
 
     // Verify original footprint is blocked
@@ -318,6 +336,7 @@ describe('NavGrid patching — building move', () => {
     // Place two buildings
     buildCommand(ctx, ['management_office'], { at: '0,0' });
     buildCommand(ctx, ['management_office'], { at: '5,5' });
+    tickUntilConstructionDone(ctx);
 
     // Try moving the first building onto the second's location
     const buildingId = ctx.state!.buildings.buildings[0]!.id;

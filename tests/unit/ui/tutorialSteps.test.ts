@@ -107,10 +107,16 @@ describe('tutorialSteps', () => {
       'scores',
       'event-fire-resolve',
       'hire-manager',
-      'contract-accept',
       'hire-driver',
       'vehicle-buy-assign',
       'build-storage',
+      // #556/#817: contract-accept sits AFTER build-storage. A contract's
+      // deadline starts at acceptance and ordering the warehouse is real
+      // queued work now, so accepting first spent that deadline watching a
+      // construction site — and contract-deliver only advances on a genuinely
+      // completed delivery, which left the tutorial card stuck with no way
+      // forward.
+      'contract-accept',
       'haul-debris',
       'contract-deliver',
       'finances',
@@ -301,8 +307,8 @@ describe('tutorialSteps', () => {
       'build-driving-center', 'train-driller', 'buy-drill-rig-assign',
       'train-digger', 'buy-rock-digger-assign',
       'drill-plan', 'charge', 'sequence', 'blast',
-      'scores', 'event-fire-resolve', 'hire-manager', 'contract-accept',
-      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'haul-debris', 'contract-deliver',
+      'scores', 'event-fire-resolve', 'hire-manager',
+      'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-accept', 'haul-debris', 'contract-deliver',
       'finances', 'box-cut', 'needs', 'tick-advance',
     ]);
     for (const step of TUTORIAL_STEPS) {
@@ -436,13 +442,19 @@ describe('tutorialSteps', () => {
   describe('step haul-debris', () => {
     const step = TUTORIAL_STEPS.find(s => s.id === 'haul-debris');
 
-    it('exists, positioned between build-storage and contract-deliver', () => {
+    it('exists, positioned after build-storage/contract-accept and before contract-deliver', () => {
       const ids = TUTORIAL_STEPS.map(s => s.id);
       const buildIdx = ids.indexOf('build-storage');
+      const acceptIdx = ids.indexOf('contract-accept');
       const haulIdx = ids.indexOf('haul-debris');
       const deliverIdx = ids.indexOf('contract-deliver');
       expect(haulIdx).toBeGreaterThan(-1);
-      expect(haulIdx).toBe(buildIdx + 1);
+      // #556/#817: contract-accept sits between build-storage and this step
+      // now — a contract's deadline starts at acceptance, and ordering the
+      // warehouse is real queued work, so accepting before it spent that
+      // deadline watching a construction site.
+      expect(acceptIdx).toBe(buildIdx + 1);
+      expect(haulIdx).toBe(acceptIdx + 1);
       expect(deliverIdx).toBe(haulIdx + 1);
     });
 

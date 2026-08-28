@@ -42,8 +42,12 @@ export interface SerializableGameState {
   orderedChargeCount: number;
   /** Remaining not-yet-`done` segments across every in-flight `state.plannedRamps` entry — proves a ramp order queues progressive excavation work instead of carving the whole corridor instantly (#555). A ramp is spliced out of `plannedRamps` entirely once its last segment lands, so this reaches 0 exactly when every ordered ramp has finished, not merely when the field would otherwise read 0 on an empty ramp. */
   orderedRampSegmentCount: number;
+  /** Buildings ordered but not yet built (state.plannedBuildings.length) — proves a build order queues work instead of creating the building instantly (#556). */
+  orderedBuildingCount: number;
   chargedCount: number;
   sequencedCount: number;
+  /** Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length) — proves a research task actually completed (reaches 0) rather than a `tick N` pad merely running, which a spontaneous mid-window event can silently cut short (tickCommand auto-pauses and refuses further ticks the instant one fires). */
+  researchQueueLength: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
   surveyCount: number;
   /** Queued-but-not-yet-claimed PendingActions (state.pendingActions) — includes auto-inserted rest tasks. */
@@ -114,8 +118,10 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     orderedRampSegmentCount: s.plannedRamps.reduce(
       (n, r) => n + r.segments.filter(seg => !seg.done).length, 0,
     ),
+    orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
     sequencedCount: Object.keys(s.sequenceDelays).length,
+    researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     buildingCount: s.buildings.buildings.length,

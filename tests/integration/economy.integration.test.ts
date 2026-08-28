@@ -152,6 +152,23 @@ function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
   }
 }
 
+/**
+ * Ticks until every construction site ordered so far has landed in
+ * state.buildings.buildings (#556), mirroring driveDrillPlanToCompletion
+ * above. A `place_building` order needs an idle employee to claim and finish
+ * it — callers of this helper are expected to have hired one first.
+ */
+function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    for (const emp of ctx.state!.employees.employees) {
+      emp.hunger = 100;
+      emp.fatigue = 100;
+      emp.breakNeed = 100;
+    }
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
 // ── Economy ──────────────────────────────────────────────────────────────────
 
 describe('Economy', () => {
@@ -480,8 +497,16 @@ describe('Economy', () => {
   // ── 11. Maintenance/fuel costs drain cash every tick (#456) ────────────────
 
   it('ticking with owned buildings and vehicles and no active tasks strictly drains cash tick over tick', () => {
+    // #556: confirming the order only queues a construction site — an idle
+    // employee has to actually finish it before the building's operating
+    // cost applies. Hire one and drive the order to completion first.
+    const hireResult = employeeCommand(ctx, ['hire'], { role: 'driller' });
+    expect(hireResult.success).toBe(true);
+
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
     expect(buildResult.success).toBe(true);
+    driveConstructionToCompletion(ctx);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
 
     const buyResult = vehicleCommand(ctx, ['buy', 'debris_hauler'], {});
     expect(buyResult.success).toBe(true);
@@ -752,20 +777,34 @@ describe('Economy', () => {
     // haul below with an automatic one.
     for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
 
-    // 3. Build an active Freight Warehouse now — immediately before the
-    // manual reachability probe/haul below, with no tick in between, so
-    // self-dispatch has no opportunity to claim this same vehicle first
-    // (syncHaulDispatch/tickEmployees only run inside tickCommand). (13,13),
-    // near the drill site rather than (5,5): bigger levels (#458 T6.1/D13)
-    // carry far more natural terrain relief than the old ones, fragmenting
-    // NavGrid bench levels into small pockets more often — (5,5) sat on a
-    // different bench than the drill/fragment area with no nearby ramp
-    // connecting them, so a loaded hauler could never findPath there
-    // (confirmed via direct reproduction). Keeping pickup and drop-off on
-    // the same bench sidesteps that pathfinding gap; a deeper general fix
-    // belongs to T6.2.
+    // 3. Build an active Freight Warehouse now. (13,13), near the drill site
+    // rather than (5,5): bigger levels (#458 T6.1/D13) carry far more
+    // natural terrain relief than the old ones, fragmenting NavGrid bench
+    // levels into small pockets more often — (5,5) sat on a different bench
+    // than the drill/fragment area with no nearby ramp connecting them, so a
+    // loaded hauler could never findPath there (confirmed via direct
+    // reproduction). Keeping pickup and drop-off on the same bench sidesteps
+    // that pathfinding gap; a deeper general fix belongs to T6.2.
+    //
+    // #556: confirming the order only queues a construction site — a fresh
+    // employee (not the driller, whose needs already ran down through the
+    // whole drill+charge grind above with nobody topping them off during the
+    // 10-tick board wait just above; not the boarded debris_hauler driver
+    // either) finishes it via driveConstructionToCompletion. That drives
+    // real ticks, but no tick runs BETWEEN completion and the manual
+    // reachability probe/haul below: tickTaskCompletion's place_building
+    // branch (which flips the site real) runs after that same tick's own
+    // syncHaulDispatch, so self-dispatch never sees the depot active in time
+    // to race the manual haul — the guarantee the old "no tick in between"
+    // comment described still holds, just spread across the site's whole
+    // build duration instead of a single instant call.
+    const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
+    expect(hireBuilder.success).toBe(true);
+
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
     expect(buildResult.success).toBe(true);
+    driveConstructionToCompletion(ctx);
+    expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
 
     // 4. Reachability-aware fragment selection — the fix under test.
     const fragmentId = findReachableGroundFragment(ctx.state!, vehicleId);
@@ -820,7 +859,23 @@ describe('Economy', () => {
   it('ore_sale contract with a realistic deadline is fulfilled by self-dispatch alone, no manual haul', () => {
     ctx.state!.cash = 200_000;
 
-    // 1. Crew a debris_hauler.
+    // 1. Active depot, on the same bench as the vehicle spawn (#458/#586
+    // reachability notes above apply equally here — (13,13) is proven
+    // reachable from this exact seed/size fixture). Built first, before any
+    // debris_hauler is crewed: no capable dispatcher exists yet, so there is
+    // nothing for self-dispatch to race regardless of how many ticks
+    // construction itself takes (#556 — confirming the order only queues a
+    // construction site; a dedicated fresh "manager" employee, not the
+    // eventual debris_hauler driver, finishes it below).
+    const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
+    expect(hireBuilder.success).toBe(true);
+
+    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
+    expect(buildResult.success).toBe(true);
+    driveConstructionToCompletion(ctx);
+    expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
+
+    // 2. Crew a debris_hauler.
     const hireDriver = employeeCommand(ctx, ['hire'], { role: 'driver' });
     expect(hireDriver.success).toBe(true);
     const driverId = ctx.state!.employees.employees.find(e => e.role === 'driver')!.id;
@@ -837,16 +892,10 @@ describe('Economy', () => {
     expect(assignResult.success).toBe(true);
 
     // Let the driver walk to and board the vehicle before any haul_debris
-    // action exists to claim — mirrors the full-economy-loop test above:
-    // no depot and no ground fragment yet, so self-dispatch has nothing to
-    // start and can't race the setup below.
+    // action exists to claim — the depot is already active at this point,
+    // but with no ground fragment yet syncHaulDispatch has nothing to queue
+    // regardless, so self-dispatch still can't race the setup below.
     for (let i = 0; i < 10; i++) tickCommand(ctx, ['1'], {});
-
-    // 2. Active depot, on the same bench as the vehicle spawn (#458/#586
-    // reachability notes above apply equally here — (13,13) is proven
-    // reachable from this exact seed/size fixture).
-    const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
-    expect(buildResult.success).toBe(true);
 
     // 3. A real, ore-bearing on_ground fragment — 430 kg of gloomium,
     // matching #671's own reproduction numbers (~33 ticks observed) —
@@ -983,8 +1032,15 @@ describe('Economy', () => {
 
     // Default Tier 1 freight_warehouse capacity (BuildingDefs.ts) — small
     // relative to the blast's total haulable mass, which is the whole point.
+    // #556: confirming the order only queues a construction site —
+    // refreshLogisticsCapacity isn't called again until the site actually
+    // completes, so storageCapacityKg stays at LogisticsState's pre-building
+    // 5000 default (createLogisticsState) until an idle staffed employee
+    // finishes the work.
     const buildResult = buildCommand(ctx, ['freight_warehouse'], { at: '13,13' });
     expect(buildResult.success).toBe(true);
+    driveConstructionToCompletion(ctx);
+    expect(ctx.state!.buildings.buildings.some(b => b.type === 'freight_warehouse')).toBe(true);
     expect(ctx.state!.logistics.storageCapacityKg).toBe(2000);
 
     // Bounded window: sandbox-measured convergence (warehouse permanently

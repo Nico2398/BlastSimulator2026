@@ -167,8 +167,9 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
-        }
+          "orderedBuildingCount": 1
+        },
+        "note": "Ordering only queues a construction site (#556); the lone driller hired above walks over and builds it during the tick blocks below, so this step asserts the site and the ticks that follow are what make it real."
       }
     },
     {

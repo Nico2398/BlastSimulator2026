@@ -1,28 +1,30 @@
 {
   "name": "building-placement-visual",
-  "description": "Visual check of building placement at different grid positions with list inspection after each",
+  "description": "Visual check of building placement at different grid positions with list inspection after each. #556: ordering a building queues a construction site (blue ghost, no building yet) instead of placing it instantly -- every order step now asserts buildingCount unchanged + orderedBuildingCount:1, followed by a mid-build checkpoint tick and a waitUntil that drives the site to completion before the next order.",
   "steps": [
     {
-      "command": "new_game seed:42 cash:150000",
-      "description": "#558: cash bumped from the default 50000 so the file's new final step (a building on ground well outside the site) is affordable on top of the four already here -- every other cash check below is shifted by the same +100000.",
+      "command": "new_game seed:42 cash:300000 staffed:true",
+      "description": "#558: cash bumped from the default 50000 so the file's final step (a building on ground well outside the site) is affordable on top of the four already here. #556: staffed:true so a free roster exists to actually walk to and work each ordered site -- without it every order below would queue forever and buildingCount would never reach 1. Bumped again to 300000 (from 150000) as part of the #556 visual-testing follow-up dispatch-livelock fix: the far (90,20) order now genuinely completes instead of stalling forever, but a small 5-person roster still burns real salary/upkeep across the ~150-170 ticks its travel and repeated need-driven rest cycles take, and 150000 ran the balance negative (briefly bankrupt) by the time it finished -- confirmed against the fixed dispatch path, not a symptom of the fix itself.",
       "timeout": 75,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:150000"
+          "command": "new_game seed:42 cash:300000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 150000,
-          "buildingCount": 0
+          "cash": 300000,
+          "buildingCount": 0,
+          "employeeCount": 5
         }
       }
     },
     {
       "command": "build living_quarters at:5,5",
-      "timeout": 70,
+      "description": "#556: order-time validation and charging are unchanged from a direct placement -- only the result differs: a construction site is queued (orderedBuildingCount:1) instead of the building existing immediately (buildingCount stays 0). The screenshot is taken AFTER Confirm, not before it: before Confirm the scene still shows the placement tool's own footprint preview, which existed long before this issue — what #556 adds, and what has to be seen, is the blue site ghost that stays on those exact tiles once the order is placed.",
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",
@@ -42,11 +44,15 @@
           "z": 5
         },
         {
-          "type": "screenshot"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1200
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "player",
@@ -55,8 +61,64 @@
           "cash": -10000
         },
         "equals": {
-          "buildingCount": 1
+          "buildingCount": 0,
+          "orderedBuildingCount": 1
+        },
+        "note": "Ordered, not placed: the site is queued for construction, no building exists yet."
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "#556: mid-construction checkpoint -- an unskilled roster member has had time to walk to (5,5) and start work, but tier 1's 40-tick base duration is nowhere near spent yet. This step's own auto-captured screenshot is the mid-build checkpoint (ghost still present, no building). Screenshot: the mid-build checkpoint of #556’s order → build → stand sequence.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1200
+        },
+        {
+          "type": "screenshot"
         }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 0
+        },
+        "note": "Still under construction 10 ticks in -- proves this is a genuine mid-build snapshot, not an already-finished site."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the living_quarters site to completion. This step's own auto-captured screenshot is the 'finished building' checkpoint. Screenshot: the finished checkpoint of #556’s order → build → stand sequence.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        },
+        {
+          "type": "wait",
+          "durationMs": 1200
+        },
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        },
+        "note": "living_quarters construction complete -- the site has landed as a real building."
       }
     },
     {
@@ -71,7 +133,8 @@
     },
     {
       "command": "build blasting_academy at:10,10",
-      "timeout": 70,
+      "description": "#556: same order-then-build semantics as the first order above.",
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",
@@ -100,7 +163,47 @@
           "cash": -15000
         },
         "equals": {
-          "buildingCount": 2
+          "buildingCount": 1,
+          "orderedBuildingCount": 1
+        },
+        "note": "living_quarters already stands from the previous order; blasting_academy is now queued, not yet built."
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "#556: mid-construction checkpoint for blasting_academy.",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
+      "description": "Drive the blasting_academy site to completion.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -116,7 +219,8 @@
     },
     {
       "command": "build geology_lab at:15,15",
-      "timeout": 70,
+      "description": "#556: same order-then-build semantics as the orders above.",
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",
@@ -145,7 +249,46 @@
           "cash": -12000
         },
         "equals": {
-          "buildingCount": 3
+          "buildingCount": 2,
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "#556: mid-construction checkpoint for geology_lab.",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:3 max_ticks:300",
+      "description": "Drive the geology_lab site to completion.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -161,7 +304,8 @@
     },
     {
       "command": "build management_office at:20,20",
-      "timeout": 70,
+      "description": "#556: same order-then-build semantics as the orders above.",
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",
@@ -190,7 +334,46 @@
           "cash": -8000
         },
         "equals": {
-          "buildingCount": 4
+          "buildingCount": 3,
+          "orderedBuildingCount": 1
+        }
+      }
+    },
+    {
+      "command": "tick 10",
+      "description": "#556: mid-construction checkpoint for management_office.",
+      "timeout": 30,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 10"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 3
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:4 max_ticks:300",
+      "description": "Drive the management_office site to completion.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 4,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 4,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -206,7 +389,7 @@
     },
     {
       "command": "build management_office at:90,20",
-      "description": "#558: targets ground well outside the default 64x64 site (chunk (5,20/16=1)... chunk index for x=90 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it.",
+      "description": "#558: targets ground well outside the default 64x64 site (chunk index for x=90 is 5, the site's own chunks only run 0-3) -- a real click through the tile picker onto ground the site does not yet own, proving the picker can raycast the landscape past the claimed edge and that the site actually grows to cover it. #556: land is claimed and cash charged at order time exactly as before (worldSizeX grows on this step); only the building itself is now a queued site rather than an instant placement.",
       "timeout": 100,
       "interaction": [
         {
@@ -236,9 +419,31 @@
           "cash": -8000
         },
         "equals": {
-          "buildingCount": 5
+          "buildingCount": 4,
+          "orderedBuildingCount": 1
         },
         "increased": ["worldSizeX"]
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:5 max_ticks:600",
+      "description": "Drive the far-off management_office site to completion -- longer travel distance from the roster's spawn point near the site origin needs a wider budget than the near-origin orders above.",
+      "timeout": 155,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 5,
+          "maxTicks": 600,
+          "timeoutMs": 150000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 5,
+          "orderedBuildingCount": 0
+        }
       }
     },
     {

@@ -4,7 +4,9 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
-import { buildCommand } from '../../src/console/commands/entities.js';
+import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
+import { tickCommand } from '../../src/console/commands/events.js';
+import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createBuildingState,
@@ -12,6 +14,8 @@ import {
   destroyBuilding,
   demolishBuilding,
   getStorageCapacity,
+  getBuildingScoreEffects,
+  hasActiveResearchCenter,
   hasExplosivesForBlast,
   storeExplosives,
   consumeExplosives,
@@ -22,6 +26,11 @@ import {
   type BuildingType,
 } from '../../src/core/entities/Building.js';
 import { createLogisticsState, syncLogisticsCapacity } from '../../src/core/economy/Logistics.js';
+import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
+import {
+  BUILDING_CONSTRUCTION_BASE_DURATION_TICKS,
+  BUILDING_CONSTRUCTION_TIER_MULTIPLIER,
+} from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -30,6 +39,66 @@ function makeCtx(): GameContext {
   const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
+}
+
+/**
+ * Same as makeCtx() but with a free, pre-hired roster (#551) so a construction
+ * site's `place_building` action — unskilled, `requiredSkill: null` (#556) —
+ * has someone idle to walk to it and work it.
+ */
+function makeStaffedCtx(): GameContext {
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', staffed: 'true' });
+  return ctx;
+}
+
+/** Tick until every ordered building has landed (or maxTicks is exhausted). */
+function tickUntilConstructionDone(ctx: GameContext, maxTicks = 300): void {
+  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
+    tickCommand(ctx, ['1'], {});
+  }
+}
+
+/**
+ * Tick a staffed `place_building` order past arrival and into genuine
+ * mid-work — the employee holding `actionId` has a non-null
+ * `taskTicksRemaining` that has already decremented below the duration it
+ * was seeded with. Arrival alone isn't enough: `tick.ts` runs
+ * `tickTaskProgress` before `tickArrivalGate` each tick, so the tick an
+ * employee arrives only seeds `taskTicksRemaining` to the full duration —
+ * one further tick is needed to observe it actually counting down (#556
+ * review finding — "preserving remaining work" tests must prove work is
+ * actually in flight, not just that a static PendingAction shape survives).
+ * Throws if the order never reaches this state within `maxTicks`.
+ */
+function tickUntilBuildingMidWork(
+  ctx: GameContext,
+  actionId: number,
+  maxTicks = 60,
+): { employeeId: number; ticksRemaining: number; durationTicks: number } {
+  const findHolder = () => {
+    const action = ctx.state!.pendingActions.find(a => a.id === actionId);
+    if (!action || action.holderId === null) return null;
+    return ctx.state!.employees.employees.find(e => e.id === action.holderId) ?? null;
+  };
+
+  let holder = findHolder();
+  for (let i = 0; i < maxTicks && (!holder || holder.taskTicksRemaining === null); i++) {
+    tickCommand(ctx, ['1'], {});
+    holder = findHolder();
+  }
+  if (!holder || holder.taskTicksRemaining === null) {
+    throw new Error('Setup: place_building order never reached in-progress work before maxTicks');
+  }
+  const durationTicks = holder.taskTicksRemaining;
+
+  tickCommand(ctx, ['1'], {});
+  holder = findHolder();
+  if (!holder || holder.taskTicksRemaining === null) {
+    throw new Error('Setup: employee left in-progress work unexpectedly');
+  }
+
+  return { employeeId: holder.id, ticksRemaining: holder.taskTicksRemaining, durationTicks };
 }
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
@@ -50,20 +119,33 @@ describe('Buildings lifecycle', () => {
   let ctx: GameContext;
 
   beforeEach(() => {
-    ctx = makeCtx();
+    // Staffed (#551): confirming a placement now only queues a construction
+    // site (#556) — an idle employee is needed to actually walk over and
+    // finish the `place_building` work before any of these lifecycle tests
+    // (destroy/upgrade/move/list) can see a real building in state.
+    ctx = makeStaffedCtx();
   });
 
   // ── 1. Place + list ─────────────────────────────────────────────────────────
 
   it('places a building and lists it', () => {
-    const placeResult = buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    const orderResult = buildCommand(ctx, ['living_quarters'], { at: '10,10' });
 
-    expect(placeResult.success).toBe(true);
-    expect(placeResult.output).toContain('Built');
-    expect(placeResult.output).toContain('living_quarters');
-    expect(placeResult.output).toContain('10,10');
+    expect(orderResult.success).toBe(true);
+    expect(orderResult.output).toContain('ordered');
+    expect(orderResult.output).toContain('living_quarters');
+    expect(orderResult.output).toContain('10,10');
+
+    // Confirming placement only queues a construction site (#556) — nothing
+    // is built yet.
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+
+    // Drive construction to completion.
+    tickUntilConstructionDone(ctx);
 
     // State should reflect the new building
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
     const b = ctx.state!.buildings.buildings[0]!;
     expect(b.type).toBe('living_quarters');
@@ -84,9 +166,11 @@ describe('Buildings lifecycle', () => {
   // ── 2. Reject overlap ───────────────────────────────────────────────────────
 
   it('rejects placement on occupied tile', () => {
-    // First placement succeeds
+    // First placement succeeds and completes.
     const first = buildCommand(ctx, ['living_quarters'], { at: '10,10' });
     expect(first.success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
 
     // Second placement at same coordinates must fail
     const second = buildCommand(ctx, ['management_office'], { at: '10,10' });
@@ -100,8 +184,9 @@ describe('Buildings lifecycle', () => {
   // ── 3. Destroy + demolish ──────────────────────────────────────────────────
 
   it('destroys a building and removes it from state', () => {
-    // Place a building
+    // Place a building and let construction finish.
     buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
 
     // Destroy it via console command
@@ -160,6 +245,7 @@ describe('Buildings lifecycle', () => {
 
     // --- Console upgrade command ---
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '1' });
+    tickUntilConstructionDone(ctx);
     const placed = ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters')!;
     expect(placed.tier).toBe(1);
 
@@ -191,6 +277,7 @@ describe('Buildings lifecycle', () => {
 
   it('rejects upgrade to a tier that has not been researched', () => {
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '1' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
 
     const result = buildCommand(ctx, ['upgrade', '1'], {});
@@ -209,6 +296,7 @@ describe('Buildings lifecycle', () => {
     // placement itself is not the thing under test here (that's tests 5b/5c).
     ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
     buildCommand(ctx, ['living_quarters'], { at: '10,10', tier: '3' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(3);
 
     // Attempt upgrade — must fail
@@ -234,6 +322,7 @@ describe('Buildings lifecycle', () => {
     // Place two different buildings at distinct locations
     buildCommand(ctx, ['living_quarters'], { at: '5,5' });
     buildCommand(ctx, ['management_office'], { at: '15,5' });
+    tickUntilConstructionDone(ctx);
 
     expect(ctx.state!.buildings.buildings).toHaveLength(2);
 
@@ -257,6 +346,7 @@ describe('Buildings lifecycle', () => {
 
   it('move command updates building position', () => {
     buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.x).toBe(10);
     expect(ctx.state!.buildings.buildings[0]!.z).toBe(10);
 
@@ -267,6 +357,31 @@ describe('Buildings lifecycle', () => {
     // Position updated in state
     expect(ctx.state!.buildings.buildings[0]!.x).toBe(20);
     expect(ctx.state!.buildings.buildings[0]!.z).toBe(20);
+  });
+
+  it('refuses to move a building onto a site still under construction', () => {
+    // Existing, finished building to move.
+    buildCommand(ctx, ['living_quarters'], { at: '10,10' });
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+
+    // A second order queues a site management_office is 3x3 -> reserves (30,30)-(32,32).
+    const order = buildCommand(ctx, ['management_office'], { at: '30,30' });
+    expect(order.success, JSON.stringify(order)).toBe(true);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+
+    // Moving the finished building onto the reserved, still-under-construction
+    // site must be refused up front, not silently accepted and corrected later
+    // by tickTaskCompletion.ts's defensive refund branch.
+    const moveResult = buildCommand(ctx, ['move', '1'], { to: '30,30' });
+
+    expect(moveResult.success).toBe(false);
+    expect(moveResult.output).toMatch(/occupied/i);
+
+    // Nothing moved, and the pending site is untouched.
+    expect(ctx.state!.buildings.buildings[0]!.x).toBe(10);
+    expect(ctx.state!.buildings.buildings[0]!.z).toBe(10);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
   });
 
   // ── 10. Freight warehouse storage + logistics sync ──────────────────────────
@@ -322,5 +437,276 @@ describe('Buildings lifecycle', () => {
     const overConsume = consumeExplosives(bs, 50);
     expect(overConsume).toBe(false);
     expect(hasExplosivesForBlast(bs)).toBe(false);
+  });
+});
+
+// ── Construction sites — order-then-build (#556) ─────────────────────────────
+// Ordering a building creates a construction site instead of an instant
+// building: confirming placement validates and charges exactly as before,
+// then queues a `place_building` action at the target. Nothing the building
+// provides counts until an employee has actually finished the work.
+
+describe('Construction sites — order-then-build (#556)', () => {
+  let ctx: GameContext;
+
+  beforeEach(() => {
+    ctx = makeStaffedCtx();
+  });
+
+  it('ordering a freight_warehouse charges cash and queues a site instead of placing the building instantly', () => {
+    const cashBefore = ctx.state!.cash;
+    const storageBefore = getStorageCapacity(ctx.state!.buildings);
+    const def = getBuildingDef('freight_warehouse', 1);
+
+    const result = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    // No building exists yet — nothing it provides is live either.
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(getStorageCapacity(ctx.state!.buildings)).toBe(storageBefore);
+
+    // Cash was charged in full at order time, same as an instant build.
+    expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
+
+    // A construction site is queued instead.
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+    const planned = ctx.state!.plannedBuildings[0]!;
+    expect(planned.type).toBe('freight_warehouse');
+    expect(planned.tier).toBe(1);
+    expect(planned.x).toBe(5);
+    expect(planned.z).toBe(5);
+    expect(planned.cost).toBe(def.constructionCost);
+
+    // One place_building PendingAction was dispatched for it, unskilled.
+    const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId);
+    expect(action).toBeDefined();
+    expect(action!.type).toBe('place_building');
+    expect(action!.requiredSkill).toBeNull();
+
+    // A blue ghost matching the real footprint appears at the site.
+    const ghost = ctx.state!.ghostPreviews.find(g => g.id === planned.actionId);
+    expect(ghost).toBeDefined();
+    expect(ghost!.footprint).toEqual(def.footprint);
+  });
+
+  it('a tier-1 order carries payload.durationTicks === BUILDING_CONSTRUCTION_BASE_DURATION_TICKS (multiplier 1)', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId)!;
+    const payload = action.payload as unknown as PlaceBuildingActionPayload;
+
+    expect(payload.durationTicks).toBe(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS);
+  });
+
+  it('a tier-2 order carries payload.durationTicks scaled by BUILDING_CONSTRUCTION_TIER_MULTIPLIER[2]', () => {
+    // Tier 2 requires research to be unlocked first (same gate as direct placement).
+    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+
+    const result = buildCommand(ctx, ['management_office'], { at: '5,5', tier: '2' });
+    expect(result.success, JSON.stringify(result)).toBe(true);
+
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId)!;
+    const payload = action.payload as unknown as PlaceBuildingActionPayload;
+
+    expect(payload.durationTicks).toBe(
+      BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[2],
+    );
+  });
+
+  it('drives the order to completion: the site lands as a real building and its effects apply', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(1);
+    const built = ctx.state!.buildings.buildings[0]!;
+    expect(built.type).toBe('freight_warehouse');
+    expect(built.x).toBe(5);
+    expect(built.z).toBe(5);
+    expect(getStorageCapacity(ctx.state!.buildings)).toBe(getBuildingDef('freight_warehouse', 1).capacity);
+
+    // The completed action and its ghost are gone.
+    expect(ctx.state!.pendingActions.find(a => a.type === 'place_building')).toBeUndefined();
+    expect(ctx.state!.ghostPreviews).toHaveLength(0);
+  });
+
+  it('living_quarters well-being effect only applies once construction completes, not at order time', () => {
+    buildCommand(ctx, ['living_quarters'], { at: '5,5' });
+    expect(getBuildingScoreEffects(ctx.state!.buildings).wellBeing).toBe(0);
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(getBuildingScoreEffects(ctx.state!.buildings).wellBeing).toBeGreaterThan(0);
+  });
+
+  it('research_center only gates research once construction completes, not at order time', () => {
+    buildCommand(ctx, ['research_center'], { at: '5,5' });
+    expect(hasActiveResearchCenter(ctx.state!.buildings)).toBe(false);
+
+    tickUntilConstructionDone(ctx);
+
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(hasActiveResearchCenter(ctx.state!.buildings)).toBe(true);
+  });
+
+  it('rejects the order when funds are insufficient, charging nothing and queuing nothing', () => {
+    ctx.state!.cash = 10;
+
+    const result = buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(10);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  it('rejects ordering an unresearched tier, same gate as direct placement', () => {
+    const result = buildCommand(ctx, ['living_quarters'], { at: '5,5', tier: '2' });
+
+    expect(result.success).toBe(false);
+    expect(result.output).toMatch(/research/i);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+  });
+
+  it('rejects an out-of-bounds order, same gate as direct placement', () => {
+    // (60,60) is off the 32x32 starting site but still gets claimed by site
+    // expansion (#473) — the site can bridge up to MAX_CLAIM_BRIDGE_CHUNKS
+    // chunks (≈384 voxels) of ground to reach a claim. Go far enough that
+    // even bridging refuses it, so this exercises the same "too far" gate
+    // direct placement always went through.
+    const result = buildCommand(ctx, ['freight_warehouse'], { at: '5000,5000' });
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+  });
+
+  it('a second order overlapping a site under construction is refused, like an overlapping real building', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' }); // freight_warehouse T1 is 4x4 -> (5,5)-(8,8)
+
+    const second = buildCommand(ctx, ['management_office'], { at: '6,6' });
+
+    expect(second.success).toBe(false);
+    expect(second.output).toMatch(/occupied/i);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  it('an order succeeds and queues even with no employees hired yet (mirrors #553/#554/#555 silent-queue pattern)', () => {
+    const freshCtx = makeCtx(); // NOT staffed
+    expect(freshCtx.state!.employees.employees).toHaveLength(0);
+
+    const result = buildCommand(freshCtx, ['freight_warehouse'], { at: '5,5' });
+
+    expect(result.success, JSON.stringify(result)).toBe(true);
+    expect(freshCtx.state!.plannedBuildings).toHaveLength(1);
+    expect(freshCtx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  it('cancelling an ordered site removes it and refunds the full construction cost', () => {
+    // There is no `build cancel` subcommand — a queued site is cancelled the
+    // same generic way any other dispatched action is, through
+    // `employee cancel <actionId>` (mirrors the dig_ramp_segment/drill_hole
+    // order-cancellation pattern; see releasePlannedHoleForCancelledAction's
+    // place_building branch in src/console/commands/mining.ts).
+    const cashBefore = ctx.state!.cash;
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const def = getBuildingDef('freight_warehouse', 1);
+    expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const actionId = planned.actionId;
+
+    const cancelResult = employeeCommand(ctx, ['cancel', String(actionId)], {});
+
+    expect(cancelResult.success, JSON.stringify(cancelResult)).toBe(true);
+    expect(ctx.state!.cash).toBe(cashBefore);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.ghostPreviews).toHaveLength(0);
+  });
+
+  it('cancelling a site whose employee is already mid-work still refunds the full cost, not a prorated amount', () => {
+    // TaskCancellation.ts's actionOrderCost refund is unconditional (a
+    // building isn't segmented like a ramp, so there's no partial-progress
+    // deduction to apply) — this proves it holds once the employee has
+    // actually arrived and burned some of the work timer, not just while the
+    // order is still queued/pre-walk (every other cancel test here cancels
+    // immediately after ordering).
+    const cashBefore = ctx.state!.cash;
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const def = getBuildingDef('freight_warehouse', 1);
+    expect(ctx.state!.cash).toBe(cashBefore - def.constructionCost);
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const actionId = planned.actionId;
+
+    const midWork = tickUntilBuildingMidWork(ctx, actionId);
+    expect(midWork.ticksRemaining).toBeLessThan(midWork.durationTicks);
+
+    // Ticking to mid-work spends employee upkeep along the way, so cash by
+    // now is already below cashBefore for reasons unrelated to the refund —
+    // what's under test is that the cancel refund itself is the FULL
+    // construction cost, not prorated down for the ticks already worked.
+    const cashBeforeCancel = ctx.state!.cash;
+    const cancelResult = employeeCommand(ctx, ['cancel', String(actionId)], {});
+
+    expect(cancelResult.success, JSON.stringify(cancelResult)).toBe(true);
+    expect(ctx.state!.cash).toBe(cashBeforeCancel + def.constructionCost);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  });
+
+  it('cancelling an unknown site id fails without touching cash or any in-flight order', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const cashAfterOrder = ctx.state!.cash;
+
+    const result = employeeCommand(ctx, ['cancel', '9999'], {});
+
+    expect(result.success).toBe(false);
+    expect(ctx.state!.cash).toBe(cashAfterOrder);
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+  });
+
+  it('save/load round-trips a site under construction, preserving its remaining work', () => {
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    // Let the site partially progress before saving.
+    for (let i = 0; i < 5; i++) tickCommand(ctx, ['1'], {});
+    expect(ctx.state!.plannedBuildings).toHaveLength(1);
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+
+    const json = serialize(ctx.state!);
+    const restored = deserialize(json);
+
+    expect(restored.plannedBuildings).toEqual(ctx.state!.plannedBuildings);
+    expect(restored.buildings.buildings).toHaveLength(0);
+    const restoredAction = restored.pendingActions.find(
+      a => a.id === ctx.state!.plannedBuildings[0]!.actionId,
+    );
+    expect(restoredAction).toBeDefined();
+    expect(restoredAction!.type).toBe('place_building');
+  });
+
+  it('save/load preserves the actual remaining work of a site whose employee is mid-construction', () => {
+    // The test above only proves the static PendingAction/PlannedBuilding
+    // shape survives a JSON round trip — it ticks before the employee has
+    // arrived, so taskTicksRemaining is still null throughout. This drives
+    // the order until an employee has actually arrived and started counting
+    // down, then asserts THAT number survives, unchanged, across save/load.
+    buildCommand(ctx, ['freight_warehouse'], { at: '5,5' });
+    const planned = ctx.state!.plannedBuildings[0]!;
+    const midWork = tickUntilBuildingMidWork(ctx, planned.actionId);
+
+    const json = serialize(ctx.state!);
+    const restored = deserialize(json);
+
+    const restoredEmployee = restored.employees.employees.find(e => e.id === midWork.employeeId);
+    expect(restoredEmployee).toBeDefined();
+    expect(restoredEmployee!.taskTicksRemaining).toBe(midWork.ticksRemaining);
+    expect(restored.plannedBuildings).toEqual(ctx.state!.plannedBuildings);
+    expect(restored.buildings.buildings).toHaveLength(0);
   });
 });

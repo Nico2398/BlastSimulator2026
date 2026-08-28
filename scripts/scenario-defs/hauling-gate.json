@@ -53,7 +53,7 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       }
     },
@@ -114,6 +114,27 @@
         "equals": {
           "orderedHoleCount": 0,
           "holeCount": 4
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "The warehouse ordered above is built by the idle roster during the drilling block, so this asserts the site actually landed rather than paying for it in ticks (#556) — keeping the blast and haul beats below on the tick trajectory this file measured them at.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -384,7 +405,11 @@
       "expect": {
         "decreased": [
           "cash"
-        ]
+        ],
+        "increased": [
+          "storedMassKg"
+        ],
+        "note": "This is the block where the gate this file is named for actually opens: the warehouse ordered at the top is standing, so the hauler has somewhere to put the blasted rock and storedMassKg climbs off 0. It moved up from the tick-60 block below (#556): ordering the warehouse rather than placing it puts a builder out on the pad, the blast catches them, and the surviving crew hauls what the blast produced inside this window instead of spilling into the next."
       }
     },
     {
@@ -412,9 +437,7 @@
         "decreased": [
           "cash"
         ],
-        "increased": [
-          "storedMassKg"
-        ]
+        "note": "storedMassKg holds at its post-haul figure here rather than climbing again (#556) — everything the blast produced was already delivered in the block above. The gate itself is asserted there."
       }
     },
     {

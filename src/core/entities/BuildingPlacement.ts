@@ -38,10 +38,16 @@ export type PlacementGrid = PlacementCell[][];
 /**
  * Build a placement grid by scanning every (x, z) column of the VoxelGrid for
  * its surface height, then marking cells covered by building footprints as BUSY.
+ *
+ * `plannedBuildings` (#556) additionally marks cells occupied by an
+ * ordered-but-not-yet-built construction site as BUSY, so a second building
+ * can't be placed on top of one still under construction. Defaults to `[]`
+ * so every pre-#556 call site keeps compiling unchanged.
  */
 export function buildPlacementGrid(
   voxelGrid: VoxelGrid,
   buildingState: BuildingState,
+  plannedBuildings: ReadonlyArray<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [],
 ): PlacementGrid {
   const grid: PlacementGrid = [];
 
@@ -59,6 +65,21 @@ export function buildPlacementGrid(
     for (const [dx, dz] of def.footprint) {
       const cx = building.x + dx;
       const cz = building.z + dz;
+      const row = grid[cz];
+      if (row !== undefined && cx >= 0 && cx < row.length) {
+        const cell = row[cx];
+        if (cell !== undefined) cell.surfaceY = BUSY;
+      }
+    }
+  }
+
+  // Mark every cell under a construction site's footprint as BUSY too, so a
+  // second order can't be placed on top of a site still under construction.
+  for (const planned of plannedBuildings) {
+    const def = getBuildingDef(planned.type, planned.tier);
+    for (const [dx, dz] of def.footprint) {
+      const cx = planned.x + dx;
+      const cz = planned.z + dz;
       const row = grid[cz];
       if (row !== undefined && cx >= 0 && cx < row.length) {
         const cell = row[cx];

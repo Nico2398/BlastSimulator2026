@@ -74,8 +74,10 @@ export const GAME_STATE_SCHEMA: Schema = {
   orderedHoleCount: { type: 'number', description: 'Holes ordered but not yet drilled (state.plannedDrillHoles.length, #553)' },
   orderedChargeCount: { type: 'number', description: 'Charges ordered but not yet loaded (Object.keys(state.plannedChargesByHole).length, #554)' },
   orderedRampSegmentCount: { type: 'number', description: 'Segments ordered but not yet dug across all in-flight ramps (state.plannedRamps, #555)' },
+  orderedBuildingCount: { type: 'number', description: 'Buildings ordered but not yet built (state.plannedBuildings.length, #556)' },
   chargedCount: { type: 'number' },
   sequencedCount: { type: 'number' },
+  researchQueueLength: { type: 'number', description: 'Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length)' },
   surveyCount: { type: 'number', description: 'Completed survey results (state.surveyResults.length)' },
   pendingActionCount: { type: 'number', description: 'Queued-but-not-yet-claimed PendingActions, including auto-inserted rest tasks (state.pendingActions.length)' },
   buildingCount: { type: 'number' },
@@ -215,7 +217,6 @@ function validateStateFile(filePath: string): ValidationResult {
       validateObject('uiState', uiState, UI_STATE_SCHEMA, errors);
       warnings.push(...checkUnknownFields('uiState', uiState, UI_STATE_SCHEMA));
     }
-
   } catch (err: any) {
     errors.push({
       path: '',
