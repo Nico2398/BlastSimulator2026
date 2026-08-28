@@ -18,7 +18,23 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { isZoneClear } from '../entities/Zone.js';
+import { EVACUATION_HOLD_KEY } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
+
+/**
+ * True for an action evacuateZone itself marked (EVACUATION_HOLD_KEY) as a
+ * stale "re-target the same employee" relay leftover, while the zone it was
+ * interrupted in is still active and not yet clear (#557) — see that
+ * constant's own doc comment (Evacuation.ts) for why this checks the
+ * per-action marker rather than a blanket "target falls in any zone" rule.
+ */
+function isEvacuationHoldBlocked(state: GameState, action: PendingAction): boolean {
+  if (action.payload[EVACUATION_HOLD_KEY] !== true) return false;
+  const zone = state.zone.activeZone;
+  if (zone === null) return false;
+  return !isZoneClear(zone, state.vehicles, state.employees);
+}
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -42,7 +58,11 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // remaining storage room, stays queued rather than being claimed and
       // immediately failing at pickup — mirrors the vehicle-availability
       // check (findVehicleForClaim) just below.
-      && isHaulOrFragmentActionClaimable(state, a))
+      && isHaulOrFragmentActionClaimable(state, a)
+      // #557: never re-claim a stale evacuation-relay leftover while its
+      // zone is still occupied — see isEvacuationHoldBlocked's own doc
+      // comment.
+      && !isEvacuationHoldBlocked(state, a))
     .sort((a, b) => a.id - b.id);
 
   for (const action of targeted) {
@@ -168,6 +188,16 @@ export function claimOnePoolCandidate(state: GameState, employee: Employee): Sel
     (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
     isHaulOrFragmentActionClaimable(state, a),
+    // #557: no evacuation-hold check needed here — EVACUATION_HOLD_KEY is
+    // only ever stamped on an action already re-targeted at a specific
+    // employee (Evacuation.ts's evacuateZone), and this filter's own
+    // `targetEmployeeId === null` above already excludes every such action.
+    // See isEvacuationHoldBlocked's own doc comment for why that scoping
+    // matters: a blanket "target falls in any zone" rule here would also
+    // block fresh, legitimate work — a player routinely uses `zone clear` as
+    // a general "clear this area" utility well before any blast plan exists
+    // (confirmed live: safety-projection-visual.json's own `zone clear` step
+    // runs before its drill_plan does).
   );
 
   const selection = selectBestActionForEmployee(

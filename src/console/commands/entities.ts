@@ -260,7 +260,9 @@ export function zoneCommand(
       }
       const bounds: ZoneBounds = { x1, z1, x2, z2 };
       defineZone(state.zone, bounds);
-      const result = evacuateZone(state, bounds);
+      // Evacuate the normalized bounds defineZone just stored (state.zone.activeZone),
+      // not the raw, possibly-unordered `bounds` the player/UI passed in.
+      const result = evacuateZone(state, state.zone.activeZone!);
       return {
         success: true,
         output: `Zone cleared. Moved ${result.orderedVehicleIds.length} vehicles and ${result.orderedEmployeeIds.length} employees.`,

@@ -435,6 +435,12 @@ console.log = (...args: unknown[]) => {
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const prevState = ctx.state;
+  // Set before dispatch, not after: the tutorial-only blast refusal
+  // (blastCommand, mining/blast.ts) reads ctx.tutorialActive during
+  // runCommand itself, below — setting it only in the post-command UI sync
+  // further down (uiManager.update's own tutorial.isActive argument) would
+  // always be one command too late (#557).
+  ctx.tutorialActive = tutorial.isActive;
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once

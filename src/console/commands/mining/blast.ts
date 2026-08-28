@@ -7,7 +7,7 @@ import { requireGame, assembleValidBlastPlan } from './shared.js';
 import { executeBlast, buildBlastReport } from '../../../core/mining/BlastExecution.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
-import { processProjections } from '../../../core/entities/Damage.js';
+import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { killEmployee } from '../../../core/entities/Employee.js';
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
@@ -17,6 +17,8 @@ import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { NavGrid } from '../../../core/nav/NavGrid.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
+import { computeDangerZone, isZoneClear, countZoneOccupants } from '../../../core/entities/Zone.js';
+import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 
 export function blastCommand(
   ctx: MiningContext,
@@ -25,6 +27,21 @@ export function blastCommand(
 ): CommandResult {
   const err = requireGame(ctx);
   if (err) return { success: false, output: err };
+
+  // Tutorial-only refusal (#557): the tutorial teaches evacuating the blast
+  // zone before firing, so it refuses to fire on an occupied one. Outside the
+  // tutorial this never triggers — firing on an occupied zone stays exactly
+  // as before this issue (preflight warning only, still fireable). Runs
+  // before any state mutation: no cash spent, no drill plan cleared,
+  // executeBlast never called.
+  if (ctx.tutorialActive === true) {
+    const preState = ctx.state!;
+    const dangerZone = computeDangerZone(preState.drillHoles, BLAST_DANGER_MARGIN_M);
+    if (dangerZone !== null && !isZoneClear(dangerZone, preState.vehicles, preState.employees)) {
+      const count = countZoneOccupants(dangerZone, preState.vehicles, preState.employees);
+      return { success: false, output: t('mining.blast.refused_zone_occupied', { count }) };
+    }
+  }
 
   const assembled = assembleValidBlastPlan(ctx.state!, t('mining.blast_plan.invalid_plan_header'));
   if (assembled.error) return assembled.error;
@@ -70,6 +87,12 @@ export function blastCommand(
   // Standing on the rock when it goes is not survivable, whatever the charge:
   // the ground is simply not there any more. Evacuating the blast zone first
   // (see Zone.ts) is the whole point of the safety drill.
+  // Accidents produced by THIS blast call specifically — not a filter over
+  // state.damage.accidents by tick, since two blasts can share a tick and
+  // that would misattribute the first blast's accidents to the second's
+  // report (or vice versa).
+  const thisBlastAccidents: AccidentRecord[] = [];
+
   const blastedColumns = new Set(result.clearedColumns);
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
@@ -77,16 +100,20 @@ export function blastCommand(
     killEmployee(state.employees, emp.id);
     state.damage.deathCount++;
     state.damage.lawsuitPending = true;
-    state.damage.accidents.push({
+    const accident: AccidentRecord = {
       tick: state.tickCount, type: 'death', entityId: emp.id, fragmentId: -1, kineticEnergy: 0,
-    });
+    };
+    state.damage.accidents.push(accident);
+    thisBlastAccidents.push(accident);
   }
   for (const veh of [...state.vehicles.vehicles]) {
     if (!blastedColumns.has(`${Math.floor(veh.x)},${Math.floor(veh.z)}`)) continue;
     destroyVehicle(state.vehicles, veh.id);
-    state.damage.accidents.push({
+    const accident: AccidentRecord = {
       tick: state.tickCount, type: 'vehicle_destroyed', entityId: veh.id, fragmentId: -1, kineticEnergy: 0,
-    });
+    };
+    state.damage.accidents.push(accident);
+    thisBlastAccidents.push(accident);
   }
 
   // Rock that was thrown lands somewhere, and whatever is standing there pays
@@ -104,6 +131,7 @@ export function blastCommand(
   if (impacts.length > 0) {
     syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   }
+  thisBlastAccidents.push(...impacts);
 
   // Track blast in damage state and level stats
   state.damage.blastCount++;
@@ -130,7 +158,7 @@ export function blastCommand(
     const explosive = getExplosive(charge.explosiveId);
     if (explosive) spent += explosive.costPerKg * charge.amountKg;
   }
-  state.lastBlastReport = buildBlastReport(result, state.tickCount, spent);
+  state.lastBlastReport = buildBlastReport(result, state.tickCount, spent, thisBlastAccidents);
 
   // Clear drill plan after blast (holes are consumed)
   state.drillHoles = [];

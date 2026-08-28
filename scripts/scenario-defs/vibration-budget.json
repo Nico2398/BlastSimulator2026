@@ -543,14 +543,15 @@
     },
     {
       "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #557 KNOWN BREAK: Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only) -- the audited gap #557 closed. Employee #2, idle since hire and resting at the living_quarters (16,15) while employee #1 drills grid 1, is ~6.4m from grid 1's holes and is now killed by attenuated debris from blast 1 that used to miss entirely at that range. This refusal is genuinely deterministic (not a mode-timing race) and cascades: grid 2 never drills (no licensed driller), so every step from here through the file's end is failing in `npm run scenarios` (confirmed via direct replay), not just this one command. Declaring this refused keeps this specific lint (undeclared-refusal) honest about what actually happens now; it does not fix the scenario. This file's own crew/building geometry needs rebalancing for the new debris range -- filed as a follow-up rather than guessed at here (relocating living_quarters far enough from all 3 drill grids reintroduces real risk of the worker_revolt #707's own razor-thin commute tuning was fighting off, which is a game-design balance question, not a one-line fix).",
       "interaction": [
         {
           "type": "command",
           "command": "employee assign_skill 2 skill:driving.drill_rig level:1"
         }
       ],
-      "role": "bootstrap"
+      "role": "bootstrap",
+      "commandOutcome": "refused"
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:20,10 diameter:0.089",

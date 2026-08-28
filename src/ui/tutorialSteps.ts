@@ -12,8 +12,10 @@ import {
   getVehicles,
   countBuildingsOfType,
   isBlastReportOutstanding,
+  createEvacuateZoneStep,
   TOOLBAR_TARGET,
 } from './tutorialStepHelpers.js';
+import { TUTORIAL_STEPS_CLOSING } from './tutorialStepsClosing.js';
 
 /** The one scripted event the tutorial fires, so the player meets the dialog. */
 const TUTORIAL_EVENT_ID = 'tutorial_synergy_consultant';
@@ -329,19 +331,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // clock running while the charging crew is still busy.
   createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['sequence auto delay_step:25'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
-  // ── Step 6b: evacuate-zone ──
-  // #557: the tutorial enforces evacuating the blast zone before firing.
-  // isComplete is a placeholder here — the implementer wires the real
-  // zone-clear check (see Zone.ts/Evacuation.ts).
-  {
-    id: 'evacuate-zone',
-    titleKey: 'tutorial.step_evacuate.title',
-    textKey: 'tutorial.step_evacuate',
-    highlightTarget: TOOLBAR_TARGET.blast,
-    tickBudget: 20,
-    waitsOnWork: true,
-    isComplete: () => false,
-  },
+  // ── Step 6b: evacuate-zone ── (#557 — see createEvacuateZoneStep)
+  createEvacuateZoneStep(),
 
   // ── Step 7: blast ──
   // Counts blasts fired as well as ore types collected. Keying only on ore
@@ -516,64 +507,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     })),
   }), TOOLBAR_TARGET.employees),
 
-  // ── Step 19: set-policy ──
-  {
-    id: 'set-policy',
-    titleKey: 'tutorial.step20.title',
-    textKey: 'tutorial.step20',
-    commands: ['set_policy mode:shift_8h'],
-    highlightTarget: TOOLBAR_TARGET.settings,
-    // Completes when a policy is applied, not when one of its values happens to
-    // differ. Comparing values left a player who pressed Apply on the settings
-    // already showing — the common case, since the form mirrors the policy in
-    // force — watching a "Site policy updated" message while the tutorial sat
-    // on the step forever.
-    captureSnapshot: (state: GameState) => ({
-      policyRevision: state.sitePolicy?.revision ?? 0,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const before = (snapshot.policyRevision as number | undefined) ?? 0;
-      return (state.sitePolicy?.revision ?? 0) > before;
-    },
-  },
-
-  // ── Step 20: tick-advance ──
-  {
-    id: 'tick-advance',
-    titleKey: 'tutorial.step21.title',
-    textKey: 'tutorial.step21',
-    // The whole point of this step is that the clock runs.
-    tickBudget: 30,
-    waitsOnWork: true,
-    highlightTarget: '#bs-hud-top .bs-speed-btn',
-    captureSnapshot: (state: GameState) => ({
-      prevTick: state.tickCount ?? 0,
-    }),
-    isComplete: (state: GameState, snapshot: Record<string, unknown>) => {
-      const prev = snapshot.prevTick as number;
-      return (state.tickCount ?? 0) > prev + 5;
-    },
-  },
-
-  // ── Step 21: victory ──
-  {
-    id: 'victory',
-    titleKey: 'tutorial.step22.title',
-    textKey: 'tutorial.step22',
-    // Waits on the level's profit target, which only accrues while time runs.
-    tickBudget: 60,
-    waitsOnWork: true,
-    highlightTarget: '#bs-hud-scores',
-    isComplete: (state: GameState) => state.levelEnded === true,
-  },
-
-  // ── Step 22: congratulations ──
-  {
-    id: 'congratulations',
-    titleKey: 'tutorial.complete_title',
-    textKey: 'tutorial.complete_text',
-    isComplete: () => true,
-  },
+  // ── Steps 19-22: set-policy, tick-advance, victory, congratulations ──
+  // Split into tutorialStepsClosing.ts (#557 — see that file's own header).
+  ...TUTORIAL_STEPS_CLOSING,
 ];
 
 export const TOTAL_TUTORIAL_STEPS = TUTORIAL_STEPS.length;

@@ -2,6 +2,7 @@
 // Players define safety zones before blasting and evacuate entities.
 
 import type { VehicleState } from './Vehicle.js';
+import { moveVehicle } from './Vehicle.js';
 import type { EmployeeState } from './Employee.js';
 
 // ── Zone bounds ──
@@ -57,16 +58,51 @@ export function defineZone(state: ZoneState, bounds: ZoneBounds): void {
 
 /**
  * Clear the zone: order all employees and vehicles out to a safe cell found
- * by `findSafeDestination`. See EvacuateZone.ts / Evacuation.ts for the real
- * pathfinding-aware evacuation orchestration — this is the low-level move.
+ * by `findSafeDestination`. See Evacuation.ts for the real pathfinding-aware
+ * evacuation orchestration (interrupting in-progress work, aborting a
+ * mid-haul/mid-break vehicle) — this is the low-level move: it queues a
+ * destination (a vehicle's target, an employee's walk destination) rather
+ * than teleporting anyone. An entity `findSafeDestination` cannot place is
+ * left exactly where it stands and reported stranded instead.
  */
 export function clearZone(
-  _zone: ZoneBounds,
-  _vehicles: VehicleState,
-  _employees: EmployeeState,
-  _findSafeDestination: SafeDestinationFinder,
+  zone: ZoneBounds,
+  vehicles: VehicleState,
+  employees: EmployeeState,
+  findSafeDestination: SafeDestinationFinder,
 ): EvacuationResult {
-  throw new Error('not implemented');
+  const result: EvacuationResult = {
+    orderedVehicleIds: [],
+    orderedEmployeeIds: [],
+    strandedVehicleIds: [],
+    strandedEmployeeIds: [],
+  };
+
+  for (const v of vehicles.vehicles) {
+    if (!isInZone(v.x, v.z, zone)) continue;
+    const dest = findSafeDestination(v.x, v.z, zone);
+    if (dest) {
+      moveVehicle(vehicles, v.id, dest.x, dest.z);
+      result.orderedVehicleIds.push(v.id);
+    } else {
+      result.strandedVehicleIds.push(v.id);
+    }
+  }
+
+  for (const emp of employees.employees) {
+    if (!emp.alive) continue;
+    if (!isInZone(emp.x, emp.z, zone)) continue;
+    const dest = findSafeDestination(emp.x, emp.z, zone);
+    if (dest) {
+      emp.destinationX = dest.x;
+      emp.destinationZ = dest.z;
+      result.orderedEmployeeIds.push(emp.id);
+    } else {
+      result.strandedEmployeeIds.push(emp.id);
+    }
+  }
+
+  return result;
 }
 
 /** Check if the zone is clear of all entities. */
@@ -88,6 +124,23 @@ export function isZoneClear(
 /** Check if a point is inside the zone. */
 export function isInZone(x: number, z: number, zone: ZoneBounds): boolean {
   return x >= zone.x1 && x <= zone.x2 && z >= zone.z1 && z <= zone.z2;
+}
+
+/**
+ * Combined count of alive employees + vehicles standing inside `zone` — the
+ * one number the Fire step's occupant list (Fire.ts's `occupants()`), the
+ * tutorial-gated console blast refusal, and the tutorial-gated FIRE button
+ * reason all report, so they never disagree on how many are still in the way.
+ */
+export function countZoneOccupants(zone: ZoneBounds, vehicles: VehicleState, employees: EmployeeState): number {
+  let count = 0;
+  for (const emp of employees.employees) {
+    if (emp.alive && isInZone(emp.x, emp.z, zone)) count++;
+  }
+  for (const v of vehicles.vehicles) {
+    if (isInZone(v.x, v.z, zone)) count++;
+  }
+  return count;
 }
 
 /**

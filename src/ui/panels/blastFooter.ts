@@ -14,6 +14,8 @@ import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
+import { computeDangerZone, isZoneClear, countZoneOccupants } from '../../core/entities/Zone.js';
+import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 
 export class BlastFooter {
   private readonly el: HTMLElement;
@@ -80,11 +82,11 @@ export class BlastFooter {
 
   setFireRequestedHandler(cb: () => void): void { this.onFireRequested = cb; }
 
-  update(state: GameState, _tutorialActive: boolean = false): void {
+  update(state: GameState, tutorialActive: boolean = false): void {
     const plan = assembleBlastPlan(state.drillHoles, state.chargesByHole, state.sequenceDelays);
     const errors = validateBlastPlan(plan, new Set(Object.keys(state.plannedChargesByHole)));
     const hasHoles = plan.holes.length > 0;
-    const fireOk = hasHoles && errors.length === 0;
+    const baseFireOk = hasHoles && errors.length === 0;
 
     const planCost = Object.values(state.chargesByHole).reduce((sum, charge) => {
       const explosive = getExplosive(charge.explosiveId);
@@ -92,9 +94,25 @@ export class BlastFooter {
     }, 0);
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
     const margin = estValue - planCost;
+
+    // Tutorial-only gate (#557): mirrors the console `blast` command's own
+    // refusal (mining/blast.ts) so FIRE and the command it dispatches agree.
+    // Outside the tutorial this never applies — an occupied zone stays
+    // fireable, preflight-warning-only, exactly as before this issue.
+    let zoneOccupiedCount: number | null = null;
+    if (tutorialActive && baseFireOk) {
+      const dangerZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
+      if (dangerZone && !isZoneClear(dangerZone, state.vehicles, state.employees)) {
+        zoneOccupiedCount = countZoneOccupants(dangerZone, state.vehicles, state.employees);
+      }
+    }
+    const fireOk = baseFireOk && zoneOccupiedCount === null;
+
     const reason = !hasHoles
       ? t('ui.blast_workshop.footer.fire_reason_no_holes')
-      : (errors[0] ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) }) : null);
+      : errors[0]
+        ? t('ui.blast_workshop.footer.fire_reason_invalid', { hole: errors[0].holeId, issue: t(errors[0].issue) })
+        : (zoneOccupiedCount !== null ? t('ui.blast_workshop.footer.fire_reason_zone_occupied', { count: zoneOccupiedCount }) : null);
 
     const signature = JSON.stringify({ planCost, estValue, margin, fireOk, reason });
     if (signature === this.lastSignature) return;
