@@ -16,6 +16,7 @@ import {
   getVehicleDefByTier,
   getAllVehicleRoles,
 } from '../../src/core/entities/Vehicle.js';
+import type { VehicleTask } from '../../src/core/entities/Vehicle.js';
 import {
   createEmployeeState,
   hireEmployee,
@@ -44,7 +45,7 @@ import { createRunner, runCommand } from '../../src/console/createRunner.js';
  * so the fix is to fund the fixture, not to weaken the guard.
  */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '1000000' });
   return ctx;
 }
@@ -231,11 +232,12 @@ describe('Vehicle fleet', () => {
     tickVehicle(ctx.state!, v);
 
     // Should have moved debrisHaulerSpeed cells closer to target
-    if (v.task === 'moving') {
+    const taskAfterTick = v.task as VehicleTask;
+    if (taskAfterTick === 'moving') {
       expect(v.x).toBe(origX + debrisHaulerSpeed);
     }
     // If the vehicle arrived, task becomes 'idle' and x == targetX
-    if (v.task === 'idle') {
+    if (taskAfterTick === 'idle') {
       expect(v.x).toBe(origX + 4);
     }
   });
@@ -371,7 +373,7 @@ describe('Vehicle fleet', () => {
   // ── move without game context ──
 
   it('vehicle command errors when no game is loaded', () => {
-    const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
     const result = vehicleCommand(emptyCtx, ['list'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');

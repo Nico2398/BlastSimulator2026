@@ -11,7 +11,7 @@ import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '24' });
   return ctx;
 }
