@@ -123,6 +123,38 @@
       }
     },
     {
+      "command": "employee dispatch 1 x:20 z:20",
+      "description": "Walk the driller clear of the office it just built (#556). Construction relocates the builder off the finished footprint onto the nearest walkable tile — right up against the building — and the employee pick further down then lands on the office instead of the crew member, so the selection bar never offers DETAIL at all.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:20 z:20"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 25",
+      "description": "Let the driller finish that walk before the picking steps below.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
+      }
+    },
+    {
       "command": "state",
       "timeout": 30,
       "description": "Frame the building dead-centre, then hover it — the tag should appear once the 60ms debounce settles, showing the building's name and HP",
