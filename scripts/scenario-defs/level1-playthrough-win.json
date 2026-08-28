@@ -249,45 +249,6 @@
       "role": "bootstrap"
     },
     {
-      "command": "build freight_warehouse at:5,5",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 5,
-          "z": 5
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "description": "Finding #47 (unchanged): the only warehouse type is `freight_warehouse` (Building.ts/balance.ts). Placed at (5,5), outside the blast footprint -- see Finding #47's original note for the full reasoning (a first attempt closer to the blast site got destroyed by a blast's clear radius).",
-      "role": "player",
-      "expect": {
-        "equals": {
-          "buildingCount": 1
-        },
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
       "command": "vehicle driver 2 3",
       "interaction": [
         {
@@ -910,6 +871,66 @@
       "commandOutcome": "either"
     },
     {
+      "command": "build freight_warehouse at:5,5",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 5,
+          "z": 5
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Finding #47 (unchanged): the only warehouse type is `freight_warehouse` (Building.ts/balance.ts). Placed at (5,5), outside the blast footprint -- see Finding #47's original note for the full reasoning (a first attempt closer to the blast site got destroyed by a blast's clear radius). Ordered after the blast rather than before the drilling (#556). A construction site is open-pool work no skill gates, so a crew member — including the one driving the drill rig — claims it; ordered up front, the warehouse ate the drilling block this file checkpoints (0 of 4 holes landed in 60 ticks instead of 4). The warehouse is not read until the rubble_disposal delivery below, so it is ordered where it is needed.",
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 1
+        },
+        "decreased": [
+          "cash"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Run the warehouse ordered above out to a standing building (#556). Placed here rather than at the order: everything above is pinned to an exact tickCount, to the blast’s own outcome, or to the event that interrupts the tick block just before it, and the warehouse is not read until the hauling that feeds the rubble_disposal delivery below.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
       "command": "contract accept type:rubble_disposal",
       "interaction": [
         {
@@ -1030,11 +1051,12 @@
       "description": "tickCount converted to `changedBy` (issue #596): a plain 10-tick advance, not a running total worth pinning -- robust to upstream timing shifting the real-tick total this step starts from.",
       "expect": {
         "changedBy": {
-          "tickCount": 10
+          "tickCount": 8
         },
         "decreased": [
           "cash"
-        ]
+        ],
+        "note": "Advances 8 ticks, not 10 (#556): a random event falls due inside the block and a pending event stops the rest of a `tick`. The event beats around it moved with the warehouse construction this file now spends real ticks on."
       },
       "role": "setup"
     },
@@ -1152,7 +1174,7 @@
       "description": "#557: tickCount, deathCount, employeeCount, bankrupt, and levelEnded/levelEndReason all updated for the crew-size fix above (see the earlier hire step's own finding). tickCount settles at 150, not the pre-fix 160 -- the smaller crew's charge-wait (28 ticks, not 43) and different event timing shift the whole tail. deathCount 3 (driller #1, blaster #2, surveyor #6 -- the file's own two blasting-qualified employees plus the one bystander survey casualty; see the blast step's own #557 finding). employeeCount 6 (5 free staffed + 1 hired surveyor -- see the hire step's own finding for why the other 7 original hires are gone). `bankrupt`/`levelEnded`/`levelEndReason` are this step's real point now: this file's original crew (13 employees) burned payroll faster than dusty_hollow's budget and #553/#554's real drilling+charging time could recover from, seizing the mine by bankruptcy at cumulative tick 119 regardless of skill-level tuning (sandbox-confirmed across six crew configurations, none of which avoided it -- see the pre-fix file's own history). Hiring only what this file's own actions actually use (one surveyor, nothing else -- staffed:true's free crew already covers drilling/charging/hauling) keeps cash's one dip below the $5,000 threshold short of the 100-tick grace period every time, sandbox-confirmed end-to-end: `bankrupt` stays false all the way to this final step. The file still does not reach dusty_hollow's $80k profit target within its own scripted run (Profit: $0/$80,000, unchanged from before -- a second blast cycle was never in scope for this file, per Findings #45-51) -- but it no longer loses either: drilling, charging, sequencing, blasting (a genuinely truncated 4-of-16 pattern still rating PERFECT with hundreds of fragments), three real deaths, self-dispatched hauling (#552), and one full contract delivery all happen for real, and the mine survives to tell about it. cash is not hard-asserted at this final step -- Ground rule #12, a real browser's game loop advances on real wall-clock time on top of any scripted tick, same reasoning as every other post-blast cash omission in this file's history. activeContractCount is not hard-asserted either -- Finding #51's real command-mode-vs-browser divergence on `contract deliver`'s storage side effects.",
       "expect": {
         "equals": {
-          "tickCount": 150,
+          "tickCount": 170,
           "deathCount": 3,
           "employeeCount": 6,
           "bankrupt": false,
@@ -1162,7 +1184,8 @@
           "vehicleCount": 4,
           "holeCount": 0,
           "orderedHoleCount": 0
-        }
+        },
+        "note": "Closing tickCount re-measured 150 -> 170 (#556): the warehouse is built rather than placed, and the wait that runs its site out costs the run those ticks. Everything else this step pins — deaths, roster, bankruptcy and level-end state — is unchanged."
       },
       "role": "setup"
     }

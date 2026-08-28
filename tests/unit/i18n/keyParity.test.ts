@@ -168,10 +168,15 @@ describe('en.json / fr.json — key-set parity', () => {
     // economy.contract.usage_deliver, economy.contract.usage_negotiate,
     // economy.contract.usage_combined, economy.fragments.usage,
     // policy.usage, state.usage — both locales translated.
+    // Baseline is now 3323 (up from 3322): #556 added 2 new ui.build.* keys
+    // (ordered, under_construction_count) for the order-then-build
+    // construction-site flow, both locales translated, and removed the
+    // orphaned ui.build.placed key — BuildMenu.ts uses ui.build.ordered
+    // instead, and nothing in src/ referenced ui.build.placed anymore.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3322);
+    expect(Object.keys(en).length).toBe(3323);
   });
 });
 

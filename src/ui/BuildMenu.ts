@@ -76,6 +76,12 @@ export class BuildMenu {
    *  research hides the "Queue Research" button without changing cash,
    *  placed count, or unlockedTiers. */
   private lastResearchQueueSignature = '';
+  /** Serialized `plannedBuildings` contents for change detection (#556) —
+   *  a construction site starting or completing changes each catalog row's
+   *  under-construction count without changing cash or placed count. */
+  private lastPlannedBuildingsSignature = '';
+  /** Per-type under-construction count span, populated by makeCatalogRow. */
+  private readonly underConstructionEls = new Map<BuildingType, HTMLElement>();
   private readonly locale = new LocaleTextRegistry();
 
   constructor(container: HTMLElement) {
@@ -166,6 +172,20 @@ export class BuildMenu {
       this.refreshPlacedList(state.buildings.buildings);
     }
     if (unlockedChanged || queueChanged) this.refreshCatalogButtons(state.cash);
+
+    const plannedSig = state.plannedBuildings.map((pb) => `${pb.id}:${pb.type}`).join(',');
+    if (plannedSig !== this.lastPlannedBuildingsSignature) {
+      this.lastPlannedBuildingsSignature = plannedSig;
+      this.refreshUnderConstructionCounts(state);
+    }
+  }
+
+  /** Update each catalog row's "N under construction" count (#556). */
+  private refreshUnderConstructionCounts(state: GameState): void {
+    for (const [type, target] of this.underConstructionEls) {
+      const count = state.plannedBuildings.filter((pb) => pb.type === type).length;
+      target.textContent = count > 0 ? t('ui.build.under_construction_count', { count }) : '';
+    }
   }
 
   setStatus(msg: string): void {
@@ -309,7 +329,9 @@ export class BuildMenu {
   // ── Catalog (place new buildings) ──────────────────────────────────────────
 
   private buildCatalog(): void {
+    this.underConstructionEls.clear();
     this.catalogEl.replaceChildren(...getAllBuildingTypes().map((type) => this.makeCatalogRow(type)));
+    if (this.lastState) this.refreshUnderConstructionCounts(this.lastState);
   }
 
   private makeCatalogRow(type: BuildingType): HTMLElement {
@@ -337,7 +359,14 @@ export class BuildMenu {
       attrs: { style: 'font:500 10px/1 var(--bsx-font-mono);color:var(--bsx-text-micro);white-space:nowrap' },
     });
     this.updateCostDisplay(costEl, type, this.selectedTiers.get(type) ?? 1);
-    info.append(nameEl, costEl);
+
+    const constructionEl = el('span', {
+      className: 'bs-build-under-construction',
+      attrs: { style: 'font:500 9px/1.3 var(--bsx-font-mono);color:var(--bsx-text-micro)' },
+    });
+    this.underConstructionEls.set(type, constructionEl);
+
+    info.append(nameEl, costEl, constructionEl);
 
     // Tier selector
     const tierSel = el('select', { className: 'bs-build-tier-sel' });
@@ -363,7 +392,7 @@ export class BuildMenu {
         }
         this.armBuildingPointTool(type, tier, t(`building.${type}.t${tier}.name`), (x, z) => {
           const cmdResult = this.gameConsole?.(`build ${type} at:${x},${z} tier:${tier}`);
-          this.setStatus(cmdResult?.success ? t('ui.build.placed') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
+          this.setStatus(cmdResult?.success ? t('ui.build.ordered') : (cmdResult?.output ?? t('ui.build.invalid_placement')));
         });
       },
     });

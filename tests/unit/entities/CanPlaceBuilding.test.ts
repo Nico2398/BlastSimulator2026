@@ -4,10 +4,15 @@ import { describe, it, expect } from 'vitest';
 import {
   BUSY,
   canPlaceBuilding,
+  buildPlacementGrid,
+  createBuildingState,
+  type BuildingType,
+  type BuildingTier,
   type CanPlaceBuildingResult,
   type PlacementCell,
   type PlacementGrid,
 } from '../../../src/core/entities/Building.js';
+import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 // ── Test helper ───────────────────────────────────────────────────────────────
 
@@ -295,4 +300,118 @@ describe('canPlaceBuilding', () => {
     expect(result.reason).toBe('Out of bounds');
   });
 
+});
+
+// ── buildPlacementGrid — plannedBuildings occupy the grid too (#556) ─────────
+// A construction site under order (not yet a real Building) must block a
+// second placement the same way a finished building does — plannedBuildings
+// is the fourth, optional buildPlacementGrid param that marks its footprint
+// cells BUSY alongside the existing buildingState.buildings loop.
+//
+// Order-time validation and charging themselves (bounds/research/funds) are
+// exercised at the orderBuildingCommand/console level in
+// tests/integration/buildings.integration.test.ts — this file stays scoped to
+// the placement-grid mechanics, matching every other describe block above.
+
+function makeFilledVoxelGrid(sizeX: number, sizeY: number, sizeZ: number, fillUpToY: number): VoxelGrid {
+  const grid = new VoxelGrid(sizeX, sizeY, sizeZ);
+  for (let y = 0; y < fillUpToY; y++) {
+    for (let z = 0; z < sizeZ; z++) {
+      for (let x = 0; x < sizeX; x++) {
+        grid.setVoxel(x, y, z, { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 });
+      }
+    }
+  }
+  return grid;
+}
+
+describe('buildPlacementGrid — plannedBuildings mark BUSY (#556)', () => {
+  it('marks every cell under a plannedBuildings footprint as BUSY', () => {
+    const vg = makeFilledVoxelGrid(10, 4, 10, 2);
+    const state = createBuildingState();
+    const planned: Array<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [
+      { x: 2, z: 2, type: 'management_office', tier: 1 }, // 2x2 footprint -> (2,2)-(3,3)
+    ];
+
+    const pg = buildPlacementGrid(vg, state, planned);
+
+    expect(pg[2]![2]!.surfaceY).toBe(BUSY);
+    expect(pg[2]![3]!.surfaceY).toBe(BUSY);
+    expect(pg[3]![2]!.surfaceY).toBe(BUSY);
+    expect(pg[3]![3]!.surfaceY).toBe(BUSY);
+  });
+
+  it('leaves cells outside a plannedBuildings footprint untouched', () => {
+    const vg = makeFilledVoxelGrid(10, 4, 10, 2);
+    const state = createBuildingState();
+    const planned: Array<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [
+      { x: 2, z: 2, type: 'management_office', tier: 1 },
+    ];
+
+    const pg = buildPlacementGrid(vg, state, planned);
+
+    expect(pg[0]![0]!.surfaceY).not.toBe(BUSY);
+    expect(pg[5]![5]!.surfaceY).not.toBe(BUSY);
+  });
+
+  it('canPlaceBuilding rejects a placement overlapping a planned (under-construction) site', () => {
+    const vg = makeFilledVoxelGrid(10, 4, 10, 2);
+    const state = createBuildingState();
+    const planned: Array<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [
+      { x: 2, z: 2, type: 'management_office', tier: 1 },
+    ];
+
+    const pg = buildPlacementGrid(vg, state, planned);
+    const result = canPlaceBuilding(pg, 'management_office', 2, 2);
+
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('Space is occupied');
+  });
+
+  it('canPlaceBuilding still accepts a non-overlapping placement elsewhere on the same grid', () => {
+    const vg = makeFilledVoxelGrid(10, 4, 10, 2);
+    const state = createBuildingState();
+    const planned: Array<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [
+      { x: 2, z: 2, type: 'management_office', tier: 1 },
+    ];
+
+    const pg = buildPlacementGrid(vg, state, planned);
+    const result = canPlaceBuilding(pg, 'management_office', 6, 6);
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('multiple plannedBuildings entries each mark their own footprint', () => {
+    const vg = makeFilledVoxelGrid(20, 4, 20, 2);
+    const state = createBuildingState();
+    const planned: Array<{ x: number; z: number; type: BuildingType; tier: BuildingTier }> = [
+      { x: 2, z: 2, type: 'management_office', tier: 1 },
+      { x: 10, z: 10, type: 'freight_warehouse', tier: 1 }, // 4x4 footprint
+    ];
+
+    const pg = buildPlacementGrid(vg, state, planned);
+
+    expect(pg[2]![2]!.surfaceY).toBe(BUSY);
+    expect(pg[10]![10]!.surfaceY).toBe(BUSY);
+    expect(pg[13]![13]!.surfaceY).toBe(BUSY);
+  });
+
+  it('defaults plannedBuildings to [] when the 3rd argument is omitted (regression — pre-#556 callers)', () => {
+    const vg = makeFilledVoxelGrid(10, 4, 10, 2);
+    const state = createBuildingState();
+
+    const pg = buildPlacementGrid(vg, state);
+
+    expect(pg[2]![2]!.surfaceY).not.toBe(BUSY);
+  });
+
+  it('an empty plannedBuildings array behaves identically to omitting the argument', () => {
+    const vg = makeFilledVoxelGrid(10, 4, 10, 2);
+    const state = createBuildingState();
+
+    const withEmpty = buildPlacementGrid(vg, state, []);
+    const withOmitted = buildPlacementGrid(vg, state);
+
+    expect(withEmpty).toEqual(withOmitted);
+  });
 });

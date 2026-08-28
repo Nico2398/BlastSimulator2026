@@ -265,7 +265,7 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       },
       "role": "player"
@@ -403,6 +403,27 @@
           "worldSizeX"
         ],
         "note": "#553: orderedHoleCount, not holeCount -- this hole is never drilled in this file (no wait follows), it only needs to be ordered for the site-expansion claim and the save/load round-trip below to happen; claimForAction (siteExpansion.ts) expands the site at order time regardless of drilling."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Run the office ordered above out to a standing building before the save (#556). Placed here rather than at the order so the blast beats between the two keep the tick trajectory the file measured them at.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
       }
     },
     {

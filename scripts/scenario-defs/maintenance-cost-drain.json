@@ -28,6 +28,33 @@
       "role": "observe"
     },
     {
+      "command": "employee hire role:driller",
+      "description": "Hired first (#556): a build order is queued work now, so the two orders below need someone on the roster to walk over and build them. A single hire rather than staffed:true, which would also land four vehicles and move the fleet count this scenario asserts. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
       "command": "build freight_warehouse at:5,5",
       "interaction": [
         {
@@ -59,7 +86,7 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       }
     },
@@ -91,7 +118,28 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
         }
       }
     },

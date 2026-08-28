@@ -586,6 +586,53 @@ describe('tickEmployees — cost-based dispatch and per-employee task queues (#5
     expect(stillReservedB.status).toBe('assigned');
     expect(stillReservedB.holderId).toBe(employee.id);
   });
+
+  it('#816: an idle employee whose own taskQueue holds one permanently-unreachable action falls through to the open pool instead of freezing forever', () => {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeFlatNavGrid(30, 5);
+    blockColumn(state.navGrid, 3); // walls off x>=3 from the employee's own column
+    const rng = new Random(SEED);
+    const { employee } = hireEmployee(state.employees, 'blaster', rng, 0, 0);
+
+    // Simulates the exact stale shape #816 traced (autoInsertNeedTasks
+    // inserting a targeted 'rest' action whose 'rest in place' target later
+    // becomes unreachable, e.g. a place_building footprint closing over it):
+    // an already-'assigned', still-holderId-matching action sitting in this
+    // employee's own taskQueue, whose target is unreachable this tick and
+    // every tick after (not a one-tick fluke — genuinely walled off).
+    const staleQueued = makeAction({
+      id: 1, targetX: 10, targetZ: 0, status: 'assigned', holderId: employee.id,
+    });
+    const openPoolCandidate = makeAction({ id: 2, targetX: 1, targetZ: 0 });
+    state.pendingActions.push(staleQueued, openPoolCandidate);
+    employee.taskQueue = [staleQueued.id];
+
+    // Before the fix, fillIdleEmployeeFromQueueOrPool returned as soon as the
+    // one taskQueue candidate came back unreachable, never trying the open
+    // pool at all — the employee stayed idle forever with a fully claimable
+    // action sitting untouched right next to them.
+    for (let i = 0; i < 5; i++) {
+      tickEmployees(state);
+      tickEmployeeMovement(state);
+      tickArrivalGate(state);
+      if (employee.activeActionId === openPoolCandidate.id) break;
+    }
+
+    expect(employee.activeActionId).toBe(openPoolCandidate.id);
+    const pool = state.pendingActions.find(a => a.id === openPoolCandidate.id)!;
+    // 'assigned' (claimed, still walking) or 'in_progress' (already arrived
+    // and working, reachable target is one cell away) — either proves the
+    // fall-through claimed it, not which tick within the settle loop did so.
+    expect(['assigned', 'in_progress']).toContain(pool.status);
+    expect(pool.holderId).toBe(employee.id);
+
+    // The stale entry is retried, not dropped — still sitting in
+    // pendingActions/taskQueue, available to resume automatically if its
+    // target ever becomes reachable again (a blast reopening it, etc.).
+    const stale = state.pendingActions.find(a => a.id === staleQueued.id)!;
+    expect(stale.status).toBe('assigned');
+    expect(stale.holderId).toBe(employee.id);
+  });
 });
 
 describe('tickEmployees — task duration seeding on claim (Ch.3 skill progression, issue #406)', () => {

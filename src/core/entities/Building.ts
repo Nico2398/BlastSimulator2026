@@ -182,6 +182,9 @@ export function isPlacementBlockedByResearch(
  * `originX`/`originZ` its west/north edges — which are no longer always 0,
  * since a site that has been claimed westward or northward starts at negative
  * coordinates (#473).
+ *
+ * `reservedId`, when given, is the id already claimed for this building at order
+ * time (#556); omitted, the next id is allocated here as it always was.
  */
 export function placeBuilding(
   state: BuildingState,
@@ -193,31 +196,43 @@ export function placeBuilding(
   tier: BuildingTier = 1,
   originX: number = 0,
   originZ: number = 0,
+  reservedId?: number,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
-  const { sizeX, sizeZ } = getDefSize(def);
 
   if (isPlacementBlockedByResearch(state, type, tier)) {
     return { success: false, error: `Tier ${tier} ${type} is not researched — research required before placement.` };
   }
 
-  if (x < originX || z < originZ || x + sizeX > originX + gridSizeX || z + sizeZ > originZ + gridSizeZ) {
-    return { success: false, error: 'Out of bounds' };
-  }
-
-  if (isOccupied(state, x, z, sizeX, sizeZ)) {
-    return { success: false, error: 'Space is occupied' };
+  const check = checkFootprintPlacement(
+    state.buildings.map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
+    type, x, z, tier, gridSizeX, gridSizeZ, originX, originZ,
+  );
+  if (!check.valid) {
+    return { success: false, error: check.error! };
   }
 
   const building: Building = {
-    id: state.nextId++,
+    // `reservedId` is the id claimed when the building was ORDERED (#556). Sites
+    // are built in parallel and finish in whatever order the crew reaches them,
+    // so allocating here would number buildings by completion rather than by the
+    // order the player placed them — two orders back to back could come out with
+    // their ids swapped, and every id the player then typed (`build destroy 1`,
+    // `employee train … building:1`) would name the other building.
+    id: reservedId ?? state.nextId++,
     type,
     tier,
     x, z,
     hp: def.maxHp,
     active: true,
   };
-  state.buildings.push(building);
+  // Keep the array ordered by id. With ids claimed at order time (#556) and
+  // sites finishing in whatever order the crew reaches them, a plain push would
+  // leave `buildings` in completion order — so `build list` and the Build panel,
+  // which both just walk the array, would show the player 2, 1, 4, 3.
+  const at = state.buildings.findIndex(b => b.id > building.id);
+  if (at === -1) state.buildings.push(building);
+  else state.buildings.splice(at, 0, building);
 
   return { success: true, building, cost: def.constructionCost };
 }
@@ -272,7 +287,13 @@ export function getMoveCost(building: Building): number {
   return Math.round(getBuildingDef(building.type, building.tier).constructionCost * 0.5);
 }
 
-/** Move a building to new coordinates. Returns relocation cost (50% of construction). */
+/**
+ * Move a building to new coordinates. Returns relocation cost (50% of
+ * construction). `plannedOccupants` (#556, sites under construction —
+ * `GameState.plannedBuildings`) are checked alongside live buildings so a
+ * move cannot land on a site still being built; callers that have no
+ * planned-buildings list may omit it.
+ */
 export function moveBuilding(
   state: BuildingState,
   buildingId: number,
@@ -282,19 +303,21 @@ export function moveBuilding(
   gridSizeZ: number,
   originX: number = 0,
   originZ: number = 0,
+  plannedOccupants: ReadonlyArray<FootprintOccupant> = [],
 ): PlaceBuildingResult {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building) return { success: false, error: 'Building not found' };
 
-  const def = getBuildingDef(building.type, building.tier);
-  const { sizeX, sizeZ } = getDefSize(def);
-
-  if (newX < originX || newZ < originZ || newX + sizeX > originX + gridSizeX || newZ + sizeZ > originZ + gridSizeZ) {
-    return { success: false, error: 'Out of bounds' };
-  }
-
-  if (isOccupied(state, newX, newZ, sizeX, sizeZ, building.id)) {
-    return { success: false, error: 'Space is occupied' };
+  const occupants: FootprintOccupant[] = [
+    ...state.buildings.filter(b => b.id !== buildingId).map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
+    ...plannedOccupants,
+  ];
+  const check = checkFootprintPlacement(
+    occupants,
+    building.type, newX, newZ, building.tier, gridSizeX, gridSizeZ, originX, originZ,
+  );
+  if (!check.valid) {
+    return { success: false, error: check.error! };
   }
 
   building.x = newX;
@@ -361,24 +384,55 @@ export function findNearestActiveBuildingOfType(
   return nearest;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Construction site footprint checks (#556) ────────────────────────────────
 
-function isOccupied(
-  state: BuildingState,
-  x: number, z: number,
-  sizeX: number, sizeZ: number,
-  excludeId?: number,
-): boolean {
-  for (const b of state.buildings) {
-    if (excludeId !== undefined && b.id === excludeId) continue;
-    const def = getBuildingDef(b.type, b.tier);
-    const { sizeX: bSX, sizeZ: bSZ } = getDefSize(def);
-    if (x < b.x + bSX && x + sizeX > b.x &&
-        z < b.z + bSZ && z + sizeZ > b.z) {
-      return true;
+/**
+ * An occupant of the placement grid for `checkFootprintPlacement` purposes —
+ * either a live `Building` or a still-under-construction `PlannedBuilding`
+ * (`GameState.ts`), reduced to the fields footprint overlap needs.
+ */
+export interface FootprintOccupant {
+  type: BuildingType;
+  tier: BuildingTier;
+  x: number;
+  z: number;
+}
+
+/**
+ * Whether a building of `type`/`tier` can be placed at (x, z) given the
+ * current occupants (live buildings AND planned-but-not-yet-built ones) —
+ * bounds + occupancy check shared by `placeBuilding` and the new
+ * order-then-build path. Stub: implementation phase moves the real checks
+ * here from `placeBuilding`'s inline bounds/`isOccupied` calls.
+ */
+export function checkFootprintPlacement(
+  occupants: ReadonlyArray<FootprintOccupant>,
+  type: BuildingType,
+  x: number,
+  z: number,
+  tier: BuildingTier,
+  gridSizeX: number,
+  gridSizeZ: number,
+  originX: number,
+  originZ: number,
+): { valid: boolean; error?: string } {
+  const def = getBuildingDef(type, tier);
+  const { sizeX, sizeZ } = getDefSize(def);
+
+  if (x < originX || z < originZ || x + sizeX > originX + gridSizeX || z + sizeZ > originZ + gridSizeZ) {
+    return { valid: false, error: 'Out of bounds' };
+  }
+
+  for (const occ of occupants) {
+    const occDef = getBuildingDef(occ.type, occ.tier);
+    const { sizeX: oSX, sizeZ: oSZ } = getDefSize(occDef);
+    if (x < occ.x + oSX && x + sizeX > occ.x &&
+        z < occ.z + oSZ && z + sizeZ > occ.z) {
+      return { valid: false, error: 'Space is occupied' };
     }
   }
-  return false;
+
+  return { valid: true };
 }
 
 // ── Re-exports from sub-modules ──────────────────────────────────────────────

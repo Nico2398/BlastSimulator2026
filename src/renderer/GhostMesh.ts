@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { GhostPreview } from '../core/state/GameState.js';
+import { getFootprintSize } from '../core/entities/Building.js';
 
 // ---------- Config ----------
 
@@ -128,6 +129,25 @@ export class GhostMesh {
         // Update material in place on a claimed/unclaimed transition —
         // never recreate the mesh for this.
         if (existing.material !== targetMaterial) existing.material = targetMaterial;
+        continue;
+      }
+
+      // A `place_building` ghost carries its real footprint (#556) — size and
+      // center the box to the site's full bounding box instead of the fixed
+      // single-point cube every other action type still gets. Mirrors how
+      // BuildingMesh.ts centers a real building's box on its own footprint:
+      // group position at (x + sizeX/2, z + sizeZ/2), box sized sizeX x sizeZ.
+      if (preview.footprint) {
+        const { sizeX, sizeZ } = getFootprintSize(preview.footprint);
+        const geo = new THREE.BoxGeometry(sizeX, GHOST_SIZE, sizeZ);
+        const mesh = new THREE.Mesh(geo, targetMaterial);
+        mesh.position.set(
+          preview.targetX + sizeX / 2,
+          preview.targetY + GHOST_SIZE / 2,
+          preview.targetZ + sizeZ / 2,
+        );
+        this.scene.add(mesh);
+        this.meshes.set(preview.id, mesh);
         continue;
       }
 

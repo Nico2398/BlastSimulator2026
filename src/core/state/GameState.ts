@@ -20,7 +20,7 @@ import type { ContractState } from '../economy/Contract.js';
 import { createContractState } from '../economy/Contract.js';
 import type { LogisticsState } from '../economy/Logistics.js';
 import { createLogisticsState } from '../economy/Logistics.js';
-import type { BuildingState, Building } from '../entities/Building.js';
+import type { BuildingState, Building, BuildingType, BuildingTier } from '../entities/Building.js';
 import { createBuildingState } from '../entities/Building.js';
 import { NavGrid } from '../nav/NavGrid.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
@@ -77,7 +77,11 @@ import type { RampDef } from '../mining/Ramp.js';
 // `nextPlannedRampId: number` (#555 ramp excavation becomes work — a ramp
 // order queues one `dig_ramp_segment` action per segment instead of carving
 // voxels into the grid instantly). See SaveLoad.ts's migrateV12ToV13 stub.
-export const SAVE_VERSION = 13;
+// v13 -> v14: GameState gained `plannedBuildings: PlannedBuilding[]` and
+// `nextPlannedBuildingId: number` (#556 construction sites — placing a
+// building queues one `place_building` action at the target instead of
+// creating the building instantly). See SaveLoad.ts's migrateV13ToV14 stub.
+export const SAVE_VERSION = 14;
 
 export interface GameConfig {
   seed: number;
@@ -128,6 +132,12 @@ export interface GhostPreview {
   targetY: number;
   /** True once an employee has claimed the underlying action (#547). */
   claimed: boolean;
+  /**
+   * Footprint cells (as [dx, dz] offsets from targetX/targetZ) for a
+   * `place_building` ghost — lets the renderer draw the full site outline
+   * instead of a single point (#556). Absent for every other action type.
+   */
+  footprint?: ReadonlyArray<readonly [number, number]>;
 }
 
 /** A pending action waiting for a qualified employee to execute it. */
@@ -166,6 +176,27 @@ export interface PlannedRamp {
   def: RampDef;
   footprint: { minX: number; maxX: number; minZ: number; maxZ: number };
   segments: RampSegmentTracker[];
+}
+
+/**
+ * A building ordered but not yet built — queues one `place_building` action
+ * and lands in `BuildingState.buildings` on completion (#556, mirrors
+ * PlannedRamp's order-then-work pattern).
+ */
+export interface PlannedBuilding {
+  id: number;
+  /**
+   * The id the finished building will carry, claimed from `BuildingState.nextId`
+   * at order time so buildings are numbered in the order the player placed them
+   * rather than in the order the crew happened to finish them.
+   */
+  buildingId: number;
+  type: BuildingType;
+  tier: BuildingTier;
+  x: number;
+  z: number;
+  actionId: number;
+  cost: number;
 }
 
 /**
@@ -294,6 +325,10 @@ export interface GameState {
   plannedRamps: PlannedRamp[];
   /** Next ID to assign to a newly created PlannedRamp. */
   nextPlannedRampId: number;
+  /** Buildings ordered but not yet built — each queues one `place_building` action and lands in `buildings.buildings` on completion (#556). */
+  plannedBuildings: PlannedBuilding[];
+  /** Next ID to assign to a newly created PlannedBuilding. */
+  nextPlannedBuildingId: number;
 }
 
 export interface WorldState {
@@ -400,6 +435,8 @@ export function createGame(config: GameConfig): GameState {
     tubingState: createTubingState(),
     plannedRamps: [],
     nextPlannedRampId: 1,
+    plannedBuildings: [],
+    nextPlannedBuildingId: 1,
   };
 
   if (config.staffed) {

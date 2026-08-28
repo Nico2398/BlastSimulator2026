@@ -4,10 +4,10 @@
 // Issue #333
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { makeCampaignCtx } from './helpers.js';
+import { makeCampaignCtx, driveConstructionToCompletion } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
 import { surveyCommand } from '../../../src/console/commands/world.js';
-import { buildCommand } from '../../../src/console/commands/entities.js';
+import { buildCommand, employeeCommand } from '../../../src/console/commands/entities.js';
 import { buildRampCommand } from '../../../src/console/commands/mining.js';
 import {
   buildPlacementGrid,
@@ -18,6 +18,7 @@ import { getDominantRockId } from '../../../src/core/world/VoxelGrid.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
+import { HIRING_COSTS } from '../../../src/core/config/balance.js';
 
 const DESERT_ROCKS = ['cruite', 'sandite', 'molite'];
 
@@ -122,12 +123,24 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     const spot = findBuildableSpot(ctx, 'freight_warehouse', 1, WAREHOUSE_REGION);
     expect(spot).not.toBeNull();
 
-    // ── Act: place the building ──
+    // #556: confirming a placement only queues a construction site — an idle
+    // employee must exist to finish it before it becomes a real building.
+    const hireBuilder = employeeCommand(ctx, ['hire'], { role: 'manager' });
+    expect(hireBuilder.success).toBe(true);
+
+    // ── Act: order the building ──
     const result: CommandResult = buildCommand(ctx, ['freight_warehouse'], { at: `${spot!.x},${spot!.z}` });
 
-    // Assert: command succeeds
+    // Assert: command succeeds — order confirmation, not an instant build.
     expect(result.success).toBe(true);
-    expect(result.output).toContain('Built freight_warehouse');
+    expect(result.output).toContain('freight_warehouse T1 ordered');
+
+    // Nothing is built yet — only queued.
+    expect(ctx.state!.buildings.buildings.length).toBe(0);
+    expect(ctx.state!.plannedBuildings.length).toBe(1);
+
+    // Drive construction to completion.
+    driveConstructionToCompletion(ctx);
 
     // Building exists in state
     expect(ctx.state!.buildings.buildings.length).toBe(1);
@@ -137,8 +150,11 @@ describe('Tutorial Level Terrain Coordinates (Issue #333)', () => {
     expect(building.type).toBe('freight_warehouse');
     expect(building.tier).toBe(1);
 
-    // Construction cost deducted from cash
-    expect(ctx.state!.cash).toBe(TUTORIAL_START_CASH - 15000);
+    // Construction cost + the builder's hiring cost deducted from cash, at
+    // minimum — the exact figure also includes payroll/upkeep for however
+    // many ticks the walk + build actually took, which varies with the
+    // buildable spot found above.
+    expect(ctx.state!.cash).toBeLessThanOrEqual(TUTORIAL_START_CASH - 15000 - HIRING_COSTS.manager);
   });
 
   // ── Test 3: Ramp construction ─────────────────────────────────────────────

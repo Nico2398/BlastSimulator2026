@@ -100,6 +100,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     (s) => countBuildingsOfType(s, 'living_quarters'),
     ['build living_quarters at:18,14'],
     TOOLBAR_TARGET.build,
+    // #556: ordering a building is queued work now — a site goes up over
+    // BUILDING_CONSTRUCTION_BASE_DURATION_TICKS plus the walk to it, so without
+    // waitsOnWork this step's clock is held the moment the default budget
+    // elapses and the tutorial never advances past it. Same budget and reason as
+    // build-storage below, whose own comment carries the arithmetic.
+    { tickBudget: 60, waitsOnWork: true },
   ),
 
   // ── Step 3a-ii: set-early-policy ──
@@ -149,6 +155,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     (s) => countBuildingsOfType(s, 'driving_center'),
     ['build driving_center at:10,8'],
     TOOLBAR_TARGET.build,
+    // #556: ordering a building is queued work now — a site goes up over
+    // BUILDING_CONSTRUCTION_BASE_DURATION_TICKS plus the walk to it, so without
+    // waitsOnWork this step's clock is held the moment the default budget
+    // elapses and the tutorial never advances past it. Same budget and reason as
+    // build-storage below, whose own comment carries the arithmetic.
+    { tickBudget: 60, waitsOnWork: true },
   ),
 
   // ── Step 3c: train-driller ──
@@ -383,12 +395,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // ── Step 10: hire-manager ──
   createHireStepWithEventGuard('hire-manager', 'tutorial.step11.title', 'tutorial.step11', 'manager'),
 
-  // ── Step 11: contract-accept ──
-  // Offers are regenerated on a timer and the oldest is dropped, so the list
-  // rearranges itself under a player who is reading it. Hold the clock almost
-  // immediately: nothing about choosing an offer needs time to pass.
-  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contract accept 1'], TOOLBAR_TARGET.contracts, { tickBudget: 1 }),
-
   // ── Step 12: hire-driver ──
   createHireStep('hire-driver', 'tutorial.step13.title', 'tutorial.step13', 'driver'),
 
@@ -434,7 +440,31 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   // ── Step 14: build-storage ──
-  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:6,6'], TOOLBAR_TARGET.build),
+  // #556: placing a building is no longer instant -- confirming the order
+  // queues a `place_building` action (BUILDING_CONSTRUCTION_BASE_DURATION_TICKS
+  // for a tier-1 warehouse) that an employee has to walk to and
+  // work before the freight_warehouse count actually moves. Without
+  // waitsOnWork the rail's clock-hold (tutorialGuide.ts's decideClock) treats
+  // the step as already resolved and stalls waiting on a count that hasn't
+  // changed yet -- same gap 'drill-plan'/'charge'/'sequence' document above.
+  // tickBudget 60 comfortably clears the build plus walk time.
+  createComparisonStep('build-storage', 'tutorial.step15.title', 'tutorial.step15', (s) => countBuildingsOfType(s, 'freight_warehouse'), ['build freight_warehouse at:6,6'], TOOLBAR_TARGET.build, { tickBudget: 60, waitsOnWork: true }),
+
+  // ── contract-accept ──
+  // Moved below build-storage (#556). A contract's deadline starts running the
+  // moment it is accepted (`acceptedAtTick`, Contract.ts) and a rubble_disposal
+  // offer's own deadline is at most 100 ticks (`rng.nextInt(30, 100)`), while
+  // ordering the warehouse is real queued work now: accepting first spent a
+  // large part of that deadline watching a site go up, and since contract-deliver
+  // only advances on a genuinely COMPLETED delivery, a contract that expired in
+  // the meantime left the tutorial card stuck at contract-deliver with no way
+  // forward — a dead end for a real player, not just a failing assertion
+  // (issue #817). Storage before the promise is also the better lesson: you
+  // need somewhere to put the rock before committing to a deadline to remove it.
+  // Offers are regenerated on a timer and the oldest is dropped, so the list
+  // rearranges itself under a player who is reading it. Hold the clock almost
+  // immediately: nothing about choosing an offer needs time to pass.
+  createComparisonStep('contract-accept', 'tutorial.step12.title', 'tutorial.step12', (s) => (s.contracts?.active ?? []).length, ['contract accept 1'], TOOLBAR_TARGET.contracts, { tickBudget: 1 }),
 
   // ── Step 14b: haul-debris ──
   // Fires when stored mass increases — the same "value went up" pattern every

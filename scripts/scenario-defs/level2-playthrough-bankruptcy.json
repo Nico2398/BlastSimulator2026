@@ -1,6 +1,6 @@
 {
   "name": "level2-playthrough-bankruptcy",
-  "description": "Level 2 (Grumpstone Ridge) bankruptcy scenario: buy a management office, a five-vehicle fleet and a ten-strong crew, blast nothing, collapse. `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default on a fresh campaign) -- the run continues against the substitute new_game world instead, same class as the already-documented level3-playthrough-ecology.json/treranium_depths issue; see Finding #58. That is why the funding cheat is on `new_game` here rather than on `campaign start`. The run is funded to exactly the shopping list ($185,800), so every purchase is a click a real player could make and the spree ends on exactly $0 -- under the $5,000 BANKRUPTCY_THRESHOLD from the first tick, with BANKRUPTCY_GRACE_TICKS = 100 ticks of payroll and upkeep and no income finishing the job. The named bankruptcy outcome is unchanged and still real: levelEndReason:'bankruptcy' fires at tick 100, reported by the tick-105 step.",
+  "description": "Level 2 (Grumpstone Ridge) bankruptcy scenario: buy a management office, a five-vehicle fleet and a ten-strong crew, blast nothing, collapse. `campaign start level:grumpstone_ridge` fails outright (tier-2, locked by default on a fresh campaign) -- the run continues against the substitute new_game world instead, same class as the already-documented level3-playthrough-ecology.json/treranium_depths issue; see Finding #58. That is why the funding cheat is on `new_game` here rather than on `campaign start`. The run is funded to exactly the shopping list ($185,800), so every purchase is a click a real player could make and the spree ends on exactly $0 -- under the $5,000 BANKRUPTCY_THRESHOLD from the first tick, with BANKRUPTCY_GRACE_TICKS = 100 ticks of payroll and upkeep and no income finishing the job. The named bankruptcy outcome is unchanged and still real: levelEndReason:'bankruptcy' fires at tick 100, reported by the tick-105 step. #556: the management office is ordered at tick 0 and stands from ~tick 45, when the crew hired below finally exists to build it — the file spends no ticks at all before then. Its maintenance therefore starts three tick blocks later than it used to, and every score checkpoint here has been re-measured against the real run: the safety and ecology drift the file used to record came from building-conditioned events resolving differently against a site than against a standing office, and now holds at the 50 baseline at several beats. The tick trajectory, deathCount 0, and the bankruptcy itself (tick 105, levelEndReason \"bankrupt\") are unchanged — those are what this file exists to pin.",
   "steps": [
     {
       "command": "new_game seed:2277 cash:185800",
@@ -773,7 +773,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7050
+          "cash": -6990
         }
       }
     },
@@ -820,7 +820,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7050
+          "cash": -6990
         }
       }
     },
@@ -867,7 +867,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7050
+          "cash": -6990
         }
       }
     },
@@ -932,8 +932,8 @@
           "tickCount": 30,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 63.20000000000009,
-          "safety": 63.500000000000085,
+          "wellBeing": 62.81000000000009,
+          "safety": 50,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -964,7 +964,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7175
+          "cash": -7127
         }
       }
     },
@@ -1123,8 +1123,8 @@
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 99.95,
-          "safety": 83.75000000000021,
+          "wellBeing": 99.6080000000004,
+          "safety": 66.6500000000001,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -1194,7 +1194,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -70625,
+          "cash": -70397,
           "tickCount": 105,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1314,7 +1314,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 99.95,
+          "safety": 86.90000000000023,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1499,9 +1499,9 @@
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 99.95,
+          "wellBeing": 99.944,
           "safety": 99.95,
-          "ecology": 57.25000000000004,
+          "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
@@ -1637,9 +1637,9 @@
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 97.22000000000004,
+          "wellBeing": 95.77400000000003,
           "safety": 99.95,
-          "ecology": 56.2500000000001,
+          "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
@@ -1662,9 +1662,9 @@
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 97.22000000000004,
+          "wellBeing": 95.77400000000003,
           "safety": 99.95,
-          "ecology": 56.2500000000001,
+          "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,
@@ -1687,9 +1687,9 @@
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 97.22000000000004,
+          "wellBeing": 95.77400000000003,
           "safety": 99.95,
-          "ecology": 56.2500000000001,
+          "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
           "levelEnded": true,

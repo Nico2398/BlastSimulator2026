@@ -3,12 +3,12 @@
   "description": "Tests minimap integration with navgrid overlay showing cell types",
   "steps": [
     {
-      "command": "new_game seed:42 cash:70000 staffed:true",
-      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped from the default $50,000 to $70,000 so the site stays comfortably clear of BANKRUPTCY_THRESHOLD ($5,000) through the ~140-tick wait below plus the two offices and the hire after it (no income anywhere in this file).",
+      "command": "new_game seed:42 cash:95000 staffed:true",
+      "description": "Staffed opening (#551): a driller with blasting + drill_rig licence, plus an unmanned drill_rig, are hired/purchased for free at game-open — #553's automatic drill dispatch needs both to ever land an ordered hole. Cash bumped from the default $50,000 to $70,000 so the site stays comfortably clear of BANKRUPTCY_THRESHOLD ($5,000) through the ~140-tick wait below plus the two offices and the hire after it (no income anywhere in this file). Opening cash raised 70000 -> 95000 (#556): the two offices are queued construction now, and the staffed roster draws salary across the ticks that build them, which used to leave the hire below its own $1,000 price.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 cash:70000 staffed:true"
+          "command": "new_game seed:42 cash:95000 staffed:true"
         },
         {
           "type": "keypress",
@@ -18,7 +18,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 70000,
+          "cash": 95000,
           "buildingCount": 0,
           "holeCount": 0
         }
@@ -111,7 +111,7 @@
       ],
       "role": "player",
       "expect": {
-        "increased": ["buildingCount"],
+        "increased": ["orderedBuildingCount"],
         "changedBy": {
           "cash": -8000
         },
@@ -148,9 +148,30 @@
       ],
       "role": "player",
       "expect": {
-        "increased": ["buildingCount"],
+        "increased": ["orderedBuildingCount"],
         "changedBy": {
           "cash": -8000
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
         }
       }
     },

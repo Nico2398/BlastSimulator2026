@@ -20,6 +20,73 @@
       }
     },
     {
+      "command": "employee hire role:driller",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 1
+        }
+      },
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+    },
+    {
+      "command": "employee hire role:blaster",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 2
+        }
+      },
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+    },
+    {
+      "command": "employee hire role:driver",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": ["cash"],
+        "equals": {
+          "employeeCount": 3
+        }
+      },
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+    },
+    {
       "command": "build research_center at:30,5",
       "description": "Placed before any research is queued — a placed research_center is a hard prerequisite (#442) to queue a research task at all.",
       "interaction": [
@@ -50,11 +117,30 @@
       ],
       "role": "player",
       "expect": {
-        "equals": {
-          "buildingCount": 1
-        },
         "changedBy": {
           "cash": -25000
+        },
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before the Queue Research click below depends on hasActiveResearchCenter seeing a real building."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the Research Center site to completion (#556).",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -85,10 +171,32 @@
       "role": "player",
       "expect": {
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 1,
+          "buildingCount": 1
         },
         "changedBy": {
           "cash": -10000
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -154,9 +262,31 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 3
+          "orderedBuildingCount": 1,
+          "buildingCount": 2
         },
         "note": "cash uses decreased, not equals, because this build follows a tick step — real browser interaction mode keeps ticking on wall-clock time (Finding #12), so the exact post-tick cash value can drift"
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
+        }
       }
     },
     {
@@ -219,7 +349,29 @@
       "expect": {
         "decreased": ["cash"],
         "equals": {
-          "buildingCount": 4
+          "orderedBuildingCount": 1,
+          "buildingCount": 3
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:4 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 4,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 4,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -232,70 +384,6 @@
         }
       ],
       "role": "observe"
-    },
-    {
-      "command": "employee hire role:driller",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": ["cash"],
-        "equals": {
-          "employeeCount": 1
-        }
-      }
-    },
-    {
-      "command": "employee hire role:blaster",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"blaster\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": ["cash"],
-        "equals": {
-          "employeeCount": 2
-        }
-      }
-    },
-    {
-      "command": "employee hire role:driver",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driver\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": ["cash"],
-        "equals": {
-          "employeeCount": 3
-        }
-      }
     },
     {
       "command": "employee list",

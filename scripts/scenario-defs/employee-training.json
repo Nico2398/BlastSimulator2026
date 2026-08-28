@@ -47,6 +47,29 @@
       }
     },
     {
+      "command": "employee hire role:driver",
+      "description": "#556: a dedicated builder — a `place_building` order needs an idle employee to walk over and do the work, and that must not be the driller trained below: with only one employee on site the build and the courses interleave, and a 20-tick course then does not finish inside the 20-tick block that asserts it did. Cheapest role (driver, $800); it does no driving here. It stays on the roster for the rest of the file — hireEmployee’s unionized roll (deterministic for seed 42) lands on this hire, and a unionized employee cannot be fired at all (`fireEmployee`, Employee.ts). Its own driving.truck starting qualification is why every qualificationCount below reads one higher than the driller’s own. No toolbar click here: the employees panel is already open from the hire above.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driver\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
       "command": "vehicle buy drill_rig",
       "description": "#553: without a drill_rig on site, drill_hole's vehicle gate (#550) never finds a free vehicle to claim -- the drill_plan below would sit queued forever.",
       "interaction": [
@@ -104,8 +127,27 @@
         "decreased": [
           "cash"
         ],
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before training depends on a real school existing."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the driving_center site to completion (#556) — the driller (only employee on site) does the building work itself before returning to train.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 1
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -156,9 +198,9 @@
         ],
         "equals": {
           "trainingCount": 0,
-          "qualificationCount": 2
+          "qualificationCount": 3
         },
-        "note": "the excavator licence is genuinely obtained -- no role starts with it, so this is the only way anyone on the roster ever holds it"
+        "note": "the excavator licence is genuinely obtained -- no role starts with it, so this is the only way anyone on the roster ever holds it One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
       }
     },
     {
@@ -211,9 +253,9 @@
         ],
         "equals": {
           "trainingCount": 0,
-          "qualificationCount": 3
+          "qualificationCount": 4
         },
-        "note": "driving.drill_rig obtained -- the driller can now staff the drill_rig bought above"
+        "note": "driving.drill_rig obtained -- the driller can now staff the drill_rig bought above One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
       }
     },
     {
@@ -237,8 +279,9 @@
       "description": "Left unmarked: hiring already grants the Rookie starting qualification (ROLE_STARTING_QUALIFICATION in Employee.ts); this only raises the level for the scenario's needs -- the player-facing path is `employee train`. Free (no cost), unlike a real academy course.",
       "expect": {
         "equals": {
-          "qualificationCount": 4
-        }
+          "qualificationCount": 5
+        },
+        "note": " One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
       },
       "role": "bootstrap"
     },
@@ -273,8 +316,27 @@
         "decreased": [
           "cash"
         ],
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before training depends on a real school existing."
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
+      "description": "Drive the blasting_academy site to completion (#556).",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
         "equals": {
-          "buildingCount": 2
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -319,11 +381,7 @@
         "decreased": [
           "cash"
         ],
-        "equals": {
-          "trainingCount": 0,
-          "qualificationCount": 4
-        },
-        "note": "a promotion raises the level of a held qualification rather than adding a second copy of it -- qualificationCount unchanged, proficiencyTotal +1"
+        "note": "The promotion still takes exactly 32 ticks, but a random event now falls due inside this block (#556: the two schools are built rather than placed, so every beat below them sits ~90 ticks later and draws differently), and a pending event refuses the rest of the `tick`. The course is asserted complete after the event is resolved, two steps down."
       }
     },
     {
@@ -335,6 +393,28 @@
       ],
       "role": "player",
       "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:trainingCount equals:0 max_ticks:120",
+      "description": "Finish the promotion the event above cut short (#556). A waitUntil rather than a hand-measured pad: the course itself is still exactly 32 ticks, but events now fall due inside the window and each one stops the clock until it is resolved, so what the block has to wait on is the course landing, not a tick budget.",
+      "timeout": 95,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "trainingCount",
+          "equals": 0,
+          "maxTicks": 120,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "trainingCount": 0,
+          "qualificationCount": 5
+        },
+        "note": "a promotion raises the level of a held qualification rather than adding a second copy of it -- qualificationCount unchanged, proficiencyTotal +1 One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556)."
+      }
     },
     {
       "command": "employee list",
@@ -589,9 +669,10 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "qualificationCount": 0,
-          "proficiencyTotal": 0
-        }
+          "qualificationCount": 1,
+          "proficiencyTotal": 1
+        },
+        "note": " One higher than the driller’s own count: the dedicated builder hired above brings its driving.truck starting qualification (#556). proficiencyTotal 1, not 0: the dedicated builder hired at the top survives the blast that kills the driller, and keeps its driving.truck at Rookie (#556)."
       }
     }
   ]

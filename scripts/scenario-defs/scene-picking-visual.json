@@ -11,10 +11,7 @@
       "name": "closeup",
       "yaw": 30,
       "pitch": 35,
-      "target": [
-        11,
-        11
-      ],
+      "target": [11, 11],
       "distance": 12
     }
   ],
@@ -36,6 +33,33 @@
           "employeeCount": 0,
           "cash": 50000
         }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "timeout": 30,
+      "description": "Setup for the employee side of the picker: hire a driller (parity with the retired playtest 'scene-picking' definition) Hired ahead of the order below rather than after it (#556): a build order is queued work now, so the site needs someone on the roster to walk over and build it. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": ["employeeCount"],
+        "changedBy": {
+          "cash": -1000
+        },
+        "note": "HIRING_COSTS.driller is 1000 (balance.ts); cash was 42000 after the management_office purchase above"
       }
     },
     {
@@ -70,11 +94,64 @@
       ],
       "role": "player",
       "expect": {
-        "increased": ["buildingCount"],
+        "increased": ["orderedBuildingCount"],
         "changedBy": {
           "cash": -8000
         },
         "note": "management_office tier 1 costs 8000 (BuildingDefs.ts constructionCost)"
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 1 x:20 z:20",
+      "description": "Walk the driller clear of the office it just built (#556). Construction relocates the builder off the finished footprint onto the nearest walkable tile — right up against the building — and the employee pick further down then lands on the office instead of the crew member, so the selection bar never offers DETAIL at all.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:20 z:20"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "changedBy": {
+          "cash": 0
+        }
+      }
+    },
+    {
+      "command": "tick 25",
+      "description": "Let the driller finish that walk before the picking steps below.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 25"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1
+        }
       }
     },
     {
@@ -207,33 +284,6 @@
         }
       ],
       "role": "observe"
-    },
-    {
-      "command": "employee hire role:driller",
-      "timeout": 30,
-      "description": "Setup for the employee side of the picker: hire a driller (parity with the retired playtest 'scene-picking' definition)",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "increased": ["employeeCount"],
-        "changedBy": {
-          "cash": -1000
-        },
-        "note": "HIRING_COSTS.driller is 1000 (balance.ts); cash was 42000 after the management_office purchase above"
-      }
     },
     {
       "command": "state",

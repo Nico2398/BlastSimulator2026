@@ -23,8 +23,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -43,7 +43,8 @@
         "changedBy": {
           "cash": -1000
         }
-      }
+      },
+      "description": "Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size."
     },
     {
       "command": "employee dispatch 1 x:10 z:10",
@@ -115,7 +116,7 @@
     },
     {
       "command": "build living_quarters at:15,15",
-      "description": "Placed away from the (10,10) dispatch target (#437) \u2014 building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
+      "description": "Placed away from the (10,10) dispatch target (#437) — building on top of the employee's own tile made that cell permanently NavGrid-blocked with the employee still standing on it, so every later rest/collapse routing failed to path out and the employee got stuck COLLAPSING at 0/0/0 needs forever instead of demonstrating the queued-rest recovery this scenario is about.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -148,10 +149,10 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1,
-          "pendingActionCount": 1
+          "pendingActionCount": 2,
+          "orderedBuildingCount": 1
         },
-        "note": "Recalibrated for #547 (see the tick-40 checkpoint's note for root cause): still just the tick-40 checkpoint's warning-rest -- nothing ticks between there and here."
+        "note": "Ordering only queues a construction site (#556), and that site is itself a pending action — so pendingActionCount reads 2 here: the driller’s own dispatched work plus the build."
       }
     },
     {
@@ -284,10 +285,10 @@
           "minFatigue"
         ],
         "equals": {
-          "pendingActionCount": 1,
+          "pendingActionCount": 0,
           "collapsedCount": 0
         },
-        "note": "#700: with the stronger, correctly-scaled replenishment above, fatigue's natural working decline reaches the 25 warning threshold a few ticks later than the old calibration did, landing inside this batch instead of the next one -- a proactive rest is queued (pendingActionCount 1, confirmed via direct trace) but not yet claimed/completed by the point this random-event interruption cuts the batch short at 5 of 30 requested ticks. collapsedCount stays 0, well above the collapse floor."
+        "note": "#700: with the stronger, correctly-scaled replenishment above, fatigue's natural working decline reaches the 25 warning threshold a few ticks later than the old calibration did, landing inside this batch instead of the next one -- a proactive rest is queued (pendingActionCount 1, confirmed via direct trace) but not yet claimed/completed by the point this random-event interruption cuts the batch short at 5 of 30 requested ticks. collapsedCount stays 0, well above the collapse floor. Re-measured for #556: the quarters is built and standing well before this window now, and the proactive rest this step used to catch mid-queue has already been claimed and completed inside it — nothing is left queued."
       }
     },
     {

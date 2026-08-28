@@ -17,9 +17,10 @@ import {
   getUpgradeCost,
   getMoveCost,
   moveBuilding,
+  checkFootprintPlacement,
   BUILDING_DEFS,
 } from '../../../src/core/entities/Building.js';
-import type { Building } from '../../../src/core/entities/Building.js';
+import type { Building, FootprintOccupant } from '../../../src/core/entities/Building.js';
 
 describe('Building system', () => {
   it('placing a building deducts cost and adds it to state', () => {
@@ -396,5 +397,179 @@ describe('moveBuilding() cost matches getMoveCost()', () => {
 
     expect(result.success).toBe(true);
     expect(result.cost).toBe(expectedCost);
+  });
+});
+
+// ── moveBuilding — plannedOccupants (#556 review finding 2) ──────────────────
+// A move must be refused up front when it would land on a site still under
+// construction, the same way an overlapping real building already refuses it
+// — not silently accepted and corrected later by tickTaskCompletion.ts's
+// defensive completion-time refund.
+
+describe('moveBuilding() — plannedOccupants (sites under construction)', () => {
+  it('refuses a move onto a site reserved by a plannedOccupant, "Space is occupied"', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const moverId = state.buildings[0]!.id;
+    const plannedOccupants: FootprintOccupant[] = [{ type: 'freight_warehouse', tier: 1, x: 20, z: 20 }];
+
+    const result = moveBuilding(state, moverId, 20, 20, 64, 64, 0, 0, plannedOccupants);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Space is occupied');
+    // Building must not have moved.
+    expect(state.buildings[0]!.x).toBe(0);
+    expect(state.buildings[0]!.z).toBe(0);
+  });
+
+  it('allows a move that overlaps no plannedOccupant', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const moverId = state.buildings[0]!.id;
+    const plannedOccupants: FootprintOccupant[] = [{ type: 'freight_warehouse', tier: 1, x: 40, z: 40 }];
+
+    const result = moveBuilding(state, moverId, 20, 20, 64, 64, 0, 0, plannedOccupants);
+
+    expect(result.success).toBe(true);
+    expect(state.buildings[0]!.x).toBe(20);
+    expect(state.buildings[0]!.z).toBe(20);
+  });
+
+  it('defaults plannedOccupants to empty — a caller with no planned-buildings list behaves as before', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const moverId = state.buildings[0]!.id;
+
+    const result = moveBuilding(state, moverId, 20, 20, 64, 64);
+
+    expect(result.success).toBe(true);
+  });
+});
+
+// ── checkFootprintPlacement (#556 — construction sites) ──────────────────────
+// Shared bounds + occupancy check for the order-then-build path: `occupants`
+// covers both live Buildings AND still-under-construction PlannedBuildings —
+// FootprintOccupant reduces either to {type, tier, x, z}, so this function
+// can't (and shouldn't) tell them apart. placeBuilding's own bounds/isOccupied
+// checks are expected to become a thin wrapper around this once implemented.
+
+describe('checkFootprintPlacement (#556)', () => {
+  it('is valid for an in-bounds, unoccupied placement with no occupants', () => {
+    const result = checkFootprintPlacement([], 'management_office', 0, 0, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('rejects a negative x with "Out of bounds"', () => {
+    const result = checkFootprintPlacement([], 'management_office', -1, 0, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Out of bounds');
+  });
+
+  it('rejects a negative z with "Out of bounds"', () => {
+    const result = checkFootprintPlacement([], 'management_office', 0, -1, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Out of bounds');
+  });
+
+  it('rejects a footprint that overflows the grid width with "Out of bounds"', () => {
+    // management_office T1 is 2x2; x=63 on a 64-wide grid needs cols 63-64.
+    const result = checkFootprintPlacement([], 'management_office', 63, 0, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Out of bounds');
+  });
+
+  it('rejects a footprint that overflows the grid depth with "Out of bounds"', () => {
+    const result = checkFootprintPlacement([], 'management_office', 0, 63, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Out of bounds');
+  });
+
+  it('rejects overlap with an existing real-building occupant, "Space is occupied"', () => {
+    const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 0, z: 0 }];
+    const result = checkFootprintPlacement(occupants, 'management_office', 1, 1, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Space is occupied');
+  });
+
+  it('rejects overlap with a still-under-construction occupant the same way as a live building', () => {
+    // Nothing distinguishes a PlannedBuilding from a Building here — both are
+    // reduced to the same {type, tier, x, z} shape by FootprintOccupant.
+    const occupants: FootprintOccupant[] = [{ type: 'freight_warehouse', tier: 1, x: 10, z: 10 }];
+    const result = checkFootprintPlacement(occupants, 'management_office', 11, 11, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Space is occupied');
+  });
+
+  it('allows placement when occupants exist but none overlap the requested footprint', () => {
+    const occupants: FootprintOccupant[] = [{ type: 'management_office', tier: 1, x: 0, z: 0 }];
+    const result = checkFootprintPlacement(occupants, 'management_office', 10, 10, 1, 64, 64, 0, 0);
+    expect(result.valid).toBe(true);
+  });
+
+  it('blocks placement only for the occupant that actually overlaps, among several', () => {
+    const occupants: FootprintOccupant[] = [
+      { type: 'management_office', tier: 1, x: 0, z: 0 },
+      { type: 'freight_warehouse', tier: 1, x: 20, z: 20 },
+    ];
+    const overlapping = checkFootprintPlacement(occupants, 'management_office', 20, 20, 1, 64, 64, 0, 0);
+    expect(overlapping.valid).toBe(false);
+    expect(overlapping.error).toBe('Space is occupied');
+
+    const clear = checkFootprintPlacement(occupants, 'management_office', 40, 40, 1, 64, 64, 0, 0);
+    expect(clear.valid).toBe(true);
+  });
+
+  it('uses the tier-specific footprint size — a larger tier can go out of bounds where tier 1 fits', () => {
+    // living_quarters T1 is small; T3 is a 5x4 rect. Near the grid edge, T1
+    // fits but T3 overflows.
+    const t1 = checkFootprintPlacement([], 'living_quarters', 60, 60, 1, 64, 64, 0, 0);
+    expect(t1.valid).toBe(true);
+
+    const t3 = checkFootprintPlacement([], 'living_quarters', 60, 60, 3, 64, 64, 0, 0);
+    expect(t3.valid).toBe(false);
+    expect(t3.error).toBe('Out of bounds');
+  });
+
+  it('respects a non-zero site origin (a westward/northward-claimed site, #473)', () => {
+    // Site bounding box runs from (-10,-10) to (54,54) — a placement at
+    // (-5,-5) is in-bounds relative to that origin, not the world origin.
+    const result = checkFootprintPlacement([], 'management_office', -5, -5, 1, 64, 64, -10, -10);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a placement below a non-zero site origin with "Out of bounds"', () => {
+    const result = checkFootprintPlacement([], 'management_office', -15, -5, 1, 64, 64, -10, -10);
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe('Out of bounds');
+  });
+});
+
+// ── moveBuilding — exact error strings (#556 regression) ─────────────────────
+// Once checkFootprintPlacement becomes the shared source of truth behind
+// placeBuilding/moveBuilding, these exact strings must not drift.
+
+describe('moveBuilding — exact error strings stay stable (#556 regression)', () => {
+  it('reports exactly "Out of bounds" for an out-of-bounds move target', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    const id = state.buildings[0]!.id;
+
+    const result = moveBuilding(state, id, 63, 63, 64, 64);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Out of bounds');
+  });
+
+  it('reports exactly "Space is occupied" for a move target overlapping another building', () => {
+    const state = createBuildingState();
+    placeBuilding(state, 'management_office', 0, 0, 64, 64);
+    placeBuilding(state, 'freight_warehouse', 20, 20, 64, 64);
+    const moverId = state.buildings[0]!.id;
+
+    const result = moveBuilding(state, moverId, 20, 20, 64, 64);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Space is occupied');
   });
 });

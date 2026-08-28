@@ -230,7 +230,7 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       }
     },
@@ -265,7 +265,28 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 2
+        }
+      }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 2,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 2,
+          "orderedBuildingCount": 0
         }
       }
     },
@@ -331,7 +352,9 @@
     {
       "command": "event choose 0",
       "interaction": [
-        { "type": "resolveEventIfPending" }
+        {
+          "type": "resolveEventIfPending"
+        }
       ],
       "role": "player",
       "commandOutcome": "either"

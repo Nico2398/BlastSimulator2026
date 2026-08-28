@@ -562,7 +562,7 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 1
+          "orderedBuildingCount": 1
         }
       }
     },
@@ -878,6 +878,27 @@
       ],
       "role": "player",
       "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Assert the warehouse ordered above actually landed (#556). The crew builds it across the tick blocks the file already runs, so this costs no ticks of its own — which is what keeps the haul below, and the contract accepted around it, on the trajectory this file measured.",
+      "timeout": 130,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 1,
+          "maxTicks": 400,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        }
+      }
     },
     {
       "command": "tick 20",

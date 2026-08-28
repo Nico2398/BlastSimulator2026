@@ -107,6 +107,20 @@ export function releasePlannedHoleForCancelledAction(state: GameState, action: P
     return;
   }
 
+  // #556: a cancelled place_building order keyed off buildingOrderId, not
+  // holeId — same generic-cancel-path gap as dig_ramp_segment above. Money
+  // is already refunded in full by cancelAction/actionOrderCost (a building
+  // is one atomic unit, not segmented); this only removes the PlannedBuilding
+  // (and its ghost, via completePendingAction — already run by cancelAction
+  // before this hook fires) so the site can be built on again.
+  if (action.type === 'place_building') {
+    const buildingOrderId = action.payload['buildingOrderId'];
+    if (typeof buildingOrderId !== 'number') return;
+    const idx = state.plannedBuildings.findIndex(pb => pb.id === buildingOrderId);
+    if (idx !== -1) state.plannedBuildings.splice(idx, 1);
+    return;
+  }
+
   const holeId = action.payload['holeId'];
   if (typeof holeId !== 'string') return;
 
