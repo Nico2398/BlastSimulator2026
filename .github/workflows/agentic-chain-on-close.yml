@@ -46,12 +46,20 @@ concurrency:
   # finding out. So the group mirrors the job's `if:` exactly: only an event the
   # job will actually act on contends for the shared name, and everything else
   # gets its own group keyed by this run, where it can evict nothing.
+  #
+  # This is workflow-level, so the *run* claims the group whatever its jobs do —
+  # which is why the mirroring has to happen in this expression and not only in
+  # the job's `if:`. It reads nothing but `github`, deliberately: the enable flag
+  # is a `vars` lookup, and if `vars` were not in scope here the expression would
+  # silently collapse to the no-op arm on every run and this entry point would
+  # stop serialising against the other three — the one failure this group exists
+  # to prevent, arriving as a passing workflow. The flag gates the steps instead,
+  # exactly as `handle-failure.yml` gates its own.
   group: >-
     ${{
-      (
-        vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true' &&
-        contains(github.event.issue.labels.*.name, 'agent-task')
-      ) && 'agentic-assignment' || format('agentic-chain-on-close-noop-{0}', github.run_id)
+      contains(github.event.issue.labels.*.name, 'agent-task')
+        && 'agentic-assignment'
+        || format('agentic-chain-on-close-noop-{0}', github.run_id)
     }}
   cancel-in-progress: false
 
@@ -72,13 +80,13 @@ jobs:
     # a pull request is carrying the chain already. This clause only keeps
     # unrelated closes out of the shared concurrency group.
     if: >-
-      vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true' &&
       contains(github.event.issue.labels.*.name, 'agent-task')
     runs-on: ubuntu-latest
     steps:
       # The assignability rules are read from the workspace, not vendored into
       # the action's YAML, so the repository has to be here.
       - name: Checkout repository
+        if: vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -90,6 +98,7 @@ jobs:
       # event keeps carrying that chain and this run returns having done nothing.
       - name: Assign the next ready issue
         id: assign
+        if: vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'
         uses: ./.github/actions/agentic-assign
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
@@ -104,7 +113,9 @@ jobs:
 
       - name: Report auto-assign state
         run: |
-          if [ -n "${{ steps.assign.outputs.issue }}" ]; then
+          if [ "${{ vars.AGENTIC_AUTO_ASSIGN_ENABLED }}" != "true" ]; then
+            echo 'Auto-assign is disabled (AGENTIC_AUTO_ASSIGN_ENABLED is not "true").'
+          elif [ -n "${{ steps.assign.outputs.issue }}" ]; then
             echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
           elif [ "${{ steps.assign.outputs.halted }}" = "true" ]; then
             echo 'Cascade brake is engaged — the queue is parked. See the notice on the issue.'

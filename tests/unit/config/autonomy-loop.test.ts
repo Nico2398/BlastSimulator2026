@@ -303,17 +303,32 @@ describe('chaining past a run whose deliverable was not a pull request', () => {
     const jobIf = text.slice(text.indexOf('\n    if: >'), text.indexOf('\n    runs-on:'));
     expect(jobIf).toContain('if: >');
 
-    for (const clause of [
-      "vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'",
-      "contains(github.event.issue.labels.*.name, 'agent-task')",
-    ]) {
-      expect(concurrency, `group is missing \`${clause}\``).toContain(clause);
-      expect(jobIf, `job \`if:\` is missing \`${clause}\``).toContain(clause);
-    }
+    const clause = "contains(github.event.issue.labels.*.name, 'agent-task')";
+    expect(concurrency, `group is missing \`${clause}\``).toContain(clause);
+    expect(jobIf, `job \`if:\` is missing \`${clause}\``).toContain(clause);
 
-    expect(concurrency).toContain("&& 'agentic-assignment' ||");
+    expect(concurrency).toContain("&& 'agentic-assignment'");
     expect(concurrency).toMatch(/format\('agentic-chain-on-close-noop-\{0\}',\s*github\.run_id\)/);
     expect(concurrency).toContain('cancel-in-progress: false');
+  });
+
+  // The group is workflow-level, so the run claims it whatever its jobs decide —
+  // and it must therefore resolve from contexts that are certainly in scope
+  // there. `vars` is not one this repository has ever exercised in a
+  // `concurrency:` expression, and if it silently read as empty the whole
+  // expression would collapse to the no-op arm on every run: this entry point
+  // would stop serialising against the other three, and would report success
+  // while doing it. So the enable flag gates the steps, the way
+  // `handle-failure.yml` gates its own, and never the group.
+  it('resolves its concurrency group without reading `vars`', () => {
+    const text = onClose();
+    const concurrency = text.slice(text.indexOf('\nconcurrency:'), text.indexOf('\npermissions:'));
+    const group = concurrency.slice(concurrency.indexOf('group:'));
+    expect(group).not.toContain('vars.');
+
+    // The flag still has to gate the work, just further in.
+    const assign = text.slice(text.indexOf(ASSIGN_ACTION) - 400, text.indexOf(ASSIGN_ACTION));
+    expect(assign).toContain("if: vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'");
   });
 });
 
@@ -434,11 +449,11 @@ describe('the entry points cannot race', () => {
       /concurrency:\s*\n(?:.*\n)*?\s*group: (?:agentic-assignment|>-)/
     );
     if (!/group: agentic-assignment/.test(concurrency)) {
-      expect(concurrency, `${name}: conditional group never resolves to the shared name`).toContain(
-        "&& 'agentic-assignment' ||"
+      expect(concurrency, `${name}: conditional group never resolves to the shared name`).toMatch(
+        /&&\s*'agentic-assignment'\s*\|\|/
       );
       expect(concurrency, `${name}: the skip arm must be unique per run`).toMatch(
-        /\|\| format\('[a-z-]+-noop-\{0\}', github\.run_id\)/
+        /\|\|\s*format\('[a-z-]+-noop-\{0\}',\s*github\.run_id\)/
       );
     }
     expect(concurrency).toContain('cancel-in-progress: false');
