@@ -23,13 +23,13 @@ import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
-import { createRunner, runCommand } from './console/createRunner.js';
+import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLandscape, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
-import { getLivingEmployees } from './core/entities/Employee.js';
+import { getLivingEmployees } from './core/entities/Employee.js'; import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
@@ -434,13 +434,7 @@ console.log = (...args: unknown[]) => {
  * other caller gets the immediate sync.
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
-  const prevState = ctx.state;
-  // Set before dispatch, not after: the tutorial-only blast refusal
-  // (blastCommand, mining/blast.ts) reads ctx.tutorialActive during
-  // runCommand itself, below — setting it only in the post-command UI sync
-  // further down (uiManager.update's own tutorial.isActive argument) would
-  // always be one command too late (#557).
-  ctx.tutorialActive = tutorial.isActive;
+  const prevState = ctx.state; syncTutorialActive(ctx, tutorial.isActive);
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -634,8 +628,8 @@ window.__gameState = () => {
     // delivered (not just spoil) needs a single numeric field to check
     // increased/decreased/changedBy against (#671).
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
-    lastCommandOutput,
-    frameCount: scene.frameCount,
+    dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees), // mirrors serializeGameState (#557)
+    lastCommandOutput, frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
     consoleLogs: consoleLogs.splice(0, 50),
     // Sample voxels at blast center to check if they're cleared

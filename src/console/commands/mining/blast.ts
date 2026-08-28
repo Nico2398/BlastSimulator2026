@@ -119,7 +119,12 @@ export function blastCommand(
   // Rock that was thrown lands somewhere, and whatever is standing there pays
   // for it. Fragment positions are where the rock came to rest and its speed is
   // what it was doing on impact, so this reads the blast's own outcome rather
-  // than guessing at a danger radius.
+  // than guessing at a danger radius. Gated to computeDangerZone's own padded
+  // bounds (state.drillHoles is still populated here, cleared further below) —
+  // a fragment's real flyrock trajectory can land past that box, and an entity
+  // clearly outside it must not take a hit just because a stray fragment
+  // happened to come down nearby (#557 audit).
+  const dangerZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
   const impacts = processProjections(
     result.fragments,
     state.buildings,
@@ -127,6 +132,7 @@ export function blastCommand(
     state.employees,
     state.damage,
     state.tickCount,
+    dangerZone,
   );
   if (impacts.length > 0) {
     syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));

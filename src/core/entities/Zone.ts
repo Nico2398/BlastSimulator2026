@@ -4,6 +4,7 @@
 import type { VehicleState } from './Vehicle.js';
 import { moveVehicle } from './Vehicle.js';
 import type { EmployeeState } from './Employee.js';
+import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
 
 // ── Zone bounds ──
 
@@ -157,4 +158,22 @@ export function computeDangerZone(holes: readonly { x: number; z: number }[], ma
     x2 = Math.max(x2, h.x); z2 = Math.max(z2, h.z);
   }
   return { x1: x1 - marginM, z1: z1 - marginM, x2: x2 + marginM, z2: z2 + marginM };
+}
+
+/**
+ * Whether the live drill plan's own danger zone (computeDangerZone over
+ * `drillHoles` at BLAST_DANGER_MARGIN_M — the same box Fire.ts's occupant
+ * list and Sound the Horn button use) is clear of every vehicle and living
+ * employee. True when no plan exists yet — nothing to be clear of. The one
+ * check `window.__gameState`/serializeGameState expose as `dangerZoneClear`,
+ * so a scenario's wait_until can prove an evacuation genuinely finished
+ * rather than merely that `zone clear` returned (#557).
+ */
+export function isDangerZoneClear(
+  drillHoles: readonly { x: number; z: number }[],
+  vehicles: VehicleState,
+  employees: EmployeeState,
+): boolean {
+  const zone = computeDangerZone(drillHoles, BLAST_DANGER_MARGIN_M);
+  return zone === null || isZoneClear(zone, vehicles, employees);
 }

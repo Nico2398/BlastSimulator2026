@@ -38,7 +38,15 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
   const result: NeedRestorationResult = { routed: [], noBuilding: [] };
 
   for (const emp of state.employees.employees) {
-    if (!emp.alive || emp.injured || emp.activeActionId !== null) continue;
+    // destinationX !== null with activeActionId === null is an employee
+    // walking outside the claim system entirely — currently only
+    // evacuateZone's direct-field walk order (Zone.ts's clearZone,
+    // Evacuation.ts). Without this guard they read as idle and this routine
+    // would happily self-claim a fresh rest action, overwriting the
+    // evacuation destination with a walk back toward whatever building is
+    // nearest — same failure class EmployeeDispatch.ts's own mid-walk guard
+    // exists for (#557).
+    if (!emp.alive || emp.injured || emp.activeActionId !== null || emp.destinationX !== null) continue;
     const needsRest =
       emp.hunger  < NEED_WARNING_THRESHOLDS.hunger ||
       emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;

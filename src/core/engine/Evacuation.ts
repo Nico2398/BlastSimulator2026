@@ -38,10 +38,19 @@ import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 export const EVACUATION_HOLD_KEY = 'evacuationHold';
 
 /**
+ * isInZone (Zone.ts) is inclusive at the boundary (>=/<=), so a candidate
+ * pushed out by exactly EVACUATION_CLEARANCE_M lands ON the padded zone's
+ * edge and still reads as "inside" it. One extra metre puts the candidate
+ * strictly beyond the margin instead of merely touching it.
+ */
+const EVACUATION_CANDIDATE_OFFSET_M = EVACUATION_CLEARANCE_M + 1;
+
+/**
  * Candidate safe destinations for an entity at (fromX, fromZ) evacuating
  * `zone`: the projection past the zone's nearest edge (the shortest way out),
- * then the zone's four corners (each pushed out by EVACUATION_CLEARANCE_M) as
- * fallbacks when the nearest-edge point is blocked or unreachable.
+ * then the zone's four corners (each pushed out by more than
+ * EVACUATION_CLEARANCE_M, see EVACUATION_CANDIDATE_OFFSET_M) as fallbacks
+ * when the nearest-edge point is blocked or unreachable.
  */
 function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): EvacuationDestination[] {
   const distLeft = fromX - zone.x1;
@@ -52,20 +61,20 @@ function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): Evacua
 
   let nearestEdge: EvacuationDestination;
   if (minDist === distLeft) {
-    nearestEdge = { x: zone.x1 - EVACUATION_CLEARANCE_M, z: fromZ };
+    nearestEdge = { x: zone.x1 - EVACUATION_CANDIDATE_OFFSET_M, z: fromZ };
   } else if (minDist === distRight) {
-    nearestEdge = { x: zone.x2 + EVACUATION_CLEARANCE_M, z: fromZ };
+    nearestEdge = { x: zone.x2 + EVACUATION_CANDIDATE_OFFSET_M, z: fromZ };
   } else if (minDist === distTop) {
-    nearestEdge = { x: fromX, z: zone.z1 - EVACUATION_CLEARANCE_M };
+    nearestEdge = { x: fromX, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M };
   } else {
-    nearestEdge = { x: fromX, z: zone.z2 + EVACUATION_CLEARANCE_M };
+    nearestEdge = { x: fromX, z: zone.z2 + EVACUATION_CANDIDATE_OFFSET_M };
   }
 
   const corners: EvacuationDestination[] = [
-    { x: zone.x1 - EVACUATION_CLEARANCE_M, z: zone.z1 - EVACUATION_CLEARANCE_M },
-    { x: zone.x2 + EVACUATION_CLEARANCE_M, z: zone.z1 - EVACUATION_CLEARANCE_M },
-    { x: zone.x1 - EVACUATION_CLEARANCE_M, z: zone.z2 + EVACUATION_CLEARANCE_M },
-    { x: zone.x2 + EVACUATION_CLEARANCE_M, z: zone.z2 + EVACUATION_CLEARANCE_M },
+    { x: zone.x1 - EVACUATION_CANDIDATE_OFFSET_M, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M },
+    { x: zone.x2 + EVACUATION_CANDIDATE_OFFSET_M, z: zone.z1 - EVACUATION_CANDIDATE_OFFSET_M },
+    { x: zone.x1 - EVACUATION_CANDIDATE_OFFSET_M, z: zone.z2 + EVACUATION_CANDIDATE_OFFSET_M },
+    { x: zone.x2 + EVACUATION_CANDIDATE_OFFSET_M, z: zone.z2 + EVACUATION_CANDIDATE_OFFSET_M },
   ];
 
   return [nearestEdge, ...corners].map(c => ({ x: Math.round(c.x), z: Math.round(c.z) }));
@@ -76,17 +85,19 @@ function buildCandidates(fromX: number, fromZ: number, zone: ZoneBounds): Evacua
  * EVACUATION_CLEARANCE_M) reachable from (fromX, fromZ). Returns null when
  * no safe cell can be reached.
  *
- * With no NavGrid built yet, returns the first (nearest-edge) candidate
- * unconditionally — the same "nothing to route around, so nothing blocks the
- * direct destination" fallback EntityMovementTick.ts's tickEmployeeMovement/
- * tickVehicle already use when state.navGrid is null.
+ * With no NavGrid built yet, reachability cannot be verified at all — unlike
+ * EntityMovementTick.ts's direct-walk fallback (moving toward an explicit
+ * target the caller already chose), here the destination itself is a guess
+ * this function is making. Guessing a safe cell without anything to route
+ * across it is exactly the "silently stranded" failure #557 calls out, so
+ * this returns null instead of the first geometric candidate.
  */
 export function findSafeEvacuationCell(
   state: GameState, fromX: number, fromZ: number, zone: ZoneBounds,
 ): EvacuationDestination | null {
-  const candidates = buildCandidates(fromX, fromZ, zone);
+  if (!state.navGrid) return null;
 
-  if (!state.navGrid) return candidates[0]!;
+  const candidates = buildCandidates(fromX, fromZ, zone);
 
   for (const candidate of candidates) {
     const cell = state.navGrid.cellAt(candidate.x, candidate.z);

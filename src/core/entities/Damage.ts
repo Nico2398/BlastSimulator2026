@@ -11,6 +11,7 @@ import { destroyVehicle } from './Vehicle.js';
 import type { EmployeeState, Employee } from './Employee.js';
 import { injureEmployee, killEmployee } from './Employee.js';
 import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
+import { isInZone, type ZoneBounds } from './Zone.js';
 
 // ── Config ──
 
@@ -61,6 +62,13 @@ export function createDamageState(): DamageState {
 /**
  * Process projection fragments against all entities.
  * Returns list of accidents that occurred.
+ *
+ * `dangerZone`, when given, bounds who can be hit at all — a fragment's real
+ * flyrock trajectory can land it well past computeDangerZone's padded box, and
+ * an entity that is clearly outside that box must not take a hit just because
+ * it happens to be near where a stray fragment came down (#557 audit). Passed
+ * null by callers with no zone to check against (e.g. unit tests exercising
+ * pure distance falloff), which disables the zone gate entirely.
  */
 export function processProjections(
   projections: FragmentData[],
@@ -69,8 +77,10 @@ export function processProjections(
   employees: EmployeeState,
   damage: DamageState,
   tick: number,
+  dangerZone: ZoneBounds | null = null,
 ): AccidentRecord[] {
   const newAccidents: AccidentRecord[] = [];
+  const inZone = (x: number, z: number): boolean => dangerZone === null || isInZone(x, z, dangerZone);
 
   for (const frag of projections) {
     if (!frag.isProjection) continue;
@@ -83,9 +93,12 @@ export function processProjections(
     // full kinetic energy; a near miss out to BLAST_DANGER_MARGIN_M still
     // hits, at an inverse-square-attenuated energy, rather than being ignored
     // outright the instant it's a fraction of a metre past the exact radius
-    // (#557 audit — debris was only ever hitting something dead-on).
+    // (#557 audit — debris was only ever hitting something dead-on). Either
+    // way the entity itself must be inside the danger zone first.
     for (const b of [...buildings.buildings]) {
-      const dist = buildingDistance(fx, fz, b);
+      const { cx, cz } = buildingCenter(b);
+      if (!inZone(cx, cz)) continue;
+      const dist = distanceBetween(fx, fz, cx, cz);
       const effectiveKe = keAtDistance(ke, dist);
       if (effectiveKe === null) continue;
       const acc = processBuildingHit(b, buildings, frag, effectiveKe, tick);
@@ -94,6 +107,7 @@ export function processProjections(
 
     // Check vehicles
     for (const v of [...vehicles.vehicles]) {
+      if (!inZone(v.x, v.z)) continue;
       const dist = distanceBetween(fx, fz, v.x, v.z);
       const effectiveKe = keAtDistance(ke, dist);
       if (effectiveKe === null) continue;
@@ -104,6 +118,7 @@ export function processProjections(
     // Check employees
     for (const emp of employees.employees) {
       if (!emp.alive || emp.injured) continue;
+      if (!inZone(emp.x, emp.z)) continue;
       const dist = distanceBetween(fx, fz, emp.x, emp.z);
       const effectiveKe = keAtDistance(ke, dist);
       if (effectiveKe === null) continue;
@@ -191,12 +206,10 @@ function distanceBetween(x1: number, z1: number, x2: number, z2: number): number
   return Math.sqrt(dx * dx + dz * dz);
 }
 
-function buildingDistance(fx: number, fz: number, b: Building): number {
+function buildingCenter(b: Building): { cx: number; cz: number } {
   const def = getBuildingDef(b.type, b.tier);
   const { sizeX, sizeZ } = getDefSize(def);
-  const cx = b.x + sizeX / 2;
-  const cz = b.z + sizeZ / 2;
-  return distanceBetween(fx, fz, cx, cz);
+  return { cx: b.x + sizeX / 2, cz: b.z + sizeZ / 2 };
 }
 
 /**

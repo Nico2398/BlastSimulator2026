@@ -106,7 +106,7 @@ export const GAME_STATE_SCHEMA: Schema = {
   muckPile: { type: 'object', optional: true, description: 'Fragment size, speed and clearance spread after a blast' },
   storedMassKg: { type: 'number', description: 'Mass held in warehouse storage (LogisticsState.storedMassKg)' },
   collectedOreTotal: { type: 'number', description: 'Sum across every material key in state.collectedOre (kg, #671)' },
-};
+  dangerZoneClear: { type: 'boolean', description: 'computeDangerZone clear of every vehicle/employee (#557)' } };
 
 /** UI state schema — mirrors window.__uiState() in src/main.ts. */
 export const UI_STATE_SCHEMA: Schema = {
