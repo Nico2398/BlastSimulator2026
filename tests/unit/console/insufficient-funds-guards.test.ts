@@ -45,6 +45,8 @@ function makeCtx(cash: number): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
   setCash(ctx, cash);
@@ -695,7 +697,7 @@ describe('employee raise — invalid amount override sanitization (#534)', () =>
 
 describe('new_game cash: — invalid cash override sanitization (#534)', () => {
   function freshCtx(): MiningContext {
-    return { state: null, grid: null, emitter: new EventEmitter() };
+    return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   }
 
   it('falls back to STARTING_CASH for cash:notanumber', () => {
@@ -755,7 +757,7 @@ describe('start_level — invalid cash override sanitization (#534 campaign.ts)'
   const TUTORIAL_START_CASH = getLevel('tutorial_pit')!.startingCash;
 
   function freshCtx(): MiningContext {
-    return { state: null, grid: null, emitter: new EventEmitter() };
+    return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   }
 
   it('does not set cash to Infinity for a cash override that overflows parseInt', () => {
