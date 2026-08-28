@@ -89,7 +89,7 @@ Most things that get in a run's way do not. `agentic-decision-autonomy` holds th
 | Outcome | Issue ends | Queue behaviour |
 |---------|-----------|-----------------|
 | Merged-ready PR | closed by the merge | `auto-assign-next.yml` chains on the merge |
-| `done` + closed | closed, `done` | `handle-failure.yml` does not fire; the merge path does |
+| `done` + closed | closed, `done` | `agentic-chain-on-close.yml` chains on the close. No PR means no merge to chain from, and no halt label means `handle-failure.yml` never fires — the close is the only event this state raises |
 | `paused` | `ready` + `paused`, `Blocked by` the filed dependency | `handle-failure.yml` chains on; `assignability.cjs` holds this issue until the dependency lands, then re-picks it |
 | `blocked` | `blocked` | `handle-failure.yml` chains on; the issue waits for a human |
 

@@ -29,7 +29,11 @@ inputs:
   guard:
     description: >
       Extra precondition to check before assigning.
-      "closed_without_pr" — only chain when completed_issue closed without a linked PR.
+      "closed_without_pr" — only chain when completed_issue is a run that closed its
+      own issue without a deliverable PR, because its deliverable was an answer, a
+      command or a set of filed issues rather than a diff. Requires the issue to have
+      carried `in-progress`, so a human closing a backlog issue starts nothing. Same
+      cascade brake.
       "after_blocked_run" — only chain when completed_issue is a run that ended `blocked`,
       and only while the cascade brake is open.
       "after_paused_run" — only chain when completed_issue is a run that ended `paused`:
@@ -137,6 +141,32 @@ runs:
               core.info(`Issue #${completed} has pull request #${carrier.number} — the merge event carries the chain.`);
               return;
             }
+
+            // A human closing a stale backlog issue is tidying up, not ending a
+            // run, and `issues: closed` fires for every one of them. Only an
+            // issue a run actually held releases the next session — the same
+            // test both halt guards apply. Without it, closing any old issue
+            // starts a session nobody asked for, which is how filing #489 once
+            // woke a runner through a different path.
+            if (!(await api.everCarriedInProgress(completed))) {
+              core.info(
+                `Issue #${completed} never carried \`in-progress\`, so no run ended here. Not chaining.`
+              );
+              return;
+            }
+
+            // The run is over, so `in-progress` cannot still be true. A run that
+            // settles its own issue drops it, but one that was closed from
+            // outside may not have — and left on a closed issue it is invisible
+            // to single flight, which lists open issues only, while still
+            // reading as a live run to anything that looks the issue up directly.
+            if (finished.labels.includes(rules.IN_PROGRESS)) {
+              await github.rest.issues
+                .removeLabel({ owner, repo, issue_number: completed, name: rules.IN_PROGRESS })
+                .catch(() => {});
+              core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it closed it.`);
+            }
+
             core.info(`Issue #${completed} closed without a PR — chaining directly.`);
           }
 
@@ -189,7 +219,17 @@ runs:
                 .catch(() => {});
               core.info(`Issue #${completed}: dropped \`in-progress\`, the run that held it ended ${noun}.`);
             }
+          }
 
+          // --- Cascade brake ---
+          // Every chain that fires from a finished run passes here, not just the
+          // two that fire from a halting one. A `done` close is a success, but
+          // it is not a *merge*: it resets nothing, so a queue deliberately
+          // parked because run after run is halting must not be restarted by the
+          // one issue that happened to close cleanly. The merge path is the only
+          // caller that skips the brake, and it skips it because a merge zeroes
+          // the count by definition.
+          if (guard !== 'none') {
             const limit = rules.blockedChainLimit(process.env.BLOCKED_CHAIN_LIMIT);
             const failures = await rules.consecutiveHaltedRuns(api);
             if (failures >= limit) {

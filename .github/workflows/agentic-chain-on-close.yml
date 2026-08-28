@@ -1,0 +1,113 @@
+name: "Pipeline: chain past a run whose deliverable was not a pull request"
+
+# The fourth terminal state — and the only one with nothing listening for it.
+#
+# A run ends in one of four states, and the queue has to keep moving through
+# every one of them: a merged pull request, which `auto-assign-next.yml` chains
+# from; `paused` or `blocked`, which `handle-failure.yml` chains from; or — when
+# the deliverable was an answer, an executed command or a set of filed issues
+# rather than a diff — the issue closed and labelled `done`.
+#
+# That last one raised nothing any workflow was subscribed to. It opens no pull
+# request, so no `pull_request` event fires and `auto-assign-next.yml` stays
+# dormant. It applies no halt label, so `handle-failure.yml` never runs. And the
+# watchdog only sweeps issues still holding `in-progress`, which a run that
+# settles its own issue deliberately drops. The queue went idle with every
+# `ready` issue still sitting in it, and nothing anywhere reported that.
+#
+# On 28 Aug 2026 that stopped the pipeline dead with 23 issues queued. #557
+# ended `blocked` and chained correctly to #807 (run 33204199229 — the halt
+# chain worked). #807's run filed twelve follow-up issues, #838 through #849,
+# then closed itself `done` at 19:41:07 because its deliverable was those issues
+# and not a diff. Nothing ran after that. The failure was not a broken chain: it
+# was a terminal state that never had a chain attached to it.
+#
+# `agentic-assign`'s `closed_without_pr` guard was written for precisely this
+# case and had never had a caller in the repository's history. This workflow is
+# that caller.
+#
+# This does not make a runner chain to the next issue — that stays forbidden,
+# because a run starting the next run is the pipeline deciding to run again on
+# its own, and a runner has no view of the queue it would be restarting. The
+# chain lives here instead, in a workflow reacting to an event, with the whole
+# queue and the cascade brake in view. Same shape as `handle-failure.yml`.
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  # Shared with every other path into the queue, so no two can assign at once.
+  #
+  # But `issues: closed` fires for every issue closed anywhere in the repository,
+  # including the merge path's own close, and GitHub keeps only one *pending*
+  # run per group — a second arrival silently cancels the first, zero steps, no
+  # trace. #572 and #610 were both a real assignment evicted that way by a no-op
+  # that would have resolved `if:` false but claimed the slot on its way to
+  # finding out. So the group mirrors the job's `if:` exactly: only an event the
+  # job will actually act on contends for the shared name, and everything else
+  # gets its own group keyed by this run, where it can evict nothing.
+  group: >-
+    ${{
+      (
+        vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true' &&
+        contains(github.event.issue.labels.*.name, 'agent-task')
+      ) && 'agentic-assignment' || format('agentic-chain-on-close-noop-{0}', github.run_id)
+    }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  chain:
+    # `agent-task` is the pipeline's own marker: intake defines it and
+    # `agentic-issue-creation` puts it on every issue filed for the queue, so an
+    # issue a run could have held always carries it. A human closing anything
+    # else is tidying up, and must start nothing.
+    #
+    # The real gate is in the action, not here: `closed_without_pr` refuses to
+    # chain from an issue that never carried `in-progress`, and refuses again if
+    # a pull request is carrying the chain already. This clause only keeps
+    # unrelated closes out of the shared concurrency group.
+    if: >-
+      vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true' &&
+      contains(github.event.issue.labels.*.name, 'agent-task')
+    runs-on: ubuntu-latest
+    steps:
+      # The assignability rules are read from the workspace, not vendored into
+      # the action's YAML, so the repository has to be here.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      # `closed_without_pr` is what makes this safe to fire on any close: it
+      # chains only from an issue that actually held a run and produced no
+      # deliverable pull request. A merge-closed issue has one, so the merge
+      # event keeps carrying that chain and this run returns having done nothing.
+      - name: Assign the next ready issue
+        id: assign
+        uses: ./.github/actions/agentic-assign
+        with:
+          token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
+          agent: ${{ vars.AGENTIC_AGENT }}
+          # Quoted: an unquoted `#` opens a YAML comment, which silently ate the
+          # issue number and the outcome out of this line in the two workflows
+          # that had it unquoted.
+          reason: "auto-assigned after issue #${{ github.event.issue.number }} closed without a pull request"
+          guard: closed_without_pr
+          completed_issue: ${{ github.event.issue.number }}
+          blocked_chain_limit: ${{ vars.AGENTIC_BLOCKED_CHAIN_LIMIT }}
+
+      - name: Report auto-assign state
+        run: |
+          if [ -n "${{ steps.assign.outputs.issue }}" ]; then
+            echo "Assigned issue #${{ steps.assign.outputs.issue }} to ${{ steps.assign.outputs.mention }}."
+          elif [ "${{ steps.assign.outputs.halted }}" = "true" ]; then
+            echo 'Cascade brake is engaged — the queue is parked. See the notice on the issue.'
+          else
+            echo "Nothing assigned — see the assign step for the reason."
+          fi
