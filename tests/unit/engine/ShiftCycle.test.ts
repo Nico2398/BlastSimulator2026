@@ -367,6 +367,68 @@ describe('processShiftCycle (7.9)', () => {
   // trace of it) and passes on the fix (action released to 'queued'/
   // holderId: null, its remaining duration preserved for whoever reclaims it
   // next).
+  // ── #811 dedup pin: exact end-state produced by ForceShiftRest.ts's shared
+  // tail (finishForceRest), legacy path. Written before finishForceRest is
+  // wired into forceShiftRestIfNeeded — passes today against the duplicated
+  // tail and must keep passing unchanged once the implementer extracts it,
+  // so a regression in destinationX/Z sourcing, activeActionId identity, or
+  // emit ordering during that extraction fails this test.
+  it('sets destinationX/Z and activeActionId from the pushed rest action, in commit order, before emitting (legacy path, #811)', () => {
+    const state = createGame({ seed: SEED });
+    state.buildings.unlockedTiers.living_quarters = 3;
+    const rng = new Random(SEED);
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng);
+    employee.activeActionId = 1400;
+    employee.ticksWorked = WORK_DURATION_TICKS - 1; // triggers shift rest
+
+    // Away from the employee's own (0,0) so destination equality is meaningful.
+    placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 2);
+
+    // shiftRested itself is only exposed via processShiftCycle's return
+    // value (assembled internally, not passed in) — so ordering relative to
+    // it is pinned indirectly via firedEvents below, which IS passed by the
+    // caller and therefore visible through the closure at emit-time.
+    const pendingActionsCountAtEmit: number[] = [];
+    const activeActionIdAtEmit: (number | null)[] = [];
+    const destinationAtEmit: Array<{ x: number | null; z: number | null }> = [];
+    const firedEventsAtEmit: string[][] = [];
+    const mockEmitter = {
+      emit: () => {
+        // Snapshot everything at the moment of emit — proves every other
+        // side effect already committed before the event fires.
+        pendingActionsCountAtEmit.push(state.pendingActions.length);
+        activeActionIdAtEmit.push(employee.activeActionId);
+        destinationAtEmit.push({ x: employee.destinationX, z: employee.destinationZ });
+        firedEventsAtEmit.push(firedEvents.map(e => e.eventId));
+      },
+    } as unknown as EventEmitter;
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents, mockEmitter);
+
+    // The rest action actually pushed to state.pendingActions is the one
+    // now held by the employee.
+    const restAction = state.pendingActions.find(a => a.id === employee.activeActionId);
+    expect(restAction).toBeDefined();
+    expect(restAction!.type).toBe('rest');
+
+    // Destination is sourced from that action's own target, not recomputed.
+    expect(employee.destinationX).toBe(restAction!.targetX);
+    expect(employee.destinationZ).toBe(restAction!.targetZ);
+    expect(employee.destinationX).not.toBe(employee.x); // routed to the T2 building, not in place
+
+    expect(result.shiftRested).toContain(employee.id);
+    expect(firedEvents.map(e => e.eventId)).toContain('employee_shift_change');
+
+    // Ordering: by the time the emitter fires, the push/assignment/bookkeeping
+    // above had already happened.
+    expect(pendingActionsCountAtEmit[0]).toBe(state.pendingActions.length);
+    expect(activeActionIdAtEmit[0]).toBe(restAction!.id);
+    expect(destinationAtEmit[0]).toEqual({ x: restAction!.targetX, z: restAction!.targetZ });
+    expect(firedEventsAtEmit[0]).toContain('employee_shift_change');
+  });
+
   it('releases the interrupted active action back to the pool instead of orphaning it (#684)', () => {
     const state = createGame({ seed: SEED });
     state.buildings.unlockedTiers.living_quarters = 3;
@@ -918,6 +980,56 @@ describe('processShiftCycle — under an applied policy (#678)', () => {
     expect(employee.restTicksRemaining).toBeNull();
     expect(employee.pendingRestDuration).not.toBeNull();
     expect(employee.activeActionId).not.toBeNull();
+  });
+
+  // ── #811 dedup pin: exact end-state produced by ForceShiftRest.ts's shared
+  // tail (finishForceRest), policy path. Mirrors the legacy-path pin above —
+  // both callers must produce byte-identical end-state/ordering through the
+  // same shared helper once it is wired in.
+  it('sets destinationX/Z and activeActionId from the pushed rest action, in commit order, before emitting (policy path, #811)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 1500;
+    employee.ticksWorked = SHIFT_DURATIONS_TICKS.shift_8h - 1; // fires this call
+
+    // Away from the employee's own (0,0) so destination equality is meaningful.
+    const placed = placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 1);
+    expect(placed.success).toBe(true);
+
+    const pendingActionsCountAtEmit: number[] = [];
+    const activeActionIdAtEmit: (number | null)[] = [];
+    const destinationAtEmit: Array<{ x: number | null; z: number | null }> = [];
+    const firedEventsAtEmit: string[][] = [];
+    const mockEmitter = {
+      emit: () => {
+        pendingActionsCountAtEmit.push(state.pendingActions.length);
+        activeActionIdAtEmit.push(employee.activeActionId);
+        destinationAtEmit.push({ x: employee.destinationX, z: employee.destinationZ });
+        firedEventsAtEmit.push(firedEvents.map(e => e.eventId));
+      },
+    } as unknown as EventEmitter;
+
+    const firedEvents: FiredEvent[] = [];
+    const result = processShiftCycle(state, firedEvents, mockEmitter);
+
+    const restAction = state.pendingActions.find(a => a.id === employee.activeActionId);
+    expect(restAction).toBeDefined();
+    expect(restAction!.type).toBe('rest');
+
+    expect(employee.destinationX).toBe(restAction!.targetX);
+    expect(employee.destinationZ).toBe(restAction!.targetZ);
+    expect(employee.destinationX).not.toBe(employee.x); // routed to the T1 building, not in place
+
+    expect(result.shiftRested).toContain(employee.id);
+    expect(firedEvents.map(e => e.eventId)).toContain('employee_shift_change');
+
+    expect(pendingActionsCountAtEmit[0]).toBe(state.pendingActions.length);
+    expect(activeActionIdAtEmit[0]).toBe(restAction!.id);
+    expect(destinationAtEmit[0]).toEqual({ x: restAction!.targetX, z: restAction!.targetZ });
+    expect(firedEventsAtEmit[0]).toContain('employee_shift_change');
   });
 
   it('does not disturb an idle employee mid-walk to board a vehicle (pendingDriverVehicleId set)', () => {
