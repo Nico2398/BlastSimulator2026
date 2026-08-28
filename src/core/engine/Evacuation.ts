@@ -12,28 +12,40 @@ import { abortBreak } from '../economy/BoulderBreaking.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 
 /**
- * PendingAction.payload key evacuateZone stamps on an action interruptActiveAction
- * just re-targeted back at the employee it interrupted (#557). Dispatch
- * (EmployeeDispatchSteps.ts's isEvacuationHoldBlocked) refuses to reclaim a
- * so-marked action while the zone it was interrupted in is still active and
- * not yet clear — otherwise the relay hands the action right back to the
- * just-evacuated employee the instant they go idle at the safe cell, walking
- * them straight back into the danger zone.
+ * PendingAction.payload key evacuateZone stamps on any action it interrupts
+ * whose own target falls inside the zone being evacuated (#557) — whether
+ * interruptActiveAction's relay re-targeted it back at the same employee (an
+ * action claimed but not yet started, TaskCancellation.ts's own re-target
+ * branch) or left it in the open pool untouched (an action already
+ * mid-progress — taskTicksRemaining > 0 — takes interruptActiveAction's other
+ * branch instead, which never touches targetEmployeeId). Dispatch
+ * (EmployeeDispatchSteps.ts's isEvacuationHoldBlocked, checked by both
+ * claimActionsTargetedAtEmployee and claimOnePoolCandidate) refuses to
+ * reclaim a so-marked action while the zone it was interrupted in is still
+ * active and not yet clear — otherwise either the relay hands the action
+ * right back to the just-evacuated employee, or (the case the mid-progress
+ * branch needs covering too) it sits in the open pool and gets picked up by
+ * whichever qualified employee goes idle first — including, confirmed live
+ * via tutorial-interactive.json's `wait_until dangerZoneClear`, the very
+ * employee who just finished evacuating, the instant they arrive at their
+ * own safe cell. Either way the target walks someone straight back into the
+ * danger zone.
  *
- * Deliberately NOT a blanket "any targeted action whose target falls in any
- * zone" rule: `state.zone.activeZone` has no way to become null again once
- * set (defineZone only ever assigns it), so a zone a player drew once, for
- * an entirely unrelated reason (site-prep clearing well before any blast
- * plan exists — confirmed live via safety-projection-visual.json's own
- * `zone clear` step, issued before its drill_plan even runs), stays "active"
- * for the rest of the session. A blanket rule permanently blocked every
- * ordinary needs-driven interruption (a proactive rest mid-walk) whose
- * target happened to sit in that old footprint — the drill/charge work the
- * zone was cleared FOR could then never resume, since the zone reads
- * "occupied" for as long as anyone is legitimately working inside it.
- * Scoping the check to only actions THIS evacuation itself re-targeted
- * avoids that false-positive entirely, while still closing the real relay
- * bug this exists for.
+ * Deliberately NOT a blanket "any pending action whose target falls in any
+ * zone" rule evaluated fresh at claim time: `state.zone.activeZone` has no
+ * way to become null again once set (defineZone only ever assigns it), so a
+ * zone a player drew once, for an entirely unrelated reason (site-prep
+ * clearing well before any blast plan exists — confirmed live via
+ * safety-projection-visual.json's own `zone clear` step, issued before its
+ * drill_plan even runs), stays "active" for the rest of the session. A rule
+ * like that would also catch every ordinary future action — a building
+ * ordered long after this evacuation completed, still sitting inside the
+ * same old footprint — for as long as anyone is legitimately working inside
+ * it, permanently blocking work the zone was cleared FOR. Stamping only the
+ * specific actions THIS evacuateZone call itself interrupted avoids that
+ * false-positive entirely: the marker is set once, only on actions that
+ * existed at this exact moment, never re-evaluated against a fresh action's
+ * geography later.
  */
 export const EVACUATION_HOLD_KEY = 'evacuationHold';
 
@@ -136,17 +148,12 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     if (!isInZone(emp.x, emp.z, zone)) continue;
     const actionId = emp.activeActionId;
     if (actionId !== null) {
+      // interruptActiveAction always leaves the action 'queued' (whether
+      // TaskCancellation's relay re-targeted it back at `emp.id` or left it
+      // in the open pool untouched) — the blanket 'queued'-action stamping
+      // loop below picks it up from there, so no separate stamp is needed
+      // here.
       interruptActiveAction(state, emp, actionId);
-      // interruptActiveAction's own "re-target the same employee if not yet
-      // arrived" relay (TaskCancellation.ts) may have just set this action's
-      // targetEmployeeId back to `emp.id` — the exact condition
-      // EVACUATION_HOLD_KEY exists to catch, scoped to only actions THIS
-      // evacuation itself re-targeted (see the constant's own doc comment
-      // for why this can't be a blanket "any zone, any interruption" rule).
-      const action = state.pendingActions.find(a => a.id === actionId);
-      if (action && action.targetEmployeeId === emp.id && isInZone(action.targetX, action.targetZ, zone)) {
-        action.payload = { ...action.payload, [EVACUATION_HOLD_KEY]: true };
-      }
     }
   }
 
@@ -154,6 +161,31 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     if (!isInZone(vehicle.x, vehicle.z, zone)) continue;
     if (vehicle.haulingPhase !== null) abortHaul(vehicle);
     if (vehicle.breakPhase !== null) abortBreak(vehicle);
+  }
+
+  // Stamp every already-queued, unheld action (targetEmployeeId === null or
+  // not — either way nobody is actively walking it right now) whose own
+  // target sits inside the zone, on top of the per-employee interruption loop
+  // above. An action can land in the open pool long before this specific
+  // evacuation call — a ramp segment interrupted by an entirely earlier
+  // collapse/rest cycle, say — and sit there queued, unclaimed, for the rest
+  // of the session; the interruption loop above only ever sees an action that
+  // was THIS tick's activeActionId for someone currently in the zone, so it
+  // never touches one that was already idle in the pool. Without this,
+  // dispatch (EmployeeDispatchSteps.ts) claims it exactly like ordinary
+  // ready work the instant anyone goes idle — including the very employee
+  // who just finished evacuating, the moment they reach their own safe cell —
+  // and walks them right back into the zone being cleared. Scoped to actions
+  // that are 'queued' (not 'assigned'/'in_progress' — those are still
+  // genuinely held by someone outside the zone, or will be caught by the
+  // per-employee loop above if that holder is inside it) at the exact moment
+  // THIS evacuateZone call runs, same "existed at this moment, never
+  // re-evaluated later" scoping EVACUATION_HOLD_KEY's own doc comment
+  // describes for why this isn't the blanket rule that doc comment rules out.
+  for (const action of state.pendingActions) {
+    if (action.status !== 'queued') continue;
+    if (!isInZone(action.targetX, action.targetZ, zone)) continue;
+    action.payload = { ...action.payload, [EVACUATION_HOLD_KEY]: true };
   }
 
   return clearZone(

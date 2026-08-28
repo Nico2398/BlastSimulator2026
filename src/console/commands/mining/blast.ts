@@ -9,6 +9,7 @@ import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
 import { addBlastFragments, syncLogisticsCapacity } from '../../../core/economy/Logistics.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { killEmployee } from '../../../core/entities/Employee.js';
+import { releaseDeadEmployeeActions } from '../../../core/engine/TaskDispatch.js';
 import { destroyVehicle } from '../../../core/entities/Vehicle.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
 import { recordBlastResult, snapshotStats } from '../../../core/campaign/SuccessTracker.js';
@@ -138,6 +139,15 @@ export function blastCommand(
     syncLogisticsCapacity(state.logistics, getStorageCapacity(state.buildings));
   }
   thisBlastAccidents.push(...impacts);
+
+  // Every employee this blast killed (exact-hit above, or attenuated via
+  // processProjections just above) may still have a PendingAction targeting
+  // or held by them — release it back to the pool now, before dispatch's
+  // next tick ever sees it, or it stalls forever pointed at a corpse (#557
+  // audit; see releaseDeadEmployeeActions' own doc comment).
+  for (const accident of thisBlastAccidents) {
+    if (accident.type === 'death') releaseDeadEmployeeActions(state, accident.entityId);
+  }
 
   // Track blast in damage state and level stats
   state.damage.blastCount++;

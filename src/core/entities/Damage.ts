@@ -115,9 +115,24 @@ export function processProjections(
       if (acc) newAccidents.push(acc);
     }
 
-    // Check employees
+    // Check employees. Only a dead employee is skipped outright — an already
+    // injured one must still be checked against every remaining fragment,
+    // not just the one that first injured them (#557 audit): before the
+    // debris-attenuation fix, a single blast could plausibly land more than
+    // one fragment within HIT_RADIUS of the same stationary employee only by
+    // rare coincidence, so this being a blast-wide (not per-fragment) skip
+    // barely mattered. Attenuating hits out to BLAST_DANGER_MARGIN_M means a
+    // multi-thousand-fragment blast routinely lands dozens of fragments
+    // within range of the same employee, and a blast-wide skip here meant
+    // whichever fragment merely injured them first (ke in [INJURY_THRESHOLD,
+    // DEATH_THRESHOLD)) made them immune to every later, possibly lethal one
+    // (ke >= DEATH_THRESHOLD) for the rest of that same blast — an early
+    // graze was silently better protection than armor. processEmployeeHit's
+    // own `injured` check (below) still no-ops a second sub-lethal graze
+    // (no duplicate morale penalty or accident record), so this only widens
+    // what a stronger, later fragment can still do to them.
     for (const emp of employees.employees) {
-      if (!emp.alive || emp.injured) continue;
+      if (!emp.alive) continue;
       if (!inZone(emp.x, emp.z)) continue;
       const dist = distanceBetween(fx, fz, emp.x, emp.z);
       const effectiveKe = keAtDistance(ke, dist);
@@ -188,6 +203,11 @@ function processEmployeeHit(
     return { tick, type: 'death', entityId: emp.id, fragmentId: frag.id, kineticEnergy: ke };
   }
   if (ke >= INJURY_THRESHOLD) {
+    // Already injured (by an earlier, weaker fragment this same blast) —
+    // injureEmployee would re-apply its own morale penalty and this would
+    // log a second, redundant injury record for what is, from the caller's
+    // no-longer-blast-wide-skip loop above, just another non-lethal graze.
+    if (emp.injured) return null;
     injureEmployee(state, emp.id);
     return { tick, type: 'injury', entityId: emp.id, fragmentId: frag.id, kineticEnergy: ke };
   }

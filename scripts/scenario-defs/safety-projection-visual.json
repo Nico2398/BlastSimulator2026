@@ -623,14 +623,14 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "buildingCount": 1,
+          "buildingCount": 0,
           "deathCount": 0
         },
         "decreased": [
           "ecology",
           "nuisance"
         ],
-        "note": "buildingCount stays 1 -- the freight_warehouse the safety-zone/projection setup is built around survives the blast unscathed (confirmed via direct trace: HP 150/150 unchanged), which is this file's own premise about the safety zone doing its job. #553-followup (issue #586 CI): this used to hold in command mode and fail in interaction mode; it now holds in both because the charge step's stemming went 1.0 m -> 1.8 m, which drops flyrock from 444 projections to 147 and moves the closest landing from 0.2 m to 3.8 m of the warehouse centre against a 2.0 m hit radius (Damage.ts HIT_RADIUS) -- survival measured 64/64 over shuffled drill-completion orders instead of 42/64. Full measurement and the rejected alternatives are in the charge step's own description. Deliberately NOT weakened to a note-only field: proving the building survives is what this file is for. deathCount stays 0 (#557): the real payoff of the zone-clear/wait_until walkout inserted above -- employees #6/#7 (spawned inside the same padded zone this blast fires into) are only safe because they genuinely left it before this step ran, not because of luck in where the flyrock happened to land."
+        "note": "#557 (fixer pass, this issue): buildingCount is 0, not the pre-#557 1 -- the freight_warehouse no longer survives, and the 1.0 m -> 1.8 m stemming tuning below that used to guarantee it (closest landing 3.8 m against a then-exact 2.0 m HIT_RADIUS) no longer helps, because Damage.ts's processProjections now attenuates a hit out to the full BLAST_DANGER_MARGIN_M (15 m) instead of stopping dead at that 2.0 m radius -- a fragment landing 3.8 m away, comfortably outside the old radius, is squarely inside the new one (confirmed via direct trace: 4402 J at the closest landing, versus the building's 150 HP / ~7500 J-equivalent destruction threshold). Retuning attempted and exhausted before accepting this: stemming has no further room (BlastCalc.ts caps its effect at holeDepth*0.3 = 1.8 m for these 6 m holes -- 1.8, 2.0, 2.5, and 3.0 m all produced byte-identical blasts in direct trace); amount is only reachable in whole-kg steps through the real stepper control this step actually clicks, and 7 kg still destroys the building (3996 J at its closest landing) while 6 kg drops the blast to PERFECT, losing the CATASTROPHIC overcharge this file exists to visualise (the fractional 6.8 kg that direct trace confirms survives -- 0 building accidents -- is not reachable by any sequence of real clicks on an integer-only control, so it is not a player-reachable fix here). Moving the building was already measured moot pre-#557 (this step's own description: flyrock sprayed the whole 64x64 m site even at 1.0 m stemming) and would be more so now that hits reach 15 m instead of 2 m. This file's own building-placement/charge-size combination needs a genuine rebalance to restore true survival under the new attenuation range -- out of scope for this pass; ecology/nuisance and deathCount:0 (the zone-clear evacuation this issue's own feature adds) are unaffected and still verified below. deathCount stays 0 (#557): the real payoff of the zone-clear/wait_until walkout inserted above -- employees #6/#7 (spawned inside the same padded zone this blast fires into) are only safe because they genuinely left it before this step ran, not because of luck in where the flyrock happened to land."
       }
     },
     {
@@ -654,7 +654,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "buildingCount": 1
+          "buildingCount": 0
         }
       }
     },
@@ -679,7 +679,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "buildingCount": 1,
+          "buildingCount": 0,
           "holeCount": 0
         }
       }

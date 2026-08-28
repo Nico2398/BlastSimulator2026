@@ -115,6 +115,35 @@ export function isZoneClear(
   for (const v of vehicles.vehicles) {
     if (isInZone(v.x, v.z, zone)) return false;
   }
+  return isZoneClearOfEmployees(zone, employees);
+}
+
+/**
+ * Check if the zone is clear of living employees — vehicles not considered.
+ * Narrower than isZoneClear, for the one caller (EmployeeDispatchSteps.ts's
+ * isEvacuationHoldBlocked) whose only real concern is a PERSON walking back
+ * into danger, not an empty vehicle's continued presence.
+ *
+ * A vehicle can be legitimately, permanently stranded (findSafeEvacuationCell
+ * found no reachable cell for it — the same "genuinely nowhere to go" outcome
+ * Evacuation.ts documents for entities, common on a small, not-yet-expanded
+ * world where the danger zone's own padding barely fits inside it at all).
+ * isZoneClear counting that stranded, driverless machine forever is correct
+ * for its own callers (isDangerZoneClear, the tutorial's blast-refusal,
+ * Fire.ts's occupant list — a fired blast on top of a vehicle is still a real
+ * cost, whether or not anyone is driving it) but would make
+ * isEvacuationHoldBlocked's own "has it become safe to resume yet" check
+ * unsatisfiable forever too, permanently blocking completely unrelated queued
+ * work (a building order, say) from ever being reclaimed by any employee who
+ * DID evacuate successfully — confirmed live via site-expansion.json: two
+ * unmanned vehicles stranded in an oversized early-game zone kept a
+ * management_office order EVACUATION_HOLD_KEY-blocked forever even after
+ * every living employee had either evacuated or died.
+ */
+export function isZoneClearOfEmployees(
+  zone: ZoneBounds,
+  employees: EmployeeState,
+): boolean {
   for (const emp of employees.employees) {
     if (!emp.alive) continue;
     if (isInZone(emp.x, emp.z, zone)) return false;
