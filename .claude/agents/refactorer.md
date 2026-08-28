@@ -15,9 +15,9 @@ Clean up code — clarity, maintainability, conventions. No behavior change.
 
 ## Do
 
-- Extract helpers when logic duplicated/complex
+- Extract helpers when logic duplicated/complex — duplication a reviewer tagged `[in-diff]` is yours to fix in this run, never a follow-up issue
 - Rename for clarity + convention compliance
-- Split files >300 lines into sub-modules
+- Split a file `tests/unit/lint/FileSizeBudget.test.ts` rejects — that test, not a line count you judge yourself, decides
 - Core error handling: `Result<T>` pattern
 - Add missing i18n entries (`en.json` + `fr.json`)
 - Comment non-obvious algorithms

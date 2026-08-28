@@ -22,6 +22,8 @@ All three of the latter become ordinary issues the moment they are filed. They d
 
 **Not everything you find belongs here.** The Follow-up Gate in `CLAUDE.md` sorts that, and `agentic-decision-autonomy` holds the procedures: something small enough to fix where you stand is fixed, not filed. Filing is for work that is genuinely its own task. An issue per two-minute fix costs a whole run to deliver two minutes of work.
 
+**Convention debt is not filed at all.** Duplication, file length, naming, comment drift, a missing mirrored test, "consider extracting" — in code the run wrote, @refactorer fixes it in the run; in code the run only read, it is recorded in the run's follow-up comment and goes no further. That class reproduces off the pipeline's own output: every merged pull request is fresh surface for the same reviewers, so filing it makes the queue grow with throughput instead of with need. A convention worth holding is worth a lint test under `tests/unit/lint/` — the file-size budget is the worked example — and a convention a test already owns is never issue material. What earns an issue is a defect: behaviour observably wrong, or a verification channel that fails to prove what it claims. `agentic-pipeline-finalization` holds the gate and the per-run cap.
+
 Two shapes are valid, and they differ in how much of the answer is already known:
 
 | Shape | Written by | Carries |
@@ -277,5 +279,7 @@ recorded can be picked up in that window.
 - [ ] A finding or a scope cut carries `## Where found` and `## Why not fixed here`
 - [ ] A scope cut names its remainder issues in the pull request body and on the original issue
 - [ ] The finding was too big to fix on the spot — anything small enough was fixed, not filed
+- [ ] The finding is a defect, or a structural filing (bypass, pause, scope cut, decision) — convention debt is recorded in the run's follow-up comment, never filed
+- [ ] The run has filed no other finding: one filed finding per run, structural filings aside
 - [ ] A bypassed blocker carries `## Bypass to remove`, and its `## Files` names the file the `TODO(#N)` sits in
 - [ ] A blocker a run paused behind is set as that issue's `blocked_by` relationship **and** written under its `Blocked by` heading, and read back to confirm

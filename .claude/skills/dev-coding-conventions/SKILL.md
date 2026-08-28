@@ -22,7 +22,7 @@ description: >
 - **Functional style** in `src/core/` — prefer pure functions, avoid mutation
 - **Interfaces over classes** for data structures; **classes** for stateful systems
 - **Named exports** — no default exports except entry points
-- **File size limit:** 300 lines per code file. Split into sub-modules if needed.
+- **File size limit:** 300 lines per code file under `src/` and `scripts/`, enforced by `tests/unit/lint/FileSizeBudget.test.ts`. A new file complies. The files already over it are grandfathered at their current size in `tests/unit/lint/file-size-baseline.json` and may only shrink — put an addition in a new module rather than growing one of them. Tests are outside the budget (a test file grows one independent case at a time, so its length carries no cohesion signal, and splitting one mints the near-duplicate fixtures a duplication review then flags), and so are the pure data tables named in that test's exemption list. **A length is never issue material** — the budget test owns the rule, so a run satisfies it or files nothing about it.
 - **Comments:** Document non-obvious algorithms. Don't comment obvious code.
 - **`TODO(#N)` — every TODO names its issue.** A bare `TODO` is debt with no owner and no queue position; `TODO(#N)` is debt an issue will come back and remove. Write what to do when #N lands, not just what is wrong, and say so on the line when the workaround degrades behaviour:
 
