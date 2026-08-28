@@ -525,7 +525,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.setGameConsole(gameConsole);
       tut.start(state);
 
-      // createMockState does not include events → pendingEvent is undefined (== null)
+      // createGame() defaults events.pendingEvent to null
       tut.stepIndex = 16;
       tut.advanceToNextStep();
 
