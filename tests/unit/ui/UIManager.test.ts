@@ -635,6 +635,7 @@ function makeVehicle(id: number): Vehicle {
     targetX: 5, targetZ: 5, driverId: null, state: 'idle', payloadKg: 0,
     waitingTicks: 0, moveConsecutiveFailures: 0, isMoveStuck: false,
     haulingFragmentId: null, haulingPhase: null, haulingDepotBuildingId: null,
+    breakFragmentId: null, breakPhase: null, reservedForActionId: null,
   };
 }
 

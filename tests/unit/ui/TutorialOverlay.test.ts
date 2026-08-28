@@ -1,30 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { TutorialOverlay } from '../../../src/ui/TutorialOverlay.js';
 import { TUTORIAL_STEPS, TOTAL_TUTORIAL_STEPS } from '../../../src/ui/tutorialSteps.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
+import { createGame } from '../../../src/core/state/GameState.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 
 function createMockState(): GameState {
-  return {
-    isPaused: false,
-    timeScale: 1,
-    time: 0,
-    tickCount: 0,
-    seed: 42,
-    version: 5,
-    mineType: 'tutorial',
-    world: null,
-    navGrid: null,
-    surveyResults: [],
-    drillHoles: [],
-    pendingActions: [],
-    employees: [] as unknown as GameState['employees'],
-    vehicles: [] as unknown as GameState['vehicles'],
-    buildings: {} as GameState['buildings'],
-  } as GameState;
+  return createGame({ seed: 42, mineType: 'tutorial' });
 }
 
 /**
@@ -542,7 +525,7 @@ describe('TutorialOverlay (12.4)', () => {
       tut.setGameConsole(gameConsole);
       tut.start(state);
 
-      // createMockState does not include events → pendingEvent is undefined (== null)
+      // createGame() defaults events.pendingEvent to null
       tut.stepIndex = 16;
       tut.advanceToNextStep();
 
@@ -629,7 +612,7 @@ describe('TutorialOverlay (12.4)', () => {
 
     it('finishing takes effect immediately during the completion message', () => {
       vi.useFakeTimers();
-      const tut = new TutorialOverlay(container);
+      const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       const state = createMockState();
       tut.start(state);
@@ -649,7 +632,7 @@ describe('TutorialOverlay (12.4)', () => {
 
     it('finish() is idempotent — calling it twice does not throw', () => {
       vi.useFakeTimers();
-      const tut = new TutorialOverlay(container);
+      const tut = new TutorialOverlay(container) as any;
       overlay = tut;
       const state = createMockState();
       tut.start(state);

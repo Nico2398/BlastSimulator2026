@@ -46,6 +46,21 @@
     // taskQueue, plus a handful of unused-import/unused-local (TS6133/TS6192)
     // and one callback-return-type (TS2322) fix. (68 -> 58 entries,
     // 200 -> 170 errors).
+    // #806 removed the 10 ./unit/ui/*.test.ts entries -- TutorialBridge,
+    // TutorialOverlay, UIManager, panels/CrewPanel, panels/FleetPanel,
+    // panels/OperationsPanel, panels/PreflightModal, panels/SurveyPanel,
+    // panels/blastSteps/Fire, and tutorialSteps. All were fixture-vs-interface
+    // drift: Employee object literals missing taskQueue and the later
+    // ticksWorked-onward field block, Vehicle literals missing
+    // breakFragmentId/breakPhase/reservedForActionId, FragmentData missing
+    // halfExtents/shapeSeed, EmployeeState missing ticksSincePayday, plus a
+    // stale two-arg toMatch() call (TS2554), two unused imports (TS6133), a
+    // hand-built GameState fixture replaced with createGame(), and two
+    // partial-GameState casts widened to the existing `as unknown as
+    // GameState` double-cast idiom already used elsewhere in the same file.
+    // (58 -> 48 entries, freshly measured 150 errors remain across the 48
+    // still-excluded files -- the prior 170 count had already drifted from
+    // the #805 measurement by the time this ran).
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -93,16 +108,6 @@
     "./unit/state/GameState.test.ts",
     "./unit/state/SaveLoad.test.ts",
     "./unit/state/logistics-serialization.test.ts",
-    "./unit/state/navgrid-serialization.test.ts",
-    "./unit/ui/TutorialBridge.test.ts",
-    "./unit/ui/TutorialOverlay.test.ts",
-    "./unit/ui/UIManager.test.ts",
-    "./unit/ui/panels/CrewPanel.test.ts",
-    "./unit/ui/panels/FleetPanel.test.ts",
-    "./unit/ui/panels/OperationsPanel.test.ts",
-    "./unit/ui/panels/PreflightModal.test.ts",
-    "./unit/ui/panels/SurveyPanel.test.ts",
-    "./unit/ui/panels/blastSteps/Fire.test.ts",
-    "./unit/ui/tutorialSteps.test.ts"
+    "./unit/state/navgrid-serialization.test.ts"
   ]
 }
