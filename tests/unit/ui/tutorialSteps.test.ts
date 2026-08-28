@@ -259,7 +259,7 @@ describe('tutorialSteps', () => {
       scores: { wellBeing: 75, safety: 80, ecology: 60, nuisance: 30 },
       collectedOre: { iron: 500 },
       cash: 25000,
-    } as GameState);
+    } as unknown as GameState);
     expect(snap9.scores).toBeDefined();
     expect(snap9.collectedOre).toBeDefined();
 
@@ -269,7 +269,7 @@ describe('tutorialSteps', () => {
     const snap18 = step18.captureSnapshot!({
       cash: 100000,
       contracts: { active: [{ id: 'c1' }] },
-    } as GameState);
+    } as unknown as GameState);
     expect(snap18.cash).toBe(100000);
 
     // needs — captures employee needs

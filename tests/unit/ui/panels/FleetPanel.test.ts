@@ -33,6 +33,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     pendingRestDuration: null, pendingRestNeedKey: null,
     pendingTaskDuration: null, pendingActionType: null,
     pendingActionPayload: null, pendingDriverVehicleId: null,
+    taskQueue: [],
     ...overrides,
   };
 }
@@ -67,6 +68,8 @@ function makeOversizedFragment(id: number, x: number, z: number, mass = 5000): F
     oreDensities: {},
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
+    halfExtents: { x: 0.5, y: 0.5, z: 0.5 },
+    shapeSeed: 1,
   };
 }
 

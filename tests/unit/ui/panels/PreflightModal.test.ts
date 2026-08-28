@@ -121,6 +121,12 @@ describe('PreflightModal', () => {
       unionized: false, injured: false, alive: true, x: 11, z: 11,
       qualifications: [], trainingState: null, activeActionId: null,
       hunger: 0, fatigue: 0, breakNeed: 0, collapsing: false, interruptedActionPayload: null,
+      ticksWorked: 0, restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+      activeTaskSkill: null, destinationX: null, destinationZ: null,
+      moveConsecutiveFailures: 0, isMoveStuck: false,
+      pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
+      pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
+      taskQueue: [],
     });
 
     modal.update(state, 'sunny');

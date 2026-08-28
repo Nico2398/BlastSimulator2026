@@ -38,12 +38,10 @@ describe('Tutorial Bridge — window.__startTutorial', () => {
     // Must have an actual assignment — not just the skeleton placeholder
     expect(src).not.toMatch(
       /\/\/\s*SKELETON.*__startTutorial/,
-      'src/main.ts still contains the SKELETON comment placeholder for __startTutorial',
     );
     // Must contain the real assignment pattern
     expect(src).toMatch(
       /window\.__startTutorial\s*=/,
-      'src/main.ts is missing the runtime assignment: window.__startTutorial = ...',
     );
   });
 
@@ -61,7 +59,6 @@ describe('Tutorial Bridge — window.__startTutorial', () => {
     // The bridge must call tutorial.start() so Puppeteer can trigger the overlay
     expect(src).toMatch(
       /window\.__startTutorial[\s\S]{0,200}?tutorial\.start\(/,
-      'window.__startTutorial must call tutorial.start()',
     );
   });
 });

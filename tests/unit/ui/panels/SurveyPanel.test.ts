@@ -20,6 +20,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     pendingRestDuration: null, pendingRestNeedKey: null,
     pendingTaskDuration: null, pendingActionType: null,
     pendingActionPayload: null, pendingDriverVehicleId: null,
+    taskQueue: [],
     ...overrides,
   };
 }
@@ -98,7 +99,7 @@ describe('SurveyPanel', () => {
 
   it('Run button is disabled with no geology-qualified surveyor', () => {
     const { panel } = makePanel();
-    panel.update(makeState({ employees: { employees: [], nextId: 1 } as GameState['employees'] }));
+    panel.update(makeState({ employees: { employees: [], nextId: 1, ticksSincePayday: 0 } as GameState['employees'] }));
     const runBtn = panel.root.querySelector<HTMLButtonElement>('#bs-survey-run')!;
     expect(runBtn.disabled).toBe(true);
     expect(panel.root.querySelector('.bs-survey-status')!.textContent).toContain('surveyor');
