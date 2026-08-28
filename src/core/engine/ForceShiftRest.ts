@@ -29,18 +29,14 @@ function finishForceRest(
   firedEvents: FiredEvent[],
   _emitter?: EventEmitter,
 ): void {
-  void state;
-  void emp;
-  void restAction;
-  void shiftRested;
-  void firedEvents;
-  void _emitter;
-  // TODO: implement
+  state.pendingActions.push(restAction);
+  emp.activeActionId = restAction.id;
+  emp.destinationX = restAction.targetX;
+  emp.destinationZ = restAction.targetZ;
+  shiftRested.push(emp.id);
+  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
 }
-
-// Referenced here only to satisfy noUnusedLocals until the implementer phase
-// wires finishForceRest into forceShiftRestIfNeeded/forceShiftRestIfNeededByPolicy.
-void finishForceRest;
 
 /**
  * If an active employee has worked enough ticks, force a shift rest:
@@ -95,13 +91,7 @@ export function forceShiftRestIfNeeded(
     payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
   }, emp.id);
 
-  state.pendingActions.push(restAction);
-  emp.activeActionId = restAction.id;
-  emp.destinationX = targetX;
-  emp.destinationZ = targetZ;
-  shiftRested.push(emp.id);
-  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  finishForceRest(state, emp, restAction, shiftRested, firedEvents, _emitter);
 }
 
 /**
@@ -249,11 +239,5 @@ export function forceShiftRestIfNeededByPolicy(
     payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId },
   }, emp.id);
 
-  state.pendingActions.push(restAction);
-  emp.activeActionId = restAction.id;
-  emp.destinationX = targetX;
-  emp.destinationZ = targetZ;
-  shiftRested.push(emp.id);
-  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  finishForceRest(state, emp, restAction, shiftRested, firedEvents, _emitter);
 }
