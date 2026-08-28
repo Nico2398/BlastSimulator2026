@@ -57,7 +57,10 @@ concurrency:
   # exactly as `handle-failure.yml` gates its own.
   group: >-
     ${{
-      contains(github.event.issue.labels.*.name, 'agent-task')
+      (
+        contains(github.event.issue.labels.*.name, 'agent-task') ||
+        contains(github.event.issue.labels.*.name, 'in-progress')
+      )
         && 'agentic-assignment'
         || format('agentic-chain-on-close-noop-{0}', github.run_id)
     }}
@@ -70,17 +73,24 @@ permissions:
 
 jobs:
   chain:
-    # `agent-task` is the pipeline's own marker: intake defines it and
-    # `agentic-issue-creation` puts it on every issue filed for the queue, so an
-    # issue a run could have held always carries it. A human closing anything
-    # else is tidying up, and must start nothing.
+    # Deliberately a superset of what the pipeline normally applies, not an
+    # exact match for it. `agent-task` is the marker `agentic-issue-creation`
+    # puts on every issue filed for the queue and the one every queued issue
+    # carries today — but `assignability.cjs` selects candidates by `ready`, not
+    # by `agent-task`, so an issue *can* be assigned without it. Keying on
+    # `agent-task` alone would then reproduce this workflow's own bug on that
+    # issue: run, close, no chain, silent stall. `in-progress` closes that gap
+    # from the other side, since assignment always applies it and a run releasing
+    # its own issue closes before dropping it.
     #
     # The real gate is in the action, not here: `closed_without_pr` refuses to
     # chain from an issue that never carried `in-progress`, and refuses again if
     # a pull request is carrying the chain already. This clause only keeps
-    # unrelated closes out of the shared concurrency group.
+    # unrelated closes out of the shared concurrency group, so erring wide costs
+    # a no-op run and erring narrow costs the queue.
     if: >-
-      contains(github.event.issue.labels.*.name, 'agent-task')
+      contains(github.event.issue.labels.*.name, 'agent-task') ||
+      contains(github.event.issue.labels.*.name, 'in-progress')
     runs-on: ubuntu-latest
     steps:
       # The assignability rules are read from the workspace, not vendored into

@@ -303,9 +303,17 @@ describe('chaining past a run whose deliverable was not a pull request', () => {
     const jobIf = text.slice(text.indexOf('\n    if: >'), text.indexOf('\n    runs-on:'));
     expect(jobIf).toContain('if: >');
 
-    const clause = "contains(github.event.issue.labels.*.name, 'agent-task')";
-    expect(concurrency, `group is missing \`${clause}\``).toContain(clause);
-    expect(jobIf, `job \`if:\` is missing \`${clause}\``).toContain(clause);
+    // Both clauses, in both places. `agent-task` is what queued issues carry;
+    // `in-progress` is what assignment applies regardless, and dropping it would
+    // leave an issue assigned without `agent-task` unable to chain — this
+    // workflow's own bug, reproduced on the issues it does not recognise.
+    for (const clause of [
+      "contains(github.event.issue.labels.*.name, 'agent-task')",
+      "contains(github.event.issue.labels.*.name, 'in-progress')",
+    ]) {
+      expect(concurrency, `group is missing \`${clause}\``).toContain(clause);
+      expect(jobIf, `job \`if:\` is missing \`${clause}\``).toContain(clause);
+    }
 
     expect(concurrency).toContain("&& 'agentic-assignment'");
     expect(concurrency).toMatch(/format\('agentic-chain-on-close-noop-\{0\}',\s*github\.run_id\)/);
