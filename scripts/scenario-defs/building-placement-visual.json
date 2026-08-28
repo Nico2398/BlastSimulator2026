@@ -23,8 +23,8 @@
     },
     {
       "command": "build living_quarters at:5,5",
-      "description": "#556: order-time validation and charging are unchanged from a direct placement -- only the result differs: a construction site is queued (orderedBuildingCount:1) instead of the building existing immediately (buildingCount stays 0). This step's own auto-captured screenshot is the 'ghost appears at order' checkpoint.",
-      "timeout": 70,
+      "description": "#556: order-time validation and charging are unchanged from a direct placement -- only the result differs: a construction site is queued (orderedBuildingCount:1) instead of the building existing immediately (buildingCount stays 0). The screenshot is taken AFTER Confirm, not before it: before Confirm the scene still shows the placement tool's own footprint preview, which existed long before this issue — what #556 adds, and what has to be seen, is the blue site ghost that stays on those exact tiles once the order is placed.",
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",
@@ -44,11 +44,15 @@
           "z": 5
         },
         {
-          "type": "screenshot"
-        },
-        {
           "type": "clickSelector",
           "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1200
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "player",
@@ -65,12 +69,19 @@
     },
     {
       "command": "tick 10",
-      "description": "#556: mid-construction checkpoint -- an unskilled roster member has had time to walk to (5,5) and start work, but tier 1's 40-tick base duration is nowhere near spent yet. This step's own auto-captured screenshot is the mid-build checkpoint (ghost still present, no building).",
-      "timeout": 30,
+      "description": "#556: mid-construction checkpoint -- an unskilled roster member has had time to walk to (5,5) and start work, but tier 1's 40-tick base duration is nowhere near spent yet. This step's own auto-captured screenshot is the mid-build checkpoint (ghost still present, no building). Screenshot: the mid-build checkpoint of #556’s order → build → stand sequence.",
+      "timeout": 90,
       "interaction": [
         {
           "type": "command",
           "command": "tick 10"
+        },
+        {
+          "type": "wait",
+          "durationMs": 1200
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup",
@@ -83,7 +94,7 @@
     },
     {
       "command": "wait_until field:buildingCount equals:1 max_ticks:300",
-      "description": "Drive the living_quarters site to completion. This step's own auto-captured screenshot is the 'finished building' checkpoint.",
+      "description": "Drive the living_quarters site to completion. This step's own auto-captured screenshot is the 'finished building' checkpoint. Screenshot: the finished checkpoint of #556’s order → build → stand sequence.",
       "timeout": 95,
       "interaction": [
         {
@@ -92,6 +103,13 @@
           "equals": 1,
           "maxTicks": 300,
           "timeoutMs": 90000
+        },
+        {
+          "type": "wait",
+          "durationMs": 1200
+        },
+        {
+          "type": "screenshot"
         }
       ],
       "role": "setup",
@@ -116,7 +134,7 @@
     {
       "command": "build blasting_academy at:10,10",
       "description": "#556: same order-then-build semantics as the first order above.",
-      "timeout": 70,
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",
@@ -202,7 +220,7 @@
     {
       "command": "build geology_lab at:15,15",
       "description": "#556: same order-then-build semantics as the orders above.",
-      "timeout": 70,
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",
@@ -287,7 +305,7 @@
     {
       "command": "build management_office at:20,20",
       "description": "#556: same order-then-build semantics as the orders above.",
-      "timeout": 70,
+      "timeout": 90,
       "interaction": [
         {
           "type": "clickSelector",

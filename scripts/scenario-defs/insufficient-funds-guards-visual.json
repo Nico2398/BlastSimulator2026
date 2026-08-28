@@ -170,12 +170,12 @@
       "role": "bootstrap"
     },
     {
-      "command": "corrupt target:witness cost:157300",
-      "description": "Setup, not the guard under test: drains cash to $1,500 via the same named cost:<amount> override attemptCorruption already accepts, landing below every one of the six real costs checked below. Drain re-measured 159500 -> 157300 (#556): the office above is queued construction now and the driller draws salary across the ticks that build it, so there is $2,200 less on the table by the time this step parks cash at exactly $1,500 for the guards below.",
+      "command": "corrupt target:witness cost:158400",
+      "description": "Setup, not the guard under test: drains cash to $1,500 via the same named cost:<amount> override attemptCorruption already accepts, landing below every one of the six real costs checked below. Drain re-measured 159500 -> 158400 (#556): the office above is queued construction now and the driller draws salary across the ticks that build it, so there is $1,100 less on the table by the time this step parks cash at exactly $1,500 for the guards below.",
       "interaction": [
         {
           "type": "command",
-          "command": "corrupt target:witness cost:157300"
+          "command": "corrupt target:witness cost:158400"
         }
       ],
       "expect": {

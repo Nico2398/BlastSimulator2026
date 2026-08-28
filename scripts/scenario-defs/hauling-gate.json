@@ -405,7 +405,11 @@
       "expect": {
         "decreased": [
           "cash"
-        ]
+        ],
+        "increased": [
+          "storedMassKg"
+        ],
+        "note": "This is the block where the gate this file is named for actually opens: the warehouse ordered at the top is standing, so the hauler has somewhere to put the blasted rock and storedMassKg climbs off 0. It moved up from the tick-60 block below (#556): ordering the warehouse rather than placing it puts a builder out on the pad, the blast catches them, and the surviving crew hauls what the blast produced inside this window instead of spilling into the next."
       }
     },
     {
@@ -433,9 +437,7 @@
         "decreased": [
           "cash"
         ],
-        "increased": [
-          "storedMassKg"
-        ]
+        "note": "storedMassKg holds at its post-haul figure here rather than climbing again (#556) — everything the blast produced was already delivered in the block above. The gate itself is asserted there."
       }
     },
     {

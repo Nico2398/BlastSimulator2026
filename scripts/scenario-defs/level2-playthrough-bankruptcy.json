@@ -964,7 +964,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7085
+          "cash": -7127
         }
       }
     },
@@ -1011,7 +1011,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -13885
+          "cash": -13975
         }
       }
     },
@@ -1058,7 +1058,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -7085
+          "cash": -7175
         }
       }
     },
@@ -1123,8 +1123,8 @@
           "tickCount": 75,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 98.13600000000032,
-          "safety": 50,
+          "wellBeing": 99.6080000000004,
+          "safety": 66.6500000000001,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": false,
@@ -1155,7 +1155,7 @@
           "levelEndReason": null
         },
         "changedBy": {
-          "cash": -13909
+          "cash": -13975
         }
       }
     },
@@ -1194,7 +1194,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": -70109,
+          "cash": -70397,
           "tickCount": 105,
           "deathCount": 0,
           "employeeCount": 10,
@@ -1314,7 +1314,7 @@
           "deathCount": 0,
           "employeeCount": 10,
           "wellBeing": 99.95,
-          "safety": 65.3000000000001,
+          "safety": 86.90000000000023,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1499,8 +1499,8 @@
           "tickCount": 160,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 99.21000000000004,
-          "safety": 83.30000000000021,
+          "wellBeing": 99.944,
+          "safety": 99.95,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1637,8 +1637,8 @@
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 93.1700000000001,
-          "safety": 92.30000000000027,
+          "wellBeing": 95.77400000000003,
+          "safety": 99.95,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1662,8 +1662,8 @@
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 93.1700000000001,
-          "safety": 92.30000000000027,
+          "wellBeing": 95.77400000000003,
+          "safety": 99.95,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,
@@ -1687,8 +1687,8 @@
           "tickCount": 180,
           "deathCount": 0,
           "employeeCount": 10,
-          "wellBeing": 93.1700000000001,
-          "safety": 92.30000000000027,
+          "wellBeing": 95.77400000000003,
+          "safety": 99.95,
           "ecology": 50,
           "nuisance": 50,
           "bankrupt": true,

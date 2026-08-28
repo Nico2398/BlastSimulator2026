@@ -656,7 +656,21 @@ export const VEHICLE_SCRAP_RESIDUAL_FRACTION = 0.4;
 export const RAMP_DIG_VOXELS_PER_TICK_TIER1 = 8;
 
 /** Base duration (ticks) of a `place_building` action before the per-tier multiplier (#556 construction sites). */
-export const BUILDING_CONSTRUCTION_BASE_DURATION_TICKS = 40;
+/**
+ * Base work a tier-1 construction site takes before the building stands (#556).
+ *
+ * 15, not the 40 this landed on first: the figure is not just the site's own
+ * duration, it is crew time. A builder walks to the site, works it in whatever
+ * blocks the site policy's rest cycle leaves them, and is worn down for
+ * everything that comes after. At 40 the tutorial's own two buildings cost the
+ * crew ~350 ticks and left them at morale 0 by the box-cut stage, deep enough
+ * into the rest cycle that they never completed a single one of its 12
+ * dig_ramp_segment actions across 300 ticks — the tutorial could not be
+ * finished, by a scenario or by a player. At 15 the same crew reaches that
+ * stage at morale ~61 and digs the ramp. Still unmistakably real work: a
+ * tier-1 building takes most of a day and a tier-3 one (x2.4) over three.
+ */
+export const BUILDING_CONSTRUCTION_BASE_DURATION_TICKS = 15;
 
 /** Per-tier multiplier applied to BUILDING_CONSTRUCTION_BASE_DURATION_TICKS (#556 construction sites) — a bigger tier takes longer to build. */
 export const BUILDING_CONSTRUCTION_TIER_MULTIPLIER: Record<BuildingTier, number> = { 1: 1, 2: 1.6, 3: 2.4 };

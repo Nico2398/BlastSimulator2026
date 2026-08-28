@@ -128,7 +128,7 @@
         "equals": {
           "orderedBuildingCount": 1
         },
-        "note": "Ordering only queues a construction site (#556); the lone driller hired above walks over and builds it during the tick blocks below, so this step asserts the site and the ticks that follow are what make it real."
+        "note": "Ordering only queues a construction site (#556); the crew hired above walks over and builds it during the tick blocks below, so this step asserts the site and the ticks that follow are what make it real."
       }
     },
     {
@@ -222,7 +222,7 @@
         "increased": [
           "minFatigue"
         ],
-        "note": "Finding #26 measured this window as still net-decreasing: auto-rest cycles had begun but each rest’s completion burst was mostly offset by the idle drain accrued during the rest itself. Ordering the quarters is queued construction now (#556), so the driller spends the two blocks above building it and the quarters only opens as a rest destination partway through this one — it lands on the collapse floor first and then climbs off it here (5.75 -> 38.80), the same #700 full-duration replenish the tick-50 block below watches, just reached one block earlier."
+        "note": "Finding #26 measured this window as still net-decreasing — auto-rest cycles had begun but each rest’s completion burst was mostly offset by the idle drain accrued during the rest itself. Ordering the quarters is queued construction now (#556), so it opens as a rest destination partway through this block instead of at the top of the file: the driller lands on the collapse floor first and then climbs off it here (5.75 -> 60.40), the same #700 full-duration replenish the tick-50 block below used to watch, reached one block earlier."
       }
     },
     {
@@ -256,13 +256,11 @@
       ],
       "role": "setup",
       "expect": {
-        "increased": [
+        "decreased": [
+          "cash",
           "minFatigue"
         ],
-        "decreased": [
-          "cash"
-        ],
-        "note": "#700: the rest cycle active by this point now applies its replenish rate for the rest's own full duration, not once -- minFatigue climbs from the collapse floor instead of merely holding near it (confirmed live: 30.05 -> 72.15 over this window)."
+        "note": "#700’s own full-duration replenish has already happened one block above (#556) — this window is the working decline that follows it (60.40 -> 32.80), not a second recovery."
       }
     },
     {

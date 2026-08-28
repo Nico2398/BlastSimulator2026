@@ -1,6 +1,6 @@
 {
   "name": "tutorial-interactive",
-  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at \u2014 speed button, toolbar, hire buttons, blast panel, event choices \u2014 and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the retired playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut.",
+  "description": "Plays the Tutorial Pit the way a first-time player does: every step is driven by a real click on the control the tutorial card points at — speed button, toolbar, hire buttons, blast panel, event choices — and each beat waits for the tutorial's own rails to advance (waitForTutorialStep) before the next click, mirroring the retired playtest definition's click path (seismic survey at 23,23; the box cut dug down the west face before the drill grid; drill grid on the exact 20,20-30,30 rectangle; haul before deliver). Every tutorial-facing step is role-marked 'player' or 'setup' (issue #479): a player step's interaction may not fall back to a console command, so a step that cannot actually be clicked fails the scenario instead of passing on a typed shortcut.",
   "skipBlastPlayback": true,
   "shots": [
     {
@@ -18,7 +18,7 @@
     {
       "command": "campaign start level:tutorial_pit cash:320000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit \u2014 the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
+      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
       "role": "setup",
       "interaction": [
         {
@@ -93,7 +93,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "Player follows the glowing Crew button \u2014 the tutorial card must not swallow the click",
+      "description": "Player follows the glowing Crew button — the tutorial card must not swallow the click",
       "role": "player",
       "interaction": [
         {
@@ -133,7 +133,7 @@
     {
       "command": "employee assign_skill 1 skill:geology level:3",
       "timeout": 30,
-      "description": "Test-only bootstrap, not a tutorial stage: hiring already grants Rookie geology (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for tighter survey estimates. No role tag \u2014 there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building, which this scenario does not need. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
+      "description": "Test-only bootstrap, not a tutorial stage: hiring already grants Rookie geology (ROLE_STARTING_QUALIFICATION in Employee.ts, same for the UI hire button and this console command), so this only raises the level for tighter survey estimates. No role tag — there is no UI control for this and none should exist; the player-facing way to raise a skill is `employee train` at a training building, which this scenario does not need. Command mode keeps running it unchanged; interaction mode keeps it as an unmarked (legacy) command step.",
       "interaction": [
         {
           "type": "command",
@@ -145,7 +145,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "the hired surveyor can actually be sent to survey: opening the Survey panel alone must already show a usable Run button \u2014 a surveyor who cannot survey is not a surveyor. If Run is disabled here, hiring grants no geology qualification and no button in the game grants one (mirrors tutorial.json's own standalone beat).",
+      "description": "the hired surveyor can actually be sent to survey: opening the Survey panel alone must already show a usable Run button — a surveyor who cannot survey is not a surveyor. If Run is disabled here, hiring grants no geology qualification and no button in the game grants one (mirrors tutorial.json's own standalone beat).",
       "role": "player",
       "interaction": [
         {
@@ -160,7 +160,7 @@
     {
       "command": "survey seismic x:23 z:23",
       "timeout": 90,
-      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk \u2014 no scripted `tick` needed once a click starts it.",
+      "description": "survey complete: seismic (the method the card names), target picked inside the step's outlined region (18..28), dispatched, and the surveyor walks out and works it. waitForTutorialStep drives the real clock for the walk — no scripted `tick` needed once a click starts it.",
       "role": "player",
       "interaction": [
         {
@@ -548,7 +548,7 @@
     {
       "command": "build_ramp start:16,19 end:16,31 depth:8",
       "timeout": 90,
-      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). waitForTutorialStep drives the real clock \u2014 no scripted `tick` needed.",
+      "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). waitForTutorialStep drives the real clock — no scripted `tick` needed.",
       "role": "player",
       "interaction": [
         {
@@ -596,7 +596,7 @@
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
       "timeout": 30,
-      "description": "Test-only bootstrap, not a tutorial stage \u2014 see the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
+      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
       "interaction": [
         {
           "type": "command",
@@ -608,7 +608,7 @@
     {
       "command": "employee assign_skill 1 skill:blasting level:3",
       "timeout": 30,
-      "description": "#707: test-only bootstrap, not a tutorial stage \u2014 grants employee #1 (surveyor\u2192digger, trained driving.excavator above) the blasting qualification. `charge_hole` gates on `requiredSkill: 'blasting'` alone (mining.ts) -- no vehicle or driving licence needed -- so employee #1, idle since box-cut finished, can now split the 9 `charge_hole` dispatches with the driller (employee #2) instead of the driller carrying drilling and all 9 charges alone. That single-employee grind is what let interaction mode's extra polling ticks (interaction-mode ticks run further ahead than command-mode ticks for the same step sequence) push well-being to 0 and hold it past REVOLT_TICKS (120 ticks, balance.ts), ending the level in a genuine worker_revolt moments before the blast step. Splitting the charge workload across two qualified employees shortens the real-tick span charging takes, closing that race. See the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
+      "description": "#707: test-only bootstrap, not a tutorial stage — grants employee #1 (surveyor→digger, trained driving.excavator above) the blasting qualification. `charge_hole` gates on `requiredSkill: 'blasting'` alone (mining.ts) -- no vehicle or driving licence needed -- so employee #1, idle since box-cut finished, can now split the 9 `charge_hole` dispatches with the driller (employee #2) instead of the driller carrying drilling and all 9 charges alone. That single-employee grind is what let interaction mode's extra polling ticks (interaction-mode ticks run further ahead than command-mode ticks for the same step sequence) push well-being to 0 and hold it past REVOLT_TICKS (120 ticks, balance.ts), ending the level in a genuine worker_revolt moments before the blast step. Splitting the charge workload across two qualified employees shortens the real-tick span charging takes, closing that race. See the geology assign_skill step above for why this stays an unmarked (legacy) command step in interaction mode too.",
       "interaction": [
         {
           "type": "command",
@@ -691,7 +691,7 @@
     {
       "command": "charge hole:* explosive:pop_rock amount:3 stemming:2",
       "timeout": 30,
-      "description": "charge ordered: Charge All Holes clicked \u2014 the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed).",
+      "description": "charge ordered: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed).",
       "role": "player",
       "interaction": [
         {
@@ -848,7 +848,7 @@
     {
       "command": "employee hire role:manager",
       "timeout": 90,
-      "description": "hire-manager complete: manager hired now that the event is resolved. #776: raised from 30s to 60s -- this step lands right after the blast sequence (steps 24-31) when the scene is heaviest, and effectiveStepTimeoutMs's formula-correct 35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out at exactly 35000ms with the real hire + tutorial advance to contract-accept already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand.",
+      "description": "hire-manager complete: manager hired now that the event is resolved. #776: raised from 30s to 60s -- this step lands right after the blast sequence (steps 24-31) when the scene is heaviest, and effectiveStepTimeoutMs's formula-correct 35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out at exactly 35000ms with the real hire + tutorial advance to contract-accept already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. Card sequence follows tutorialSteps.ts’s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract’s deadline no longer starts while a construction site is still going up.",
       "role": "player",
       "interaction": [
         {
@@ -861,74 +861,37 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "contract-accept"
-        }
-      ],
-      "expect": {
-        "tutorialStep": "contract-accept"
-      }
-    },
-    {
-      "command": "wait_until field:tickCount equals:721 max_ticks:220",
-      "timeout": 230,
-      "description": "#816 retarget: the two new order-then-wait pairs inserted upstream of the blast (build-living-quarters/build-driving-center, #556 construction sites) push this step's own command-mode entry tick from 303 to 621 (direct trace, command mode, this fix) -- roughly the +250-300 real ticks those two waits themselves cost, on top of #816's own root-cause dispatch fix (relocating a bystander stranded on a just-completed building's footprint, and letting an idle employee fall through to the open pool when its own taskQueue holds one permanently-unreachable entry) actually letting driving_center/drilling/charging complete for real instead of livelocking forever. Direct-traced (command mode) that a rubble_disposal offer is continuously present in the pool from tick 622 through at least tick 1021 (400-tick scan) -- unlike the earlier #689/#707 rounds' narrower single-instance windows, every ~20-tick rotation in this range still carries a rubble_disposal slot, so this step no longer needs to land inside one specific instance's narrow window. Retargeted 420 -> 721 (100 ticks above the command-mode floor of 621) with max_ticks widened 140 -> 220 to also clear a materially larger interaction-mode entry tick than command mode's own 621 -- interaction mode's extra role:'player' polling ticks (waitForTutorialStep/waitForSelector loops command mode's plain `command` string never runs) were already ~100 ticks ahead of command mode at a similar point in earlier, shorter rounds of this file (#707 follow-up 2's own tick-370-vs-303 trace), and this file has grown since; not independently confirmed under a live interaction-mode run this round (no browser session in this fix pass) -- if interaction mode's own entry to this step is ever traced past 721, retarget upward the same way #689/#707/#707-followup-2 each did, using the continuous-presence property above rather than re-deriving a narrow window.",
-      "role": "setup",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "tickCount",
-          "equals": 721,
-          "maxTicks": 220,
-          "timeoutMs": 200000
-        }
-      ],
-      "expect": {
-        "tutorialStep": "contract-accept",
-        "equals": {
-          "tickCount": 721
-        }
-      }
-    },
-    {
-      "command": "contract accept type:rubble_disposal",
-      "timeout": 90,
-      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this file's sibling scenarios the accept click is scoped to `[data-contract-type]`/`[data-contract-material]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. #653 review round (Finding 2): this step used to stay unscoped, reasoning that tutorialStages.ts's own 'contract-accept' stage declares its live target as the bare `#bs-contract-panel .bs-contract-accept` and that scoping raced the offer pool's own refresh clock (REFRESH_INTERVAL=20 ticks, Contract.ts) -- but an unscoped click accepts whichever offer leads the DOM, which is only rubble_disposal at some tick landings and a different type at others (replay-verified at varied timing), silently accepting the wrong contract while the later deliver step (scoped to `[data-contract-type=\"rubble_disposal\"]`) then finds nothing to deliver and times out. Scoped now, matching contract-negotiation.json/contract-panel-visual.json's own accept steps: a `waitForSelector` on the scoped selector ahead of the click gives the refresh cycle time to surface the right card instead of assuming it's there instantly, and `expect.equals` on `activeContractCount` proves the right contract landed rather than merely some contract. #653: retargeted from `type:ore_sale material:gloomium` to `type:rubble_disposal` (no `material:` -- rubble_disposal contracts carry `materialId: ''`), because the ore_sale/gloomium contract this step used to accept could never actually be delivered later (see the deliver step's own note below) -- the debris hauler this tutorial buys only ever fills storage with excavation spoil, never an ore-bearing fragment. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg`, which the hauler does fill, making this the first contract type in this run the later deliver step can genuinely complete. Live-verified landing under real render load is ~100 extra ticks reaching this point (tick 332 vs command mode's tick 232), not the 300+ an earlier round of this file assumed. issue #585 (merge, agrees independently): a hardcoded id here is exactly as fragile as the DOM-scoped click above and for the same reason -- the contract pool's ids increment off total elapsed ticks (Contract.ts) -- reaching the same `type:rubble_disposal` selector via a separate trace before #653 landed. #776: raised from 30s to 60s -- this step lands right after the blast/event/hire-manager stretch above, and effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real accept + tutorial advance to hire-driver already having succeeded before the deadline fired -- same shape as the hire-manager step's own #776 fix above. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept",
-          "timeout": 30000
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
-        },
-        {
-          "type": "waitForTutorialStep",
           "stepId": "hire-driver"
         }
       ],
       "expect": {
-        "tutorialStep": "hire-driver",
-        "equals": {
-          "activeContractCount": 1
+        "tutorialStep": "hire-driver"
+      }
+    },
+    {
+      "command": "tick 30",
+      "description": "#816 retarget: the two new order-then-wait pairs inserted upstream of the blast (build-living-quarters/build-driving-center, #556 construction sites) push this step's own command-mode entry tick from 303 to 621 (direct trace, command mode, this fix) -- roughly the +250-300 real ticks those two waits themselves cost, on top of #816's own root-cause dispatch fix (relocating a bystander stranded on a just-completed building's footprint, and letting an idle employee fall through to the open pool when its own taskQueue holds one permanently-unreachable entry) actually letting driving_center/drilling/charging complete for real instead of livelocking forever. Direct-traced (command mode) that a rubble_disposal offer is continuously present in the pool from tick 622 through at least tick 1021 (400-tick scan) -- unlike the earlier #689/#707 rounds' narrower single-instance windows, every ~20-tick rotation in this range still carries a rubble_disposal slot, so this step no longer needs to land inside one specific instance's narrow window. Retargeted 420 -> 721 (100 ticks above the command-mode floor of 621) with max_ticks widened 140 -> 220 to also clear a materially larger interaction-mode entry tick than command mode's own 621 -- interaction mode's extra role:'player' polling ticks (waitForTutorialStep/waitForSelector loops command mode's plain `command` string never runs) were already ~100 ticks ahead of command mode at a similar point in earlier, shorter rounds of this file (#707 follow-up 2's own tick-370-vs-303 trace), and this file has grown since; not independently confirmed under a live interaction-mode run this round (no browser session in this fix pass) -- if interaction mode's own entry to this step is ever traced past 721, retarget upward the same way #689/#707/#707-followup-2 each did, using the continuous-presence property above rather than re-deriving a narrow window. REPLACED for #556: an absolute tickCount target cannot hold here — command mode and interaction mode enter this step hundreds of ticks apart (interaction mode runs polling ticks command mode never does), and `equals` only matches going forward, so any single number is either already behind one mode or out of reach of the other. What the step actually needs is in the note above: a rubble_disposal offer is continuously present through this range, not confined to one narrow window, so a short relative block that turns the pool once (REFRESH_INTERVAL 20 ticks, Contract.ts) buys it in either mode.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 30"
         }
+      ],
+      "role": "setup",
+      "expect": {
+        "tutorialStep": "hire-driver"
       }
     },
     {
       "command": "employee hire role:driver",
       "timeout": 90,
-      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and contract-accept steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center/freight_warehouse both complete for real and cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely.",
+      "description": "hire-driver complete: driver hired through the crew panel. #776: raised from 30s to 60s -- same shape as the hire-manager and contract-accept steps' own #776 fixes above: effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real hire + tutorial advance to vehicle-buy-assign already having succeeded before the deadline fired. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. #816: no longer downstream of the set_policy mode:continuous construction livelock -- driving_center/freight_warehouse both complete for real and cash recovers on schedule now that place_building's root-cause livelock is fixed, so this succeeds genuinely. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556/#817): with contract-accept moved below build-storage, the step before this one is the manager hire and the panel is already open — the toolbar tab toggles, so a second click would close it, and the rail (which lights the last reachable control) makes that click inert.",
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "clickSelector",
@@ -946,7 +909,7 @@
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
       "timeout": 90,
-      "description": "Test-only bootstrap, not a tutorial stage \u2014 see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically. #776: raised to 90s -- confirmed the actual command succeeded and only the shot-capture cost (this scenario's shots:[\"overview\",\"birdseye\"]) exceeded the tight 30s default on this and the surrounding post-blast steps; floored to the file's own established 90s precedent (steps 31/39/41/42) instead of retuning each step individually. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root (tickTaskCompletion.ts), so this succeeds genuinely.",
+      "description": "Test-only bootstrap, not a tutorial stage — see the geology assign_skill step above; hiring already grants Rookie driving.truck, this only raises the level. Kept for command mode, which needs it for its own explicit `vehicle driver 1 4` to succeed identically. #776: raised to 90s -- confirmed the actual command succeeded and only the shot-capture cost (this scenario's shots:[\"overview\",\"birdseye\"]) exceeded the tight 30s default on this and the surrounding post-blast steps; floored to the file's own established 90s precedent (steps 31/39/41/42) instead of retuning each step individually. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root (tickTaskCompletion.ts), so this succeeds genuinely.",
       "interaction": [
         {
           "type": "command",
@@ -983,7 +946,7 @@
     {
       "command": "vehicle driver 3 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards \u2014 the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1 (destroyed by its own blast, but the id isn't reused). #653: vehicle #3, not #2 -- both vehicles bought earlier in this run (drill_rig #1, rock_digger #2) are destroyed by an earlier blast (vehicleCount 2\u21920, deathCount 0\u21922), so ids are never reused and the debris_hauler bought in the previous step is vehicle #3. issue #585 (merge, agrees independently): same #3 conclusion, confirmed via a separate direct trace before #653 landed. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root, so this succeeds genuinely.",
+      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1 (destroyed by its own blast, but the id isn't reused). #653: vehicle #3, not #2 -- both vehicles bought earlier in this run (drill_rig #1, rock_digger #2) are destroyed by an earlier blast (vehicleCount 2→0, deathCount 0→2), so ids are never reused and the debris_hauler bought in the previous step is vehicle #3. issue #585 (merge, agrees independently): same #3 conclusion, confirmed via a separate direct trace before #653 landed. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root, so this succeeds genuinely.",
       "role": "player",
       "interaction": [
         {
@@ -1040,7 +1003,7 @@
     {
       "command": "tick 1",
       "timeout": 95,
-      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, so a proactive-rest policy no longer strands anyone permanently). Waits on orderedBuildingCount returning to 0 rather than a hardcoded buildingCount total -- this scenario's own buildingCount at this point depends on how many earlier orders (driving_center, freight_warehouse) have already landed, which this fix run re-verifies directly rather than assumes.",
+      "description": "#556/#816: build-storage complete -- the freight_warehouse site finishes construction (root-cause livelock in place_building's dispatch/interruption logic fixed: an idle bystander employee standing on a just-completed building's footprint is now relocated the same way the builder already was, so a proactive-rest policy no longer strands anyone permanently). Waits on orderedBuildingCount returning to 0 rather than a hardcoded buildingCount total -- this scenario's own buildingCount at this point depends on how many earlier orders (driving_center, freight_warehouse) have already landed, which this fix run re-verifies directly rather than assumes. Card sequence follows tutorialSteps.ts’s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract’s deadline no longer starts while a construction site is still going up.",
       "role": "setup",
       "interaction": [
         {
@@ -1055,7 +1018,38 @@
         "equals": {
           "orderedBuildingCount": 0
         },
-        "tutorialStep": "haul-debris"
+        "tutorialStep": "contract-accept"
+      }
+    },
+    {
+      "command": "contract accept type:rubble_disposal",
+      "timeout": 90,
+      "description": "contract-accept complete: Accept clicked on the offer this step's `command` names. #513/#581: elsewhere in this file's sibling scenarios the accept click is scoped to `[data-contract-type]`/`[data-contract-material]` rather than a bare `.bs-contract-accept` (which resolves to whichever offered card leads the DOM), so a scoped click can't silently accept a different contract than the command names. #653 review round (Finding 2): this step used to stay unscoped, reasoning that tutorialStages.ts's own 'contract-accept' stage declares its live target as the bare `#bs-contract-panel .bs-contract-accept` and that scoping raced the offer pool's own refresh clock (REFRESH_INTERVAL=20 ticks, Contract.ts) -- but an unscoped click accepts whichever offer leads the DOM, which is only rubble_disposal at some tick landings and a different type at others (replay-verified at varied timing), silently accepting the wrong contract while the later deliver step (scoped to `[data-contract-type=\"rubble_disposal\"]`) then finds nothing to deliver and times out. Scoped now, matching contract-negotiation.json/contract-panel-visual.json's own accept steps: a `waitForSelector` on the scoped selector ahead of the click gives the refresh cycle time to surface the right card instead of assuming it's there instantly, and `expect.equals` on `activeContractCount` proves the right contract landed rather than merely some contract. #653: retargeted from `type:ore_sale material:gloomium` to `type:rubble_disposal` (no `material:` -- rubble_disposal contracts carry `materialId: ''`), because the ore_sale/gloomium contract this step used to accept could never actually be delivered later (see the deliver step's own note below) -- the debris hauler this tutorial buys only ever fills storage with excavation spoil, never an ore-bearing fragment. rubble_disposal is fulfilled by `consumeStoredOre()` drawing on raw `storedMassKg`, which the hauler does fill, making this the first contract type in this run the later deliver step can genuinely complete. Live-verified landing under real render load is ~100 extra ticks reaching this point (tick 332 vs command mode's tick 232), not the 300+ an earlier round of this file assumed. issue #585 (merge, agrees independently): a hardcoded id here is exactly as fragile as the DOM-scoped click above and for the same reason -- the contract pool's ids increment off total elapsed ticks (Contract.ts) -- reaching the same `type:rubble_disposal` selector via a separate trace before #653 landed. #776: raised from 30s to 60s -- this step lands right after the blast/event/hire-manager stretch above, and effectiveStepTimeoutMs's formula-correct ~35000ms (30s declared vs innerMs+margin) proved empirically insufficient in two independent interaction-mode runs, both timing out here with the real accept + tutorial advance to hire-driver already having succeeded before the deadline fired -- same shape as the hire-manager step's own #776 fix above. #776 follow-up: raised again to 90s -- floored with every other post-blast step to this file's own established 90s precedent (steps 31/39/41/42), covering this scenario's shots:[\"overview\",\"birdseye\"] render cost rather than retuning each step by hand. Card sequence follows tutorialSteps.ts’s reordered canonical order (#556/#817): contract-accept now sits after build-storage, so a contract’s deadline no longer starts while a construction site is still going up.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept",
+          "timeout": 30000
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-contract-panel [data-contract-type=\"rubble_disposal\"] .bs-contract-accept"
+        },
+        {
+          "type": "waitForTutorialStep",
+          "stepId": "haul-debris"
+        }
+      ],
+      "expect": {
+        "tutorialStep": "haul-debris",
+        "equals": {
+          "activeContractCount": 1
+        }
       }
     },
     {
@@ -1115,14 +1109,13 @@
         "equals": {
           "activeContractCount": 0
         },
-        "note": "TODO(#817): activeContractCount:0 holds, but not for the reason #653/#585/#707's own history here describes (a genuinely completed delivery) -- the contract has already expired by the time this step runs (see this step's own description), so activeContractCount was already 0 going in. commandOutcome:'refused' below is the honest declaration; this equals check is kept because it remains true either way (a completed delivery and an already-expired contract both leave the count at 0), not because delivery actually succeeded. #817 will need this note (and the interaction array's own waitForTutorialStep, which currently expects the tutorial to advance past 'contract-deliver' -- it currently cannot, since the card only moves on once completedHistory increases) revisited once the deadline/construction-time conflict is resolved."
-      },
-      "commandOutcome": "refused"
+        "note": "A genuinely completed delivery again — which is what #653/#585/#707’s own history here describes, and what #817 recorded as no longer true. The contract is accepted after the warehouse stands now (tutorialSteps.ts’s reordered canonical sequence, #556), so its deadline is not spent watching a construction site and it is still live when this runs. activeContractCount drops to 0 by completion, not by expiry, and the payout is what proves the difference. The payout itself is not asserted here: in interaction mode the payroll accrued across the step’s own clicks can outweigh a small delivery, so the direction of cash is not a stable claim. What is stable, and what #817 was about, is that the count drops by completion — the contract is still live when this runs instead of having expired during a construction wait."
+      }
     },
     {
       "command": "set_policy mode:shift_8h",
       "timeout": 90,
-      "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) \u2014 the form mirrors the policy in force, and applying it unchanged still counts. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
+      "description": "set-policy complete: Apply pressed in the Operations panel (redesign P5 moved site policy out of Settings) — the form mirrors the policy in force, and applying it unchanged still counts. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "player",
       "interaction": [
         {
@@ -1152,13 +1145,13 @@
       ],
       "expect": {
         "tutorialStep": "tick-advance",
-        "note": "Applies without touching a control first \u2014 the form mirrors the policy already in force, and it used to leave the step stuck while the panel said the policy had been updated (mirrors tutorial.json's own note)."
+        "note": "Applies without touching a control first — the form mirrors the policy already in force, and it used to leave the step stuck while the panel said the policy had been updated (mirrors tutorial.json's own note)."
       }
     },
     {
       "command": "tick 6",
       "timeout": 90,
-      "description": "tick-advance complete: the tutorial's own clock runs \u2014 the whole point of this step \u2014 until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the retired playtest's own beat, which was `letTimePass` only. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
+      "description": "tick-advance complete: the tutorial's own clock runs — the whole point of this step — until tickCount has advanced more than 5, reaching the closing victory card. No click and no scripted `tick`: mirrors the retired playtest's own beat, which was `letTimePass` only. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "player",
       "interaction": [
         {
@@ -1180,7 +1173,7 @@
     {
       "command": "campaign complete",
       "timeout": 90,
-      "description": "victory complete: level ends, card shows Tutorial Complete. Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action \u2014 `campaign` is on the reused setup allowlist. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
+      "description": "victory complete: level ends, card shows Tutorial Complete. Forces the transition so the scenario ends deterministically rather than waiting out the profit-threshold win check; not a player action — `campaign` is on the reused setup allowlist. #776: raised to 90s -- post-blast step under this scenario's shots:[\"overview\",\"birdseye\"] render cost; floored to the file's own established 90s precedent (steps 31/39/41/42) alongside its neighbors rather than retuning individually.",
       "role": "setup",
       "interaction": [
         {

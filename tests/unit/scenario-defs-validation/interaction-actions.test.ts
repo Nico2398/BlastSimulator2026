@@ -321,15 +321,18 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
   forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
     const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
     if (stepObj.command !== 'employee hire role:manager') return;
-    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('contract-accept')) return;
+    // 'hire-driver', not 'contract-accept' (#556/#817): contract-accept moved
+    // below build-storage in tutorialSteps.ts's canonical order, so the card
+    // this beat waits for is the one after it. Same step, same #776 budget.
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('hire-driver')) return;
     matchedStepIndex = stepIndex;
     matchedStepObj = stepObj;
   });
 
-  it('step hiring the manager and waiting for tutorial step "contract-accept" has effectiveStepTimeoutMs >= 60000ms', () => {
+  it('step hiring the manager and waiting for tutorial step "hire-driver" has effectiveStepTimeoutMs >= 60000ms', () => {
     expect(
       matchedStepIndex,
-      'expected to find a step with command "employee hire role:manager" whose interaction array waits for tutorial step "contract-accept" — tutorial-interactive.json may have changed shape',
+      'expected to find a step with command "employee hire role:manager" whose interaction array waits for tutorial step "hire-driver" — tutorial-interactive.json may have changed shape',
     ).toBeGreaterThanOrEqual(0);
 
     const stepObj = matchedStepObj as ScenarioStepDef;
@@ -360,15 +363,18 @@ describe('tutorial-interactive.json — post-blast waitForTutorialStep steps hav
   forEachActionOfType(scenario, 'waitForTutorialStep', (action, stepIndex) => {
     const stepObj = scenario.steps[stepIndex] as ScenarioStepDef;
     if (stepObj.command !== 'contract accept type:rubble_disposal') return;
-    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('hire-driver')) return;
+    // 'haul-debris', not 'hire-driver' (#556/#817): see the note on the
+    // manager beat above — the accept now sits after build-storage, so the
+    // card it waits for is haul-debris.
+    if (!(Array.isArray(action.stepId) ? action.stepId : [action.stepId]).includes('haul-debris')) return;
     driverStepIndex = stepIndex;
     driverStepObj = stepObj;
   });
 
-  it('step accepting the rubble_disposal contract and waiting for tutorial step "hire-driver" has effectiveStepTimeoutMs >= 60000ms', () => {
+  it('step accepting the rubble_disposal contract and waiting for tutorial step "haul-debris" has effectiveStepTimeoutMs >= 60000ms', () => {
     expect(
       driverStepIndex,
-      'expected to find a step with command "contract accept type:rubble_disposal" whose interaction array waits for tutorial step "hire-driver" — tutorial-interactive.json may have changed shape',
+      'expected to find a step with command "contract accept type:rubble_disposal" whose interaction array waits for tutorial step "haul-debris" — tutorial-interactive.json may have changed shape',
     ).toBeGreaterThanOrEqual(0);
 
     const stepObj = driverStepObj as ScenarioStepDef;
