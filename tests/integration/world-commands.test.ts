@@ -17,7 +17,7 @@ describe('Console — world commands', () => {
   let ctx: GameContext;
 
   beforeEach(() => {
-    ctx = { state: null, grid: null, emitter: new EventEmitter() };
+    ctx = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   });
 
   describe('new_game', () => {
@@ -159,7 +159,7 @@ describe('Console — world commands', () => {
     });
 
     it('errors with no game loaded', () => {
-      const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+      const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
       const result = inspectCommand(emptyCtx, ['10,5,3'], {});
       expect(result.success).toBe(false);
     });

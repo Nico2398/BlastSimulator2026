@@ -29,7 +29,7 @@ import { SURVEY_DURATION_TICKS, XP_THRESHOLDS } from '../../src/core/config/bala
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }

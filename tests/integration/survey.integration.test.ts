@@ -22,7 +22,7 @@ import { cancelAction } from '../../src/core/engine/TaskDispatch.js';
 import { VoxelGrid } from '../../src/core/world/VoxelGrid.js';
 import { Random } from '../../src/core/math/Random.js';
 import { createGame } from '../../src/core/state/GameState.js';
-import { SURVEY_STALE_TICKS, SURVEY_COSTS, STARTING_CASH, SURVEY_DURATION_TICKS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
+import { SURVEY_STALE_TICKS, SURVEY_COSTS, SURVEY_DURATION_TICKS, AGENT_WALK_SPEED } from '../../src/core/config/balance.js';
 import { hireEmployee, assignSkill } from '../../src/core/entities/Employee.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 
@@ -30,7 +30,7 @@ import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }
@@ -438,6 +438,8 @@ describe('Survey system', () => {
         oreDensities: { blingite: 0.5 },
         initialVelocity: { x: 0, y: 0, z: 0 },
         isProjection: false,
+        halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+        shapeSeed: 1,
       },
       {
         id: 2,
@@ -448,6 +450,8 @@ describe('Survey system', () => {
         oreDensities: { dirtite: 0.3 },
         initialVelocity: { x: 0, y: 0, z: 0 },
         isProjection: false,
+        halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+        shapeSeed: 2,
       },
     ];
 
@@ -524,7 +528,6 @@ describe('Survey system', () => {
   // ── Additional: survey cost deducted from cash via runSurvey ──────────────
 
   it('survey cost is deducted from cash', () => {
-    const grid = makeOreGrid(30);
     const state = createGame({ seed: 42, startingCash: 100_000 });
 
     // Add a surveyor with geology

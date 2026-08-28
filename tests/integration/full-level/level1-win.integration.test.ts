@@ -24,7 +24,6 @@ describe('Level 1 — Win', () => {
     expect(ctx.state).not.toBeNull();
     expect(ctx.state!.cash).toBe(50000);
     expect(ctx.state!.campaign.activeLevelId).toBe('dusty_hollow');
-    expect(ctx.state!.grid).not.toBeNull();
     // Verify grid dimensions: dusty_hollow = 96x40x96 (#458 T6.1/D13)
     expect(ctx.grid).not.toBeNull();
     expect(ctx.grid!.sizeX).toBe(96);

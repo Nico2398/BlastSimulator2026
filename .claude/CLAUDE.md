@@ -138,13 +138,19 @@ Sort a finding by **size** and by **whether it is in your way**. Those two quest
 | You found | You do |
 |-----------|--------|
 | Something small enough to fix where you stand — a wrong path, a stale comment, a one-line guard, a missing type | **Fix it.** No issue. A separate issue for a two-minute fix costs a whole run to deliver. |
-| Tech debt, a gap, or an inconsistency that is **not in your way** | File the finding and carry on — `agentic-issue-creation` |
+| Duplication, a long file, a naming slip, a missing mirrored test — **in code this run wrote** | **Fix it here.** That is what the refactor phase is for. Filing it defers a five-minute fix into a whole run. |
+| The same shape of finding, in code this run only read | **Record it.** It goes in the run's follow-up comment, where a human or a later run can promote it — `agentic-pipeline-finalization` holds the filing gate |
+| A defect — behaviour that is observably wrong, or a verification channel that fails to prove what it claims | File it — `agentic-issue-creation`. This is the finding the mechanism exists for. |
 | Something in your way that you can **work around** | File it, then bypass it with a `TODO(#N)` naming that issue, and finish your task on the bypass. The filed issue removes the bypass when it lands. |
 | Something in your way with **no way around it** — your task cannot be delivered at all | File it, then **pause**: your issue returns to `ready` with the new issue as its `Blocked by`, and any work already done goes on a draft PR labelled `paused` — `agentic-decision-autonomy` |
 | A default you chose that a human may want to revisit | File the decision — `agentic-decision-autonomy` |
 | That your own task is bigger than one run | File the scope you cut, so the remainder is not lost — `agentic-issue-creation` |
 
-**Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you — it is filed after review, once every agent's findings are in.
+**Filing never halts you.** It does not hold your PR, downgrade it to draft, or leave your own issue non-terminal. Fix what your change exposes; file the rest. If your tools block `gh`, hand the finding to whoever invoked you — it is dispositioned after review, once every agent's findings are in.
+
+**One issue per run.** The gate is a cap as well as a filter: a run files at most one issue for what it found, on top of whatever a bypass, a pause or a scope cut structurally requires — those carry a `TODO(#N)` or a named remainder, and dropping them leaves the codebase pointing at nothing. Everything else it found is recorded in the follow-up comment instead. A pipeline that files as fast as it merges spends its throughput on itself: one measured stretch ran at 0.99 follow-up issues per run, with half of all merged pull requests resolving issues the pipeline had filed for itself and finding-chains seven generations deep, while the two human-authored gameplay issues in the queue went untouched.
+
+**A convention a machine can check is never issue material.** The file-size budget (`tests/unit/lint/FileSizeBudget.test.ts`) either passes or fails on the spot; a run satisfies it, and files nothing about a length the baseline already accepts. The same holds for any convention that grows a lint test — enforce it there, do not re-discover it once per pull request.
 
 **A blocker in your path is not automatically the end of your run.** Reach for the bypass before the pause: a `TODO(#N)` that keeps the rest of the task deliverable is worth far more than a run that stops with nothing landed. Pause only when there is genuinely nothing left to deliver. And `blocked` is narrower still — it is for a question only a human can answer, never for work another issue will do.
 

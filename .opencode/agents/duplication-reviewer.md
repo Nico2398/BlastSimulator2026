@@ -54,6 +54,10 @@ handles that) — focus on **semantic and structural** duplication.
 ### Semantic Coherence
 - Delegated to `@semantic-reviewer`. If semantic-reviewer fails, do not override.
 
+## Who Fixes What You Flag
+
+Duplication you tag `[in-diff]` is @refactorer's, fixed inside this run — it is code this run wrote, and a five-minute extraction filed as an issue costs a whole run to deliver. Duplication you tag `[pre-existing]` is recorded in the run's follow-up comment and files nothing on its own: extraction debt in code the diff only read reproduces faster than the queue consumes it, and the queue is for defects. Report both the same way; the disposition is not yours to make.
+
 ## What NOT to Flag
 
 - Syntactic clones already caught by jscpd (qualimetry step).
@@ -76,7 +80,7 @@ handles that) — focus on **semantic and structural** duplication.
 
 ## Output Format
 
-Tag every finding with its scope so `merge-findings` can disposition it: `[in-diff]` when it sits inside what this PR changed or broke, `[pre-existing]` when the diff merely revealed it. Report a `[pre-existing]` finding like any other — the orchestrator files it as a follow-up issue rather than widening this PR. Report it rather than filing it: mutating `gh` is blocked for this agent by design.
+Tag every finding with its scope so `merge-findings` can disposition it: `[in-diff]` when it sits inside what this PR changed or broke, `[pre-existing]` when the diff merely revealed it. Report a `[pre-existing]` finding like any other — never widen this PR to fix one. The orchestrator dispositions it by the filing gate in `agentic-pipeline-finalization`: a defect may become an issue, and convention debt is recorded in the run's follow-up comment instead of filed. Report it rather than filing it: mutating `gh` is blocked for this agent by design.
 
 Each finding includes a confidence level:
 

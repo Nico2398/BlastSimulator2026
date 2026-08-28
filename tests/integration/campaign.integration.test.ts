@@ -32,7 +32,7 @@ import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }
@@ -278,7 +278,6 @@ describe('Campaign', () => {
   // ── 9. calculateStarRating returns 1-3 stars ───────────────────────────────
 
   it('calculateStarRating returns 1-3 stars based on profit, safety, and ecology', () => {
-    const profitTarget = 80000;
     const threshold = 80000;
 
     // ── 3 stars: all criteria met ──
@@ -490,7 +489,7 @@ describe('Campaign', () => {
   // ── 12. campaign start with no prior game ──────────────────────────────────
 
   it('campaign start succeeds with no prior game, same as after a fresh new_game', () => {
-    const freshCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const freshCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
 
     const result = campaignStartCommand(freshCtx, [], { level: 'tutorial_pit' });
 
@@ -503,7 +502,7 @@ describe('Campaign', () => {
   });
 
   it('campaign start with no prior game rejects a locked level, same as with one', () => {
-    const freshCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const freshCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
 
     const result = campaignStartCommand(freshCtx, [], { level: 'grumpstone_ridge' });
 
@@ -593,18 +592,16 @@ describe('Campaign', () => {
 
     const fragments = [
       {
-        volume: 25,
-        density: 2.0,
-        oreDensities: { blingite: 0.3, dirtite: 0.1 },
-        velocity: { x: 0, y: 0, z: 0 },
-        position: { x: 0, y: 0, z: 0 },
+        id: 1, position: { x: 0, y: 0, z: 0 }, volume: 25, mass: 50,
+        rockId: 'sandite', oreDensities: { blingite: 0.3, dirtite: 0.1 },
+        initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+        halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 1,
       },
       {
-        volume: 15,
-        density: 1.5,
-        oreDensities: { blingite: 0.0, dirtite: 0.5 },
-        velocity: { x: 0, y: 0, z: 0 },
-        position: { x: 0, y: 0, z: 0 },
+        id: 2, position: { x: 0, y: 0, z: 0 }, volume: 15, mass: 50,
+        rockId: 'sandite', oreDensities: { blingite: 0.0, dirtite: 0.5 },
+        initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+        halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 2,
       },
     ];
 
@@ -617,11 +614,10 @@ describe('Campaign', () => {
 
     // Adding another blast with a new ore
     recordBlastResult(stats, [{
-      volume: 10,
-      density: 1.0,
-      oreDensities: { treranium: 0.8 },
-      velocity: { x: 0, y: 0, z: 0 },
-      position: { x: 0, y: 0, z: 0 },
+      id: 3, position: { x: 0, y: 0, z: 0 }, volume: 10, mass: 50,
+      rockId: 'sandite', oreDensities: { treranium: 0.8 },
+      initialVelocity: { x: 0, y: 0, z: 0 }, isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 3,
     }]);
 
     expect(stats.totalVolumeBlasted).toBe(50);

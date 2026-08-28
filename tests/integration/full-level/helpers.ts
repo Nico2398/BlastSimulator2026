@@ -12,7 +12,7 @@ import { recordProfit } from '../../../src/core/campaign/Campaign.js';
  * Used as the base for all full-level test helpers.
  */
 function createBaseContext(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }

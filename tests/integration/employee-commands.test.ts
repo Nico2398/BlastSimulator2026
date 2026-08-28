@@ -12,7 +12,7 @@ import { killEmployee } from '../../src/core/entities/Employee.js';
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }
@@ -278,7 +278,7 @@ describe('Console — set_policy', () => {
   });
 
   it('errors when no game is loaded', () => {
-    const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const emptyCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
     const result = setPolicyCommand(emptyCtx, [], { mode: 'shift_8h' });
 
     expect(result.success).toBe(false);
@@ -345,7 +345,7 @@ describe('Console — needs command', () => {
   });
 
   it('handles no game loaded', () => {
-    const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const emptyCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
     const result = needsCommand(emptyCtx, [], {});
 
     expect(result.success).toBe(false);

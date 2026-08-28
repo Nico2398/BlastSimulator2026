@@ -217,7 +217,6 @@ function validateStateFile(filePath: string): ValidationResult {
       validateObject('uiState', uiState, UI_STATE_SCHEMA, errors);
       warnings.push(...checkUnknownFields('uiState', uiState, UI_STATE_SCHEMA));
     }
-
   } catch (err: any) {
     errors.push({
       path: '',

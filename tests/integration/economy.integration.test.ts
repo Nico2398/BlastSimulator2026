@@ -23,8 +23,6 @@ import {
   getBalance,
   getFinancialReport,
   type FinanceState,
-  type IncomeCategory,
-  type ExpenseCategory,
 } from '../../src/core/economy/Finance.js';
 import {
   createContractState,
@@ -92,6 +90,8 @@ function pushStoredFragment(
     oreDensities,
     initialVelocity: { x: 0, y: 0, z: 0 },
     isProjection: false,
+    halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+    shapeSeed: id,
   };
   ctx.state!.logistics.fragments.push({ fragment, state: 'stored', vehicleId: null });
   ctx.state!.logistics.storedMassKg += mass;
@@ -100,7 +100,7 @@ function pushStoredFragment(
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }
@@ -629,7 +629,7 @@ describe('Economy', () => {
       tick += 20;
       generateContracts(ctx.state!.contracts, new Random(7 + tick), tick);
     }
-    expect(contractCommand(ctx, ['accept', String(evictedId)]).success).toBe(false);
+    expect(contractCommand(ctx, ['accept', String(evictedId)], {}).success).toBe(false);
 
     // If a same-kind contract is still on offer, the selector finds it —
     // no id renumbering required.
@@ -913,6 +913,8 @@ describe('Economy', () => {
       oreDensities: { gloomium: 0.4 },
       initialVelocity: { x: 0, y: 0, z: 0 },
       isProjection: false,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+      shapeSeed: 9001,
     };
     ctx.state!.logistics.fragments.push({ fragment, state: 'on_ground', vehicleId: null });
 

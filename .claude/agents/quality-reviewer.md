@@ -38,7 +38,7 @@ Adjust review depth based on `risk_tier` from context:
 - **PRNG** — `Math.random()` used directly. Must use `src/core/math/Random.ts`.
 - **TypeScript strict** — `any` outside test fixtures. Excessive `as` assertions.
 - **Config** — hardcoded balance numbers. Must use `src/core/config/`.
-- **File size** — code files >300 lines (data/i18n JSON exempt).
+- **File size** — owned by `tests/unit/lint/FileSizeBudget.test.ts`, never reported here. A length that test accepts is not a finding.
 - **Dead code** — unreachable branches, unused imports, commented-out code.
 - **Naming** — inconsistent identifiers vs conventions in `dev-coding-conventions` skill.
 - **SOLID principles** — violations of single responsibility (class/function does too much), dependency inversion (high-level depends on low-level details), or interface segregation (bloated interfaces) per `dev-coding-conventions` skill.
@@ -75,7 +75,7 @@ Adjust review depth based on `risk_tier` from context:
 
 ## Output Format
 
-Tag every finding with its scope so `merge-findings` can disposition it: `[in-diff]` when it sits inside what this PR changed or broke, `[pre-existing]` when the diff merely revealed it. Report a `[pre-existing]` finding like any other — the orchestrator files it as a follow-up issue rather than widening this PR. Report it rather than filing it: mutating `gh` is blocked for this agent by design.
+Tag every finding with its scope so `merge-findings` can disposition it: `[in-diff]` when it sits inside what this PR changed or broke, `[pre-existing]` when the diff merely revealed it. Report a `[pre-existing]` finding like any other — never widen this PR to fix one. The orchestrator dispositions it by the filing gate in `agentic-pipeline-finalization`: a defect may become an issue, and convention debt is recorded in the run's follow-up comment instead of filed. Report it rather than filing it: mutating `gh` is blocked for this agent by design.
 
 Each finding includes a confidence level:
 
@@ -88,7 +88,7 @@ Each finding includes a confidence level:
 ### Findings
 - src/core/foo/Bar.ts:42 — Math.random() used directly [critical] [high]
 - src/core/foo/Bar.ts:100 — hardcoded balance value 1.5 [warning] [medium]
-- src/ui/Baz.ts:200 — file exceeds 300 lines (342) [suggestion] [low]
+- src/ui/Baz.ts:200 — `Baz` mixes panel layout with save-state serialisation (single responsibility) [suggestion] [low]
 
 ### Summary
 Critical: 1 | Warning: 1 | Suggestion: 1 | Clean: ✅/❌

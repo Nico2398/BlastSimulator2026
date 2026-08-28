@@ -29,7 +29,7 @@ import {
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }
@@ -120,7 +120,6 @@ describe('Employee needs', () => {
     tickNeedGauges(emp, 'working');
     const workingHunger = emp.hunger;
     const workingFatigue = emp.fatigue;
-    const workingBreak = emp.breakNeed;
 
     // Reset and do one idle tick
     emp.hunger = 100;

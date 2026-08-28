@@ -36,7 +36,7 @@ import {
 
 /** Build a fresh context with a real GameState (seed=42, desert biome, 32×32 grid). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
   return ctx;
 }
@@ -47,7 +47,7 @@ function makeCtx(): GameContext {
  * has someone idle to walk to it and work it.
  */
 function makeStaffedCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', staffed: 'true' });
   return ctx;
 }
@@ -495,7 +495,7 @@ describe('Construction sites — order-then-build (#556)', () => {
 
     const planned = ctx.state!.plannedBuildings[0]!;
     const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId)!;
-    const payload = action.payload as PlaceBuildingActionPayload;
+    const payload = action.payload as unknown as PlaceBuildingActionPayload;
 
     expect(payload.durationTicks).toBe(BUILDING_CONSTRUCTION_BASE_DURATION_TICKS);
   });
@@ -509,7 +509,7 @@ describe('Construction sites — order-then-build (#556)', () => {
 
     const planned = ctx.state!.plannedBuildings[0]!;
     const action = ctx.state!.pendingActions.find(a => a.id === planned.actionId)!;
-    const payload = action.payload as PlaceBuildingActionPayload;
+    const payload = action.payload as unknown as PlaceBuildingActionPayload;
 
     expect(payload.durationTicks).toBe(
       BUILDING_CONSTRUCTION_BASE_DURATION_TICKS * BUILDING_CONSTRUCTION_TIER_MULTIPLIER[2],

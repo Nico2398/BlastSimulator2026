@@ -81,9 +81,13 @@ function dropInstantBuildingCountCheck(steps: ScenarioStepDef[]): ScenarioStepDe
   return steps.map((step, i) => {
     if (i !== livingQuartersIdx || !step.expect?.equals || !('buildingCount' in step.expect.equals)) return step;
     const { buildingCount: _dropped, ...restEquals } = step.expect.equals;
+    // exactOptionalPropertyTypes: an empty `equals` is dropped from the object
+    // entirely rather than set to `undefined` — the optional field's type is
+    // `Record<string, unknown>`, which `undefined` does not satisfy.
+    const { equals: _droppedEquals, ...restExpect } = step.expect;
     return {
       ...step,
-      expect: { ...step.expect, ...(Object.keys(restEquals).length > 0 ? { equals: restEquals } : { equals: undefined }) },
+      expect: Object.keys(restEquals).length > 0 ? { ...step.expect, equals: restEquals } : restExpect,
     };
   });
 }

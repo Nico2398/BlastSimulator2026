@@ -19,7 +19,7 @@ import { queueResearchTask, isTierUnlocked, placeBuilding } from '../../src/core
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '500000' });
   return ctx;
 }

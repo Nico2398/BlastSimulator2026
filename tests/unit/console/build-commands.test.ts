@@ -14,6 +14,8 @@ function makeCtx(): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   // Staffed (#556): confirming a placement only queues a construction site —
   // an idle employee is needed to actually walk over and finish the
