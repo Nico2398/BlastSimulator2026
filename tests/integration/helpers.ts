@@ -11,5 +11,7 @@ export function tickUntil(
   predicate: () => boolean,
   maxTicks = 400,
 ): void {
-  throw new Error('not implemented');
+  for (let i = 0; i < maxTicks && !predicate(); i++) {
+    run('tick 1');
+  }
 }
