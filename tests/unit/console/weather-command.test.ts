@@ -15,6 +15,8 @@ function makeCtx(): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
   return ctx;
@@ -25,6 +27,8 @@ describe('weatherCommand', () => {
     const ctx: MiningContext = {
       state: null, grid: null,
       emitter: new EventEmitter(),
+      landscape: null,
+      playableArea: null,
     };
     const result = weatherCommand(ctx, [], {});
     expect(result.success).toBe(false);

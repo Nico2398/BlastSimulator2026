@@ -1,14 +1,14 @@
 // BlastSimulator2026 — vehicle command unit tests
 // Tests for the `driver` sub-command and driver-aware `list` output.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { newGameCommand } from '../../../src/console/commands/world.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, type MiningContext } from '../../../src/console/commands/mining.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
-import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
+import type { Employee } from '../../../src/core/entities/Employee.js';
 
 // ── Test context factory ──
 
@@ -17,6 +17,8 @@ function makeCtx(): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
   return ctx;

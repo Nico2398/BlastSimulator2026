@@ -14,7 +14,7 @@ import { campaignStartCommand, tutorialStartCommand } from '../../../src/console
 import type { GameContext } from '../../../src/console/commands/world.js';
 
 function makeCtx(): GameContext {
-  return { state: null, grid: null, emitter: new EventEmitter() };
+  return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
 }
 
 describe('tutorial_start command', () => {

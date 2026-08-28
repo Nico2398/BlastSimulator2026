@@ -33,6 +33,8 @@ function makeMiningContext(): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   // Staffed (#553): a `drill_plan grid/add` no longer writes holes straight
   // into state.drillHoles — it queues one drill_hole PendingAction per hole,
@@ -110,7 +112,7 @@ function driveRampToCompletion(ctx: MiningContext, maxTicks = 400): void {
 }
 
 beforeEach(() => resetHoleIds());
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); });
 
 // ── blast_plan list ──────────────────────────────────────────────────────────
 
@@ -575,6 +577,8 @@ describe('blast_preview', () => {
       state: null,
       grid: null,
       emitter: new EventEmitter(),
+      landscape: null,
+      playableArea: null,
     };
     const result = blastPreviewCommand(ctx, [], {});
     expect(result.success).toBe(false);
@@ -809,6 +813,8 @@ describe('surveyCommand', () => {
       state: null,
       grid: null,
       emitter: new EventEmitter(),
+      landscape: null,
+      playableArea: null,
     };
     const result = surveyCommand(ctx, ['seismic'], { x: '10', z: '10' });
     expect(result.success).toBe(false);
@@ -1178,6 +1184,8 @@ describe('surveyCommand — mode subcommand', () => {
     const ctx: MiningContext = {
       state: null, grid: null,
       emitter: new EventEmitter(),
+      landscape: null,
+      playableArea: null,
     };
     const result = surveyCommand(ctx, ['mode'], {});
     expect(result.success).toBe(false);
@@ -1236,6 +1244,8 @@ describe('surveyCommand — ore_report subcommand', () => {
     const ctx: MiningContext = {
       state: null, grid: null,
       emitter: new EventEmitter(),
+      landscape: null,
+      playableArea: null,
     };
     const result = surveyCommand(ctx, ['ore_report'], {});
     expect(result.success).toBe(false);
@@ -1501,6 +1511,8 @@ describe('buildRampCommand', () => {
     const ctx: MiningContext = {
       state: null, grid: null,
       emitter: new EventEmitter(),
+      landscape: null,
+      playableArea: null,
     };
     const result = buildRampCommand(ctx, [], { origin: '0,0', direction: 'south', length: '5' });
     expect(result.success).toBe(false);
@@ -1899,7 +1911,7 @@ describe('dig_ramp_segment completion via tickCommand (#695 coverage gap)', () =
 
 describe('drillPlanCommand — requires a loaded game', () => {
   it('returns success:false with "No game loaded" when ctx.state is null', () => {
-    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
     const result = drillPlanCommand(ctx, ['grid'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
@@ -1908,7 +1920,7 @@ describe('drillPlanCommand — requires a loaded game', () => {
 
 describe('sequenceCommand — requires a loaded game', () => {
   it('returns success:false with "No game loaded" when ctx.state is null', () => {
-    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
     const result = sequenceCommand(ctx, ['set'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
@@ -1917,7 +1929,7 @@ describe('sequenceCommand — requires a loaded game', () => {
 
 describe('blastPlanCommand — requires a loaded game', () => {
   it('returns success:false with "No game loaded" when ctx.state is null', () => {
-    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
     const result = blastPlanCommand(ctx, ['save'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');
@@ -1926,7 +1938,7 @@ describe('blastPlanCommand — requires a loaded game', () => {
 
 describe('tubingCommand — requires a loaded game', () => {
   it('returns success:false with "No game loaded" when ctx.state is null', () => {
-    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter() };
+    const ctx: MiningContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
     const result = tubingCommand(ctx, ['buy'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');

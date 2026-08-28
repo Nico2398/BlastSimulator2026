@@ -15,7 +15,6 @@ import {
   type MiningContext,
 } from '../../../src/console/commands/mining.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
-import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 
@@ -26,6 +25,8 @@ function makeCtx(): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   // Staffed (#553): the "NavGrid patching — blast" describe below drills a
   // hole through drill_plan add, which now queues a drill_hole PendingAction
@@ -162,7 +163,6 @@ describe('NavGrid patching — building placement', () => {
     // The NavGrid should still be unchanged from the initial buildGameNavGrid state
     // (or from whatever the first placement may have done).
     // This test documents the expected behavior: failed placements don't patch.
-    const nav = ctx.state!.navGrid!;
     // We just verify the command rejected the duplicate placement
     expect(result.output).toContain('occupied');
   });
@@ -318,8 +318,6 @@ describe('NavGrid patching — building move', () => {
     // Place two buildings
     buildCommand(ctx, ['management_office'], { at: '0,0' });
     buildCommand(ctx, ['management_office'], { at: '5,5' });
-
-    const nav = ctx.state!.navGrid!;
 
     // Try moving the first building onto the second's location
     const buildingId = ctx.state!.buildings.buildings[0]!.id;

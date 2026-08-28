@@ -37,6 +37,15 @@
     // follow-up fix.
     // The remainder still need the fixture-vs-interface drift fixed before
     // re-inclusion.
+    // #805 removed the 10 ./unit/console/*.test.ts entries #804 exposed --
+    // build-commands, campaign-commands, insufficient-funds-guards,
+    // mining-commands, navgrid-patching, policy-threshold-guards,
+    // saveload-commands, vehicle-commands, vehicle-list, and weather-command.
+    // All were fixture-vs-interface drift: GameContext/MiningContext object
+    // literals missing landscape/playableArea, EMPLOYEE_DEFAULTS missing
+    // taskQueue, plus a handful of unused-import/unused-local (TS6133/TS6192)
+    // and one callback-return-type (TS2322) fix. (68 -> 58 entries,
+    // 200 -> 170 errors).
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -44,16 +53,6 @@
     "./unit/config/autonomy-loop.test.ts",
     "./unit/config/balance.test.ts",
     "./unit/config/state-schema.test.ts",
-    "./unit/console/build-commands.test.ts",
-    "./unit/console/campaign-commands.test.ts",
-    "./unit/console/insufficient-funds-guards.test.ts",
-    "./unit/console/mining-commands.test.ts",
-    "./unit/console/navgrid-patching.test.ts",
-    "./unit/console/policy-threshold-guards.test.ts",
-    "./unit/console/saveload-commands.test.ts",
-    "./unit/console/vehicle-commands.test.ts",
-    "./unit/console/vehicle-list.test.ts",
-    "./unit/console/weather-command.test.ts",
     "./unit/coverage/coverage-config.test.ts",
     "./unit/economy/BoulderBreaking.approach.test.ts",
     "./unit/economy/BoulderBreaking.test.ts",
