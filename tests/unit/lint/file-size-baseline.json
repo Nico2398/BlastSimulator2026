@@ -12,7 +12,6 @@
   "scripts/validate-context.ts": 645,
   "scripts/validate-state-schema.ts": 341,
   "src/console/commands/entities.ts": 361,
-  "src/console/commands/mining.ts": 1285,
   "src/console/commands/world.ts": 399,
   "src/core/engine/ArrivalGate.ts": 356,
   "src/core/engine/EntityMovementTick.ts": 301,
