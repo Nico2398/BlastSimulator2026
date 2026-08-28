@@ -23,6 +23,26 @@ export function createZoneState(): ZoneState {
   return { activeZone: null };
 }
 
+// ── Evacuation ──
+
+/** A safe cell an entity can be moved to, outside the danger zone. */
+export interface EvacuationDestination { x: number; z: number }
+
+/**
+ * Finds a safe destination for an entity currently at (fromX, fromZ),
+ * given the zone it must clear. Returns null when no safe cell can be
+ * found — the entity is stranded.
+ */
+export type SafeDestinationFinder = (fromX: number, fromZ: number, zone: ZoneBounds) => EvacuationDestination | null;
+
+/** Outcome of evacuating a zone: who made it out, and who is stranded. */
+export interface EvacuationResult {
+  orderedVehicleIds: number[];
+  orderedEmployeeIds: number[];
+  strandedVehicleIds: number[];
+  strandedEmployeeIds: number[];
+}
+
 // ── Operations ──
 
 /** Define a safety zone. */
@@ -35,38 +55,18 @@ export function defineZone(state: ZoneState, bounds: ZoneBounds): void {
   };
 }
 
-/** Clear the zone: move all employees and vehicles out. */
+/**
+ * Clear the zone: order all employees and vehicles out to a safe cell found
+ * by `findSafeDestination`. See EvacuateZone.ts / Evacuation.ts for the real
+ * pathfinding-aware evacuation orchestration — this is the low-level move.
+ */
 export function clearZone(
-  zone: ZoneBounds,
-  vehicles: VehicleState,
-  employees: EmployeeState,
-): { movedVehicles: number; movedEmployees: number } {
-  let movedVehicles = 0;
-  let movedEmployees = 0;
-
-  // Move vehicles outside zone (to just beyond x2, z2)
-  const safeX = zone.x2 + 5;
-  const safeZ = zone.z2 + 5;
-
-  for (const v of vehicles.vehicles) {
-    if (isInZone(v.x, v.z, zone)) {
-      v.x = safeX;
-      v.z = safeZ;
-      v.task = 'idle';
-      movedVehicles++;
-    }
-  }
-
-  for (const emp of employees.employees) {
-    if (!emp.alive) continue;
-    if (isInZone(emp.x, emp.z, zone)) {
-      emp.x = safeX;
-      emp.z = safeZ;
-      movedEmployees++;
-    }
-  }
-
-  return { movedVehicles, movedEmployees };
+  _zone: ZoneBounds,
+  _vehicles: VehicleState,
+  _employees: EmployeeState,
+  _findSafeDestination: SafeDestinationFinder,
+): EvacuationResult {
+  throw new Error('not implemented');
 }
 
 /** Check if the zone is clear of all entities. */

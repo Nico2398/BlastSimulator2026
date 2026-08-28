@@ -295,6 +295,12 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     { target: '#bs-blast-panel [data-action="auto-sequence"]', hintKey: 'tutorial.stage.auto_sequence' },
   ],
 
+  // #557 stub — implementer wires the real evacuation control target(s).
+  'evacuate-zone': [
+    { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
+    { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.sound_horn' },
+  ],
+
   blast: [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="execute"]', hintKey: 'tutorial.stage.execute' },

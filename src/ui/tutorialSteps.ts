@@ -329,6 +329,20 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   // clock running while the charging crew is still busy.
   createComparisonStep('sequence', 'tutorial.step7.title', 'tutorial.step7', (s) => Object.keys(s.sequenceDelays ?? {}).length, ['sequence auto delay_step:25'], TOOLBAR_TARGET.blast, { tickBudget: 20, waitsOnWork: true }),
 
+  // ── Step 6b: evacuate-zone ──
+  // #557: the tutorial enforces evacuating the blast zone before firing.
+  // isComplete is a placeholder here — the implementer wires the real
+  // zone-clear check (see Zone.ts/Evacuation.ts).
+  {
+    id: 'evacuate-zone',
+    titleKey: 'tutorial.step_evacuate.title',
+    textKey: 'tutorial.step_evacuate',
+    highlightTarget: TOOLBAR_TARGET.blast,
+    tickBudget: 20,
+    waitsOnWork: true,
+    isComplete: () => false,
+  },
+
   // ── Step 7: blast ──
   // Counts blasts fired as well as ore types collected. Keying only on ore
   // dead-ends the tutorial when a legitimate blast comes up barren — the player
