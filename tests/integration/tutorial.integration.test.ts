@@ -8,6 +8,7 @@ import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { createRunner } from '../../src/console/createRunner.js';
+import type { MiningContext } from '../../src/console/commands/mining.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -126,7 +127,7 @@ describe('Tutorial flow', () => {
 // separately in tutorial-pause.integration.test.ts.
 
 describe('haul-debris step (#552): self-dispatching, no manual command', () => {
-  it('is the 24th of 31 tutorial steps (0-based index 23), between contract-accept and contract-deliver', () => {
+  it('is the 25th of 32 tutorial steps (0-based index 24), between contract-accept and contract-deliver', () => {
     // #553 inserts build-driving-center/train-driller/buy-drill-rig-assign
     // right after hire-driller, shifting every later step (including this
     // one) up by 3 from their pre-#553 positions. #555 inserts
@@ -140,10 +141,11 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     // starts at acceptance, and ordering the warehouse is real queued work
     // now, so accepting first spent that deadline watching a construction
     // site while contract-deliver waited on a delivery that could no longer
-    // complete.
+    // complete. #557 inserts evacuate-zone between 'sequence' and 'blast' —
+    // both well before this step — shifting it up 1 more (23 -> 24).
     const ids = TUTORIAL_STEPS.map(s => s.id);
     const idx = ids.indexOf('haul-debris');
-    expect(idx).toBe(23);
+    expect(idx).toBe(24);
     expect(ids[idx - 1]).toBe('contract-accept');
     expect(ids[idx - 2]).toBe('build-storage');
     expect(ids[idx + 1]).toBe('contract-deliver');
@@ -211,5 +213,123 @@ describe('haul-debris step (#552): self-dispatching, no manual command', () => {
     expect(state.logistics.storedMassKg).toBeGreaterThan(0);
     expect(state.logistics.fragments.some(f => f.state === 'stored')).toBe(true);
     expect(commandsRun.some(cmd => cmd.startsWith('vehicle haul'))).toBe(false);
+  });
+});
+
+// ── evacuate before you fire (#557) ─────────────────────────────────────────
+//
+// The tutorial's evacuate-zone step (between 'sequence' and 'blast') exists
+// because the console command it's teaching has real teeth: with
+// ctx.tutorialActive set, `blast` refuses to fire while anyone is still
+// standing in the danger zone, and the refusal must leave the whole blast
+// step a no-op — no cash spent, no plan cleared, no blast recorded — not just
+// an error string.
+
+describe('blast refuses to fire on an occupied zone during the tutorial (#557)', () => {
+  function setup(): { ctx: MiningContext; runCmd: (cmd: string) => ReturnType<ReturnType<typeof createRunner>['runner']['run']> } {
+    const { runner, ctx } = createRunner();
+    ctx.tutorialActive = true;
+    const runCmd = (cmd: string) => runner.run(cmd);
+    expect(runCmd('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
+    expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
+    for (let i = 0; i < 400 && ctx.state!.plannedDrillHoles.length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      runCmd('tick 1');
+    }
+    expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    for (let i = 0; i < 400 && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      runCmd('tick 1');
+    }
+    expect(runCmd('sequence auto delay_step:25').success).toBe(true);
+    return { ctx, runCmd };
+  }
+
+  it('refuses to fire while the danger zone is still occupied: no cash spent, no plan cleared, no blast recorded', () => {
+    const { ctx, runCmd } = setup();
+    const state = ctx.state!;
+
+    // Leave the crew standing inside the danger zone instead of clearing it.
+    for (const emp of state.employees.employees) {
+      emp.x = 16;
+      emp.z = 16;
+    }
+
+    const beforeCash = state.cash;
+    const beforeHoleCount = state.drillHoles.length;
+    const beforeChargeCount = Object.keys(state.chargesByHole).length;
+    const beforeBlastCount = state.damage.blastCount;
+
+    const result = runCmd('blast');
+
+    expect(result.success, 'blast fired while tutorialActive and the zone was occupied').toBe(false);
+    expect(result.output.length).toBeGreaterThan(0);
+    expect(state.cash).toBe(beforeCash);
+    expect(state.drillHoles.length).toBe(beforeHoleCount);
+    expect(Object.keys(state.chargesByHole).length).toBe(beforeChargeCount);
+    expect(state.damage.blastCount).toBe(beforeBlastCount);
+  });
+
+  it('fires once the zone is genuinely clear of every employee and vehicle', () => {
+    const { ctx, runCmd } = setup();
+    const state = ctx.state!;
+
+    // Evacuate everyone well clear of the danger zone before firing.
+    for (const emp of state.employees.employees) {
+      emp.x = 44;
+      emp.z = 44;
+    }
+    for (const veh of state.vehicles.vehicles) {
+      veh.x = 44;
+      veh.z = 44;
+    }
+
+    const result = runCmd('blast');
+
+    expect(result.success, result.output).toBe(true);
+    expect(state.damage.blastCount).toBe(1);
+  });
+
+  it('without tutorialActive, the same occupied zone does not block firing — the gate is tutorial-only', () => {
+    const { runner, ctx } = createRunner();
+    ctx.tutorialActive = false;
+    const runCmd = (cmd: string) => runner.run(cmd);
+    expect(runCmd('new_game seed:42 size:48 mine_type:desert staffed:true').success).toBe(true);
+    expect(runCmd('drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15').success).toBe(true);
+    const state = ctx.state!;
+    for (let i = 0; i < 400 && state.plannedDrillHoles.length > 0; i++) {
+      for (const emp of state.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      runCmd('tick 1');
+    }
+    expect(runCmd('charge hole:* explosive:boomite amount:8 stemming:2').success).toBe(true);
+    for (let i = 0; i < 400 && Object.keys(state.plannedChargesByHole).length > 0; i++) {
+      for (const emp of state.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+      runCmd('tick 1');
+    }
+    expect(runCmd('sequence auto delay_step:25').success).toBe(true);
+
+    for (const emp of state.employees.employees) {
+      emp.x = 16;
+      emp.z = 16;
+    }
+
+    const result = runCmd('blast');
+    expect(result.success, result.output).toBe(true);
   });
 });

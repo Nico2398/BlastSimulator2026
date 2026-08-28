@@ -991,12 +991,52 @@
         }
       ],
       "role": "player",
-      "description": "sequence complete: Auto Sequence clicked. delay_step:25 already matches the Sequence panel's own default (Sequence.ts DEFAULT_DELAY_STEP_MS) so 0 stepper clicks are needed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern.",
+      "description": "sequence complete: Auto Sequence clicked. delay_step:25 already matches the Sequence panel's own default (Sequence.ts DEFAULT_DELAY_STEP_MS) so 0 stepper clicks are needed. tutorial_start (step 2) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #557: the tutorial now advances to 'evacuate-zone' next, not straight to 'blast' -- the new step between them, matching tutorial-interactive.json's own insertion at the same point.",
       "expect": {
         "equals": {
           "sequencedCount": 9
         },
-        "tutorialStep": "blast"
+        "tutorialStep": "evacuate-zone"
+      }
+    },
+    {
+      "command": "zone clear x1:5 y1:5 x2:41 y2:41",
+      "timeout": 180,
+      "description": "#557: evacuate-zone. Same box as tutorial-interactive.json's own evacuate-zone step -- computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this file's identical 3x3/spacing:3 grid at (20,20) pads out to (5,5)-(41,41), which on tutorial_pit's 32x32 map covers nearly the whole site. The tick-60 step above already routes Kurt/Walt off the pattern toward rest (forceShiftRestIfNeededByPolicy, see that step's own extensive note) before this point, so this step may find the zone already empty -- clearZone/dangerZoneClear still have to genuinely report that, not assume it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed, so Sound the Horn is reachable with no tab click.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
+      }
+    },
+    {
+      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
+      "timeout": 180,
+      "description": "#557: drain the real walkout Sound the Horn just ordered -- the tutorial card only advances to 'blast' once dangerZoneClear genuinely reports true, matching every other wait_until in this file.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "dangerZoneClear",
+          "equals": true,
+          "maxTicks": 300,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "tutorialStep": "blast",
+        "equals": {
+          "dangerZoneClear": true
+        }
       }
     },
     {
