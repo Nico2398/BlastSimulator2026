@@ -13,6 +13,8 @@ function makeCtx(): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
   // These tests exercise tier placement/upgrade mechanics directly, not the

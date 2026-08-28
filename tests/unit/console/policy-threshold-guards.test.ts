@@ -20,7 +20,7 @@ import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter() };
+  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '24' });
   return ctx;
 }

@@ -10,8 +10,8 @@
   "exclude": [
     "node_modules",
     "../dist",
-    // Pre-existing type errors as of 2026-08-27 (234 errors across 77 files remain
-    // outstanding, across 77 entries below) -- tracked in a follow-up issue (filed
+    // Pre-existing type errors as of 2026-08-27 (200 errors across 68 files remain
+    // outstanding, across 68 entries below) -- tracked in a follow-up issue (filed
     // alongside this PR). These are a mix of mechanical unused-locals/params
     // (TS6133/6192/6196) and real fixture-vs-interface drift (test object literals
     // built against Employee/Vehicle/GameState/etc. that have since grown required
@@ -26,34 +26,33 @@
     // TS6133. All 3 are fixed and all 16 entries (helpers.ts + 15 siblings) are
     // removed from exclude below (102 -> 86 entries, 277 -> 274 errors,
     // 89 -> 86 files) -- `tsc --noEmit` is green for the whole cluster.
+    // #804 shrank the exclude list by 9 entries -- ./integration/policy,
+    // research, skills, survey-overlay-pipeline, survey, tutorial-pause,
+    // vehicles, world-commands.test.ts, and ./scenarios/level-playthroughs.test.ts
+    // (77 -> 68 entries, 234 -> 200 errors) -- to expose the fixture-vs-interface
+    // drift (GameContext/MiningContext missing landscape/playableArea,
+    // FragmentData missing halfExtents/shapeSeed, RailsStep optional-property
+    // strictness, TutorialOverlay private-member intersection, and a handful of
+    // unused-locals/TS2367/TS2503/TS18048 issues) across those 9 files, for a
+    // follow-up fix.
     // The remainder still need the fixture-vs-interface drift fixed before
     // re-inclusion.
-    "./integration/policy.integration.test.ts",
-    "./integration/research.integration.test.ts",
-    "./integration/skills.integration.test.ts",
-    "./integration/survey-overlay-pipeline.integration.test.ts",
-    "./integration/survey.integration.test.ts",
-    "./integration/tutorial-pause.integration.test.ts",
+    // #805 removed the 10 ./unit/console/*.test.ts entries #804 exposed --
+    // build-commands, campaign-commands, insufficient-funds-guards,
+    // mining-commands, navgrid-patching, policy-threshold-guards,
+    // saveload-commands, vehicle-commands, vehicle-list, and weather-command.
+    // All were fixture-vs-interface drift: GameContext/MiningContext object
+    // literals missing landscape/playableArea, EMPLOYEE_DEFAULTS missing
+    // taskQueue, plus a handful of unused-import/unused-local (TS6133/TS6192)
+    // and one callback-return-type (TS2322) fix. (68 -> 58 entries,
+    // 200 -> 170 errors).
     "./integration/tutorial.integration.test.ts",
-    "./integration/vehicles.integration.test.ts",
-    "./integration/world-commands.test.ts",
-    "./scenarios/level-playthroughs.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
     "./unit/config/assignability.test.ts",
     "./unit/config/autonomy-loop.test.ts",
     "./unit/config/balance.test.ts",
     "./unit/config/state-schema.test.ts",
-    "./unit/console/build-commands.test.ts",
-    "./unit/console/campaign-commands.test.ts",
-    "./unit/console/insufficient-funds-guards.test.ts",
-    "./unit/console/mining-commands.test.ts",
-    "./unit/console/navgrid-patching.test.ts",
-    "./unit/console/policy-threshold-guards.test.ts",
-    "./unit/console/saveload-commands.test.ts",
-    "./unit/console/vehicle-commands.test.ts",
-    "./unit/console/vehicle-list.test.ts",
-    "./unit/console/weather-command.test.ts",
     "./unit/coverage/coverage-config.test.ts",
     "./unit/economy/BoulderBreaking.approach.test.ts",
     "./unit/economy/BoulderBreaking.test.ts",

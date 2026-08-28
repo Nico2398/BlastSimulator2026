@@ -53,6 +53,8 @@ function makeCtx(): MiningContext {
     state: null,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
   newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
   return ctx;
@@ -78,6 +80,7 @@ function addTruckDriver(ctx: MiningContext): number {
     qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0 }],
     trainingState: null,
     ...EMPLOYEE_DEFAULTS,
+    taskQueue: [],
   };
   ctx.state!.employees.employees.push(emp);
   return emp.id;
