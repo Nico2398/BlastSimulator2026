@@ -29,19 +29,19 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "Hired first (#556): a build order is queued work now, so the two orders below need someone on the roster to walk over and build them. A single hire rather than staffed:true, which would also land four vehicles and move the fleet count this scenario asserts.",
+      "description": "Hired first (#556): a build order is queued work now, so the two orders below need someone on the roster to walk over and build them. A single hire rather than staffed:true, which would also land four vehicles and move the fleet count this scenario asserts. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-hire-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-hire-role=\"driller\"]"
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
       "role": "player",

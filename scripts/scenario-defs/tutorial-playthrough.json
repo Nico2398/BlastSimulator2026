@@ -47,8 +47,8 @@
       "command": "employee hire role:surveyor",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -67,7 +67,8 @@
         "changedBy": {
           "cash": -1200
         }
-      }
+      },
+      "description": "Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size."
     },
     {
       "command": "employee assign_skill 1 skill:geology level:3",
@@ -128,8 +129,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -148,7 +149,8 @@
         "changedBy": {
           "cash": -1000
         }
-      }
+      },
+      "description": "Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size."
     },
     {
       "command": "employee assign_skill 2 skill:blasting level:3",
@@ -506,8 +508,8 @@
       "command": "employee hire role:manager",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -526,7 +528,8 @@
         "changedBy": {
           "cash": -2000
         }
-      }
+      },
+      "description": "Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size."
     },
     {
       "command": "employee assign_skill 3 skill:management level:3",
@@ -558,8 +561,8 @@
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -578,7 +581,8 @@
         "changedBy": {
           "cash": -800
         }
-      }
+      },
+      "description": "Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size."
     },
     {
       "command": "employee assign_skill 4 skill:driving.truck level:3",
@@ -704,11 +708,11 @@
     },
     {
       "command": "contract accept type:rubble_disposal",
-      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"rubble_disposal\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run as the queued charge/drill work pushed the tick clock forward past REFRESH_INTERVAL/MAX_AVAILABLE (Contract.ts), verified against `contract list` at this file's real tick count (251) each time; #635 drops the numeric id entirely for the stable `type:rubble_disposal` selector (materialId '' for this type, so no `material:` clause). Accepted below the warehouse build rather than above it (#556): ordering a building is queued work now, and a contract left running while the site goes up expires on its own deadline before this file ever delivers against it.",
+      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"rubble_disposal\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run as the queued charge/drill work pushed the tick clock forward past REFRESH_INTERVAL/MAX_AVAILABLE (Contract.ts), verified against `contract list` at this file's real tick count (251) each time; #635 drops the numeric id entirely for the stable `type:rubble_disposal` selector (materialId '' for this type, so no `material:` clause). Accepted below the warehouse build rather than above it (#556): ordering a building is queued work now, and a contract left running while the site goes up expires on its own deadline before this file ever delivers against it. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
         {
           "type": "waitForSelector",
@@ -750,8 +754,8 @@
       "command": "contract accept type:ore_sale material:sparkium",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
         {
           "type": "waitForSelector",
@@ -768,7 +772,7 @@
           "activeContractCount": 2
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"sparkium\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time -- nothing between the two accept steps consumes a tick); #635 drops the numeric id entirely for the stable `type:ore_sale material:sparkium` selector."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"sparkium\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time -- nothing between the two accept steps consumes a tick); #635 drops the numeric id entirely for the stable `type:ore_sale material:sparkium` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
     },
     {
       "command": "contract deliver type:ore_sale material:sparkium amount:5000",
@@ -803,8 +807,8 @@
       "command": "employee hire role:driver",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -815,7 +819,7 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "description": "issue #585 (confirmed via direct trace): the surveyor (employee #1) this file's own build_ramp section was written to license is dead by this point -- so is the driller (employee #2), both lost in the pattern-1 blast -- and assign_skill grants a licence to a dead roster entry without complaint, so the gap only surfaced downstream when vehicle driver refused a corpse as \"Employee not found\". Employee #5 hired here, alive, takes the excavator course instead.",
+      "description": "issue #585 (confirmed via direct trace): the surveyor (employee #1) this file's own build_ramp section was written to license is dead by this point -- so is the driller (employee #2), both lost in the pattern-1 blast -- and assign_skill grants a licence to a dead roster entry without complaint, so the gap only surfaced downstream when vehicle driver refused a corpse as \"Employee not found\". Employee #5 hired here, alive, takes the excavator course instead. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size.",
       "role": "player",
       "expect": {
         "changedBy": {
@@ -966,8 +970,8 @@
       "command": "contract accept type:ore_sale material:gloomium",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"contracts\"]"
+          "type": "ensurePanel",
+          "panel": "contracts"
         },
         {
           "type": "waitForSelector",
@@ -984,7 +988,7 @@
           "activeContractCount": 3
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"gloomium\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:gloomium` selector."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"gloomium\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:gloomium` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size."
     },
     {
       "command": "contract deliver type:ore_sale material:gloomium amount:5000",
@@ -1043,8 +1047,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -1055,7 +1059,7 @@
           "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "description": "#553: a replacement driller. Employee #2 died in the first blast standing at the pattern they had just finished drilling (`employee list` reports them DEAD), and a dead driller drills nothing -- pre-#553 that never showed, because confirming a plan created the holes with no worker involved at all. Employee #6 (issue #585: renumbered up from #5 -- see the excavator-hire step's own note).",
+      "description": "#553: a replacement driller. Employee #2 died in the first blast standing at the pattern they had just finished drilling (`employee list` reports them DEAD), and a dead driller drills nothing -- pre-#553 that never showed, because confirming a plan created the holes with no worker involved at all. Employee #6 (issue #585: renumbered up from #5 -- see the excavator-hire step's own note). Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size.",
       "role": "player",
       "expect": {
         "equals": {

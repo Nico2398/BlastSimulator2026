@@ -23,8 +23,8 @@
       "command": "employee hire role:driller",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
@@ -44,7 +44,7 @@
           "employeeCount": 1
         }
       },
-      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size."
     },
     {
       "command": "employee hire role:blaster",
@@ -252,6 +252,10 @@
       "command": "employee train 1 skill:driving.excavator building:1",
       "interaction": [
         {
+          "type": "ensurePanel",
+          "panel": "employees"
+        },
+        {
           "type": "clickSelector",
           "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle"
         },
@@ -272,7 +276,8 @@
         "equals": {
           "trainingCount": 1
         }
-      }
+      },
+      "description": "Opens the Crew panel first (#556): the two hires moved to the top of the file so there is someone to build the schools, and the build steps between them and this one leave the Build panel showing — the employee row this clicks is not on screen without it."
     },
     {
       "command": "employee list",

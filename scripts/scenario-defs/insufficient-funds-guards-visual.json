@@ -31,12 +31,12 @@
     },
     {
       "command": "employee hire role:driller",
-      "description": "Hired by clicking the real Crew panel — the mafia accident/frame guards below target this one employee. HIRING_COSTS.driller is 1000 (balance.ts). Hired ahead of the order below rather than after it (#556): a build order is queued work now, so the site needs someone on the roster to walk over and build it.",
+      "description": "Hired by clicking the real Crew panel — the mafia accident/frame guards below target this one employee. HIRING_COSTS.driller is 1000 (balance.ts). Hired ahead of the order below rather than after it (#556): a build order is queued work now, so the site needs someone on the roster to walk over and build it. Opens the Crew panel with ensurePanel rather than a bare toolbar click (#556): the toolbar tab toggles, so when a preceding step has already opened the panel a second click closes it and the hire button underneath reports zero size.",
       "role": "player",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+          "type": "ensurePanel",
+          "panel": "employees"
         },
         {
           "type": "waitForSelector",
