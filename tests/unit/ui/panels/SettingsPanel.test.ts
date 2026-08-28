@@ -257,17 +257,20 @@ describe('SettingsPanel', () => {
       panel.dispose();
     });
 
-    it('RETURN TO MAIN MENU requests a confirm rather than acting immediately', () => {
+    it('RETURN TO MAIN MENU requests a confirm rather than acting immediately', async () => {
       const { container, panel } = mount();
       panel.update(createGame({ seed: 1, mineType: 'desert' }));
       panel.show();
       let returned = false;
-      panel.setConfirmHandler(() => {});
+      let requested: ConfirmModalConfig | null = null;
+      panel.setConfirmHandler((config) => { requested = config; });
       panel.setReturnToMenuHandler(() => { returned = true; });
 
       const btn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === t('ui.settings.return_to_menu'))!;
       btn.click();
+      await vi.waitFor(() => { if (!requested) throw new Error('confirm not requested yet'); });
 
+      expect(requested).not.toBeNull();
       expect(returned).toBe(false);
       panel.dispose();
     });
