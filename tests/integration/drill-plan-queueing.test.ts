@@ -15,17 +15,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import { NavGrid } from '../../src/core/nav/NavGrid.js';
-
-/** Runs `tick 1` until `predicate(state)` is true or `maxTicks` is exhausted. */
-function tickUntil(
-  run: (cmd: string) => unknown,
-  predicate: () => boolean,
-  maxTicks = 400,
-): void {
-  for (let i = 0; i < maxTicks && !predicate(); i++) {
-    run('tick 1');
-  }
-}
+import { tickUntil } from './helpers.js';
 
 describe('drill_plan grid — queues drill_hole actions instead of writing holes instantly (#553)', () => {
   afterEach(() => {

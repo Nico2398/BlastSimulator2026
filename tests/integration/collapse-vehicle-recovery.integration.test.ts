@@ -22,17 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-
-/** Runs `tick 1` until `predicate()` is true or `maxTicks` is exhausted. */
-function tickUntil(
-  run: (cmd: string) => unknown,
-  predicate: () => boolean,
-  maxTicks: number,
-): void {
-  for (let i = 0; i < maxTicks && !predicate(); i++) {
-    run('tick 1');
-  }
-}
+import { tickUntil } from './helpers.js';
 
 /** Sets up a staffed new_game, hands employee #1 the drill_rig, and lets them drill at least one hole before the test forces a collapse. */
 function setupDrivingDriller(): { run: (cmd: string) => unknown; state: GameState } {

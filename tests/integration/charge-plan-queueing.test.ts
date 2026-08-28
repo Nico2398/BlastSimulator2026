@@ -17,17 +17,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../src/console/createRunner.js';
-
-/** Runs `tick 1` until `predicate()` is true or `maxTicks` is exhausted. */
-function tickUntil(
-  run: (cmd: string) => unknown,
-  predicate: () => boolean,
-  maxTicks = 400,
-): void {
-  for (let i = 0; i < maxTicks && !predicate(); i++) {
-    run('tick 1');
-  }
-}
+import { tickUntil } from './helpers.js';
 
 /** Drills a grid and waits for every hole to land in state.drillHoles. */
 function drillAndLand(
