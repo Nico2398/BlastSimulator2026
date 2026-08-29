@@ -137,6 +137,27 @@
     // guard-and-throw on the array-destructured `group` (already this file's
     // own findFillMesh() idiom) under noUncheckedIndexedAccess. No test logic
     // or assertions changed.
+    // #845 fixed the ./unit/state/*.test.ts cluster (34 -> 30 entries), 8
+    // errors across 4 files: GameState.test.ts had an unused NavGrid import
+    // (TS6133, deleted) and a single-cast `(employee as Record<string,
+    // unknown>)` widened to the established `as unknown as Record<string,
+    // unknown>` double-cast idiom (matching WorkerRevolt.test.ts). SaveLoad.test.ts's
+    // updateScores() call and its plannedBuildings/pendingActions round-trip
+    // fixture were missing fields BuildingState/PlannedBuilding have since
+    // grown (TS2739/TS2345): `{ buildings: [] }` replaced with
+    // createBuildingState() (nextId/researchQueue/unlockedTiers), and the
+    // pushed PlannedBuilding literal plus its matching toEqual() assertion
+    // both gained `buildingId`. logistics-serialization.test.ts's makeCtx
+    // MiningContext literal carried softwareTier/tubingState (TS2353), fields
+    // that moved off MiningContext onto GameState itself in the SaveLoad
+    // v6->v7 migration -- removed along with the now-dead createTubingState
+    // import, and replaced with the landscape/playableArea fields
+    // GameContext has since grown; its makeFragment FragmentData literal was
+    // missing halfExtents/shapeSeed (TS2739), same fix as the #804/#806
+    // clusters. navgrid-serialization.test.ts's two inline MiningContext
+    // literals (makeCtx and the "no game" test) were missing the same
+    // landscape/playableArea fields (TS2739). No test logic or assertions
+    // changed.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -166,10 +187,6 @@
     "./unit/scenario-defs-validation/issue-regressions.test.ts",
     "./unit/scenario-defs-validation/step-tagging.test.ts",
     "./unit/scenario/survey-post-blast-ore-report.test.ts",
-    "./unit/scripts/shared/scenario-trace.test.ts",
-    "./unit/state/GameState.test.ts",
-    "./unit/state/SaveLoad.test.ts",
-    "./unit/state/logistics-serialization.test.ts",
-    "./unit/state/navgrid-serialization.test.ts"
+    "./unit/scripts/shared/scenario-trace.test.ts"
   ]
 }

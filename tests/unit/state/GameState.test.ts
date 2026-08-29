@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGame, buildGameNavGrid } from '../../../src/core/state/GameState.js';
 import type { GameState, PendingAction, ActionType, GhostPreview } from '../../../src/core/state/GameState.js';
-import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { Building } from '../../../src/core/entities/Building.js';
 import type { DrillHole } from '../../../src/core/mining/DrillPlan.js';
@@ -145,7 +144,7 @@ function addQualifiedEmployee(
     assignSkill(state.employees, employee.id, skill, 1);
   } catch {
     // Defensive fallback — keep test working even if assignSkill signature changes
-    (employee as Record<string, unknown>).qualifications = [
+    (employee as unknown as Record<string, unknown>).qualifications = [
       { category: skill, proficiencyLevel: 1, xp: 0 },
     ];
   }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createGame } from '../../../src/core/state/GameState.js';
+import { createBuildingState } from '../../../src/core/entities/Building.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
 import { FilePersistence } from '../../../src/persistence/FilePersistence.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -468,7 +469,7 @@ describe('deserialize — v12→v13 migration for ScoreState.decayRate (#555)', 
 
     const restored = deserialize(JSON.stringify(parsed));
     updateScores(restored.scores, {
-      buildings: { buildings: [] },
+      buildings: createBuildingState(),
       avgMorale: 50,
       recentAccidents: 0,
       hasSafetyEquipment: false,
@@ -584,7 +585,7 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
     employee.taskTicksRemaining = 17;
     employee.activeTaskTotalTicks = 40;
     state.plannedBuildings.push({
-      id: 1, type: 'freight_warehouse', tier: 1, x: 5, z: 5, actionId: 100, cost: 15000,
+      id: 1, buildingId: 1, type: 'freight_warehouse', tier: 1, x: 5, z: 5, actionId: 100, cost: 15000,
     });
     state.pendingActions.push({
       id: 100, type: 'place_building', requiredSkill: null, requiredVehicleRole: null,
@@ -598,7 +599,7 @@ describe('deserialize — v13→v14 migration for GameState.plannedBuildings (#5
     const restored = deserialize(json);
 
     expect(restored.plannedBuildings).toEqual([
-      { id: 1, type: 'freight_warehouse', tier: 1, x: 5, z: 5, actionId: 100, cost: 15000 },
+      { id: 1, buildingId: 1, type: 'freight_warehouse', tier: 1, x: 5, z: 5, actionId: 100, cost: 15000 },
     ]);
     expect(restored.nextPlannedBuildingId).toBe(2);
 
