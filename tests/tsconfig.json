@@ -185,20 +185,39 @@
     // logic bug). Un-excluding only -- the fixtures themselves still have
     // real type errors and are fixed in a following commit blind to this
     // one, per the TDD red-phase split.
+    // #848 fixed the ./unit/{benchmarks,campaign,config,coverage,lint} cluster
+    // (19 -> 12 entries). 12 errors across 7 files: assignability.test.ts (4
+    // TS18048/TS2532) had two `parseInt(match[1], 10)` sites and two
+    // `.comments[0].body` sites under noUncheckedIndexedAccess, fixed with
+    // non-null assertions matching this file's own regex-match and the
+    // repo-wide `array[0]!.field` idiom. balance.test.ts's buildCtx (1
+    // TS2739) was missing EventContext's activeContractCount/weatherId,
+    // matching benchmarks.test.ts's own buildContext. state-schema.test.ts
+    // (1 TS2352) had a `serializeGameState(...) as Record<string, unknown>`
+    // cast that no longer sufficiently overlaps SerializableGameState,
+    // widened to the `as unknown as Record<string, unknown>` double-cast
+    // idiom (same fix as #845's GameState.test.ts). coverage-config.test.ts
+    // (1 TS2307) imported vitest.config.ts directly instead of via the
+    // codebase's `.ts`-source-via-`.js`-specifier convention.
+    // SuccessTracker.test.ts's makeFragment (1 TS2739) was missing
+    // FragmentData's halfExtents/shapeSeed, same fixture-vs-interface drift
+    // as the #804/#806/#845/#846 clusters. benchmarks.test.ts (4 errors) had
+    // setup20AgentGameState's Employee push missing 13 fields grown since
+    // (taskTicksRemaining-onward block), its pendingActions.push() literal
+    // using a non-existent `"drilling"` SkillCategory instead of `"blasting"`
+    // (matching src/console/commands/mining/drillPlan.ts's real dispatch
+    // constant), and that same literal missing PendingAction's
+    // status/holderId. NoDanglingDocReferences.test.ts (1 TS18048) had a
+    // `tokens.push(m[1])` regex-capture access, same non-null-assertion
+    // idiom as assignability.test.ts's fix above. No test logic or
+    // assertions changed; no src/ production files touched.
     "./integration/tutorial.integration.test.ts",
-    "./unit/benchmarks/benchmarks.test.ts",
-    "./unit/campaign/SuccessTracker.test.ts",
-    "./unit/config/assignability.test.ts",
-    "./unit/config/balance.test.ts",
-    "./unit/config/state-schema.test.ts",
-    "./unit/coverage/coverage-config.test.ts",
     "./unit/economy/BoulderBreaking.approach.test.ts",
     "./unit/economy/BoulderBreaking.test.ts",
     "./unit/economy/FragmentApproach.test.ts",
     "./unit/economy/HaulDispatch.test.ts",
     "./unit/economy/HaulingTask.test.ts",
     "./unit/economy/Logistics.test.ts",
-    "./unit/lint/NoDanglingDocReferences.test.ts",
     "./unit/recording-format.test.ts",
     "./unit/scenario-defs-validation/issue-regressions.test.ts",
     "./unit/scenario-defs-validation/step-tagging.test.ts",

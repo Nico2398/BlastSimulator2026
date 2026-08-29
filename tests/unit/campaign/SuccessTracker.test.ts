@@ -23,6 +23,8 @@ function makeFragment(overrides: Partial<FragmentData> = {}): FragmentData {
     oreDensities: {},
     initialVelocity: zeroVec,
     isProjection: false,
+    halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+    shapeSeed: 1,
     ...overrides,
   };
 }

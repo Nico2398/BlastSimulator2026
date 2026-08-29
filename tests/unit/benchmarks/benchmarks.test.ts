@@ -179,6 +179,19 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
       ticksWorked: 0,
       restTicksRemaining: null,
       restNeedKey: null,
+      taskTicksRemaining: null,
+      activeTaskSkill: null,
+      destinationX: null,
+      destinationZ: null,
+      moveConsecutiveFailures: 0,
+      isMoveStuck: false,
+      pendingRestDuration: null,
+      pendingRestNeedKey: null,
+      pendingTaskDuration: null,
+      pendingActionType: null,
+      pendingActionPayload: null,
+      pendingDriverVehicleId: null,
+      taskQueue: [],
     });
   }
 
@@ -187,13 +200,15 @@ function setup20AgentGameState(): { state: GameState; rng: Random } {
     state.pendingActions.push({
       id: state.nextPendingActionId++,
       type: 'drill_hole',
-      requiredSkill: 'drilling',
+      requiredSkill: 'blasting',
       requiredVehicleRole: null,
       targetX: 20 + i,
       targetZ: 20,
       targetY: 0,
       payload: {},
       targetEmployeeId: null,
+      status: 'queued',
+      holderId: null,
     });
   }
 

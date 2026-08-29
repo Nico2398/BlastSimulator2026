@@ -164,7 +164,7 @@ function extractPathTokens(lineText: string): string[] {
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(lineText))) {
-      tokens.push(m[1]);
+      tokens.push(m[1]!);
     }
   }
   return tokens;

@@ -30,6 +30,8 @@ function buildCtx(state: GameState): EventContext {
     hasDrillPlan: false,
     tickCount: state.tickCount,
     lawsuitCount: 0,
+    activeContractCount: 0,
+    weatherId: 'clear',
   };
 }
 
