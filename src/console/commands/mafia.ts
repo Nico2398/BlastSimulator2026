@@ -59,7 +59,7 @@ export function mafiaCommand(
       const result = arrangeAccident(state.mafia, state.employees, state.corruption, empId, rng);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Arranged accident', state.tickCount);
-      return { success: true, output: result.message };
+      return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
     }
 
     case 'frame': {
@@ -72,7 +72,7 @@ export function mafiaCommand(
       );
       if (pending) {
         const result = completeFrame(state.mafia, state.employees, empId, state.tickCount, rng);
-        return { success: true, output: result.message };
+        return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
       }
 
       if (state.cash < FRAME_COST) {
@@ -87,7 +87,7 @@ export function mafiaCommand(
       const result = startFraming(state.mafia, state.employees, empId, state.tickCount);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Frame job', state.tickCount);
-      return { success: true, output: result.message };
+      return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
     }
 
     case 'smuggle': {
