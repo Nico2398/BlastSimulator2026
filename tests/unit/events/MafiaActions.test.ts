@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { Random } from '../../../src/core/math/Random.js';
 import {
   createMafiaState,
@@ -10,6 +10,7 @@ import {
 } from '../../../src/core/events/MafiaActions.js';
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
+import { t, setLocale } from '../../../src/core/i18n/I18n.js';
 
 const EMPLOYEE_DEFAULTS = {
   activeActionId: null, hunger: 100, fatigue: 100, breakNeed: 100,
@@ -31,6 +32,8 @@ function addTestEmployee(state: ReturnType<typeof createEmployeeState>, unionize
   state.employees.push(emp);
   return emp;
 }
+
+afterEach(() => setLocale('en'));
 
 describe('Mafia gameplay mechanics', () => {
   it('accident arrangement removes targeted employee if successful', () => {
@@ -113,5 +116,28 @@ describe('Mafia gameplay mechanics', () => {
     }
     // With 0.95 exposure and 0.15 base risk, should trigger often
     expect(triggered).toBe(true);
+  });
+
+  // ── completeFrame with no pending frame — issue #862 ────────────────────
+  //
+  // Not reachable through mafia.ts's console command (its 'frame' case only
+  // calls completeFrame after confirming a ready pending frame exists), so
+  // this outcome is covered directly against the core function instead.
+  it('completeFrame with no pending frame for the target returns outcomeKey mafia.frame_no_ready', () => {
+    const mafia = createMafiaState();
+    const employees = createEmployeeState();
+    const emp = addTestEmployee(employees);
+
+    const result = completeFrame(mafia, employees, emp.id, 100, new Random(42));
+
+    expect(result.success).toBe(false);
+    expect(result.outcomeKey).toBe('mafia.frame_no_ready');
+    expect(result.outcomeParams).toBeUndefined();
+
+    const NO_READY_FRAME_EN = 'No ready frame for this employee';
+    expect(t(result.outcomeKey, result.outcomeParams)).toBe(NO_READY_FRAME_EN);
+
+    setLocale('fr');
+    expect(t(result.outcomeKey, result.outcomeParams)).not.toBe(NO_READY_FRAME_EN);
   });
 });
