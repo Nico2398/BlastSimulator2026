@@ -267,7 +267,9 @@ describe('writeTraceEntry', () => {
 
     const lines = readFileSync(path, 'utf8').split('\n').filter(l => l.length > 0);
     expect(lines).toHaveLength(2);
-    expect(JSON.parse(lines[0])).toEqual(first);
-    expect(JSON.parse(lines[1])).toEqual(second);
+    const [line0, line1] = lines;
+    if (!line0 || !line1) throw new Error('expected 2 trace lines');
+    expect(JSON.parse(line0)).toEqual(first);
+    expect(JSON.parse(line1)).toEqual(second);
   });
 });

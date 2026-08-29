@@ -14,7 +14,7 @@ import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  return { state: null, grid: null, emitter: new EventEmitter() };
+  return { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

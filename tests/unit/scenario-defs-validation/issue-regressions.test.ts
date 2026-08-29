@@ -119,6 +119,7 @@ describe('blast-visual-full.json H1/H2 charge-override steps click the per-hole 
       expect(step!.interaction!.length).toBeGreaterThan(0);
 
       const finalAction = step!.interaction![step!.interaction!.length - 1];
+      if (!finalAction) throw new Error(`step "${command}" has an empty interaction array`);
       expect(
         'selector' in finalAction && finalAction.selector,
         `step "${command}"'s final interaction action should target "${selector}", got ${JSON.stringify(finalAction)}`,

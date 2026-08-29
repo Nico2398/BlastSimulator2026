@@ -211,17 +211,37 @@
     // `tokens.push(m[1])` regex-capture access, same non-null-assertion
     // idiom as assignability.test.ts's fix above. No test logic or
     // assertions changed; no src/ production files touched.
-    "./integration/tutorial.integration.test.ts",
+    // #849 fixed the ./{integration/tutorial.integration,unit/recording-format,
+    // unit/scenario-defs-validation/{issue-regressions,step-tagging},
+    // unit/scenario/survey-post-blast-ore-report,
+    // unit/scripts/shared/scenario-trace}.test.ts cluster (12 -> 6 entries).
+    // 11 errors across 6 files: issue-regressions.test.ts (3 TS18048) and
+    // step-tagging.test.ts (2 TS18048) both indexed the last/first element of
+    // a scenario step's `interaction` array and read it repeatedly without
+    // narrowing -- fixed with a guard-and-throw right after the index
+    // access, same idiom as the repo-wide `array[0]!`-adjacent fixture
+    // fixes above. survey-post-blast-ore-report.test.ts's makeFragment (2
+    // TS2739) was missing FragmentData's halfExtents/shapeSeed, same
+    // fixture-vs-interface drift as the #804/#806/#845/#846/#848 clusters,
+    // fixed to match SurveyCalc.test.ts's own makeFragment precedent.
+    // scenario-trace.test.ts (2 TS2345) had two `JSON.parse(lines[N])` calls
+    // on a `noUncheckedIndexedAccess` array after only a `toHaveLength(2)`
+    // check -- fixed with a destructure-and-guard-throw before both parses.
+    // recording-format.test.ts (1 TS18046) wrote through
+    // `recording.meta.eventCount`/`.durationMs` where `recording.meta` is
+    // `unknown` -- fixed with an `as Record<string, unknown>` cast
+    // matching this same file's own `parsedMeta` cast a few lines below.
+    // tutorial.integration.test.ts's makeCtx (1 TS2739) GameContext literal
+    // was missing landscape/playableArea, same fixture-vs-interface drift
+    // as every sibling *.integration.test.ts file's makeCtx. No test logic
+    // or assertions changed; no src/ production files touched. 8 errors
+    // remain across the 6 still-excluded ./unit/economy/*.test.ts files, for
+    // a follow-up issue.
     "./unit/economy/BoulderBreaking.approach.test.ts",
     "./unit/economy/BoulderBreaking.test.ts",
     "./unit/economy/FragmentApproach.test.ts",
     "./unit/economy/HaulDispatch.test.ts",
     "./unit/economy/HaulingTask.test.ts",
-    "./unit/economy/Logistics.test.ts",
-    "./unit/recording-format.test.ts",
-    "./unit/scenario-defs-validation/issue-regressions.test.ts",
-    "./unit/scenario-defs-validation/step-tagging.test.ts",
-    "./unit/scenario/survey-post-blast-ore-report.test.ts",
-    "./unit/scripts/shared/scenario-trace.test.ts"
+    "./unit/economy/Logistics.test.ts"
   ]
 }

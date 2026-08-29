@@ -54,6 +54,7 @@ describe('Every scenario step has a dual-play interaction array', () => {
         expect(step.interaction!.length).toBeGreaterThan(0);
         if (step.role !== undefined) continue;
         const firstAction = step.interaction![0];
+        if (!firstAction) throw new Error(`step[${i}] ("${step.command}") interaction array is unexpectedly empty`);
         expect(
           firstAction.type,
           `step[${i}] ("${step.command}") is unconverted, so its interaction must still mirror the command`,
