@@ -223,7 +223,7 @@ export function forceShiftRestIfNeededByPolicy(
   // early, infrastructure-light site (exactly what tutorial_pit's own
   // scripted tutorial is — no living_quarters exists there at all) twice
   // for the one condition the policy exists to make survivable in the
-  // first place. tests/unit/engine/GameLoop.test.ts's own "no living_quarters
+  // first place. tests/unit/engine/ShiftCycle.test.ts's own "no living_quarters
   // at all" case documents this — previously pinned to the doubled value.
 
   // The rest timer itself does not start until ArrivalGate.tickArrivalGate

@@ -552,7 +552,7 @@ describe('Tick-driven task/XP pipeline (dispatch + tick command, issue #406)', (
 // ── Issue #549: cost-based dispatch through the real tick pipeline ──────────
 //
 // tickEmployees's claim logic (exercised directly in the unit suite,
-// GameLoop.test.ts) is first-come-first-served today — array/insertion
+// EmployeeDispatch.test.ts) is first-come-first-served today — array/insertion
 // order, not cost. This end-to-end test drives the same claim logic through
 // the full console `tick` pipeline (tickCommand, events.ts) with two
 // surveyors and three unclaimed survey targets at different distances, the
