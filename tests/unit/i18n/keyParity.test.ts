@@ -191,10 +191,16 @@ describe('en.json / fr.json — key-set parity', () => {
     // campaign.ts/sandbox.ts/world.ts/siteExpansion.ts console command
     // modules — 26 module-local keys + 1 shared console.staffed_suffix key,
     // both locales translated.
+    // Baseline is now 3391 (up from 3384): #862 reshaped MafiaActions.ts's
+    // MafiaActionResult from a hardcoded `message: string` to
+    // `outcomeKey`/`outcomeParams`, wired through mafia.ts's 3 call sites via
+    // t(). 7 new mafia.* keys — target_not_found, accident_success,
+    // accident_failed, frame_started, frame_no_ready, frame_success,
+    // frame_detected — both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3384);
+    expect(Object.keys(en).length).toBe(3391);
   });
 });
 
