@@ -61,6 +61,22 @@
     // (58 -> 48 entries, freshly measured 150 errors remain across the 48
     // still-excluded files -- the prior 170 count had already drifted from
     // the #805 measurement by the time this ran).
+    // #838 fixed ./unit/mining/BlastCalc.test.ts (48 -> 47 entries). 22 errors:
+    // 8 TS2305 missing-export imports (calculateFragmentation,
+    // calculateFragmentCount, calculateInitialVelocity, classifyProjection,
+    // calculateFreeFace, propagateEnergy, identifyFragmentedVoxels,
+    // PropagationResult) for symbols a past refactor renamed or moved -- their
+    // behaviour now lives in FragmentGeneration.ts, FragmentVelocity.ts,
+    // EnergyPropagation.ts, and VoxelFragmentation.ts, each already covered by
+    // its own dedicated test file -- so the dead imports were removed rather
+    // than resurrected. Plus 14 unused-import errors (TS6133 x12, TS6192 x2):
+    // stemmingFactor and waterEffect were imported but never exercised, now
+    // wired into two new direct-assertion describe blocks; PROJECTION_SPEED_THRESHOLD
+    // and the VoxelGrid class import were removed (VoxelGrid has its own
+    // suite; this file only needed the VoxelData type); and two fully-unused
+    // import statements (balance.js's MAX_PROPAGATION_ITERATIONS/
+    // FRAGMENTATION_MULTIPLIER, Vec3.js's vec3/length) were deleted outright.
+    // Measured before: 22 errors with this file re-included. After: 0.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -88,7 +104,6 @@
     "./unit/events/MafiaActions.test.ts",
     "./unit/events/TutorialEvents.test.ts",
     "./unit/lint/NoDanglingDocReferences.test.ts",
-    "./unit/mining/BlastCalc.test.ts",
     "./unit/mining/BlastExecution.test.ts",
     "./unit/mining/MuckPileSummary.test.ts",
     "./unit/mining/SoftwarePreview.test.ts",
