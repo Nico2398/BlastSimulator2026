@@ -14,7 +14,7 @@
 //
 // DO NOT implement anything here — only add implementation to scripts/.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { parseArgs, parseShardArg, selectShard } from '../../../scripts/run-all-scenarios-cli.js';
 
 const ORIGINAL_ARGV = process.argv;
