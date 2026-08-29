@@ -80,111 +80,54 @@ describe('corruption.ts per-outcome lines — English literal + fr divergence', 
     vi.restoreAllMocks();
   });
 
-  it('success line matches the exact English literal by default', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: true,
-      cost: 1000,
-      scandalTriggered: false,
-      mafiaJustUnlocked: false,
-    });
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.success).toBe(true);
-    expect(result.output.split('\n')[0]).toBe('CORRUPTION SUCCESSFUL.');
-  });
+  const cases: Array<{
+    name: string;
+    mockResult: CorruptionModule.CorruptionResult;
+    lineIndex: number;
+    englishLiteral: string;
+  }> = [
+    {
+      name: 'success line',
+      mockResult: { success: true, cost: 1000, scandalTriggered: false, mafiaJustUnlocked: false },
+      lineIndex: 0,
+      englishLiteral: 'CORRUPTION SUCCESSFUL.',
+    },
+    {
+      name: 'failed/scandal header',
+      mockResult: { success: false, cost: 1000, scandalTriggered: true, mafiaJustUnlocked: false },
+      lineIndex: 0,
+      englishLiteral: 'CORRUPTION FAILED — SCANDAL!',
+    },
+    {
+      name: 'scandal-erupted line',
+      mockResult: { success: false, cost: 1000, scandalTriggered: true, mafiaJustUnlocked: false },
+      lineIndex: 2,
+      englishLiteral: 'A scandal has erupted. Expect consequences.',
+    },
+    {
+      name: 'mafia-unlocked line',
+      mockResult: { success: true, cost: 1000, scandalTriggered: false, mafiaJustUnlocked: true },
+      lineIndex: 2,
+      englishLiteral: 'You have attracted the attention of... certain organizations.',
+    },
+  ];
 
-  it('success line differs from the English literal under locale fr', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: true,
-      cost: 1000,
-      scandalTriggered: false,
-      mafiaJustUnlocked: false,
+  for (const { name, mockResult, lineIndex, englishLiteral } of cases) {
+    it(`${name} matches the exact English literal by default`, () => {
+      const ctx = makeCtx();
+      vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue(mockResult);
+      const result = corruptCommand(ctx, [], { target: 'inspector' });
+      expect(result.success).toBe(true);
+      expect(result.output.split('\n')[lineIndex]).toBe(englishLiteral);
     });
-    setLocale('fr');
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.success).toBe(true);
-    expect(result.output.split('\n')[0]).not.toBe('CORRUPTION SUCCESSFUL.');
-  });
 
-  it('failed/scandal header matches the exact English literal by default', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: false,
-      cost: 1000,
-      scandalTriggered: true,
-      mafiaJustUnlocked: false,
+    it(`${name} differs from the English literal under locale fr`, () => {
+      const ctx = makeCtx();
+      vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue(mockResult);
+      setLocale('fr');
+      const result = corruptCommand(ctx, [], { target: 'inspector' });
+      expect(result.success).toBe(true);
+      expect(result.output.split('\n')[lineIndex]).not.toBe(englishLiteral);
     });
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.success).toBe(true);
-    expect(result.output.split('\n')[0]).toBe('CORRUPTION FAILED — SCANDAL!');
-  });
-
-  it('failed/scandal header differs from the English literal under locale fr', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: false,
-      cost: 1000,
-      scandalTriggered: true,
-      mafiaJustUnlocked: false,
-    });
-    setLocale('fr');
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.success).toBe(true);
-    expect(result.output.split('\n')[0]).not.toBe('CORRUPTION FAILED — SCANDAL!');
-  });
-
-  it('scandal-erupted line matches the exact English literal by default', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: false,
-      cost: 1000,
-      scandalTriggered: true,
-      mafiaJustUnlocked: false,
-    });
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.output.split('\n')[2]).toBe('A scandal has erupted. Expect consequences.');
-  });
-
-  it('scandal-erupted line differs from the English literal under locale fr', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: false,
-      cost: 1000,
-      scandalTriggered: true,
-      mafiaJustUnlocked: false,
-    });
-    setLocale('fr');
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.output.split('\n')[2]).not.toBe('A scandal has erupted. Expect consequences.');
-  });
-
-  it('mafia-unlocked line matches the exact English literal by default', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: true,
-      cost: 1000,
-      scandalTriggered: false,
-      mafiaJustUnlocked: true,
-    });
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.output.split('\n')[2]).toBe(
-      'You have attracted the attention of... certain organizations.',
-    );
-  });
-
-  it('mafia-unlocked line differs from the English literal under locale fr', () => {
-    const ctx = makeCtx();
-    vi.spyOn(CorruptionModule, 'attemptCorruption').mockReturnValue({
-      success: true,
-      cost: 1000,
-      scandalTriggered: false,
-      mafiaJustUnlocked: true,
-    });
-    setLocale('fr');
-    const result = corruptCommand(ctx, [], { target: 'inspector' });
-    expect(result.output.split('\n')[2]).not.toBe(
-      'You have attracted the attention of... certain organizations.',
-    );
-  });
+  }
 });
