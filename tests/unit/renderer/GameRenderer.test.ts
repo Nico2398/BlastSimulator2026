@@ -54,6 +54,7 @@ function makeCtx(seed = 42): MiningContext {
   return {
     state,
     grid,
+    landscape: null, playableArea: null,
     emitter: new EventEmitter(),
   };
 }
@@ -186,7 +187,7 @@ describe('GameRenderer — ghost preview positioning (issue #406)', () => {
     renderer.syncFromContext(ctx);
     const before = new Set(sm.scene.children);
 
-    ctx.state!.ghostPreviews.push({ id: 1, type: 'general_work', targetX: 5, targetZ: 5, targetY: 0 });
+    ctx.state!.ghostPreviews.push({ id: 1, type: 'general_work', targetX: 5, targetZ: 5, targetY: 0, claimed: false });
     // Real dispatch (TaskDispatch.ts's dispatchPendingAction) bumps this on every
     // push — this fixture pushes directly, bypassing it, so it must bump the
     // revision itself or syncFromContext's dirty-check (#761) sees no change.
@@ -426,7 +427,7 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
     const ctx: MiningContext = {
-      state: null, grid: null, landscape: null,
+      state: null, grid: null, landscape: null, playableArea: null,
       emitter: new EventEmitter(),
     };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
@@ -490,7 +491,7 @@ describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
   async function makeLandscapeCtx(mineType: string): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
     const ctx: MiningContext = {
-      state: null, grid: null, landscape: null,
+      state: null, grid: null, landscape: null, playableArea: null,
       emitter: new EventEmitter(),
     };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
@@ -886,7 +887,7 @@ describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
     const ctx: MiningContext = {
-      state: null, grid: null, landscape: null,
+      state: null, grid: null, landscape: null, playableArea: null,
       emitter: new EventEmitter(),
     };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
@@ -971,7 +972,7 @@ describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
 describe('GameRenderer — staged level load (#474)', () => {
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
     const { newGameCommand } = await import('../../../src/console/commands/world.js');
-    const ctx: MiningContext = { state: null, grid: null, landscape: null, emitter: new EventEmitter() };
+    const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
     const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
     expect(result.success).toBe(true);
     return ctx;
@@ -1019,7 +1020,7 @@ describe('GameRenderer — staged level load (#474)', () => {
 
   it('finishLevelLoad() is a no-op without a loaded state/grid, rather than throwing', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
-    expect(() => renderer.finishLevelLoad({ state: null, grid: null, landscape: null, emitter: new EventEmitter() })).not.toThrow();
+    expect(() => renderer.finishLevelLoad({ state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() })).not.toThrow();
   });
 });
 

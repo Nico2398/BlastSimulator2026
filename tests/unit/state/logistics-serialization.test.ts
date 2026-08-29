@@ -3,7 +3,6 @@ import { stateCommand } from '../../../src/console/commands/state.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { createTubingState } from '../../../src/core/mining/Tubing.js';
 import type { TrackedFragment } from '../../../src/core/economy/Logistics.js';
 
 // ── Helper factories ────────────────────────────────────────────────────────
@@ -14,8 +13,8 @@ function makeCtx(state: ReturnType<typeof createGame>): MiningContext {
     state,
     grid: null,
     emitter: new EventEmitter(),
-    softwareTier: 1,
-    tubingState: createTubingState(),
+    landscape: null,
+    playableArea: null,
   };
 }
 
@@ -30,6 +29,8 @@ function makeFragment(id: number, fragState: TrackedFragment['state']): TrackedF
       oreDensities: {},
       initialVelocity: { x: 0, y: 0, z: 0 },
       isProjection: false,
+      halfExtents: { x: 0.4, y: 0.4, z: 0.4 },
+      shapeSeed: id,
     },
     state: fragState,
     vehicleId: null,

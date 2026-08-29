@@ -51,6 +51,8 @@ function makeFakeHandle(
     map,
     playableRect: rect,
     sampleColumn: sampleColumn ?? ((x, z) => ({ height: 20 - Math.abs(x) * 0.01 - Math.abs(z) * 0.01, biomeId: 0, surfCompId: compId })),
+    groundLevelY: 0,
+    structureSet: { overlays: [], spatialIndex: new Map(), rivers: [], villages: [], trees: [], landmarks: [] },
   };
 }
 
@@ -750,7 +752,7 @@ describe('LandscapeMesh — normals come from the height field, not the triangle
   /** Deliberately non-planar: a plane would hide the difference, since every scheme agrees on one. */
   const bumpy = (row: number, col: number): number => 10 + Math.sin(col * 0.9) * 2 + Math.cos(row * 0.7) * 1.5;
 
-  function makeBumpyTile(n: number, compId: number, step: number): LandscapeTile {
+  function makeBumpyTile(n: number, compId: number, _step: number): LandscapeTile {
     const heights = new Float32Array(n * n);
     for (let row = 0; row < n; row++) {
       for (let col = 0; col < n; col++) heights[row * n + col] = bumpy(row, col);

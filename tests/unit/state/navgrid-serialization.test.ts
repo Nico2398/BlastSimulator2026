@@ -74,6 +74,8 @@ function makeCtx(state: ReturnType<typeof createGame>): MiningContext {
     state,
     grid: null,
     emitter: new EventEmitter(),
+    landscape: null,
+    playableArea: null,
   };
 }
 
@@ -217,6 +219,8 @@ describe('stateCommand — navGrid serialization', () => {
       state: null,
       grid: null,
       emitter: new EventEmitter(),
+      landscape: null,
+      playableArea: null,
     };
     const result = stateCommand(ctx, ['full'], {});
     expect(result.success).toBe(false);

@@ -669,10 +669,10 @@ describe('the runner-liveness predicate cannot drift between its two copies', ()
   );
   const failsafe = workflow('agentic-ci-failure.yml');
 
-  const extract = (source, name) => {
+  const extract = (source: string, name: string): string => {
     const match = new RegExp(`const ${name} = (\\[[^\\]]*\\]);`).exec(source);
     expect(match, `${name} array not found`).not.toBeNull();
-    return match[1];
+    return match![1] ?? '';
   };
 
   it('polls the same runner workflows in both copies', () => {
@@ -723,7 +723,7 @@ describe('enabling auto-merge actually reaches GitHub', () => {
     const variables = /\{([^{}]*)\}\s*\n\s*\);/.exec(call)?.[1] ?? '';
     expect(variables, 'no variables object found on the graphql call').not.toBe('');
 
-    for (const key of variables.split(',').map((pair) => pair.split(':')[0].trim())) {
+    for (const key of variables.split(',').map((pair) => (pair.split(':')[0] ?? '').trim())) {
       expect(RESERVED, `\`${key}\` is an @octokit/graphql request option`).not.toContain(key);
     }
   });
@@ -937,7 +937,9 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
 
-  const buildMissingGatedJobs = (jobsByRunId) =>
+  interface GatedJob { name: string; conclusion: string }
+
+  const buildMissingGatedJobs = (jobsByRunId: Record<number, GatedJob[]>) =>
     new Function(
       'github',
       'owner',
@@ -945,7 +947,7 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
       `${source.slice(start, end)} return missingGatedJobs;`
     )(
       {
-        paginate: async (_fn, { run_id }) => jobsByRunId[run_id] ?? [],
+        paginate: async (_fn: unknown, { run_id }: { run_id: number }) => jobsByRunId[run_id] ?? [],
         rest: { actions: { listJobsForWorkflowRun: () => {} } },
       },
       'Nico2398',
@@ -953,8 +955,8 @@ describe("asking the CI run's own jobs before trusting its conclusion", () => {
     ) as (labels: { name: string }[], runs: unknown[]) => Promise<string[]>;
 
   const CI_RUN = { id: 555, path: '.github/workflows/ci.yml' };
-  const interactionJob = (n, conclusion) => ({ name: `Scenarios (interaction mode) — shard ${n}/4`, conclusion });
-  const buildJob = (conclusion) => ({ name: 'Production build', conclusion });
+  const interactionJob = (n: number, conclusion: string): GatedJob => ({ name: `Scenarios (interaction mode) — shard ${n}/4`, conclusion });
+  const buildJob = (conclusion: string): GatedJob => ({ name: 'Production build', conclusion });
 
   it('is a no-op when the PR carries no gated label', async () => {
     const missingGatedJobs = buildMissingGatedJobs({});
@@ -1102,7 +1104,7 @@ describe('the sweep that runs when the checks come in', () => {
   // `workflows:` matches on the workflow's `name:`, not its filename, so a
   // rename in ci.yml silently unhooks the only path that merges anything.
   it('names the CI workflow as CI declares itself', () => {
-    const declared = /^name:\s*(.+)$/m.exec(workflow('ci.yml'))?.[1].trim();
+    const declared = /^name:\s*(.+)$/m.exec(workflow('ci.yml'))?.[1]?.trim();
     expect(declared).toBe('CI');
   });
 
@@ -1175,7 +1177,7 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   it('acts only on the pipeline\'s own feature branch', () => {
     const pattern = /const PIPELINE_HEAD = (\/\^pipeline.*?\/);/.exec(failsafe);
     expect(pattern, 'PIPELINE_HEAD not found in the fail-safe').toBeTruthy();
-    const head = new RegExp(pattern[1].slice(1, -1));
+    const head = new RegExp((pattern![1] ?? '').slice(1, -1));
     expect(head.test('main')).toBe(false);
     expect(head.test('pipeline/tests-769-32908623869')).toBe(false);
     expect(head.test('feature/something')).toBe(false);
@@ -1187,7 +1189,8 @@ describe('a red CI on a pipeline PR is handed back to the agent', () => {
   // ever handed back — PR #773's reached a human instead.
   it('matches the run-id-suffixed heads real runs produce, and reads the issue from both', () => {
     const pattern = /const PIPELINE_HEAD = (\/\^pipeline.*?\/);/.exec(failsafe);
-    const head = new RegExp(pattern[1].slice(1, -1));
+    expect(pattern, 'PIPELINE_HEAD not found in the fail-safe').toBeTruthy();
+    const head = new RegExp((pattern![1] ?? '').slice(1, -1));
     expect(head.exec('pipeline/feature-769-32908623869')?.[1]).toBe('769');
     expect(head.exec('pipeline/feature-769')?.[1]).toBe('769');
   });
@@ -1531,7 +1534,7 @@ describe('the watchdog re-raises a red CI it would otherwise skip', () => {
   it('matches the run-id-suffixed heads real runs produce', () => {
     const pattern = /const PIPELINE_HEAD = (\/\^pipeline.*?\/);/.exec(watchdog);
     expect(pattern, 'PIPELINE_HEAD not found in the watchdog').toBeTruthy();
-    const head = new RegExp(pattern[1].slice(1, -1));
+    const head = new RegExp((pattern![1] ?? '').slice(1, -1));
     expect(head.test('pipeline/feature-769-32908623869')).toBe(true);
     expect(head.test('pipeline/feature-769')).toBe(true);
     expect(head.test('main')).toBe(false);

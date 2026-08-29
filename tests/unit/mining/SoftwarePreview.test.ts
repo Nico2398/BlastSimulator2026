@@ -10,7 +10,6 @@ import { buildPlanEnergyField } from '../../../src/core/mining/BlastExecution.js
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { assembleBlastPlan } from '../../../src/core/mining/BlastPlan.js';
-import { vec3 } from '../../../src/core/math/Vec3.js';
 import { makeTestPlan } from './softwareTestFixtures.js';
 
 beforeEach(() => resetHoleIds());
@@ -28,7 +27,7 @@ describe('SoftwarePreview — computeHoleContext', () => {
   it('surface Y is 0 for a hole above an empty column', () => {
     const grid = new VoxelGrid(5, 5, 5);
     const holes = createGridPlan({ x: 2, z: 2 }, 1, 1, 3, 2, 0.1);
-    const plan = assembleBlastPlan(holes, {}, []);
+    const plan = assembleBlastPlan(holes, {}, {});
     const ctx = computeHoleContext(plan, grid);
     expect(ctx.holeSurfaceYs[holes[0]!.id]).toBe(0);
   });

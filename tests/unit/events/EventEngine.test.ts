@@ -32,6 +32,7 @@ function makeWaitingVehicle(
   return {
     id: _nextId++,
     type: 'debris_hauler',
+    tier: 1,
     x: targetX - 1,
     z: targetZ,
     hp: 100,
@@ -42,6 +43,14 @@ function makeWaitingVehicle(
     state: 'waiting',
     payloadKg: 0,
     waitingTicks,
+    moveConsecutiveFailures: 0,
+    isMoveStuck: false,
+    haulingFragmentId: null,
+    haulingPhase: null,
+    haulingDepotBuildingId: null,
+    breakFragmentId: null,
+    breakPhase: null,
+    reservedForActionId: null,
   };
 }
 

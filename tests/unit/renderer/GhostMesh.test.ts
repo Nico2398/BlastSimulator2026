@@ -285,12 +285,12 @@ describe('GhostMesh', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mat.onBeforeCompile!(shader as any, {} as any);
 
-      const rimColor = shader.uniforms.rimColor.value as THREE.Color;
+      const rimColor = shader.uniforms.rimColor!.value as THREE.Color;
       expect(rimColor.b).toBeGreaterThan(rimColor.r);
-      expect(typeof shader.uniforms.rimPower.value).toBe('number');
-      expect(shader.uniforms.rimPower.value).toBeGreaterThan(0);
-      expect(typeof shader.uniforms.rimIntensity.value).toBe('number');
-      expect(shader.uniforms.rimIntensity.value).toBeGreaterThan(0);
+      expect(typeof shader.uniforms.rimPower!.value).toBe('number');
+      expect(shader.uniforms.rimPower!.value).toBeGreaterThan(0);
+      expect(typeof shader.uniforms.rimIntensity!.value).toBe('number');
+      expect(shader.uniforms.rimIntensity!.value).toBeGreaterThan(0);
       gm.dispose();
     });
 
@@ -343,13 +343,13 @@ describe('GhostMesh', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       claimedMat.onBeforeCompile!(claimedShader as any, {} as any);
 
-      const unclaimedColor = unclaimedShader.uniforms.rimColor.value as THREE.Color;
-      const claimedColor = claimedShader.uniforms.rimColor.value as THREE.Color;
+      const unclaimedColor = unclaimedShader.uniforms.rimColor!.value as THREE.Color;
+      const claimedColor = claimedShader.uniforms.rimColor!.value as THREE.Color;
       expect(claimedColor.r).toBeCloseTo(unclaimedColor.r);
       expect(claimedColor.g).toBeCloseTo(unclaimedColor.g);
       expect(claimedColor.b).toBeCloseTo(unclaimedColor.b);
-      expect(claimedShader.uniforms.rimPower.value).toBe(unclaimedShader.uniforms.rimPower.value);
-      expect(claimedShader.uniforms.rimIntensity.value).toBe(unclaimedShader.uniforms.rimIntensity.value);
+      expect(claimedShader.uniforms.rimPower!.value).toBe(unclaimedShader.uniforms.rimPower!.value);
+      expect(claimedShader.uniforms.rimIntensity!.value).toBe(unclaimedShader.uniforms.rimIntensity!.value);
       gm.dispose();
     });
 
