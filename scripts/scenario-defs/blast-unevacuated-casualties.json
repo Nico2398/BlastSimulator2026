@@ -115,10 +115,11 @@
     },
     {
       "command": "sequence auto delay_step:25",
+      "description": "The blast panel is already open (opened once in the drill_plan step and never closed) and, by the time the preceding charge order has drained, BlastWorkshop's own autoAdvance/suggestStep has already moved it to the Sequence tab on its own. A bare clickSelector on the toolbar's blast tab here would hit togglePanel's already-open branch and close the panel instead of a no-op, leaving the very next click on a hidden, zero-size auto-sequence button (UIManager.togglePanel, src/ui/UIManager.ts) — ensurePanel is idempotent and only clicks when the panel isn't already open.",
       "interaction": [
         {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+          "type": "ensurePanel",
+          "panel": "blast"
         },
         {
           "type": "clickSelector",
