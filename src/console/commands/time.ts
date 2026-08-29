@@ -6,9 +6,6 @@ import type { GameContext } from './world.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame } from './commandUtils.js';
 
-// TODO(#821): wire t() calls into timeCommand's string literals (implementer phase).
-void t;
-
 export function timeCommand(
   ctx: GameContext,
   args: string[],
@@ -35,22 +32,22 @@ export function timeCommand(
 
     case 'pause':
       state.isPaused = true;
-      return { success: true, output: 'Game paused.' };
+      return { success: true, output: t('time.paused') };
 
     case 'resume':
       state.isPaused = false;
-      return { success: true, output: `Game resumed at ${state.timeScale}x speed.` };
+      return { success: true, output: t('time.resumed', { speed: state.timeScale }) };
 
     case 'speed': {
       const speed = parseInt(args[1] ?? named['speed'] ?? '', 10);
       if (![1, 2, 4, 8].includes(speed)) {
-        return { success: false, output: 'Valid speeds: 1, 2, 4, 8' };
+        return { success: false, output: t('time.invalid_speed') };
       }
       state.timeScale = speed;
-      return { success: true, output: `Speed set to ${speed}x.` };
+      return { success: true, output: t('time.speed_set', { speed }) };
     }
 
     default:
-      return { success: false, output: 'Usage: time (status|pause|resume|speed <1|2|4|8>)' };
+      return { success: false, output: t('time.usage') };
   }
 }

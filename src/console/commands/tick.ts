@@ -64,7 +64,7 @@ export function tickCommand(
 
   // If there's a pending event, refuse to tick — player must resolve it first
   if (state.events.pendingEvent) {
-    return { success: false, output: 'Pending event! Resolve it first: "event choose <index>".' };
+    return { success: false, output: t('tick.pending_event_refusal') };
   }
 
   const count = Math.max(1, parseInt(args[0] ?? '1', 10) || 1);
@@ -281,9 +281,9 @@ export function tickCommand(
   }
 
   if (lines.length === 0) {
-    lines.push(`Advanced ${ticksAdvanced} tick(s). Now at tick ${state.tickCount}. No events fired.`);
+    lines.push(t('tick.advanced_no_events', { advanced: ticksAdvanced, tick: state.tickCount }));
   } else if (ticksAdvanced < count) {
-    lines.push(`(Advanced ${ticksAdvanced} of ${count} requested ticks)`);
+    lines.push(t('tick.advanced_partial', { advanced: ticksAdvanced, count }));
   }
 
   return { success: true, output: lines.join('\n') };

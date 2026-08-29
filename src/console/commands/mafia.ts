@@ -17,9 +17,6 @@ import { formatMoney } from '../../core/economy/formatMoney.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame } from './commandUtils.js';
 
-// TODO(#821): wire t() calls into mafiaCommand's string literals (implementer phase).
-void t;
-
 export function mafiaCommand(
   ctx: GameContext,
   args: string[],
@@ -31,7 +28,7 @@ export function mafiaCommand(
   const sub = args[0] ?? 'status';
 
   if (!state.corruption.mafiaUnlocked && sub !== 'status') {
-    return { success: false, output: 'Mafia not unlocked. Increase your corruption level first.' };
+    return { success: false, output: t('mafia.not_unlocked') };
   }
 
   const rng = new Random(state.seed + state.tickCount);
@@ -49,11 +46,14 @@ export function mafiaCommand(
 
     case 'accident': {
       const empId = parseInt(named['employee'] ?? '', 10);
-      if (isNaN(empId)) return { success: false, output: 'Usage: mafia accident employee:<id>' };
+      if (isNaN(empId)) return { success: false, output: t('mafia.accident_usage') };
       if (state.cash < ACCIDENT_COST) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(ACCIDENT_COST)}, have $${formatMoney(state.cash)}`,
+          output: t('console.insufficient_funds', {
+            need: '$' + formatMoney(ACCIDENT_COST),
+            have: '$' + formatMoney(state.cash),
+          }),
         };
       }
       const result = arrangeAccident(state.mafia, state.employees, state.corruption, empId, rng);
@@ -64,7 +64,7 @@ export function mafiaCommand(
 
     case 'frame': {
       const empId = parseInt(named['employee'] ?? '', 10);
-      if (isNaN(empId)) return { success: false, output: 'Usage: mafia frame employee:<id>' };
+      if (isNaN(empId)) return { success: false, output: t('mafia.frame_usage') };
 
       // Check if completing or starting
       const pending = state.mafia.pendingFrames.find(
@@ -78,7 +78,10 @@ export function mafiaCommand(
       if (state.cash < FRAME_COST) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(FRAME_COST)}, have $${formatMoney(state.cash)}`,
+          output: t('console.insufficient_funds', {
+            need: '$' + formatMoney(FRAME_COST),
+            have: '$' + formatMoney(state.cash),
+          }),
         };
       }
       const result = startFraming(state.mafia, state.employees, empId, state.tickCount);
@@ -92,12 +95,12 @@ export function mafiaCommand(
       return {
         success: true,
         output: result.active
-          ? `Smuggling ACTIVATED. Income: $${result.incomePerTick}/tick. Watch your exposure.`
-          : 'Smuggling DEACTIVATED.',
+          ? t('mafia.smuggle_activated', { income: '$' + result.incomePerTick })
+          : t('mafia.smuggle_deactivated'),
       };
     }
 
     default:
-      return { success: false, output: 'Usage: mafia (status|accident|frame|smuggle) [employee:<id>]' };
+      return { success: false, output: t('mafia.usage') };
   }
 }

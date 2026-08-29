@@ -130,7 +130,7 @@ export function contractCommand(
     case 'list': {
       generateContracts(state.contracts, rng, state.tickCount);
       if (state.contracts.available.length === 0) {
-        return { success: true, output: 'No contracts available.' };
+        return { success: true, output: t('economy.contract.none_available') };
       }
       const lines = ['Available contracts:'];
       for (const c of state.contracts.available) {
@@ -161,7 +161,7 @@ export function contractCommand(
 
     case 'status': {
       if (state.contracts.active.length === 0) {
-        return { success: true, output: 'No active contracts.' };
+        return { success: true, output: t('economy.contract.none_active') };
       }
       const lines = ['Active contracts:'];
       for (const c of state.contracts.active) {
