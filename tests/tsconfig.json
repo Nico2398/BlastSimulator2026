@@ -158,6 +158,20 @@
     // literals (makeCtx and the "no game" test) were missing the same
     // landscape/playableArea fields (TS2739). No test logic or assertions
     // changed.
+    // #846 fixed the ./unit/mining/{BlastExecution,MuckPileSummary,SoftwarePreview,
+    // SurveyCalc}.test.ts cluster (30 -> 26 entries). BlastExecution.test.ts's
+    // hand-built BlastResult literal (the "reports zero projection distance when
+    // nothing was projected" test) was missing maxThrowDistance/projectileCount/
+    // flights/clearedColumns (TS2739). MuckPileSummary.test.ts's fragment()
+    // helper cast `as FragmentData` was missing rockId (TS2352), fixed by adding
+    // it to match the rockId already used in this same file's composition.rocks.
+    // SoftwarePreview.test.ts had an unused vec3 import (TS6133) and an
+    // assembleBlastPlan(holes, {}, []) call whose third (delays) argument needs
+    // Record<string, number>, not never[] (TS2345) -- [] became {}.
+    // SurveyCalc.test.ts had an unused RunSurveyResult type import (TS6133) and
+    // its makeFragment helper (inside computeBlastOreReport) was missing
+    // halfExtents/shapeSeed (TS2739), same fixture-vs-interface drift pattern as
+    // the #804/#806/#845 clusters. No test logic or assertions changed.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -178,10 +192,6 @@
     "./unit/entities/VehicleStatus.test.ts",
     "./unit/entities/Zone.test.ts",
     "./unit/lint/NoDanglingDocReferences.test.ts",
-    "./unit/mining/BlastExecution.test.ts",
-    "./unit/mining/MuckPileSummary.test.ts",
-    "./unit/mining/SoftwarePreview.test.ts",
-    "./unit/mining/SurveyCalc.test.ts",
     "./unit/nav/AgentMovement.test.ts",
     "./unit/recording-format.test.ts",
     "./unit/scenario-defs-validation/issue-regressions.test.ts",

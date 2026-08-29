@@ -15,7 +15,6 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import {
   runSurvey,
   type RunSurveyParams,
-  type RunSurveyResult,
 } from '../../../src/core/mining/SurveyCalc.js';
 // ── Task 4.7 additions ────────────────────────────────────────────────────────
 import {
@@ -798,6 +797,8 @@ describe('SurveyCalc — computeBlastOreReport (4.7)', () => {
       oreDensities,
       initialVelocity: vec3(0, 0, 0),
       isProjection: false,
+      halfExtents: vec3(0.25, 0.25, 0.25),
+      shapeSeed: 0,
     };
   }
 
