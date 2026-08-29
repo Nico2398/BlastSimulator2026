@@ -4,7 +4,7 @@
 // After implementer fills in real values, all tests PASS.
 
 import { describe, it, expect } from 'vitest';
-import vitestConfig from '../../../vitest.config.ts';
+import vitestConfig from '../../../vitest.config.js';
 
 type Thresholds = {
   perFile: boolean;
