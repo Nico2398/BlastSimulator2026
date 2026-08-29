@@ -14,6 +14,7 @@ import {
   claimActionsTargetedAtEmployee, fillIdleEmployeeFromQueueOrPool, reserveOnePoolActionAhead,
   type TickEmployeesResult,
 } from './EmployeeDispatchSteps.js';
+import { clearResolvedEvacuationHolds, isMidEvacuationWalk } from './Evacuation.js';
 
 /**
  * Match pending actions to idle qualified employees, ranked by cost
@@ -48,6 +49,14 @@ import {
  * entirely — not re-evaluated as claimable, not counted as still-waiting.
  */
 export function tickEmployees(state: GameState): TickEmployeesResult {
+  // One-shot cleanup: strip EVACUATION_HOLD_KEY from any action whose zone
+  // has genuinely cleared, before this tick's claim filters (below, via
+  // EmployeeDispatchSteps.ts's isEvacuationHoldActive) run — see
+  // clearResolvedEvacuationHolds' own doc comment (Evacuation.ts) for why
+  // this is a separate, explicitly-called step rather than a side effect of
+  // the filter check itself (#557 review).
+  clearResolvedEvacuationHolds(state);
+
   const result: TickEmployeesResult = { claimed: [], unqualified: [], waiting: [] };
 
   // Base eligibility: alive, not injured, not in training.
@@ -98,19 +107,17 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // leaves it to resolve on its own first; dispatch resumes for this
     // employee the very next tick either way (#552).
     if (employee.pendingDriverVehicleId !== null) continue;
-    // An employee mid-walk to a safe cell (evacuateZone, Evacuation.ts/
-    // Zone.ts's clearZone) is, like the boarding case just above, walking
-    // outside the claim system entirely: destinationX/Z set directly, no
-    // PendingAction and no activeActionId behind it. Without this guard they
-    // read as idle too, and claimActionsTargetedAtEmployee would happily
-    // promote a pre-existing targeted action (most often a proactive rest
-    // whose target is wherever the employee was already standing —
-    // NeedTaskInsertion.ts) straight to active, overwriting the evacuation
-    // destination with the employee's OWN current position — inside the
-    // danger zone they were just ordered out of — before they ever take a
-    // step (#557). Dispatch resumes for them the very next tick once they've
-    // arrived and destinationX clears, same as the boarding case.
-    if (employee.activeActionId === null && employee.destinationX !== null) continue;
+    // Mid-walk to a safe cell (evacuateZone) — like the boarding case just
+    // above, walking outside the claim system entirely. Without this guard,
+    // claimActionsTargetedAtEmployee would happily promote a pre-existing
+    // targeted action (most often a proactive rest whose target is wherever
+    // the employee was already standing — NeedTaskInsertion.ts) straight to
+    // active, overwriting the evacuation destination with the employee's OWN
+    // current position — inside the danger zone they were just ordered out
+    // of — before they ever take a step. See isMidEvacuationWalk's own doc
+    // comment (Evacuation.ts) for the shared reasoning across all four call
+    // sites (#557).
+    if (isMidEvacuationWalk(employee)) continue;
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);

@@ -160,30 +160,53 @@ export function interruptActiveAction(
         action.targetEmployeeId = employee.id;
       }
 
-      action.status = 'queued';
-      action.holderId = null;
-
-      const ghost = state.ghostPreviews.find(g => g.id === actionId);
-      if (ghost) {
-        ghost.claimed = false;
-        state.ghostPreviewsRevision++;
-      }
-
-      // releaseVehicleReservation no-ops on its own when nothing is reserved
-      // for this action id, so no need to gate the call on requiredVehicleRole.
       // options.keepVehicleDriver (#552) skips the dismount for the one
       // caller (ArrivalGate.ts's resolveBoarding) interrupting an action
       // whose driver had *just* boarded this same tick for it — every other
       // caller keeps the full dismount-and-idle release.
-      if (options?.keepVehicleDriver) {
-        releaseVehicleReservationKeepDriver(state, action.id);
-      } else {
-        releaseVehicleReservation(state, action.id);
-      }
+      releaseActionToOpenPool(state, action, options);
     }
   }
 
   clearHolderWalkFields(employee);
+}
+
+/**
+ * Shared "release one action back to the open pool" block: flips the action
+ * to 'queued'/holderId:null, releases any vehicle reservation held for it
+ * (releaseVehicleReservation no-ops on its own when nothing is reserved for
+ * this action id, so no gate on requiredVehicleRole is needed), and
+ * un-claims its ghost preview (bumping ghostPreviewsRevision). Used by both
+ * interruptActiveAction (single-action interrupt-with-resume, above) and
+ * releaseDeadEmployeeActions (bulk death cleanup, below) — each keeps its
+ * own distinct surrounding logic (targetEmployeeId handling,
+ * interruptedActionPayload stashing, durationTicks preservation, the dead-
+ * employee snapshot loop) and calls this only for the four fields the two
+ * used to duplicate verbatim.
+ *
+ * options.keepVehicleDriver (#552): see interruptActiveAction's own call
+ * site above — releaseDeadEmployeeActions never passes this, a dead
+ * employee has no boarding-continuity case to protect.
+ */
+function releaseActionToOpenPool(
+  state: GameState,
+  action: PendingAction,
+  options?: { keepVehicleDriver?: boolean },
+): void {
+  action.status = 'queued';
+  action.holderId = null;
+
+  if (options?.keepVehicleDriver) {
+    releaseVehicleReservationKeepDriver(state, action.id);
+  } else {
+    releaseVehicleReservation(state, action.id);
+  }
+
+  const ghost = state.ghostPreviews.find(g => g.id === action.id);
+  if (ghost) {
+    ghost.claimed = false;
+    state.ghostPreviewsRevision++;
+  }
 }
 
 /**
@@ -269,16 +292,8 @@ export function releaseDeadEmployeeActions(state: GameState, employeeId: number)
       continue;
     }
     if ((action.status === 'assigned' || action.status === 'in_progress') && action.holderId === employeeId) {
-      action.status = 'queued';
-      action.holderId = null;
       if (action.targetEmployeeId === employeeId) action.targetEmployeeId = null;
-      releaseVehicleReservation(state, action.id);
-
-      const ghost = state.ghostPreviews.find(g => g.id === action.id);
-      if (ghost) {
-        ghost.claimed = false;
-        state.ghostPreviewsRevision++;
-      }
+      releaseActionToOpenPool(state, action);
     }
   }
 }

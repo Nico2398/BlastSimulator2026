@@ -4,11 +4,13 @@ import {
   isZoneClear,
   isInZone,
   computeDangerZone,
+  countZoneOccupants,
+  isDangerZoneClear,
   type ZoneBounds,
   type SafeDestinationFinder,
 } from '../../../src/core/entities/Zone.js';
 import { createVehicleState, purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
-import { createEmployeeState, hireEmployee } from '../../../src/core/entities/Employee.js';
+import { createEmployeeState, hireEmployee, killEmployee } from '../../../src/core/entities/Employee.js';
 import { createDamageState, processProjections } from '../../../src/core/entities/Damage.js';
 import { createBuildingState } from '../../../src/core/entities/Building.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -212,5 +214,77 @@ describe('computeDangerZone', () => {
     const zone = computeDangerZone([{ x: 20, z: 20 }], 15)!;
     expect(isInZone(20, 20, zone)).toBe(true);
     expect(isInZone(4, 20, zone)).toBe(false); // just outside the padded box
+  });
+});
+
+describe('countZoneOccupants', () => {
+  it('sums alive employees and vehicles standing inside the zone, ignoring anything outside it', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const rng = new Random(20);
+    purchaseVehicle(vehicles, 'debris_hauler', 15, 15); // inside
+    purchaseVehicle(vehicles, 'debris_hauler', 5, 5);   // outside
+    hireEmployee(employees, 'driller', rng, 20, 20);    // inside
+    hireEmployee(employees, 'driller', rng, 40, 40);    // outside
+
+    expect(countZoneOccupants(zone, vehicles, employees)).toBe(2);
+  });
+
+  it('returns 0 for a zone nobody is standing in (boundary)', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+
+    expect(countZoneOccupants(zone, vehicles, employees)).toBe(0);
+  });
+
+  it('excludes a dead employee positioned inside the zone', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const rng = new Random(21);
+    const { employee } = hireEmployee(employees, 'driller', rng, 20, 20);
+    killEmployee(employees, employee.id);
+
+    expect(countZoneOccupants(zone, vehicles, employees)).toBe(0);
+  });
+});
+
+describe('isDangerZoneClear', () => {
+  // BLAST_DANGER_MARGIN_M = 15 -> danger zone for a hole at (20,20) is {x1:5,z1:5,x2:35,z2:35}.
+  const holes = [{ x: 20, z: 20 }];
+
+  it('is true when no drill holes exist yet, regardless of entity positions (boundary — nothing to be clear of)', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const rng = new Random(22);
+    hireEmployee(employees, 'driller', rng, 20, 20); // would be well inside a real danger zone
+
+    expect(isDangerZoneClear([], vehicles, employees)).toBe(true);
+  });
+
+  it('is false while a living employee stands inside the drill plan\'s padded danger zone', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const rng = new Random(23);
+    hireEmployee(employees, 'driller', rng, 20, 20); // inside the padded [5,35] box
+
+    expect(isDangerZoneClear(holes, vehicles, employees)).toBe(false);
+  });
+
+  it('is false while a vehicle (not just an employee) stands inside the padded danger zone', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    purchaseVehicle(vehicles, 'debris_hauler', 20, 20);
+
+    expect(isDangerZoneClear(holes, vehicles, employees)).toBe(false);
+  });
+
+  it('is true once every vehicle and employee is outside the padded danger zone', () => {
+    const vehicles = createVehicleState();
+    const employees = createEmployeeState();
+    const rng = new Random(24);
+    hireEmployee(employees, 'driller', rng, 100, 100);
+    purchaseVehicle(vehicles, 'debris_hauler', 100, 100);
+
+    expect(isDangerZoneClear(holes, vehicles, employees)).toBe(true);
   });
 });

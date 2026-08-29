@@ -2,13 +2,14 @@
 // Finds safe destinations for entities standing inside a blast danger zone
 // and routes them out before the blast fires (#557).
 
-import type { GameState } from '../state/GameState.js';
+import type { GameState, PendingAction } from '../state/GameState.js';
 import type { ZoneBounds, EvacuationDestination, EvacuationResult } from '../entities/Zone.js';
-import { clearZone, isInZone } from '../entities/Zone.js';
+import { clearZone, isInZone, isZoneClearOfEmployees } from '../entities/Zone.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
 import { abortHaul } from '../economy/HaulingTask.js';
 import { abortBreak } from '../economy/BoulderBreaking.js';
+import type { Employee } from '../entities/Employee.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
 
 /**
@@ -19,8 +20,8 @@ import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
  * branch) or left it in the open pool untouched (an action already
  * mid-progress — taskTicksRemaining > 0 — takes interruptActiveAction's other
  * branch instead, which never touches targetEmployeeId). Dispatch
- * (EmployeeDispatchSteps.ts's isEvacuationHoldBlocked, checked by both
- * claimActionsTargetedAtEmployee and claimOnePoolCandidate) refuses to
+ * (isEvacuationHoldActive below, checked from EmployeeDispatchSteps.ts's
+ * claimActionsTargetedAtEmployee and claimOnePoolCandidate filters) refuses to
  * reclaim a so-marked action while the zone it was interrupted in is still
  * active and not yet clear — otherwise either the relay hands the action
  * right back to the just-evacuated employee, or (the case the mid-progress
@@ -48,6 +49,84 @@ import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
  * geography later.
  */
 export const EVACUATION_HOLD_KEY = 'evacuationHold';
+
+/**
+ * Pure check: true when `action` is still evacuation-hold-blocked — carries
+ * EVACUATION_HOLD_KEY and the zone it was interrupted in has not yet cleared
+ * of living employees. Checked against isZoneClearOfEmployees, not the
+ * broader isZoneClear (see that function's own doc comment): a vehicle
+ * alone left inside — including one permanently stranded — must never block
+ * this forever.
+ *
+ * Called from EmployeeDispatchSteps.ts's claimActionsTargetedAtEmployee and
+ * claimOnePoolCandidate .filter() predicates, so this never mutates
+ * `action` or any other state — a reader has no reason to expect a
+ * .filter() predicate to have side effects. The one-shot marker removal
+ * that used to happen inline here (stripping EVACUATION_HOLD_KEY the moment
+ * the zone reads clear) is clearResolvedEvacuationHolds below instead,
+ * called once per tick from tickEmployees rather than implicitly from
+ * inside a filter (#557 review).
+ */
+export function isEvacuationHoldActive(state: GameState, action: PendingAction): boolean {
+  if (action.payload[EVACUATION_HOLD_KEY] !== true) return false;
+  const zone = state.zone.activeZone;
+  if (zone === null) return false;
+  return !isZoneClearOfEmployees(zone, state.employees);
+}
+
+/**
+ * One-shot cleanup: strips EVACUATION_HOLD_KEY from every PendingAction that
+ * still carries it, once the zone it was interrupted in has genuinely
+ * cleared of living employees. Without this, the marker would sit on the
+ * action forever — `state.zone.activeZone` never becomes null again once
+ * set (defineZone only ever assigns it), so a LATER, ordinary re-entry into
+ * the same footprint (post-blast debris cleanup, say) would make
+ * isEvacuationHoldActive read the zone as occupied again and re-arm a block
+ * on an action with no remaining connection to the evacuation that created
+ * it — confirmed live via site-expansion.json, where a cleanup trip kept an
+ * unrelated building order hold-blocked forever.
+ *
+ * Called once per tick (tickEmployees, EmployeeDispatch.ts) rather than
+ * lazily from inside isEvacuationHoldActive's own .filter() call sites — see
+ * that function's own doc comment for why the mutation moved out of the
+ * pure check. A no-op tick (no active zone, or the zone not yet clear, or
+ * nothing left carrying the marker) touches nothing.
+ */
+export function clearResolvedEvacuationHolds(state: GameState): void {
+  const zone = state.zone.activeZone;
+  if (zone === null) return;
+  if (!isZoneClearOfEmployees(zone, state.employees)) return;
+
+  for (const action of state.pendingActions) {
+    if (action.payload[EVACUATION_HOLD_KEY] !== true) continue;
+    const { [EVACUATION_HOLD_KEY]: _removed, ...rest } = action.payload;
+    action.payload = rest;
+  }
+}
+
+/**
+ * True when `employee` is currently walking a route the claim system knows
+ * nothing about: destinationX/Z set directly by an evacuation order
+ * (evacuateZone below, via Zone.ts's clearZone) rather than through a
+ * claimed PendingAction, so there is no activeActionId behind the walk at
+ * all. An employee in this state reads as "idle" to any check that only
+ * looks at activeActionId === null, and treating them as idle lets ordinary
+ * dispatch/rest-routing reassign or overwrite the evacuation destination
+ * before the employee ever takes a step — including, for an employee just
+ * evacuated FROM the area around the nearest building/action, routing them
+ * right back inside the danger zone they were just ordered out of (#557).
+ *
+ * Four call sites guard on this, each skipping its own claim/reroute logic
+ * while it is true: EmployeeDispatch.ts's tickEmployees,
+ * NeedRestoration.ts's tickNeedRestoration and tickCollapse, and
+ * ForceShiftRest.ts's forceShiftRestIfNeededByPolicy. Dispatch resumes for
+ * the employee the very next tick either way, once they've arrived and
+ * destinationX clears (or, for a manual vehicle-boarding walk, the analogous
+ * pendingDriverVehicleId guard each site already carries separately).
+ */
+export function isMidEvacuationWalk(employee: Employee): boolean {
+  return employee.activeActionId === null && employee.destinationX !== null;
+}
 
 /**
  * isInZone (Zone.ts) is inclusive at the boundary (>=/<=), so a candidate

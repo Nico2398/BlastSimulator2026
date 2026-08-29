@@ -18,35 +18,8 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
-import { isZoneClearOfEmployees } from '../entities/Zone.js';
-import { EVACUATION_HOLD_KEY } from './Evacuation.js';
+import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
-
-/**
- * True for an action evacuateZone marked (EVACUATION_HOLD_KEY) while the
- * zone it was interrupted in still has a living employee inside it (#557) —
- * see that constant's own doc comment (Evacuation.ts) for the per-action-
- * marker reasoning. Checked against isZoneClearOfEmployees, not the broader
- * isZoneClear (see its own doc comment): a vehicle alone left inside —
- * including one permanently stranded — must never block this forever.
- *
- * One-shot: once the zone is genuinely clear of people, the marker is
- * stripped from the action's own payload right here, so a LATER, ordinary
- * re-entry (post-blast debris cleanup through the same footprint) never
- * re-arms the block — confirmed live via site-expansion.json, where a
- * cleanup trip kept an unrelated building order hold-blocked forever.
- */
-function isEvacuationHoldBlocked(state: GameState, action: PendingAction): boolean {
-  if (action.payload[EVACUATION_HOLD_KEY] !== true) return false;
-  const zone = state.zone.activeZone;
-  if (zone === null) return false;
-  if (isZoneClearOfEmployees(zone, state.employees)) {
-    const { [EVACUATION_HOLD_KEY]: _removed, ...rest } = action.payload;
-    action.payload = rest;
-    return false;
-  }
-  return true;
-}
 
 export interface TickEmployeesResult {
   claimed: number[];     // IDs of PendingActions that were newly claimed (queued -> assigned) this tick
@@ -72,9 +45,9 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // check (findVehicleForClaim) just below.
       && isHaulOrFragmentActionClaimable(state, a)
       // #557: never re-claim a stale evacuation-relay leftover while its
-      // zone is still occupied — see isEvacuationHoldBlocked's own doc
-      // comment.
-      && !isEvacuationHoldBlocked(state, a))
+      // zone is still occupied — see isEvacuationHoldActive's own doc
+      // comment (Evacuation.ts).
+      && !isEvacuationHoldActive(state, a))
     .sort((a, b) => a.id - b.id);
 
   for (const action of targeted) {
@@ -201,9 +174,10 @@ export function claimOnePoolCandidate(state: GameState, employee: Employee): Sel
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
     isHaulOrFragmentActionClaimable(state, a) &&
     // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that
-    // constant's own doc comment); isEvacuationHoldBlocked's one-shot
-    // zone-clear check means this never permanently blocks later work.
-    !isEvacuationHoldBlocked(state, a)
+    // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
+    // (called once per tick from tickEmployees) means this never permanently
+    // blocks later work once the zone genuinely clears.
+    !isEvacuationHoldActive(state, a)
   );
 
   const selection = selectBestActionForEmployee(

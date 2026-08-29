@@ -120,9 +120,9 @@ export function isZoneClear(
 
 /**
  * Check if the zone is clear of living employees — vehicles not considered.
- * Narrower than isZoneClear, for the one caller (EmployeeDispatchSteps.ts's
- * isEvacuationHoldBlocked) whose only real concern is a PERSON walking back
- * into danger, not an empty vehicle's continued presence.
+ * Narrower than isZoneClear, for Evacuation.ts's isEvacuationHoldActive and
+ * clearResolvedEvacuationHolds, whose only real concern is a PERSON walking
+ * back into danger, not an empty vehicle's continued presence.
  *
  * A vehicle can be legitimately, permanently stranded (findSafeEvacuationCell
  * found no reachable cell for it — the same "genuinely nowhere to go" outcome
@@ -132,7 +132,7 @@ export function isZoneClear(
  * for its own callers (isDangerZoneClear, the tutorial's blast-refusal,
  * Fire.ts's occupant list — a fired blast on top of a vehicle is still a real
  * cost, whether or not anyone is driving it) but would make
- * isEvacuationHoldBlocked's own "has it become safe to resume yet" check
+ * isEvacuationHoldActive's own "has it become safe to resume yet" check
  * unsatisfiable forever too, permanently blocking completely unrelated queued
  * work (a building order, say) from ever being reclaimed by any employee who
  * DID evacuate successfully — confirmed live via site-expansion.json: two
