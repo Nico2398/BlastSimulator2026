@@ -30,9 +30,9 @@ export function resolveRestNeedKey(payload: Record<string, unknown>): NeedKey | 
 
 /**
  * Work-duration ticks for `employee` performing `action` — the same
- * computation GameLoop.ts's tickEmployees used to do inline at claim time.
+ * computation EmployeeDispatch.ts's tickEmployees used to do inline at claim time.
  * Single source of truth for both the cost estimate/resolution below and the
- * claim-time seeding of pendingTaskDuration/pendingRestDuration in GameLoop.ts.
+ * claim-time seeding of pendingTaskDuration/pendingRestDuration in EmployeeDispatchSteps.ts.
  *
  * A survey's own durationTicks (SURVEY_DURATION_TICKS[method], set by
  * runSurvey) and a rest action's own restDuration override the generic
@@ -72,7 +72,7 @@ export function computeActionWorkTicks(state: GameState, employee: Employee, act
  * pendingActionType, pendingActionPayload) that ArrivalGate.tickArrivalGate
  * promotes into taskTicksRemaining once the entity physically reaches the
  * action's target — the employee themself for an on-foot action, or (#550)
- * their reserved vehicle for a vehicle-gated one. Shared by GameLoop.ts's
+ * their reserved vehicle for a vehicle-gated one. Shared by EmployeeDispatchSteps.ts's
  * promoteActionToActive (on-foot claim, unchanged behavior) and
  * ArrivalGate.ts's vehicle-arrival transition, so both start work identically
  * instead of duplicating the same four-field assignment in two places.
@@ -176,7 +176,7 @@ export interface SelectedAction {
  * reachable one.
  *
  * `isClaimable` (default: always true) lets a caller apply a claim-time gate
- * — e.g. GameLoop.ts's vehicle-availability check (`findVehicleForClaim`) —
+ * — e.g. EmployeeDispatchSteps.ts's vehicle-availability check (`findVehicleForClaim`) —
  * without this module importing that gate itself (would cycle back into the
  * tick orchestrator, see header). Applied as a pre-filter over the whole
  * candidate pool, before ranking and before the bounded attempt loop, so a
@@ -192,7 +192,7 @@ export interface SelectedAction {
  */
 /**
  * Claim-time gate for a `dig_ramp_segment` PendingAction — mirrors the shape
- * of GameLoop.ts's vehicle-availability `isClaimable` predicate passed into
+ * of EmployeeDispatchSteps.ts's vehicle-availability `isClaimable` predicate passed into
  * `selectBestActionForEmployee` (see its doc above). Enforces entrance-first
  * excavation order: segment 0 is always claimable, and any later segment
  * only once its immediate predecessor in the same `PlannedRamp` is `done`.

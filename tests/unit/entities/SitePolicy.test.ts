@@ -289,7 +289,7 @@ describe("shouldForceRest() — 'custom' mode with per-employee overrides (3.12)
 // ─── getEffectiveThresholds() (#678) ─────────────────────────────────────────
 //
 // Extracted from shouldForceRest's own custom-mode override lookup so
-// GameLoop.ts's forced-rest-under-policy path (#678) can report which
+// ForceShiftRest.ts's forced-rest-under-policy path (#678) can report which
 // thresholds actually applied, not just a yes/no verdict.
 
 describe('getEffectiveThresholds() (#678)', () => {

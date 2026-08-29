@@ -29,7 +29,7 @@ export type DispatchRejectionReason = 'target-not-found' | 'target-unqualified' 
  * `reason` distinguishes.
  *
  * When `action.targetEmployeeId` is set, the action can only ever be claimed by
- * that one employee (see tickEmployees' idleMatch in GameLoop.ts) — a roster-wide
+ * that one employee (see tickEmployees' idleMatch in EmployeeDispatchSteps.ts) — a roster-wide
  * "does anyone qualify" check is not sufficient in that case, since a *different*
  * qualified employee existing does nothing for an action only the target can
  * claim. Qualification is checked against the target specifically (#406).

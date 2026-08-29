@@ -28,7 +28,7 @@ import { interruptActiveAction } from '../../../src/core/engine/TaskDispatch.js'
 
 const SEED = 42;
 
-/** Minimal PendingAction fixture, mirroring GameLoop.test.ts's makeAction. */
+/** Minimal PendingAction fixture, mirroring EmployeeDispatch.test.ts's makeAction. */
 function makeAction(_state: GameState, overrides: Partial<PendingAction> & { id: number }): PendingAction {
   return {
     type: 'general_work',

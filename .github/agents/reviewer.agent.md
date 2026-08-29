@@ -35,7 +35,7 @@ Per changed file, verify:
 - **No stale workarounds.** Remove `as any`/`as unknown` casts, feature flags, compat shims once missing piece exists.
 - **`TODO`/`FIXME` resolved.** Items addressed by this PR: deleted, not left dangling.
 - **Naming consistent.** Identifiers, constants, config keys use same words across code/comments/tests.
-- **Conventions followed** (`dev-coding-conventions` skill): naming, exports, file length, PRNG, i18n.
+- **Conventions followed** (`dev-coding-conventions` skill): naming, exports, file cohesion, PRNG, i18n.
 
 Fix every mismatch before proceeding.
 
@@ -54,7 +54,7 @@ Fix every mismatch before proceeding.
 - [ ] `src/core/` — zero DOM/WebGL/window imports
 - [ ] No reverse dependency: renderer never imported by core
 - [ ] No `Math.random()` — use `src/core/math/Random.ts`
-- [ ] No file >300 lines
+- [ ] Single responsibility per file — per `dev-coding-conventions` skill, judgment not a line count
 
 ## Step 4: i18n
 

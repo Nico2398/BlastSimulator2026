@@ -7,7 +7,7 @@
 // out of GameLoop.ts as part of #759's file-size split; re-exported there so
 // GameLoop.ts stays the single public surface for tick-orchestration callers.
 
-import type { GameState } from '../state/GameState.js';
+import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -16,6 +16,28 @@ import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingAppr
 import { isMidEvacuationWalk } from './Evacuation.js';
 import { shouldForceRest, getEffectiveThresholds } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
+
+/**
+ * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
+ * queues restAction, updates emp's activeActionId/destination, records the
+ * shift-change bookkeeping (shiftRested/firedEvents/emitter).
+ */
+function finishForceRest(
+  state: GameState,
+  emp: Employee,
+  restAction: PendingAction,
+  firedEvents: FiredEvent[],
+  shiftRested: number[],
+  _emitter?: EventEmitter,
+): void {
+  state.pendingActions.push(restAction);
+  emp.activeActionId = restAction.id;
+  emp.destinationX = restAction.targetX;
+  emp.destinationZ = restAction.targetZ;
+  shiftRested.push(emp.id);
+  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+}
 
 /**
  * If an active employee has worked enough ticks, force a shift rest:
@@ -70,13 +92,7 @@ export function forceShiftRestIfNeeded(
     payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
   }, emp.id);
 
-  state.pendingActions.push(restAction);
-  emp.activeActionId = restAction.id;
-  emp.destinationX = targetX;
-  emp.destinationZ = targetZ;
-  shiftRested.push(emp.id);
-  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
 }
 
 /**
@@ -89,7 +105,7 @@ export function forceShiftRestIfNeeded(
  * already walking to a queued rest (pendingRestDuration !== null), or mid-walk
  * to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
- * same field, GameLoop.ts's #552 comment) — overwriting activeActionId/
+ * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
  * destinationX/Z on that employee here would silently cancel the boarding
  * walk underneath the player. Otherwise runs for an idle employee
  * (activeActionId === null) exactly like a working one (#707 fix): earlier
@@ -214,7 +230,7 @@ export function forceShiftRestIfNeededByPolicy(
   // early, infrastructure-light site (exactly what tutorial_pit's own
   // scripted tutorial is — no living_quarters exists there at all) twice
   // for the one condition the policy exists to make survivable in the
-  // first place. tests/unit/engine/GameLoop.test.ts's own "no living_quarters
+  // first place. tests/unit/engine/ShiftCycle.test.ts's own "no living_quarters
   // at all" case documents this — previously pinned to the doubled value.
 
   // The rest timer itself does not start until ArrivalGate.tickArrivalGate
@@ -230,11 +246,5 @@ export function forceShiftRestIfNeededByPolicy(
     payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId },
   }, emp.id);
 
-  state.pendingActions.push(restAction);
-  emp.activeActionId = restAction.id;
-  emp.destinationX = targetX;
-  emp.destinationZ = targetZ;
-  shiftRested.push(emp.id);
-  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
 }

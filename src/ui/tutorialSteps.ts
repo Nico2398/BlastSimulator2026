@@ -112,7 +112,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 
   // ── Step 3a-ii: set-early-policy ──
   // A living_quarters alone does not force anyone to use it: the modern
-  // rest path (forceShiftRestIfNeededByPolicy, GameLoop.ts) only engages
+  // rest path (forceShiftRestIfNeededByPolicy, ForceShiftRest.ts) only engages
   // once a policy has actually been applied (state.sitePolicy.revision > 0)
   // — the default policy sitting unapplied in state is not enough.
   // 'continuous', not 'shift_8h': SHIFT_DURATIONS_TICKS.shift_8h is 8 ticks,
