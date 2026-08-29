@@ -1,19 +1,35 @@
 /**
  * Command-mode batch loop for the batch scenario runner
  * (`scripts/run-all-scenarios.ts`).
- *
- * Stub only — signature matches the current inline command-mode branch of
- * `main()` in `run-all-scenarios.ts` (issue #824). Real logic moves in at
- * implementation time.
  */
 
-import type { ScenarioResult } from './shared/command-runner.js';
+import { createGameEngine, runScenario, type ScenarioResult } from './shared/command-runner.js';
+import { loadScenarioDef, SCENARIO_DIR } from './shared/scenario-utils.js';
+import { SCREENSHOT_DIR } from './shared/puppeteer-utils.js';
+import { buildScenarioLoadFailure, logBatchProgress } from './run-all-scenarios-result.js';
 
-// TODO: implement — move body from run-all-scenarios.ts's main() command-mode branch (#824)
 export function runBatchCommand(
-  _names: string[],
-  _reportDrift: boolean,
-  _startTime: number,
+  names: string[],
+  reportDrift: boolean,
+  startTime: number,
 ): ScenarioResult[] {
-  throw new Error('not implemented');
+  console.log('\nInitializing game engine...');
+  const engine = createGameEngine();
+  console.log(`Engine ready. Running ${names.length} scenarios...`);
+
+  const results: ScenarioResult[] = [];
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i];
+    try {
+      const steps = loadScenarioDef(name!, SCENARIO_DIR).steps;
+      const result = runScenario(engine, name!, steps, SCREENSHOT_DIR, reportDrift);
+      results.push(result);
+    } catch (err: unknown) {
+      results.push(buildScenarioLoadFailure(name!, err));
+    }
+
+    logBatchProgress(results, i, names.length, startTime);
+  }
+
+  return results;
 }
