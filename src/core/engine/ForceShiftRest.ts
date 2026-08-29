@@ -104,7 +104,7 @@ export function forceShiftRestIfNeeded(
  * already walking to a queued rest (pendingRestDuration !== null), or mid-walk
  * to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
- * same field, GameLoop.ts's #552 comment) — overwriting activeActionId/
+ * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
  * destinationX/Z on that employee here would silently cancel the boarding
  * walk underneath the player. Otherwise runs for an idle employee
  * (activeActionId === null) exactly like a working one (#707 fix): earlier
