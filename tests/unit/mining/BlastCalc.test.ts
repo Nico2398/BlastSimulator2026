@@ -4,14 +4,8 @@ import {
   stemmingFactor,
   stemmingEfficiency,
   waterEffect,
-  calculateFragmentation,
-  calculateFragmentCount,
-  calculateInitialVelocity,
-  classifyProjection,
-  calculateFreeFace,
   calculateVibrations,
   groupChargesByDelay,
-  PROJECTION_SPEED_THRESHOLD,
   fragmentBoulder,
   isOversized,
   isFragmentOversized,
@@ -20,16 +14,11 @@ import {
   computeThreshold,
   computeInitialEnergy,
   effectiveHoleEnergy,
-  propagateEnergy,
-  identifyFragmentedVoxels,
-  type PropagationResult,
   type Boulder,
 } from '../../../src/core/mining/BlastCalc.js';
-import { VoxelGrid, type VoxelData } from '../../../src/core/world/VoxelGrid.js';
+import type { VoxelData } from '../../../src/core/world/VoxelGrid.js';
 import type { HoleCharge } from '../../../src/core/mining/ChargePlan.js';
 import { getRock } from '../../../src/core/world/RockCatalog.js';
-import { MAX_PROPAGATION_ITERATIONS, FRAGMENTATION_MULTIPLIER } from '../../../src/core/config/balance.js';
-import { vec3, length } from '../../../src/core/math/Vec3.js';
 import { createGridPlan, resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { Random } from '../../../src/core/math/Random.js';
 
@@ -377,7 +366,44 @@ describe('BlastCalc — computeThreshold', () => {
   });
 });
 
-// ── 5.5: propagateEnergy ──
+// -- 5.4/5.5: stemming, water effect, and initial energy --
+
+describe('BlastCalc — stemmingFactor', () => {
+  it('returns 1.0 with adequate stemming (stemming >= 30% of hole depth)', () => {
+    expect(stemmingFactor(2.4, 8)).toBe(1.0); // 2.4 / (8*0.3) = 1.0
+  });
+  it('scales linearly between 0 and full stemming', () => {
+    expect(stemmingFactor(0.5, 8)).toBeCloseTo(0.5 / (8 * 0.3), 10);
+  });
+  it('clamps above 1.0 when stemming exceeds 30% of hole depth', () => {
+    expect(stemmingFactor(10, 8)).toBe(1.0);
+  });
+  it('returns 0 with no stemming', () => {
+    expect(stemmingFactor(0, 8)).toBe(0);
+  });
+  it('returns 0 for a non-positive hole depth', () => {
+    expect(stemmingFactor(2.4, 0)).toBe(0);
+    expect(stemmingFactor(2.4, -1)).toBe(0);
+  });
+  it('clamps negative stemming to 0', () => {
+    expect(stemmingFactor(-1, 8)).toBe(0);
+  });
+});
+
+describe('BlastCalc — waterEffect', () => {
+  it('drops to 0.1 when flooded, water-sensitive, and untubed', () => {
+    expect(waterEffect(true, true, false)).toBe(0.1);
+  });
+  it('is unaffected when not flooded', () => {
+    expect(waterEffect(false, true, false)).toBe(1.0);
+  });
+  it('is unaffected when the explosive is not water-sensitive', () => {
+    expect(waterEffect(true, false, false)).toBe(1.0);
+  });
+  it('is unaffected when tubing protects a flooded, water-sensitive hole', () => {
+    expect(waterEffect(true, true, true)).toBe(1.0);
+  });
+});
 
 describe('BlastCalc — stemmingEfficiency', () => {
   it('returns 0.5 with no stemming (stemmingM = 0)', () => {
@@ -474,7 +500,7 @@ describe('BlastCalc — computeInitialEnergy', () => {
 });
 
 
-// -- identifyFragmentedVoxels --
+// -- oversized-fragment threshold --
 
 describe('BlastCalc — isFragmentOversized', () => {
   it('returns true for volume strictly above the threshold', () => {
