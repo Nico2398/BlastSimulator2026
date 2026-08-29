@@ -4,6 +4,8 @@ import { type GameContext, newGameCommand } from '../../../src/console/commands/
 import { campaignStartCommand } from '../../../src/console/commands/campaign.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../../src/console/commands/mining.js';
+import { employeeCommand } from '../../../src/console/commands/employees.js';
+import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
@@ -196,11 +198,16 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
  * @returns The blast command output text and the campaign-complete command result.
  */
 export function driveToLevelCompletion(
-  _ctx: GameContext,
-  _skillLevel: number,
-  _ticks: number
+  ctx: GameContext,
+  skillLevel: number,
+  ticks: number
 ): { blastOutput: string; completeResult: CommandResult } {
-  throw new Error('not implemented');
+  employeeCommand(ctx, ['hire'], { role: 'driller' });
+  employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: String(skillLevel) });
+  const blastOutput = performBlast(ctx, 10, 10);
+  tickWithEvents(ctx, ticks);
+  const completeResult = campaignCompleteCommand(ctx, [], {});
+  return { blastOutput, completeResult };
 }
 
 /**
