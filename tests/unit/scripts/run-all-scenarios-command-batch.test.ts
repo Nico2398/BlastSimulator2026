@@ -8,7 +8,7 @@
 // channel) exercised it end-to-end. Now that it's an independently
 // importable, synchronous, non-process.exit-ing function, it's cheap to
 // drive directly by mocking its two real dependencies
-// (scripts/shared/command-runner.js, scripts/shared/scenario-utils.js) —
+// (scripts/shared/command-runner.ts, scripts/shared/scenario-utils.ts) —
 // no browser, no dynamic-import-plus-process.exit harness needed.
 //
 // Characterization tests: pin the CURRENT real behavior read from
