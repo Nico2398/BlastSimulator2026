@@ -59,8 +59,9 @@ describe('Valid recording JSON parsing', () => {
     recording.events = [
       { type: 'click', timestamp: 100, x: 50, y: 100, button: 'left' },
     ];
-    recording.meta.eventCount = 1;
-    recording.meta.durationMs = 100;
+    const meta = recording.meta as Record<string, unknown>;
+    meta.eventCount = 1;
+    meta.durationMs = 100;
 
     const json = JSON.stringify(recording);
     const parsed = JSON.parse(json) as Record<string, unknown>;
