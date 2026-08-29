@@ -3,7 +3,11 @@
 
 import type { CommandResult } from '../ConsoleRunner.js';
 import type { GameContext } from './world.js';
+import { t } from '../../core/i18n/I18n.js';
 import { requireGame } from './commandUtils.js';
+
+// TODO(#821): wire t() calls into timeCommand's string literals (implementer phase).
+void t;
 
 export function timeCommand(
   ctx: GameContext,

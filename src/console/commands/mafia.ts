@@ -14,7 +14,11 @@ import {
 } from '../../core/events/MafiaActions.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { t } from '../../core/i18n/I18n.js';
 import { requireGame } from './commandUtils.js';
+
+// TODO(#821): wire t() calls into mafiaCommand's string literals (implementer phase).
+void t;
 
 export function mafiaCommand(
   ctx: GameContext,

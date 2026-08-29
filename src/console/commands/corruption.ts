@@ -12,8 +12,12 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, sanitizeFiniteOverride } from './commandUtils.js';
+
+// TODO(#821): wire t() calls into corruptCommand's string literals (implementer phase).
+void t;
 
 export function corruptCommand(
   ctx: GameContext,
