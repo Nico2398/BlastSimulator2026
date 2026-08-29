@@ -10,7 +10,6 @@
   "scripts/shared/scenario-utils.ts": 318,
   "scripts/ui-diagnostic.ts": 716,
   "scripts/validate-context.ts": 645,
-  "scripts/validate-state-schema.ts": 342,
   "src/console/commands/world.ts": 399,
   "src/core/engine/ArrivalGate.ts": 356,
   "src/core/engine/EntityMovementTick.ts": 301,

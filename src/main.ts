@@ -7,7 +7,7 @@ import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
-import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
+import { probeTutorialState } from './ui/tutorialStateProbe.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { WorldMap } from './ui/screens/WorldMap.js';
@@ -29,7 +29,8 @@ import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLa
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
-import { getLivingEmployees } from './core/entities/Employee.js'; import { isDangerZoneClear } from './core/entities/Zone.js';
+import { getLivingEmployees } from './core/entities/Employee.js';
+import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
@@ -434,7 +435,8 @@ console.log = (...args: unknown[]) => {
  * other caller gets the immediate sync.
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
-  const prevState = ctx.state; syncTutorialActive(ctx, tutorial.isActive);
+  const prevState = ctx.state;
+  syncTutorialActive(ctx, tutorial.isActive);
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -629,7 +631,8 @@ window.__gameState = () => {
     // increased/decreased/changedBy against (#671).
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
     dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees), // mirrors serializeGameState (#557)
-    lastCommandOutput, frameCount: scene.frameCount,
+    lastCommandOutput,
+    frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
     consoleLogs: consoleLogs.splice(0, 50),
     // Sample voxels at blast center to check if they're cleared
@@ -743,26 +746,7 @@ window.__probeSelector = (selector: string) => probeSelector(selector);
 
 // Where the tutorial believes it is. A harness that only checks for thrown
 // errors cannot tell a completed step from a silently stuck one.
-window.__tutorialState = () => {
-  const el = document.querySelector('.bs-tutorial-box .bs-panel-title');
-  const counter = document.querySelector('.bs-tutorial-progress');
-  const parsed = /(\d+)\s*\/\s*(\d+)/.exec(counter?.textContent ?? '');
-  const stage = tutorial.stageProgress;
-  const paused = document.querySelector('.bs-tutorial-paused') as HTMLElement | null;
-  return {
-    active: tutorial.isActive,
-    stepIndex: parsed ? Number(parsed[1]) - 1 : -1,
-    stepId: TUTORIAL_STEPS[parsed ? Number(parsed[1]) - 1 : -1]?.id ?? null,
-    title: el?.textContent ?? '',
-    total: parsed ? Number(parsed[2]) : 0,
-    // Which click of the step the player is on — a step is several controls,
-    // and a harness that only knew the step could not tell them apart.
-    stageIndex: stage.index,
-    stageTotal: stage.total,
-    stageTarget: stage.target,
-    clockHeld: paused !== null && paused.style.display !== 'none',
-  };
-};
+window.__tutorialState = () => probeTutorialState(tutorial);
 
 // Camera control bridges (used by scenario-test.ts for multi-angle screenshots)
 window.__cameraOrbit = (yaw: number, pitch: number) => {
