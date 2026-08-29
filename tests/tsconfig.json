@@ -77,11 +77,21 @@
     // import statements (balance.js's MAX_PROPAGATION_ITERATIONS/
     // FRAGMENTATION_MULTIPLIER, Vec3.js's vec3/length) were deleted outright.
     // Measured before: 22 errors with this file re-included. After: 0.
+    // #839 fixed ./unit/config/autonomy-loop.test.ts (47 -> 46 entries). 17
+    // errors: TS7006/TS7031 implicit-any params on local test helpers
+    // (extract, buildMissingGatedJobs's jobsByRunId/_fn/run_id, interactionJob,
+    // buildJob), TS18047/TS2532 possibly-null/undefined access on regex-match
+    // results already guarded a line above by an `expect(...).not.toBeNull()`
+    // or `.toBeTruthy()` (added the same guard to one site that lacked it),
+    // and TS2532 on a `.split(':')[0]` index access under
+    // noUncheckedIndexedAccess. All fixed with type annotations and
+    // non-null-assertion/`?? ''` idioms matching existing usage elsewhere in
+    // the suite; no runtime behaviour changed. Freshly measured 111 errors
+    // remain across the 46 still-excluded files.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
     "./unit/config/assignability.test.ts",
-    "./unit/config/autonomy-loop.test.ts",
     "./unit/config/balance.test.ts",
     "./unit/config/state-schema.test.ts",
     "./unit/coverage/coverage-config.test.ts",
