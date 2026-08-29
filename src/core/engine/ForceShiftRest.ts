@@ -25,8 +25,8 @@ function finishForceRest(
   state: GameState,
   emp: Employee,
   restAction: PendingAction,
-  shiftRested: number[],
   firedEvents: FiredEvent[],
+  shiftRested: number[],
   _emitter?: EventEmitter,
 ): void {
   state.pendingActions.push(restAction);
@@ -91,7 +91,7 @@ export function forceShiftRestIfNeeded(
     payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
   }, emp.id);
 
-  finishForceRest(state, emp, restAction, shiftRested, firedEvents, _emitter);
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
 }
 
 /**
@@ -239,5 +239,5 @@ export function forceShiftRestIfNeededByPolicy(
     payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId },
   }, emp.id);
 
-  finishForceRest(state, emp, restAction, shiftRested, firedEvents, _emitter);
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
 }
