@@ -230,35 +230,36 @@ describe('mafia.ts default usage string — English literal + fr divergence', ()
 describe('mafia.ts target-not-found outcome — English literal + fr divergence', () => {
   const TARGET_NOT_FOUND_EN = 'Target not found';
 
-  it('accident — matches the exact English literal for a nonexistent employee id', () => {
-    const ctx = makeUnlockedCtx();
-    const result = mafiaCommand(ctx, ['accident'], { employee: '999999' });
-    expect(result.success).toBe(true);
-    expect(result.output).toBe(TARGET_NOT_FOUND_EN);
-  });
+  const cases: Array<{
+    name: string;
+    run: (ctx: GameContext) => { success: boolean; output: string };
+  }> = [
+    {
+      name: 'accident — nonexistent employee id',
+      run: (ctx) => mafiaCommand(ctx, ['accident'], { employee: '999999' }),
+    },
+    {
+      name: 'frame — nonexistent employee id',
+      run: (ctx) => mafiaCommand(ctx, ['frame'], { employee: '999999' }),
+    },
+  ];
 
-  it('accident — differs from the English literal under locale fr', () => {
-    const ctx = makeUnlockedCtx();
-    setLocale('fr');
-    const result = mafiaCommand(ctx, ['accident'], { employee: '999999' });
-    expect(result.success).toBe(true);
-    expect(result.output).not.toBe(TARGET_NOT_FOUND_EN);
-  });
+  for (const { name, run } of cases) {
+    it(`${name} — matches the exact English literal`, () => {
+      const ctx = makeUnlockedCtx();
+      const result = run(ctx);
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(TARGET_NOT_FOUND_EN);
+    });
 
-  it('frame — matches the exact English literal for a nonexistent employee id', () => {
-    const ctx = makeUnlockedCtx();
-    const result = mafiaCommand(ctx, ['frame'], { employee: '999999' });
-    expect(result.success).toBe(true);
-    expect(result.output).toBe(TARGET_NOT_FOUND_EN);
-  });
-
-  it('frame — differs from the English literal under locale fr', () => {
-    const ctx = makeUnlockedCtx();
-    setLocale('fr');
-    const result = mafiaCommand(ctx, ['frame'], { employee: '999999' });
-    expect(result.success).toBe(true);
-    expect(result.output).not.toBe(TARGET_NOT_FOUND_EN);
-  });
+    it(`${name} — differs from the English literal under locale fr`, () => {
+      const ctx = makeUnlockedCtx();
+      setLocale('fr');
+      const result = run(ctx);
+      expect(result.success).toBe(true);
+      expect(result.output).not.toBe(TARGET_NOT_FOUND_EN);
+    });
+  }
 });
 
 // ── accident success / accident failed — issue #862 ─────────────────────
