@@ -8,11 +8,13 @@
 // additionally proves the output changes under locale 'fr', so a hardcoded
 // string that merely matches en.json cannot pass.
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
 import { contractCommand, fragmentsCommand } from '../../../src/console/commands/economy.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import * as ContractModule from '../../../src/core/economy/Contract.js';
+import { makeEmptyCtx } from './i18nGuardHelpers.js';
 
 function makeCtx(): GameContext {
   const ctx: GameContext = {
@@ -35,26 +37,14 @@ describe('economy.ts requireGame guard', () => {
   const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 
   it('contractCommand returns the exact English literal when no game is loaded', () => {
-    const ctx: GameContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     const result = contractCommand(ctx, ['list'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('contractCommand differs from the English literal under locale fr', () => {
-    const ctx: GameContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     setLocale('fr');
 
     const result = contractCommand(ctx, ['list'], {});
@@ -64,26 +54,14 @@ describe('economy.ts requireGame guard', () => {
   });
 
   it('fragmentsCommand returns the exact English literal when no game is loaded', () => {
-    const ctx: GameContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     const result = fragmentsCommand(ctx, ['status'], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('fragmentsCommand differs from the English literal under locale fr', () => {
-    const ctx: GameContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     setLocale('fr');
 
     const result = fragmentsCommand(ctx, ['status'], {});
@@ -153,4 +131,58 @@ describe('economy.ts usage strings — English literal + fr divergence', () => {
       expect(result.output).not.toBe(englishLiteral);
     });
   }
+});
+
+// ── contract status/list empty-state messages (#821) ────────────────────
+
+describe('economy.ts contract empty-state messages — English literal + fr divergence', () => {
+  const NONE_ACTIVE_EN = 'No active contracts.';
+
+  it('contract status — no active contracts — matches the exact English literal by default', () => {
+    const ctx = makeCtx();
+    const result = contractCommand(ctx, ['status'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(NONE_ACTIVE_EN);
+  });
+
+  it('contract status — no active contracts — differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    setLocale('fr');
+    const result = contractCommand(ctx, ['status'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).not.toBe(NONE_ACTIVE_EN);
+  });
+
+  const NONE_AVAILABLE_EN = 'No contracts available.';
+
+  describe('contract list — no contracts available (generateContracts mocked to a no-op)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('matches the exact English literal by default', () => {
+      const ctx = makeCtx();
+      // The real generateContracts always refills from an empty pool (its own
+      // "currentTick - lastRefreshTick < REFRESH_INTERVAL && available.length > 0"
+      // guard only skips refresh when the pool is already non-empty) — so a
+      // no-op mock is required to observe the "none available" branch at all.
+      vi.spyOn(ContractModule, 'generateContracts').mockImplementation(() => {});
+
+      const result = contractCommand(ctx, ['list'], {});
+
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(NONE_AVAILABLE_EN);
+    });
+
+    it('differs from the English literal under locale fr', () => {
+      const ctx = makeCtx();
+      vi.spyOn(ContractModule, 'generateContracts').mockImplementation(() => {});
+      setLocale('fr');
+
+      const result = contractCommand(ctx, ['list'], {});
+
+      expect(result.success).toBe(true);
+      expect(result.output).not.toBe(NONE_AVAILABLE_EN);
+    });
+  });
 });

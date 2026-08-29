@@ -178,10 +178,19 @@ describe('en.json / fr.json — key-set parity', () => {
     // tutorial.step_evacuate(.title), tutorial.stage.sound_horn,
     // ui.blast_workshop.footer.fire_reason_zone_occupied, and
     // mining.blast.refused_zone_occupied — both locales translated.
+    // Baseline is now 3357 (up from 3323, merged with #557's own +5 above):
+    // #821 wired the last raw-literal console command strings in
+    // corruption.ts, mafia.ts, time.ts, eventResolution.ts, tick.ts and
+    // economy.ts through t() — 29 new keys total: console.insufficient_funds
+    // (shared), 5 corruption.* keys, 6 mafia.* keys, 5 time.* keys,
+    // 9 eventResolution.* keys (the command's own guard/usage text — event.*
+    // singular is occupied by per-event content), and 3 tick.* keys.
+    // economy.ts's two empty-contract-list strings reuse the pre-existing
+    // ui.contracts.none/none_active keys instead of adding new ones.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3328);
+    expect(Object.keys(en).length).toBe(3357);
   });
 });
 

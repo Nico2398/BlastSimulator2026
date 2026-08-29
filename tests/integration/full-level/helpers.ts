@@ -67,13 +67,27 @@ export function makeCampaignCtxWithUnlock(levelId: string): GameContext {
 }
 
 /**
- * Advance the simulation by `n` ticks, running `tickCommand` each tick
- * and resolving any events that fire during the tick window.
- * @param ctx The game context.
- * @param n Number of ticks to advance.
+ * Shared loop body for tickWithEvents/driveDrillPlanToCompletion/
+ * driveChargePlanToCompletion/driveConstructionToCompletion: ticks up to
+ * `maxIterations` times (or until `continueCondition` returns false),
+ * resolving pending events and clearing the pause flag each tick. When
+ * `topUpNeeds` is set, tops up every employee's hunger/fatigue/breakNeed
+ * before each tick — see driveDrillPlanToCompletion's doc comment for why.
  */
-export function tickWithEvents(ctx: GameContext, n: number): void {
-  for (let i = 0; i < n; i++) {
+function runTickLoop(
+  ctx: GameContext,
+  maxIterations: number,
+  opts: { topUpNeeds?: boolean; continueCondition?: () => boolean } = {}
+): void {
+  const { topUpNeeds = false, continueCondition } = opts;
+  for (let i = 0; i < maxIterations && (continueCondition ? continueCondition() : true); i++) {
+    if (topUpNeeds) {
+      for (const emp of ctx.state!.employees.employees) {
+        emp.hunger = 100;
+        emp.fatigue = 100;
+        emp.breakNeed = 100;
+      }
+    }
     tickCommand(ctx, ['1'], {});
     if (ctx.state!.events.pendingEvent) {
       eventCommand(ctx, ['choose', '0'], {});
@@ -82,6 +96,16 @@ export function tickWithEvents(ctx: GameContext, n: number): void {
       ctx.state!.isPaused = false;
     }
   }
+}
+
+/**
+ * Advance the simulation by `n` ticks, running `tickCommand` each tick
+ * and resolving any events that fire during the tick window.
+ * @param ctx The game context.
+ * @param n Number of ticks to advance.
+ */
+export function tickWithEvents(ctx: GameContext, n: number): void {
+  runTickLoop(ctx, n);
 }
 
 /**
@@ -94,20 +118,10 @@ export function tickWithEvents(ctx: GameContext, n: number): void {
  * mid-drive, an unrelated needs mechanic these tests aren't exercising.
  */
 export function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): void {
-  for (let i = 0; i < maxTicks && ctx.state!.plannedDrillHoles.length > 0; i++) {
-    for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
-      emp.fatigue = 100;
-      emp.breakNeed = 100;
-    }
-    tickCommand(ctx, ['1'], {});
-    if (ctx.state!.events.pendingEvent) {
-      eventCommand(ctx, ['choose', '0'], {});
-    }
-    if (ctx.state!.isPaused) {
-      ctx.state!.isPaused = false;
-    }
-  }
+  runTickLoop(ctx, maxTicks, {
+    topUpNeeds: true,
+    continueCondition: () => ctx.state!.plannedDrillHoles.length > 0,
+  });
 }
 
 /**
@@ -118,20 +132,10 @@ export function driveDrillPlanToCompletion(ctx: GameContext, maxTicks = 400): vo
  * reasoning as driveDrillPlanToCompletion above.
  */
 export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): void {
-  for (let i = 0; i < maxTicks && Object.keys(ctx.state!.plannedChargesByHole).length > 0; i++) {
-    for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
-      emp.fatigue = 100;
-      emp.breakNeed = 100;
-    }
-    tickCommand(ctx, ['1'], {});
-    if (ctx.state!.events.pendingEvent) {
-      eventCommand(ctx, ['choose', '0'], {});
-    }
-    if (ctx.state!.isPaused) {
-      ctx.state!.isPaused = false;
-    }
-  }
+  runTickLoop(ctx, maxTicks, {
+    topUpNeeds: true,
+    continueCondition: () => Object.keys(ctx.state!.plannedChargesByHole).length > 0,
+  });
 }
 
 /**
@@ -143,20 +147,10 @@ export function driveChargePlanToCompletion(ctx: GameContext, maxTicks = 400): v
  * driveDrillPlanToCompletion/driveChargePlanToCompletion above.
  */
 export function driveConstructionToCompletion(ctx: GameContext, maxTicks = 300): void {
-  for (let i = 0; i < maxTicks && ctx.state!.plannedBuildings.length > 0; i++) {
-    for (const emp of ctx.state!.employees.employees) {
-      emp.hunger = 100;
-      emp.fatigue = 100;
-      emp.breakNeed = 100;
-    }
-    tickCommand(ctx, ['1'], {});
-    if (ctx.state!.events.pendingEvent) {
-      eventCommand(ctx, ['choose', '0'], {});
-    }
-    if (ctx.state!.isPaused) {
-      ctx.state!.isPaused = false;
-    }
-  }
+  runTickLoop(ctx, maxTicks, {
+    topUpNeeds: true,
+    continueCondition: () => ctx.state!.plannedBuildings.length > 0,
+  });
 }
 
 /**
