@@ -35,7 +35,9 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
   'buy-drill-rig-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
     { target: '#bs-vehicle-panel [data-vtype="drill_rig"]', hintKey: 'tutorial.stage.vehicle_buy_drill_rig' },
-    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
+    // Scoped to a drill_rig ROW specifically — see 'vehicle-buy-assign''s own
+    // (tutorialStages.ts) comment on the identical fix, #557 follow-up.
+    { target: '#bs-vehicle-panel [data-vtype="drill_rig"] .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
   ],
 
   'train-digger': [
@@ -63,6 +65,8 @@ export const TUTORIAL_STAGES_TRAINING: Record<string, TutorialStage[]> = {
   'buy-rock-digger-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
     { target: '#bs-vehicle-panel [data-vtype="rock_digger"]', hintKey: 'tutorial.stage.vehicle_buy_rock_digger' },
-    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
+    // Scoped to a rock_digger ROW specifically — see 'vehicle-buy-assign''s
+    // own (tutorialStages.ts) comment on the identical fix, #557 follow-up.
+    { target: '#bs-vehicle-panel [data-vtype="rock_digger"] .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
   ],
 };

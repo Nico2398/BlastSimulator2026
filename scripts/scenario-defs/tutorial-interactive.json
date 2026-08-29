@@ -986,12 +986,12 @@
     {
       "command": "vehicle driver 3 4",
       "timeout": 90,
-      "description": "vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1 (destroyed by its own blast, but the id isn't reused). #653: vehicle #3, not #2 -- both vehicles bought earlier in this run (drill_rig #1, rock_digger #2) are destroyed by an earlier blast (vehicleCount 2→0, deathCount 0→2), so ids are never reused and the debris_hauler bought in the previous step is vehicle #3. issue #585 (merge, agrees independently): same #3 conclusion, confirmed via a separate direct trace before #653 landed. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root, so this succeeds genuinely.",
+      "description": "Fix (CI regression): selector scoped to the debris_hauler row specifically (FleetPanel.ts's own per-vehicle [data-vtype], #557 follow-up), matching the same fix on this stage's own rail target (tutorialStages.ts's 'vehicle-buy-assign'). The bare '.bs-vehicle-assign-btn' this used to be matched whichever vehicle's Assign button came first in the DOM -- ambiguous now that evacuateZone (Evacuation.ts) genuinely evacuates instead of teleporting (#557): the drill_rig and rock_digger bought earlier in this file survive the blast (evacuated clear of it) rather than being destroyed as the #653 note below assumed, undriven since their own drivers dismounted once drilling/digging finished, so the Fleet panel already lists a live, licensed-crew-eligible Assign control for each of them ahead of debris_hauler's own row. vehicle-buy-assign complete: Assign clicked, then the tutorial's own clock runs while the driver walks to the vehicle and boards — the #478 deadlock path, exercised for real. #553: vehicle #2, not #1 -- the drill_rig bought earlier took vehicle slot #1. #653 (vehicle-numbering conclusion still holds; its own \"destroyed\" premise does not, now that evacuation genuinely works): vehicle #3, not #2 -- ids are never reused regardless of whether the drill_rig/rock_digger bought earlier in this run survive this file's blast or not, so the debris_hauler bought in the previous step is vehicle #3 either way. issue #585 (merge, agrees independently): same #3 conclusion, confirmed via a separate direct trace before #653 landed. #816: no longer downstream of the set_policy mode:continuous construction livelock -- fixed at the root, so this succeeds genuinely.",
       "role": "player",
       "interaction": [
         {
           "type": "clickSelector",
-          "selector": "#bs-vehicle-panel .bs-vehicle-assign-btn"
+          "selector": "#bs-vehicle-panel [data-vtype=\"debris_hauler\"] .bs-vehicle-assign-btn"
         },
         {
           "type": "waitForTutorialStep",

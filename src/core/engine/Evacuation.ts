@@ -35,13 +35,28 @@ export { EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHol
  * evacuated FROM the area around the nearest building/action, routing them
  * right back inside the danger zone they were just ordered out of (#557).
  *
- * Four call sites guard on this, each skipping its own claim/reroute logic
+ * Five call sites guard on this, each skipping its own claim/reroute logic
  * while it is true: EmployeeDispatch.ts's tickEmployees,
- * NeedRestoration.ts's tickNeedRestoration and tickCollapse, and
- * ForceShiftRest.ts's forceShiftRestIfNeededByPolicy. Dispatch resumes for
- * the employee the very next tick either way, once they've arrived and
- * destinationX clears (or, for a manual vehicle-boarding walk, the analogous
- * pendingDriverVehicleId guard each site already carries separately).
+ * NeedRestoration.ts's tickNeedRestoration and tickCollapse,
+ * ForceShiftRest.ts's forceShiftRestIfNeededByPolicy, and
+ * NeedTaskInsertion.ts's autoInsertNeedTasks (#557 follow-up — the odd one
+ * out: unlike the other four, it doesn't self-claim, so a missed guard here
+ * doesn't touch activeActionId/destinationX at all while the walk is still
+ * in flight. It queues a self-targeted 'rest' action instead, snapshotting
+ * targetX/targetZ from wherever the employee physically stands at that
+ * exact moment — still inside the danger zone through most of the walk —
+ * and leaves it unclaimed. That queued action is invisible to
+ * evacuateZone's own one-shot EVACUATION_HOLD_KEY sweep, which only stamps
+ * actions that already exist at the moment evacuation is ordered: this one
+ * is created many ticks later. It sits harmlessly queued for as long as
+ * isMidEvacuationWalk reads true, then — the instant the employee genuinely
+ * arrives and destinationX clears — ordinary dispatch claims it exactly
+ * like any other self-targeted action and walks the employee straight back
+ * to the stale, still-dangerous coordinates it was created with). Dispatch
+ * resumes for the employee the very next tick either way, once they've
+ * arrived and destinationX clears (or, for a manual vehicle-boarding walk,
+ * the analogous pendingDriverVehicleId guard each site already carries
+ * separately).
  */
 export function isMidEvacuationWalk(employee: Employee): boolean {
   return employee.activeActionId === null && employee.destinationX !== null;

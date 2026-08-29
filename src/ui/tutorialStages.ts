@@ -285,7 +285,25 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'vehicle-buy-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
     { target: '#bs-vehicle-panel [data-vtype="debris_hauler"]', hintKey: 'tutorial.stage.vehicle_buy' },
-    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
+    // Scoped to a debris_hauler ROW specifically (FleetPanel.ts's own
+    // per-vehicle [data-vtype], #557 follow-up) — not the bare
+    // '.bs-vehicle-assign-btn' class this used to be, which resolveStageIndex
+    // (tutorialGuide.ts, "last reachable stage wins") would happily match
+    // against ANY owned vehicle's Assign button, jumping this stage straight
+    // to "assign" before debris_hauler was ever bought the instant an OLDER,
+    // still-licensed-crew-eligible vehicle sat undriven on the roster.
+    // Exactly what evacuateZone (Evacuation.ts) now makes routine: a real
+    // evacuation (#557), unlike the teleport it replaced, lets the drill_rig/
+    // rock_digger from earlier in this same tutorial survive the blast
+    // instead of being destroyed — undriven (their own driver dismounted once
+    // drilling/digging finished) but still fully eligible for the exact same
+    // licensed crew this stage's own debris_hauler purchase needs, so the
+    // Fleet panel already renders a live Assign control for them. Confirmed
+    // live: tutorial-steps-visual.json's own 'vehicle buy debris_hauler' step
+    // (module id="vehicle-buy-assign") found the buy button inert — "a
+    // tutorial rail or overlay is blocking it" — with the rail already
+    // pointing at .bs-vehicle-assign-btn for the surviving drill_rig.
+    { target: '#bs-vehicle-panel [data-vtype="debris_hauler"] .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
   ],
 
   'build-storage': [
