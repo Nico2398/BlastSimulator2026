@@ -265,7 +265,7 @@ export function zoneCommand(
       const result = evacuateZone(state, state.zone.activeZone!);
       return {
         success: true,
-        output: `Zone cleared. Moved ${result.orderedVehicleIds.length} vehicles and ${result.orderedEmployeeIds.length} employees.`,
+        output: `Evacuation ordered. Routing ${result.orderedVehicleIds.length} vehicles and ${result.orderedEmployeeIds.length} employees clear of the zone.`,
       };
     }
     case 'status': {
