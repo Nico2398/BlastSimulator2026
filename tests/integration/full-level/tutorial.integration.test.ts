@@ -6,21 +6,20 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeCampaignCtx,
   tickWithEvents,
-  performBlast,
-  getStateSummary,
   driveDrillPlanToCompletion,
   driveChargePlanToCompletion,
   driveConstructionToCompletion,
+  driveToLevelCompletion,
+  assertLevelCompletion,
+  assertStateSummaryCompletion,
 } from './helpers.js';
 import { setupEvents, clearEvents } from '../../../src/core/events/index.js';
-import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { timeCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { employeeCommand, buildCommand } from '../../../src/console/commands/entities.js';
 import { surveyCommand, drillPlanCommand, chargeCommand, sequenceCommand, blastCommand, buildRampCommand } from '../../../src/console/commands/mining.js';
 import { contractCommand } from '../../../src/console/commands/economy.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
-import { stateCommand } from '../../../src/console/commands/state.js';
 import { getLevel } from '../../../src/core/campaign/Level.js';
 import { pickupFragment, deliverToDepot } from '../../../src/core/economy/Logistics.js';
 
@@ -281,44 +280,15 @@ describe('Tutorial Level — Full Walkthrough', () => {
   });
 
   it('completes the tutorial level', () => {
-    // Perform a blast first to have some activity
-    employeeCommand(ctx, ['hire'], { role: 'driller' });
-    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '3' });
-    const blastOutput = performBlast(ctx, 10, 10);
+    // Perform a blast first to have some activity, then force-complete the tutorial level
+    const { blastOutput } = assertLevelCompletion(ctx, 3, 3);
     expect(blastOutput).toContain('BLAST REPORT');
-    tickWithEvents(ctx, 3);
-
-    // Force-complete the tutorial level
-    const completeResult = campaignCompleteCommand(ctx, [], {});
-    expect(completeResult.success).toBe(true);
-    expect(completeResult.output).toContain('force-completed');
-
-    // Verify level ended
-    expect(ctx.state!.levelEnded).toBe(true);
-    expect(ctx.state!.levelEndReason).toBe('completed');
-
-    // Stats should be available
-    const summary = getStateSummary(ctx);
-    expect(summary.levelEnded).toBe(true);
-    expect(summary.levelEndReason).toBe('completed');
   });
 
   it('state summary shows completion status after level ends', () => {
-    employeeCommand(ctx, ['hire'], { role: 'driller' });
-    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
-    performBlast(ctx, 10, 10);
-    tickWithEvents(ctx, 5);
-
-    // Force-complete
-    const completeResult = campaignCompleteCommand(ctx, [], {});
+    const { completeResult } = driveToLevelCompletion(ctx, 5, 5);
     expect(completeResult.success).toBe(true);
     expect(completeResult.output).toContain('force-completed');
-
-    // The state summary should reflect completion
-    const statsResult = stateCommand(ctx as any, ['summary'], {});
-    expect(statsResult.success).toBe(true);
-    const parsed = JSON.parse(statsResult.output) as Record<string, unknown>;
-    expect(parsed.levelEnded).toBe(true);
-    expect(parsed.levelEndReason).toBe('completed');
+    assertStateSummaryCompletion(ctx);
   });
 });
