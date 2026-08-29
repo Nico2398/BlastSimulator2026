@@ -109,7 +109,10 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           agent: ${{ vars.AGENTIC_AGENT }}
-          reason: auto-assigned from merged PR #${{ github.event.pull_request.number }}
+          # Quoted, and it has to stay quoted: YAML opens a comment at an
+          # unquoted ` #`, so this read `auto-assigned from merged PR` on every
+          # run since it was written, with the PR number parsed away.
+          reason: "auto-assigned from merged PR #${{ github.event.pull_request.number }}"
           completed_issue: ${{ steps.close-issue.outputs.issue }}
 
       - name: Report auto-assign state
