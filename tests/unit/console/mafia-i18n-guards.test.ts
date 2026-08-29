@@ -378,3 +378,75 @@ describe('mafia.ts frame success/detected outcomes — English literal + fr dive
     }
   });
 });
+
+// ── status subcommand — issue #885 ───────────────────────────────────────
+//
+// mafia.ts's 'status' case still builds output from hardcoded English
+// literals directly (never routed through t()) — see the 6 new
+// mafia.status_* keys added to en.json/fr.json ahead of this wiring:
+// status_unlocked_yes, status_unlocked_no, status_exposure,
+// status_smuggling_active, status_smuggling_inactive, status_pending_frames.
+// The two states below cover both branches of every one of those 6 keys.
+
+describe('mafia.ts status subcommand — English literal + fr divergence', () => {
+  const DEFAULT_STATUS_EN =
+    'Mafia unlocked: No\nExposure risk: 0%\nSmuggling: inactive\nPending frames: 0';
+
+  it('default/locked state — matches the exact English literal by default', () => {
+    const ctx = makeCtx();
+    const result = mafiaCommand(ctx, ['status'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(DEFAULT_STATUS_EN);
+  });
+
+  it('default/locked state — differs from the English literal under locale fr', () => {
+    const ctx = makeCtx();
+    setLocale('fr');
+    const result = mafiaCommand(ctx, ['status'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).not.toBe(DEFAULT_STATUS_EN);
+  });
+
+  /**
+   * Unlocks mafia, starts a frame (pendingFrames.length -> 1, exposureRisk
+   * bumped) and toggles smuggling on (smugglingActive -> true), then builds
+   * the exact English literal from the resulting state values — not
+   * hardcoded guesses, since exposureRisk/smugglingIncome are derived from
+   * MafiaActions.ts constants this test does not duplicate.
+   */
+  function setUpUnlockedSmugglingWithPendingFrame(): { ctx: GameContext; expectedEn: string } {
+    const ctx = makeUnlockedCtx();
+    const employee = hireTestEmployee(ctx);
+    mafiaCommand(ctx, ['frame'], { employee: String(employee.id) });
+    mafiaCommand(ctx, ['smuggle'], {});
+
+    const mafia = ctx.state!.mafia;
+    expect(mafia.pendingFrames.length).toBe(1);
+    expect(mafia.smugglingActive).toBe(true);
+    expect(mafia.exposureRisk).toBeGreaterThan(0);
+
+    const expectedEn = [
+      'Mafia unlocked: YES',
+      `Exposure risk: ${(mafia.exposureRisk * 100).toFixed(0)}%`,
+      `Smuggling: ACTIVE ($${mafia.smugglingIncome}/tick)`,
+      `Pending frames: ${mafia.pendingFrames.length}`,
+    ].join('\n');
+
+    return { ctx, expectedEn };
+  }
+
+  it('unlocked/smuggling-active/pending-frame state — matches the exact English literal built from actual state values', () => {
+    const { ctx, expectedEn } = setUpUnlockedSmugglingWithPendingFrame();
+    const result = mafiaCommand(ctx, ['status'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).toBe(expectedEn);
+  });
+
+  it('unlocked/smuggling-active/pending-frame state — differs from the English literal under locale fr', () => {
+    const { ctx, expectedEn } = setUpUnlockedSmugglingWithPendingFrame();
+    setLocale('fr');
+    const result = mafiaCommand(ctx, ['status'], {});
+    expect(result.success).toBe(true);
+    expect(result.output).not.toBe(expectedEn);
+  });
+});
