@@ -88,6 +88,14 @@
     // non-null-assertion/`?? ''` idioms matching existing usage elsewhere in
     // the suite; no runtime behaviour changed. Freshly measured 111 errors
     // remain across the 46 still-excluded files.
+    // #840 fixed ./unit/entities/EmployeeTraining.test.ts (46 -> 45 entries).
+    // 14 TS2345 errors: the local school() fixture-builder returned
+    // { id, type, tier } but enrolInTraining's inline building-shaped
+    // parameter type (EmployeeTraining.ts:166) had grown required x/z
+    // fields, so every school(...) call site failed to satisfy it. Fixed by
+    // adding defaulted x = 0, z = 0 params to school() and including them in
+    // its return literal, matching this same file's makeBuilding fixture
+    // convention; no call site changed.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -105,7 +113,6 @@
     "./unit/engine/EntityMovementTick.test.ts",
     "./unit/entities/Damage.test.ts",
     "./unit/entities/EmployeeActivity.test.ts",
-    "./unit/entities/EmployeeTraining.test.ts",
     "./unit/entities/VehicleStatus.test.ts",
     "./unit/entities/Zone.test.ts",
     "./unit/events/EventEngine.test.ts",

@@ -34,8 +34,8 @@ function makeStateWithOne(role: 'driller' | 'surveyor' | 'driver' = 'driller') {
   return { state, employee };
 }
 
-function school(type: BuildingType, tier: BuildingTier = 1, id = 1) {
-  return { id, type, tier };
+function school(type: BuildingType, tier: BuildingTier = 1, id = 1, x = 0, z = 0) {
+  return { id, type, tier, x, z };
 }
 
 // ── Which school teaches what ────────────────────────────────────────────────
