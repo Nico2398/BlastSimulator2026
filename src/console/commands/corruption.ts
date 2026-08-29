@@ -12,6 +12,7 @@ import {
 } from '../../core/economy/Corruption.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { t } from '../../core/i18n/I18n.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, sanitizeFiniteOverride } from './commandUtils.js';
 
@@ -38,7 +39,7 @@ export function corruptCommand(
 
   const validTargets: CorruptionTarget[] = ['judge', 'union_leader', 'inspector', 'politician', 'witness'];
   if (!validTargets.includes(target)) {
-    return { success: false, output: `Invalid target. Valid: ${validTargets.join(', ')}` };
+    return { success: false, output: t('corruption.invalid_target', { valid: validTargets.join(', ') }) };
   }
 
   const cost = named['cost'] ? sanitizeFiniteOverride(parseInt(named['cost'], 10), { min: 0 }) : undefined;
@@ -46,7 +47,10 @@ export function corruptCommand(
   if (state.cash < resolvedCost) {
     return {
       success: false,
-      output: `Insufficient funds: need $${formatMoney(resolvedCost)}, have $${formatMoney(state.cash)}`,
+      output: t('console.insufficient_funds', {
+        need: formatMoney(resolvedCost),
+        have: formatMoney(state.cash),
+      }),
     };
   }
   const rng = new Random(state.seed + state.tickCount);
@@ -56,14 +60,14 @@ export function corruptCommand(
   state.cash -= result.cost;
 
   const lines = [
-    result.success ? 'CORRUPTION SUCCESSFUL.' : 'CORRUPTION FAILED — SCANDAL!',
+    result.success ? t('corruption.success') : t('corruption.failed_scandal'),
     `Cost: $${result.cost}`,
   ];
   if (result.scandalTriggered) {
-    lines.push('A scandal has erupted. Expect consequences.');
+    lines.push(t('corruption.scandal_erupted'));
   }
   if (result.mafiaJustUnlocked) {
-    lines.push('You have attracted the attention of... certain organizations.');
+    lines.push(t('corruption.mafia_unlocked'));
   }
 
   return { success: true, output: lines.join('\n') };

@@ -173,10 +173,19 @@ describe('en.json / fr.json — key-set parity', () => {
     // construction-site flow, both locales translated, and removed the
     // orphaned ui.build.placed key — BuildMenu.ts uses ui.build.ordered
     // instead, and nothing in src/ referenced ui.build.placed anymore.
+    // Baseline is now 3352 (up from 3323): #821 wired the last raw-literal
+    // console command strings in corruption.ts, mafia.ts, time.ts,
+    // eventResolution.ts, tick.ts and economy.ts through t() — 29 new keys
+    // total: console.insufficient_funds (shared), 5 corruption.* keys,
+    // 6 mafia.* keys, 5 time.* keys, 9 eventResolution.* keys (the command's
+    // own guard/usage text — event.* singular is occupied by per-event
+    // content), and 3 tick.* keys. economy.ts's two empty-contract-list
+    // strings reuse the pre-existing ui.contracts.none/none_active keys
+    // instead of adding new ones.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3323);
+    expect(Object.keys(en).length).toBe(3352);
   });
 });
 
