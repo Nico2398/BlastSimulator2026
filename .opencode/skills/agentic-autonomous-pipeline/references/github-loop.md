@@ -3,11 +3,11 @@
 How a filed issue becomes a merged pull request with nobody watching, and every mechanism that keeps the chain from going quiet.
 
 ```
-       merged PR         run ended `blocked`/`paused`    manual dispatch
-            │                        │                        │
-            ▼                        ▼                        ▼
-   auto-assign-next.yml     handle-failure.yml        agentic-trigger.yml
-            └────────────────────────┼────────────────────────┘
+  merged PR    run ended `blocked`/`paused`   issue closed `done`   manual dispatch
+      │                     │                          │                   │
+      ▼                     ▼                          ▼                   ▼
+auto-assign-next.yml  handle-failure.yml  agentic-chain-on-close.yml  agentic-trigger.yml
+      └─────────────────────┴──────────────┬───────────┴───────────────────┘
                                      ▼
                         [agentic-assign] oldest assignable `ready` issue
                                      │  ready → in-progress, then post the assignment comment
@@ -44,19 +44,25 @@ How a filed issue becomes a merged pull request with nobody watching, and every 
                limit spent → PR to draft, issue `blocked` → handle-failure.yml
 ```
 
-## Three ways in, and nothing else
+## Four ways in, and nothing else
+
+One entry per terminal state, which is the whole design: a run ends in exactly four
+states, and each one has a workflow subscribed to the event it raises.
 
 | Entry | Fires on | Covers |
 |-------|----------|--------|
 | `agentic-trigger.yml` | manual dispatch | A human starting the pipeline on the oldest assignable `ready` issue. This is how a run begins from a standing start |
 | `auto-assign-next.yml` | `pull_request: closed` with `merged == true` | Chain from the merge to the next issue. This is how a run begins from the previous one succeeding |
 | `handle-failure.yml` | `issues: labeled` with `blocked` or `paused` | Chain past a run that halted without merging, and report what happened. This is how a run begins from the previous one *not finishing* |
+| `agentic-chain-on-close.yml` | `issues: closed` on an `agent-task` issue | Chain past a run whose deliverable was never a diff — an answer, an executed command, a set of filed issues — so it closed its own issue `done` and opened no PR. This is how a run begins from the previous one succeeding *without merging anything* |
 
 **Nothing else may start a session on a new issue.** Filing an issue, labelling one `ready`, reopening one, and the passage of time all leave the queue exactly where it was.
 
 There is one path that starts a session without assigning anything, and the distinction is the whole of why it is allowed: `agentic-ci-failure.yml` hands a **pull request that already exists** back to the agent that already owns it. It selects no issue, reads no queue, and changes no label on the happy path — see "A red CI is nobody's report" below. `agentic-intake.yml` still reacts to `issues: opened, reopened`, but only to keep the label definitions present and to drop a stale `done` from a reopened issue — it assigns nothing. `agentic-watchdog.yml` still sweeps hourly, but only to release issues whose runs died; it does not restart the queue itself — the `blocked` label it applies does, through `handle-failure.yml`, which is why that label must be applied with the PAT.
 
-**The third entry is what makes the loop closed.** A halted run is terminal exactly as a merge is, and both outcomes have to release the queue: with only the first two entries, every failure parked the pipeline until a human dispatched the trigger, which on a repository with nobody watching means until somebody noticed. It fires on either halt label, differing only in what it reports — `blocked` asks a human for the clarification the run is missing, `paused` states that the issue is already requeued behind the dependency the run filed and asks for nothing. The chain is bounded rather than unconditional — see the cascade brake below.
+**The third and fourth entries are what make the loop closed.** A halted run is terminal exactly as a merge is, and both outcomes have to release the queue: with only the first two entries, every failure parked the pipeline until a human dispatched the trigger, which on a repository with nobody watching means until somebody noticed. It fires on either halt label, differing only in what it reports — `blocked` asks a human for the clarification the run is missing, `paused` states that the issue is already requeued behind the dependency the run filed and asks for nothing. The chain is bounded rather than unconditional — see the cascade brake below.
+
+**The fourth closed the last hole in it**, and it stayed open far longer because the state it covers looks like success. A run whose deliverable is an answer, a command or a set of filed issues closes its own issue and labels it `done`: no pull request, so `auto-assign-next.yml` never hears anything; no halt label, so `handle-failure.yml` never fires; no `in-progress` left behind, so the watchdog has nothing to sweep. Three of the four terminal states had a subscriber and the fourth had none, and every document in this tree said there were three ways in — so nothing read as broken. On 28 Aug 2026 issue #557 ended `blocked` and chained correctly to #807; #807's run filed twelve follow-up issues, closed itself `done` at 19:41:07, and the pipeline stopped with 23 `ready` issues queued behind it. `agentic-assign` had carried the `closed_without_pr` guard for this case since it was written, and had never had a caller. Same cascade brake as the halt chains: a `done` close is a success but not a *merge*, so it resets nothing and must not restart a queue the brake has parked.
 
 A `ready` issue can still sit in the queue indefinitely, because nothing is scheduled to notice it. Events genuinely do get lost — GitHub keeps one pending run per concurrency group and drops the next, a webhook can be missed — and when that happens the chain stops until a human dispatches `agentic-trigger.yml`. That is the remaining trade: an idle pipeline is preferable to sessions nobody asked for.
 
@@ -87,7 +93,7 @@ Intake never applies `agent-task` or `ready` itself — that would take label as
    **A consequence to respect:** under the PAT, everything the session posts is authored by a real user rather than a bot, and the runners' trigger guard filters on `comment.user.type != 'Bot'`. An agent-authored comment containing the agent's own mention would therefore wake a new run. **No comment written by an agent session may contain `@claude` or `@opencode`.** Exactly two comments in the whole system carry a mention, and both are written by a workflow rather than by a session: the assignment comment from `agentic-assign`, and the CI handback from `agentic-ci-failure.yml`. Each is a deliberate trigger, each is bounded, and each must be posted with the PAT for the same reason — under `GITHUB_TOKEN` the author is a bot and the runners filter it out, so the trigger would be written and never read.
 2. **The assignment comment carries the whole assignment.** It names the issue, mandates orchestrator-first delegation, states the branch names, the verification expectation, and the PR conventions. Its text is identical for every agent apart from the mention on the first line — the runtimes read the same instructions.
 
-An issue the agent closes without opening a PR raises no `pull_request` event either, so nothing chains from it. The runners used to carry their own step for that case; it was removed, because a run starting the next run is the pipeline deciding to run again on its own. Such a run still *releases* its issue — closes it, labels it `done`, drops `in-progress` — so the queue is free the moment somebody asks for the next one.
+An issue the agent closes without opening a PR raises no `pull_request` event, so the merge chain cannot carry it. The runners used to carry their own step for that case; it was removed, and correctly — a run starting the next run is the pipeline deciding to run again on its own. What was missing was the other half: with the runner's step gone and nothing put in its place, the state had no subscriber at all and the queue went idle every time a run delivered something other than a diff. `agentic-chain-on-close.yml` is that half. The runner still assigns nothing; it releases its issue — closes it, labels it `done`, drops `in-progress` — and the close is the event a workflow reacts to, with the queue and the cascade brake in view, which is exactly what a runner does not have.
 
 ## Single flight
 
@@ -141,7 +147,7 @@ One detail follows from the exemption. A run that paused itself and then died be
 
 The rescue PR is a diagnosis, not a deliverable: unreviewed and unvalidated by definition. Finishing it or dropping it is a human decision — and it has to be made *before* `ready` goes back on the issue, because an issue with an open PR against it is not assignable. That is not an obstacle to work around; it is what stops a second run being told to build a branch that already has commits on it.
 
-**No runner chains to the next issue itself.** A run starting the next run is the pipeline deciding to run again on its own, and a runner has no view of the queue it would be restarting. The chain belongs to `handle-failure.yml`, which reacts to the `blocked` or `paused` label whoever applied it — the run, `agentic-rescue`, or the watchdog — and can weigh it against every other halt since the last merge.
+**No runner chains to the next issue itself.** A run starting the next run is the pipeline deciding to run again on its own, and a runner has no view of the queue it would be restarting. The chain belongs to a workflow reacting to the event the run's own ending raised: `handle-failure.yml` on the `blocked` or `paused` label, whoever applied it — the run, `agentic-rescue`, or the watchdog — and `agentic-chain-on-close.yml` on the close of an issue the run settled itself. Both weigh the chain against every other halt since the last merge; neither is reachable from inside a session.
 
 ## The cascade brake
 

@@ -63,7 +63,11 @@ jobs:
         with:
           token: ${{ secrets.PAT_TOKEN_COPILOT_AUTOMATION }}
           agent: ${{ vars.AGENTIC_AGENT }}
-          reason: auto-assigned after issue #${{ github.event.issue.number }} ended ${{ github.event.label.name }}
+          # Quoted, and it has to stay quoted: YAML opens a comment at an
+          # unquoted ` #`, so this read `auto-assigned after issue` on every run
+          # since it was written — the issue number and the outcome were parsed
+          # away, and the assignment comment quoting the reason said neither.
+          reason: "auto-assigned after issue #${{ github.event.issue.number }} ended ${{ github.event.label.name }}"
           guard: ${{ github.event.label.name == 'paused' && 'after_paused_run' || 'after_blocked_run' }}
           completed_issue: ${{ github.event.issue.number }}
           blocked_chain_limit: ${{ vars.AGENTIC_BLOCKED_CHAIN_LIMIT }}

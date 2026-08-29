@@ -1,9 +1,16 @@
 // BlastSimulator2026 — Autonomy loop wiring
 // A filed issue is eligible for the pipeline, never a start signal for it. A
-// run begins in exactly three ways — a human dispatching `agentic-trigger.yml`,
-// a merged pipeline pull request chaining to the next `ready` issue, or a run
-// that ended `blocked` chaining past itself — and from there every step to the
-// merge is a workflow reacting to an event.
+// run begins in exactly four ways — a human dispatching `agentic-trigger.yml`,
+// a merged pipeline pull request chaining to the next `ready` issue, a run that
+// ended `blocked` or `paused` chaining past itself, or a run that closed its own
+// issue `done` because its deliverable was never a diff — and from there every
+// step to the merge is a workflow reacting to an event.
+//
+// The fourth was missing for the whole life of the pipeline, and the count in
+// this comment is why it stayed missing: three of the four terminal states had a
+// workflow subscribed to them, the fourth had none, and every document in the
+// tree agreed there were only three ways in. See
+// `agentic-chain-on-close.yml`'s own header for the run it cost.
 // Both halves fail in silence. A removed trigger or a swapped token stops the
 // queue with nothing raised, and a new assignment path starts sessions nobody
 // asked for, which is how filing issue #489 woke a runner. These tests pin the
@@ -26,11 +33,12 @@ const workflow = (name: string): string =>
 const ASSIGN_ACTION = 'uses: ./.github/actions/agentic-assign';
 const AUTO_MERGE_ACTION = 'uses: ./.github/actions/agentic-auto-merge';
 
-/** The only three workflows allowed to put an issue in front of an agent. */
+/** The only four workflows allowed to put an issue in front of an agent. */
 const ASSIGNING_WORKFLOWS = [
   'auto-assign-next.yml',
   'agentic-trigger.yml',
   'handle-failure.yml',
+  'agentic-chain-on-close.yml',
 ];
 
 // Each of these once assigned, and each removal was deliberate. Named
@@ -45,7 +53,7 @@ const NON_ASSIGNING_WORKFLOWS = [
 ];
 
 describe('entry points into the assignment queue', () => {
-  it('opens exactly three ways in', () => {
+  it('opens exactly four ways in', () => {
     for (const name of ASSIGNING_WORKFLOWS) {
       expect(workflow(name), `${name} no longer assigns`).toContain(ASSIGN_ACTION);
     }
@@ -115,7 +123,12 @@ describe('entry points into the assignment queue', () => {
 
   // A run that answers a question or executes a command closes its own issue
   // and opens no PR, so there is no merge to chain from. Starting the next
-  // session there would be the pipeline deciding to run again on its own.
+  // session from inside the runner would be the pipeline deciding to run again
+  // on its own, and a runner has no view of the queue it would be restarting —
+  // so the runner still assigns nothing. `agentic-chain-on-close.yml` reacts to
+  // the close instead, which is where the queue and the cascade brake are
+  // visible. Both halves of that have to hold: the runner must not assign, and
+  // something must.
   it.each(['claude-runner.yml', 'opencode-runner.yml'])(
     '%s releases its issue without starting the next run',
     (name) => {
@@ -213,6 +226,144 @@ describe('chaining past a run that ended blocked', () => {
   });
 });
 
+// The fourth terminal state. A run whose deliverable is an answer, a command or
+// a set of filed issues rather than a diff closes its own issue and labels it
+// `done` — raising no `pull_request` event for `auto-assign-next.yml`, no halt
+// label for `handle-failure.yml`, and leaving no `in-progress` for the watchdog
+// to sweep. Nothing was subscribed to it, so the queue simply stopped: on
+// 28 Aug 2026 #807 closed `done` at 19:41:07 with 23 `ready` issues behind it
+// and the pipeline ran nothing further. `agentic-assign` had carried the
+// `closed_without_pr` guard for exactly this the whole time, with no caller.
+describe('chaining past a run whose deliverable was not a pull request', () => {
+  // Read inside each test, not at describe level: deleting the workflow should
+  // fail these assertions by name, not throw during collection and report the
+  // whole file as "no tests" — which reads like the suite was never written.
+  const onClose = () => workflow('agentic-chain-on-close.yml');
+  const action = () =>
+    readFileSync(join(ROOT, '.github/actions/agentic-assign/action.yml'), 'utf8');
+
+  /** The `closed_without_pr` guard body, sliced out of the shipped action. */
+  const closedGuard = (): string => {
+    const text = action();
+    return text.slice(
+      text.indexOf("if (guard === 'closed_without_pr')"),
+      text.indexOf('// --- Guard: chain past a run that halted without merging ---')
+    );
+  };
+
+  it('reacts to the issue closing, which is the only event that state raises', () => {
+    const text = onClose();
+    const triggers = text.slice(text.indexOf('\non:'), text.indexOf('\nconcurrency:'));
+    expect(triggers).toMatch(/issues:\s*\n\s*types:\s*\[closed\]/);
+    expect(triggers).not.toContain('schedule:');
+    expect(text).toContain(ASSIGN_ACTION);
+  });
+
+  it('chains under the guard written for this case', () => {
+    expect(onClose()).toContain('guard: closed_without_pr');
+    expect(onClose()).toContain('completed_issue: ${{ github.event.issue.number }}');
+  });
+
+  // Without the brake this path would quietly un-park a queue the brake had
+  // parked: a `done` close is a success but it is not a merge, so it resets
+  // nothing that `consecutiveHaltedRuns` counts.
+  it('is bounded by the same cascade brake as the halt chains', () => {
+    expect(onClose()).toContain('blocked_chain_limit: ${{ vars.AGENTIC_BLOCKED_CHAIN_LIMIT }}');
+    const text = action();
+    const brake = text.slice(text.indexOf('// --- Cascade brake ---'));
+    expect(brake).toContain("if (guard !== 'none') {");
+    expect(brake).toContain('rules.consecutiveHaltedRuns(api)');
+  });
+
+  // `issues: closed` fires for every issue closed in the repository. The action
+  // is what keeps a human tidying up the backlog from starting a session, and it
+  // uses the same test both halt guards apply.
+  it('chains only from an issue a run actually held', () => {
+    const guard = closedGuard();
+    expect(guard).toContain('await api.everCarriedInProgress(completed)');
+    expect(guard).toContain('never carried');
+  });
+
+  // The merge path already chains from a merged PR. Both would otherwise fire on
+  // the same close, and the issue would be assigned twice.
+  it('stands down when a pull request is carrying the chain', () => {
+    const guard = closedGuard();
+    expect(guard).toContain('await api.deliverableFor(completed)');
+    expect(guard).toContain('the merge event carries the chain');
+    // A read that failed is not an absent PR.
+    expect(guard).toContain('finishedPrs.unknown');
+  });
+
+  // Same reasoning as the runners' own group: GitHub keeps one pending run per
+  // concurrency group and a second arrival cancels it, so a close this job will
+  // skip must never claim the shared slot on its way to finding that out.
+  it('contends for the shared assignment slot only when it will act', () => {
+    const text = onClose();
+    const concurrency = text.slice(text.indexOf('\nconcurrency:'), text.indexOf('\npermissions:'));
+    const jobIf = text.slice(text.indexOf('\n    if: >'), text.indexOf('\n    runs-on:'));
+    expect(jobIf).toContain('if: >');
+
+    // Both clauses, in both places. `agent-task` is what queued issues carry;
+    // `in-progress` is what assignment applies regardless, and dropping it would
+    // leave an issue assigned without `agent-task` unable to chain — this
+    // workflow's own bug, reproduced on the issues it does not recognise.
+    for (const clause of [
+      "contains(github.event.issue.labels.*.name, 'agent-task')",
+      "contains(github.event.issue.labels.*.name, 'in-progress')",
+    ]) {
+      expect(concurrency, `group is missing \`${clause}\``).toContain(clause);
+      expect(jobIf, `job \`if:\` is missing \`${clause}\``).toContain(clause);
+    }
+
+    expect(concurrency).toContain("&& 'agentic-assignment'");
+    expect(concurrency).toMatch(/format\('agentic-chain-on-close-noop-\{0\}',\s*github\.run_id\)/);
+    expect(concurrency).toContain('cancel-in-progress: false');
+  });
+
+  // The group is workflow-level, so the run claims it whatever its jobs decide —
+  // and it must therefore resolve from contexts that are certainly in scope
+  // there. `vars` is not one this repository has ever exercised in a
+  // `concurrency:` expression, and if it silently read as empty the whole
+  // expression would collapse to the no-op arm on every run: this entry point
+  // would stop serialising against the other three, and would report success
+  // while doing it. So the enable flag gates the steps, the way
+  // `handle-failure.yml` gates its own, and never the group.
+  it('resolves its concurrency group without reading `vars`', () => {
+    const text = onClose();
+    const concurrency = text.slice(text.indexOf('\nconcurrency:'), text.indexOf('\npermissions:'));
+    const group = concurrency.slice(concurrency.indexOf('group:'));
+    expect(group).not.toContain('vars.');
+
+    // The flag still has to gate the work, just further in.
+    const assign = text.slice(text.indexOf(ASSIGN_ACTION) - 400, text.indexOf(ASSIGN_ACTION));
+    expect(assign).toContain("if: vars.AGENTIC_AUTO_ASSIGN_ENABLED == 'true'");
+  });
+});
+
+// YAML opens a comment at an unquoted ` #`, so `reason: auto-assigned after
+// issue #${{ ... }} ended ${{ ... }}` parsed as `auto-assigned after issue` —
+// the issue number and the outcome were gone before the action ever ran, and
+// the assignment comment that quotes the reason said neither. Two workflows
+// shipped that way, and nothing failed: the chain still worked, it just stopped
+// explaining itself. Confirmed in run 33204199229's own log, which recorded
+// `ASSIGN_REASON: auto-assigned after issue`.
+describe('the assignment reason survives the YAML parser', () => {
+  const WORKFLOW_DIR = join(ROOT, '.github/workflows');
+
+  it.each(readdirSync(WORKFLOW_DIR).filter((name) => name.endsWith('.yml')))(
+    '%s quotes every reason: that interpolates an issue or PR number',
+    (name) => {
+      for (const [line] of workflow(name).matchAll(/^\s*reason:.*$/gm)) {
+        if (!line.includes('#')) continue;
+        expect(
+          line.trim(),
+          `${name}: \`#\` outside quotes truncates this line at the parser`
+        ).toMatch(/^reason:\s*"/);
+      }
+    }
+  );
+});
+
 // A timeline cross-reference is raised by any PR that merely writes "#N" in
 // prose, and reading one as "this issue has its PR" is how docs PR #561's
 // passing mention of #547 disarmed run #133's retry (#568). The deliverable
@@ -293,7 +444,27 @@ describe('the entry points cannot race', () => {
     const text = workflow(name);
     const assign = text.indexOf(ASSIGN_ACTION);
     expect(assign, `${name} no longer assigns`).toBeGreaterThan(-1);
-    expect(text.slice(0, assign)).toMatch(/concurrency:\s*\n\s*group: agentic-assignment/);
+
+    // Two shapes are allowed, and both put a run that assigns into the one
+    // shared group. A workflow whose trigger only ever means "assign" names it
+    // outright. One whose trigger also fires on events it will skip —
+    // `issues: closed` fires for every issue in the repository — resolves to
+    // that same name when it will act and to a per-run name when it will not,
+    // so a no-op cannot evict a real queued assignment on its way to finding
+    // out it is a no-op. What is never allowed is a third group name.
+    const concurrency = text.slice(0, assign);
+    expect(concurrency, `${name}: assigning job is not in the shared group`).toMatch(
+      /concurrency:\s*\n(?:.*\n)*?\s*group: (?:agentic-assignment|>-)/
+    );
+    if (!/group: agentic-assignment/.test(concurrency)) {
+      expect(concurrency, `${name}: conditional group never resolves to the shared name`).toMatch(
+        /&&\s*'agentic-assignment'\s*\|\|/
+      );
+      expect(concurrency, `${name}: the skip arm must be unique per run`).toMatch(
+        /\|\|\s*format\('[a-z-]+-noop-\{0\}',\s*github\.run_id\)/
+      );
+    }
+    expect(concurrency).toContain('cancel-in-progress: false');
   });
 
   // Arming auto-merge must stay outside that group. GitHub keeps one pending run
