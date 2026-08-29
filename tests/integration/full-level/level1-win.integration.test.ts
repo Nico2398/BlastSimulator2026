@@ -8,8 +8,8 @@ import {
   tickWithEvents,
   performBlast,
   getStateSummary,
+  driveToLevelCompletion,
 } from './helpers.js';
-import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { employeeCommand } from '../../../src/console/commands/entities.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 
@@ -59,14 +59,8 @@ describe('Level 1 — Win', () => {
   });
 
   it('can complete the level via campaignCompleteCommand', () => {
-    // Perform a blast first to have some activity
-    employeeCommand(ctx, ['hire'], { role: 'driller' });
-    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '3' });
-    performBlast(ctx, 10, 10);
-    tickWithEvents(ctx, 3);
-
-    // Force-complete the level
-    const completeResult = campaignCompleteCommand(ctx, [], {});
+    // Perform a blast first to have some activity, then force-complete the level
+    const { completeResult } = driveToLevelCompletion(ctx, 3, 3);
     expect(completeResult.success).toBe(true);
     expect(completeResult.output).toContain('force-completed');
 
@@ -81,13 +75,7 @@ describe('Level 1 — Win', () => {
   });
 
   it('level can reach star rating display after completion', () => {
-    employeeCommand(ctx, ['hire'], { role: 'driller' });
-    employeeCommand(ctx, ['assign_skill', '1'], { skill: 'blasting', level: '5' });
-    performBlast(ctx, 10, 10);
-    tickWithEvents(ctx, 5);
-
-    // Force-complete
-    campaignCompleteCommand(ctx, [], {});
+    driveToLevelCompletion(ctx, 5, 5);
 
     // The stats command should show star rating
     const statsResult = stateCommand(ctx as any, ['summary'], {});
