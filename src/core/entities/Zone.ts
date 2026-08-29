@@ -206,3 +206,24 @@ export function isDangerZoneClear(
   const zone = computeDangerZone(drillHoles, BLAST_DANGER_MARGIN_M);
   return zone === null || isZoneClear(zone, vehicles, employees);
 }
+
+/**
+ * Whether the live drill plan's danger zone is blocked, and by how many.
+ * Chains computeDangerZone → isZoneClear → countZoneOccupants — the same
+ * three-call derivation the tutorial-only FIRE refusal needs on both sides
+ * of the console/UI boundary (mining/blast.ts's console `blast` command and
+ * blastFooter.ts's FIRE button, #557) — so they never disagree on whether to
+ * refuse or on the count they report. Returns null when there are no holes
+ * to derive a zone from, or the zone is already clear; the occupant count
+ * otherwise.
+ */
+export function blockingOccupantCount(
+  drillHoles: readonly { x: number; z: number }[],
+  marginM: number,
+  vehicles: VehicleState,
+  employees: EmployeeState,
+): number | null {
+  const zone = computeDangerZone(drillHoles, marginM);
+  if (zone === null || isZoneClear(zone, vehicles, employees)) return null;
+  return countZoneOccupants(zone, vehicles, employees);
+}

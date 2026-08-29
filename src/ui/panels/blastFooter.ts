@@ -14,7 +14,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import { assembleBlastPlan, validateBlastPlan } from '../../core/mining/BlastPlan.js';
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
-import { computeDangerZone, isZoneClear, countZoneOccupants } from '../../core/entities/Zone.js';
+import { blockingOccupantCount } from '../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 
 export class BlastFooter {
@@ -95,17 +95,15 @@ export class BlastFooter {
     const estValue = estimateBlastOreValue(plan, state.surveyResults);
     const margin = estValue - planCost;
 
-    // Tutorial-only gate (#557): mirrors the console `blast` command's own
-    // refusal (mining/blast.ts) so FIRE and the command it dispatches agree.
-    // Outside the tutorial this never applies — an occupied zone stays
-    // fireable, preflight-warning-only, exactly as before this issue.
-    let zoneOccupiedCount: number | null = null;
-    if (tutorialActive && baseFireOk) {
-      const dangerZone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
-      if (dangerZone && !isZoneClear(dangerZone, state.vehicles, state.employees)) {
-        zoneOccupiedCount = countZoneOccupants(dangerZone, state.vehicles, state.employees);
-      }
-    }
+    // Tutorial-only gate (#557): shares blockingOccupantCount (Zone.ts) with
+    // the console `blast` command's own refusal (mining/blast.ts) so FIRE and
+    // the command it dispatches never disagree on whether to refuse or on
+    // the count they report. Outside the tutorial this never applies — an
+    // occupied zone stays fireable, preflight-warning-only, exactly as
+    // before this issue.
+    const zoneOccupiedCount = tutorialActive && baseFireOk
+      ? blockingOccupantCount(state.drillHoles, BLAST_DANGER_MARGIN_M, state.vehicles, state.employees)
+      : null;
     const fireOk = baseFireOk && zoneOccupiedCount === null;
 
     const reason = !hasHoles

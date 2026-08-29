@@ -18,7 +18,7 @@ import { computeBlastOreReport } from '../../../core/mining/SurveyCalc.js';
 import { detectOreReport } from '../../../core/events/EventEngine.js';
 import { NavGrid } from '../../../core/nav/NavGrid.js';
 import { getStorageCapacity } from '../../../core/entities/Building.js';
-import { computeDangerZone, isZoneClear, countZoneOccupants } from '../../../core/entities/Zone.js';
+import { computeDangerZone, blockingOccupantCount } from '../../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../../core/config/balance.js';
 
 export function blastCommand(
@@ -37,9 +37,8 @@ export function blastCommand(
   // executeBlast never called.
   if (ctx.tutorialActive === true) {
     const preState = ctx.state!;
-    const dangerZone = computeDangerZone(preState.drillHoles, BLAST_DANGER_MARGIN_M);
-    if (dangerZone !== null && !isZoneClear(dangerZone, preState.vehicles, preState.employees)) {
-      const count = countZoneOccupants(dangerZone, preState.vehicles, preState.employees);
+    const count = blockingOccupantCount(preState.drillHoles, BLAST_DANGER_MARGIN_M, preState.vehicles, preState.employees);
+    if (count !== null) {
       return { success: false, output: t('mining.blast.refused_zone_occupied', { count }) };
     }
   }
