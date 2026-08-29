@@ -16,6 +16,7 @@ import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, parseStaffedFlag } from './commandUtils.js';
+import { t } from '../../core/i18n/I18n.js';
 
 /**
  * The landscape's coarse tile map plus a reusable fine-grained sampler
@@ -199,7 +200,7 @@ export function newGameCommand(
   const biome = getBiome(mineType);
   if (!biome) {
     const valid = getAllBiomes().map(b => b.id).join(', ');
-    return { success: false, output: `Unknown mine type: "${mineType}". Valid: ${valid}` };
+    return { success: false, output: t('world.unknown_mine_type', { mineType, valid }) };
   }
 
   const size = named['size'] ? parseInt(named['size'], 10) : DEFAULT_GRID_SIZE;
@@ -224,7 +225,10 @@ export function newGameCommand(
 
   return {
     success: true,
-    output: `Game created. ${size}x${sizeY}x${size} terrain, ${mineType} biome, seed ${seed}.${staffedFlag.staffed ? ' Staffed.' : ''}`,
+    output: t('world.new_game_success', {
+      size, sizeY, mineType, seed,
+      staffedSuffix: staffedFlag.staffed ? t('console.staffed_suffix') : '',
+    }),
   };
 }
 
@@ -233,24 +237,29 @@ export function inspectCommand(
   args: string[],
   _named: Record<string, string>,
 ): CommandResult {
-  if (!ctx.grid) return { success: false, output: 'No game loaded. Use new_game first.' };
+  if (!ctx.grid) return { success: false, output: t('console.no_game_loaded') };
 
   const coords = (args[0] ?? '').split(',').map(Number);
   if (coords.length < 3 || coords.some(isNaN)) {
-    return { success: false, output: 'Usage: inspect x,y,z' };
+    return { success: false, output: t('world.inspect_usage') };
   }
   const [x, y, z] = coords as [number, number, number];
 
   if (!ctx.grid.isInBounds(x, y, z)) {
     return {
       success: false,
-      output: `Off site: (${x},${y},${z}). The site spans (${ctx.grid.minX},${ctx.grid.minZ}) to (${ctx.grid.maxX - 1},${ctx.grid.maxZ - 1}), height ${ctx.grid.sizeY}.`,
+      output: t('world.inspect_off_site', {
+        x, y, z,
+        minX: ctx.grid.minX, minZ: ctx.grid.minZ,
+        maxX: ctx.grid.maxX - 1, maxZ: ctx.grid.maxZ - 1,
+        sizeY: ctx.grid.sizeY,
+      }),
     };
   }
 
   const v = ctx.grid.getVoxel(x, y, z)!;
   if (v.density === 0) {
-    return { success: true, output: `(${x},${y},${z}): Air (empty)` };
+    return { success: true, output: t('world.inspect_air', { x, y, z }) };
   }
 
   const dominantRockId = getDominantRockId(v.composition);
@@ -270,7 +279,12 @@ export function inspectCommand(
 
   return {
     success: true,
-    output: `(${x},${y},${z}): ${rockName} | composition: ${compStr} | density: ${v.density} | fracture mod: ${v.fractureModifier}${oreStr}`,
+    output: t('world.inspect_result', {
+      x, y, z, rockName, compStr,
+      density: v.density,
+      fractureModifier: v.fractureModifier,
+      oreStr,
+    }),
   };
 }
 
@@ -280,7 +294,7 @@ export function terrainInfoCommand(
   _named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state || !ctx.grid) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
+    return { success: false, output: t('console.no_game_loaded') };
   }
 
   const w = ctx.state.world!;
@@ -328,15 +342,15 @@ export function landscapeInfoCommand(
   _named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state || !ctx.grid || !ctx.state.world) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
+    return { success: false, output: t('console.no_game_loaded') };
   }
 
   const biome = getBiome(ctx.state.mineType);
-  if (!biome) return { success: false, output: `Unknown mine type: "${ctx.state.mineType}".` };
+  if (!biome) return { success: false, output: t('world.landscape_unknown_mine_type', { mineType: ctx.state.mineType }) };
 
   const { sizeX, sizeY, sizeZ } = ctx.state.world;
   const landscape = ensureLandscape(ctx, { seed: ctx.state.seed, climateBias: biome.climateCenter, sizeX, sizeY, sizeZ });
-  if (!landscape) return { success: false, output: 'Could not build landscape — no grid loaded.' };
+  if (!landscape) return { success: false, output: t('world.landscape_build_failed') };
 
   const { map } = landscape;
   return {

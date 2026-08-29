@@ -12,6 +12,7 @@ import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { sanitizeFiniteOverride, parseStaffedFlag } from './commandUtils.js';
+import { t } from '../../core/i18n/I18n.js';
 // ── campaign status ──
 
 export function campaignStatusCommand(
@@ -20,7 +21,7 @@ export function campaignStatusCommand(
   _named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
+    return { success: false, output: t('console.no_game_loaded') };
   }
   const campaign = ctx.state.campaign;
   const lines: string[] = ['Campaign Status:'];
@@ -50,14 +51,14 @@ export function campaignCompleteCommand(
   _named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
+    return { success: false, output: t('console.no_game_loaded') };
   }
   const levelId = ctx.state.campaign.activeLevelId;
   if (!levelId) {
-    return { success: false, output: 'No active level. Use campaign start level:<id> first.' };
+    return { success: false, output: t('campaign.no_active_level') };
   }
   const level = getLevel(levelId);
-  if (!level) return { success: false, output: `Unknown level: ${levelId}` };
+  if (!level) return { success: false, output: t('campaign.complete_unknown_level', { levelId }) };
 
   // Force-complete: add a large income transaction to push profit over threshold
   addIncome(ctx.state.finances, level.unlockThreshold, 'contracts', 'debug:force_complete', ctx.state.tickCount);
@@ -67,7 +68,7 @@ export function campaignCompleteCommand(
 
   return {
     success: true,
-    output: `Debug: force-completed level "${levelId}". Profit threshold met.`,
+    output: t('campaign.force_complete_success', { levelId }),
   };
 }
 
@@ -80,7 +81,7 @@ export function campaignStartCommand(
 ): CommandResult {
   const levelId = named['level'];
   if (!levelId) {
-    return { success: false, output: 'Usage: campaign start level:<id>' };
+    return { success: false, output: t('campaign.start_usage') };
   }
 
   // No prior game means no prior progress either — a fresh CampaignState is
@@ -104,8 +105,8 @@ export function campaignStartCommand(
   const newState = createGameForLevel(campaign, levelId, staffedFlag.staffed);
   if (!newState) {
     const lvl = getLevel(levelId);
-    if (!lvl) return { success: false, output: `Unknown level: "${levelId}".` };
-    return { success: false, output: `Level "${levelId}" is locked. Complete previous levels first.` };
+    if (!lvl) return { success: false, output: t('campaign.start_unknown_level', { levelId }) };
+    return { success: false, output: t('campaign.level_locked', { levelId }) };
   }
 
   ctx.state = newState;
@@ -130,7 +131,7 @@ export function campaignStartCommand(
   const level = getLevel(levelId)!;
   const biome = getBiome(level.biome);
   if (!biome) {
-    return { success: false, output: `Unknown biome: ${level.biome}` };
+    return { success: false, output: t('campaign.unknown_biome', { biome: level.biome }) };
   }
   if (ctx.state.world) ctx.state.world.gridReady = true;
   regenerateGrid(ctx, {
@@ -151,7 +152,14 @@ export function campaignStartCommand(
   // that was silently ignored, which is the bug this override exists to fix.
   return {
     success: true,
-    output: `Started level "${levelId}". Grid: ${level.gridX}×${level.gridY}×${level.gridZ}. Cash: $${ctx.state.cash.toLocaleString('en-US')}.${staffedFlag.staffed ? ' Staffed.' : ''}`,
+    output: t('campaign.start_success', {
+      levelId,
+      gridX: level.gridX,
+      gridY: level.gridY,
+      gridZ: level.gridZ,
+      cash: ctx.state.cash.toLocaleString('en-US'),
+      staffedSuffix: staffedFlag.staffed ? t('console.staffed_suffix') : '',
+    }),
   };
 }
 
@@ -163,10 +171,10 @@ export function tutorialStartCommand(
   _named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
+    return { success: false, output: t('console.no_game_loaded') };
   }
   ctx.state.isPaused = true;
-  return { success: true, output: 'Tutorial started' };
+  return { success: true, output: t('campaign.tutorial_started') };
 }
 
 // ── stats ──
@@ -177,7 +185,7 @@ export function statsCommand(
   _named: Record<string, string>,
 ): CommandResult {
   if (!ctx.state) {
-    return { success: false, output: 'No game loaded. Use new_game first.' };
+    return { success: false, output: t('console.no_game_loaded') };
   }
   const s = ctx.state.levelStats;
   const levelId = ctx.state.campaign.activeLevelId;
