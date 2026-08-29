@@ -16,6 +16,7 @@ import {
 } from '../../../src/console/commands/mining.js';
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { makeEmptyCtx } from './i18nGuardHelpers.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import * as BlastExecutionModule from '../../../src/core/mining/BlastExecution.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
@@ -78,26 +79,14 @@ describe('mining.ts requireGame guard', () => {
   const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 
   it('returns the exact English literal when no game is loaded', () => {
-    const ctx: MiningContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     const result = chargeCommand(ctx, [], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('differs from the English literal under locale fr', () => {
-    const ctx: MiningContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     setLocale('fr');
 
     const result = chargeCommand(ctx, [], {});
