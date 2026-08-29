@@ -39,7 +39,10 @@ function makeEvent(id: string, category: 'union' | 'politics', weight: number = 
     id, category,
     titleKey: `event.${id}.title`,
     descKey: `event.${id}.desc`,
-    options: [{ labelKey: `event.${id}.opt1` }, { labelKey: `event.${id}.opt2` }],
+    options: [
+      { labelKey: `event.${id}.opt1`, resultKey: `event.${id}.res0` },
+      { labelKey: `event.${id}.opt2`, resultKey: `event.${id}.res1` },
+    ],
     consequences: [{ cashDelta: -100 }, { cashDelta: 0 }],
     weightCoeff: () => weight,
     canFire: () => true,
@@ -467,7 +470,6 @@ describe('Event system engine', () => {
 
     function runToFirstEvent(insertExtraTicksAndActions: boolean) {
       const state = createEventSystemState();
-      const timer = state.timers.find(t => t.category === 'union')!;
       const rng = new Random(99);
       let tickCount = 0;
 

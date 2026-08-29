@@ -104,6 +104,23 @@
     // lines above. Fixed with a non-null assertion on each access, matching
     // this same file's existing mat.onBeforeCompile!(...) idiom. Measured
     // before: 11 errors with this file re-included. After: 0.
+    // #843 fixed the ./unit/events/*.test.ts cluster (44 -> 39 entries):
+    // EventEngine.test.ts's makeWaitingVehicle Vehicle literal and
+    // MafiaActions.test.ts's addTestEmployee Employee literal were both
+    // missing fixture-vs-interface fields (Vehicle's tier/moveConsecutiveFailures-
+    // onward block, Employee's activeActionId-onward block plus
+    // qualifications/trainingState/taskQueue) -- fixed by matching the same
+    // established fixture conventions already used in
+    // tests/unit/ui/panels/FleetPanel.test.ts and
+    // tests/unit/console/vehicle-list.test.ts respectively.
+    // EventSystem.test.ts's makeEvent EventOption literals were missing
+    // resultKey, and a genuinely-dead `timer` local in runToFirstEvent was
+    // removed (TS6133). LawsuitEvents.test.ts and TutorialEvents.test.ts's
+    // ScoreState literals were missing decayRate (0.05, matching
+    // SCORE_DECAY_RATE in balance.ts), and TutorialEvents.test.ts's makeCtx
+    // GameContext literal was missing landscape/playableArea. No test
+    // logic or assertions changed. Freshly measured 75 errors remain across
+    // the 39 still-excluded files.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -123,11 +140,6 @@
     "./unit/entities/EmployeeActivity.test.ts",
     "./unit/entities/VehicleStatus.test.ts",
     "./unit/entities/Zone.test.ts",
-    "./unit/events/EventEngine.test.ts",
-    "./unit/events/EventSystem.test.ts",
-    "./unit/events/LawsuitEvents.test.ts",
-    "./unit/events/MafiaActions.test.ts",
-    "./unit/events/TutorialEvents.test.ts",
     "./unit/lint/NoDanglingDocReferences.test.ts",
     "./unit/mining/BlastExecution.test.ts",
     "./unit/mining/MuckPileSummary.test.ts",
