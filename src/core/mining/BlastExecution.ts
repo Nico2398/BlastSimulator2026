@@ -150,7 +150,7 @@ export interface BlastReport {
    * Estimated maximum throw distance in metres, from the fastest projected
    * fragment's launch speed — standard unresisted 45°-launch range
    * (v² / g), the angle that maximises range and the one already implied by
-   * `calculateInitialVelocity`'s 45° default. An estimate, not a traced
+   * `computeFragmentVelocity`'s 45° default. An estimate, not a traced
    * trajectory: real fragments launch at whatever angle the blast geometry
    * gives them and lose speed to drag, so this is an upper bound a report
    * card can show next to the count, not a per-fragment prediction.
