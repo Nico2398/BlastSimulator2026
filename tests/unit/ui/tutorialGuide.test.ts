@@ -192,6 +192,13 @@ describe('resolveStageIndex — vehicle-buy-assign regression (#858)', () => {
     return card;
   }
 
+  // Regression lock for #858: this is the only test of the four below that
+  // actually fails against the pre-#877 bare `.bs-vehicle-assign-btn`
+  // selector (it would wrongly resolve to 2, matching the unrelated
+  // drill_rig card, instead of 1). The other three tests in this block pass
+  // identically under the old buggy selector and the fixed scoped one — they
+  // are supporting boundary-condition coverage for `resolveStageIndex` on
+  // `vehicle-buy-assign`, not additional regression detectors.
   it('resolves to Buy sub-stage when only dealership buttons and an unrelated undriven vehicle are present', () => {
     toolbarVehiclesButton();
     const panel = vehiclePanel();
