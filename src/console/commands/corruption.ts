@@ -48,8 +48,8 @@ export function corruptCommand(
     return {
       success: false,
       output: t('console.insufficient_funds', {
-        need: '$' + formatMoney(resolvedCost),
-        have: '$' + formatMoney(state.cash),
+        need: formatMoney(resolvedCost),
+        have: formatMoney(state.cash),
       }),
     };
   }

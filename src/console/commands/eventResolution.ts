@@ -54,10 +54,10 @@ export function eventCommand(
   switch (sub) {
     case 'status': {
       if (!state.events.pendingEvent) {
-        return { success: true, output: t('events.none_pending') };
+        return { success: true, output: t('eventResolution.none_pending') };
       }
       const def = getEventById(state.events.pendingEvent.eventId);
-      if (!def) return { success: false, output: t('events.def_not_found') };
+      if (!def) return { success: false, output: t('eventResolution.def_not_found') };
       const lines = [
         `Pending event: ${t(def.titleKey)}`,
         t(def.descKey),
@@ -73,10 +73,10 @@ export function eventCommand(
 
     case 'choose': {
       const idx = parseInt(args[1] ?? '', 10);
-      if (isNaN(idx)) return { success: false, output: t('events.choose_usage') };
+      if (isNaN(idx)) return { success: false, output: t('eventResolution.choose_usage') };
       const rng = new Random(state.seed + state.tickCount);
       const result = resolveEvent(state.events, state.finances, state.scores, idx, state.tickCount, rng);
-      if (!result) return { success: false, output: t('events.choose_invalid') };
+      if (!result) return { success: false, output: t('eventResolution.choose_invalid') };
 
       // resolveEvent already logged the transaction to state.finances via
       // addIncome/addExpense — mirror it onto the flat state.cash field too,
@@ -99,10 +99,10 @@ export function eventCommand(
 
     case 'dismiss': {
       if (!state.events.lastOutcome) {
-        return { success: false, output: t('events.dismiss_none') };
+        return { success: false, output: t('eventResolution.dismiss_none') };
       }
       clearLastOutcome(state.events);
-      return { success: true, output: t('events.dismissed') };
+      return { success: true, output: t('eventResolution.dismissed') };
     }
 
     case 'timers': {
@@ -119,11 +119,11 @@ export function eventCommand(
     case 'fire': {
       const eventId = args[1];
       if (!eventId) {
-        return { success: false, output: t('events.fire_usage') };
+        return { success: false, output: t('eventResolution.fire_usage') };
       }
       const def = getEventById(eventId);
       if (!def) {
-        return { success: false, output: t('events.fire_not_found', { eventId }) };
+        return { success: false, output: t('eventResolution.fire_not_found', { eventId }) };
       }
       state.events.pendingEvent = { eventId: def.id, firedAtTick: state.tickCount };
       if (!state.events.firedEventIds.includes(def.id)) {
@@ -141,6 +141,6 @@ export function eventCommand(
     }
 
     default:
-      return { success: false, output: t('events.usage') };
+      return { success: false, output: t('eventResolution.usage') };
   }
 }

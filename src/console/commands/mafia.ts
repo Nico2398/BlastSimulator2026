@@ -51,8 +51,8 @@ export function mafiaCommand(
         return {
           success: false,
           output: t('console.insufficient_funds', {
-            need: '$' + formatMoney(ACCIDENT_COST),
-            have: '$' + formatMoney(state.cash),
+            need: formatMoney(ACCIDENT_COST),
+            have: formatMoney(state.cash),
           }),
         };
       }
@@ -79,8 +79,8 @@ export function mafiaCommand(
         return {
           success: false,
           output: t('console.insufficient_funds', {
-            need: '$' + formatMoney(FRAME_COST),
-            have: '$' + formatMoney(state.cash),
+            need: formatMoney(FRAME_COST),
+            have: formatMoney(state.cash),
           }),
         };
       }
@@ -95,7 +95,7 @@ export function mafiaCommand(
       return {
         success: true,
         output: result.active
-          ? t('mafia.smuggle_activated', { income: '$' + result.incomePerTick })
+          ? t('mafia.smuggle_activated', { income: result.incomePerTick })
           : t('mafia.smuggle_deactivated'),
       };
     }
