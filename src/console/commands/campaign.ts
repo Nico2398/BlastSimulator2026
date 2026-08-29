@@ -11,7 +11,7 @@ import { getBiome } from '../../core/world/BiomeCatalog.js';
 import { calculateStarRating } from '../../core/campaign/SuccessTracker.js';
 import { Random } from '../../core/math/Random.js';
 import { generateContracts } from '../../core/economy/Contract.js';
-import { sanitizeFiniteOverride, parseStaffedFlag } from './commandUtils.js';
+import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 // ── campaign status ──
 
@@ -158,7 +158,7 @@ export function campaignStartCommand(
       gridY: level.gridY,
       gridZ: level.gridZ,
       cash: ctx.state.cash.toLocaleString('en-US'),
-      staffedSuffix: staffedFlag.staffed ? t('console.staffed_suffix') : '',
+      staffedSuffix: staffedSuffix(staffedFlag.staffed),
     }),
   };
 }

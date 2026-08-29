@@ -19,7 +19,7 @@ import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
-import { parseStaffedFlag } from './commandUtils.js';
+import { parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
@@ -103,7 +103,7 @@ export function sandboxCommand(
       difficulty: config.difficulty,
       seed: config.seed,
       cash: level.startingCash.toLocaleString('en-US'),
-      staffedSuffix: staffedFlag.staffed ? t('console.staffed_suffix') : '',
+      staffedSuffix: staffedSuffix(staffedFlag.staffed),
     }),
   };
 }

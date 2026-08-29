@@ -15,7 +15,7 @@ import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
 import { DEFAULT_GRID_SIZE } from '../../core/config/balance.js';
-import { sanitizeFiniteOverride, parseStaffedFlag } from './commandUtils.js';
+import { sanitizeFiniteOverride, parseStaffedFlag, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 
 /**
@@ -227,7 +227,7 @@ export function newGameCommand(
     success: true,
     output: t('world.new_game_success', {
       size, sizeY, mineType, seed,
-      staffedSuffix: staffedFlag.staffed ? t('console.staffed_suffix') : '',
+      staffedSuffix: staffedSuffix(staffedFlag.staffed),
     }),
   };
 }
