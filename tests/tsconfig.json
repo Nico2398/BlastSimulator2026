@@ -96,6 +96,14 @@
     // adding defaulted x = 0, z = 0 params to school() and including them in
     // its return literal, matching this same file's makeBuilding fixture
     // convention; no call site changed.
+    // #841 fixed ./unit/renderer/GhostMesh.test.ts (45 -> 44 entries). 11
+    // TS18048 errors: every access into shader.uniforms.rimColor/rimPower/
+    // rimIntensity (and the claimedShader/unclaimedShader variants) is
+    // possibly-undefined under Three.js's indexed ShaderMaterial.uniforms
+    // type, even though onBeforeCompile unconditionally assigns them two
+    // lines above. Fixed with a non-null assertion on each access, matching
+    // this same file's existing mat.onBeforeCompile!(...) idiom. Measured
+    // before: 11 errors with this file re-included. After: 0.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -130,7 +138,6 @@
     "./unit/renderer/BlastPlanOverlay.test.ts",
     "./unit/renderer/CharacterMesh.test.ts",
     "./unit/renderer/GameRenderer.test.ts",
-    "./unit/renderer/GhostMesh.test.ts",
     "./unit/renderer/LandscapeMesh.test.ts",
     "./unit/renderer/TaskProgressBar.test.ts",
     "./unit/scenario-defs-validation/issue-regressions.test.ts",
