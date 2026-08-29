@@ -2,11 +2,10 @@
 
 import { expect } from 'vitest';
 import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
-import { campaignStartCommand } from '../../../src/console/commands/campaign.js';
+import { campaignStartCommand, campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../../src/console/commands/mining.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
-import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
@@ -213,17 +212,15 @@ export function driveToLevelCompletion(
 }
 
 /**
- * Drive a fresh level context to completion (via driveToLevelCompletion) and
- * assert the standard "level ended, force-completed" outcome: the
- * campaign-complete command result, and state.levelEnded/levelEndReason.
- * Shared assertion block extracted from level1-win.integration.test.ts and
- * tutorial.integration.test.ts (#827) — a caller that also needs the blast
- * output (tutorial's test asserts it contains 'BLAST REPORT') can read it off
- * the returned object.
- * @param ctx The game context.
- * @param skillLevel The blasting skill level to assign to the hired driller.
- * @param ticks Number of ticks to advance via tickWithEvents after blasting.
- * @returns The blast command output text and the campaign-complete command result.
+ * Drive a fresh level context to completion and assert the standard "level
+ * ended, force-completed" outcome. See `driveToLevelCompletion` for the setup
+ * sequence this drives. Shared assertion block extracted from
+ * level1-win.integration.test.ts and tutorial.integration.test.ts (#827) — a
+ * caller that also needs the blast output (tutorial's test asserts it
+ * contains 'BLAST REPORT') can read it off the returned object.
+ * @returns The blast command output text and the campaign-complete command
+ * result, plus the state.levelEnded/levelEndReason and `state summary`
+ * assertions this function makes along the way.
  */
 export function assertLevelCompletion(
   ctx: GameContext,
