@@ -254,6 +254,14 @@ export class FleetPanel {
 
     const wrap = card(rows);
     wrap.dataset['vehicleId'] = String(v.id);
+    // Mirrors the dealership buy buttons' own [data-vtype] (this file's
+    // header comment) so a tutorial stage can scope an owned-vehicle control
+    // (e.g. .bs-vehicle-assign-btn below) to a specific vehicle TYPE, not just
+    // "the first matching element in the DOM" — see tutorialStages.ts's
+    // 'vehicle-buy-assign' (and tutorialStagesTraining.ts's
+    // 'buy-drill-rig-assign'/'buy-rock-digger-assign') for why that
+    // distinction matters (#557 follow-up).
+    wrap.dataset['vtype'] = v.type;
     wrap.style.cursor = 'pointer';
     wrap.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;

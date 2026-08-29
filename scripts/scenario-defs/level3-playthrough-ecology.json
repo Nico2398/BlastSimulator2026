@@ -1470,7 +1470,7 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). #554: with charging now real, queued work, 47 more ticks elapse than the pre-#554 file needed. Finding (this pass): 11 of the 12 employees die (deathCount 0 -> 11), not the pre-#554 file's 5 -- only one hand-hired employee survives clear of the pattern. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty, unchanged from the pre-#554 figure -- vibration is a function of the charge/pattern, not of who was standing nearby). The drill_rig (vehicle #1) survives too, thanks to the relocate step above. #586-followup: `levelEnded`/`levelEndReason` corrected to false/null -- this session's padding fix (see the wait_until step's own note above) means the mine is no longer bankrupt by the time this blast fires.",
+      "description": "This blast fires for real (campaign start's lock, per the Finding above, only means it runs on the substitute new_game world, not that firing is blocked). #554: with charging now real, queued work, 47 more ticks elapse than the pre-#554 file needed. Finding (this pass, superseded by #557): all 12 employees die (deathCount 0 -> 12) -- a prior pass here read 11, with one hand-hired employee surviving as merely 'injured', but that reading depended on a Damage.ts bug (processProjections skipped any already-injured employee from every later fragment in the same blast, so a first, weaker graze made them immune to a subsequent, genuinely lethal one) that #557's fixer pass closed alongside the debris-attenuation work that exposed it -- widening hits from an exact 2m radius out to the full 15m BLAST_DANGER_MARGIN_M made a stray early graze-then-lethal-hit sequence, on the same employee within one blast, actually likely instead of a near-impossible coincidence. Ecology crashes 50 -> 29.53 (ScoreManager.ts's vibration-based ecology penalty, unchanged from the pre-#554 figure -- vibration is a function of the charge/pattern, not of who was standing nearby). The drill_rig (vehicle #1) survives too, thanks to the relocate step above. #586-followup: `levelEnded`/`levelEndReason` corrected to false/null -- this session's padding fix (see the wait_until step's own note above) means the mine is no longer bankrupt by the time this blast fires.",
       "role": "player",
       "expect": {
         "equals": {
@@ -1478,7 +1478,7 @@
           "orderedHoleCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "vehicleCount": 1,
           "levelEnded": false,
@@ -1501,7 +1501,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1523,7 +1523,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "wellBeing": 22.641333333333485,
           "safety": 50.55000000000014,
@@ -1576,7 +1576,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1603,7 +1603,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1631,7 +1631,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1659,7 +1659,7 @@
           "orderedHoleCount": 20,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1682,7 +1682,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1704,7 +1704,7 @@
       "role": "observe",
       "expect": {
         "equals": {
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "wellBeing": 22.641333333333485,
           "safety": 50.55000000000014,
@@ -1734,7 +1734,7 @@
           "tickCount": 334,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1755,9 +1755,9 @@
           "tickCount": 334,
           "holeCount": 0,
           "orderedHoleCount": 20,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 43.641333333333456,
+          "wellBeing": 23.6413333333335,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,
@@ -1779,7 +1779,7 @@
       "expect": {
         "equals": {
           "tickCount": 334,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
           "levelEnded": false,
           "levelEndReason": null
@@ -1798,9 +1798,9 @@
       "expect": {
         "equals": {
           "tickCount": 334,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 43.641333333333456,
+          "wellBeing": 23.6413333333335,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,
@@ -1821,9 +1821,9 @@
       "expect": {
         "equals": {
           "tickCount": 334,
-          "deathCount": 11,
+          "deathCount": 12,
           "employeeCount": 12,
-          "wellBeing": 43.641333333333456,
+          "wellBeing": 23.6413333333335,
           "safety": 0,
           "ecology": 30.530000000000015,
           "nuisance": 0,

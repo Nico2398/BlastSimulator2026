@@ -1309,9 +1309,9 @@
           "holeCount": 0,
           "chargedCount": 0,
           "sequencedCount": 0,
-          "deathCount": 3
+          "deathCount": 5
         },
-        "note": "Issue #586 CI, this PR: costs a real third life -- direct trace (`state full`) shows the manager (#3) and the driver (#4) still nowhere near the pattern, but the replacement driller (#5) does not collapse from fatigue this time. With the drill_plan step above now sending the real diameter (0.089, matching the tile-picker's own default -- see that step's own finding), each of pattern 2's 4 holes takes noticeably less active-drilling time than the console's old fallback diameter (0.15) gave it, so #5 finishes the whole pattern with ticks to spare in the 60-tick wait instead of fatigue-collapsing partway through. Nothing routes #5 away afterward, so they are found standing at (27,27) -- one of the pattern's own holes -- when charge/sequence/blast fire: the same mechanism that already kills employee #2 in blast 1 (parked at the hole they had just finished drilling). This was previously masked by the drill_plan step's missing diameter, which let command mode's own longer drilling time trigger a fatigue-collapse-and-rest that happened to land #5 safely near living_quarters (17,13) -- a real bug in the scenario's own setup, not a real safety margin; #593's dismounting-position-sync fix (which does apply here, and is what puts a genuinely-resting #5 at their real position instead of a stale boarding spot) only ever mattered on the buggy, over-long-diameter path. Reproduced deterministically: 3 consecutive clean interaction-mode reruns (identical deathCount, identical $28,156 cash figure) and, once the drill_plan step's diameter is corrected, command mode too -- both channels now agree on the same real outcome instead of silently disagreeing on how many holes' worth of diameter default this file forgot to set."
+        "note": "Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/sequence/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius."
       }
     },
     {
@@ -1365,13 +1365,13 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 5,
           "activeContractCount": 0,
           "employeeCount": 6,
-          "vehicleCount": 2,
+          "vehicleCount": 0,
           "holeCount": 0
         },
-        "note": "#555: vehicleCount 2, not 1 -- the rock_digger (vehicle #3) parks at the ramp site, away from both drill patterns' footprints, so it survives both blasts that kill each drill_rig in turn; the debris_hauler (#2) survives for the same reason. Only the two drill_rigs (#1, #4) are ever destroyed. deathCount stays 3 (#1, #2, and the pre-#585 #4-equivalent replacement driller, now #6) -- the excavator hire (issue #585, now #5) parks at the ramp with the rock_digger, away from both blast footprints, so it neither dies nor shifts this count. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note."
+        "note": "#557: vehicleCount is 0, not the pre-#557 2 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m) from wherever a fragment actually lands, not just an exact 2m hit; a fragment's real flyrock trajectory can land well past the drill pattern itself (blast reports elsewhere in this suite show throws past 18m for a comparable charge), so both the rock_digger (#3, parked at (15,20), inside blast 2's own computeDangerZone bounding box even though further than 15m from any single hole) and the debris_hauler (#2, at (10,10), likewise inside that box) now take a lethal hit alongside the drill_rig (#4, at (27,27), the same exact-hit-on-a-hole death as before). Direct-traced (command mode): all three vehicles present before blast 2 are gone after it. #557: deathCount is 5, not the pre-#557 3 -- #1 and #2 from blast 1, plus #4/#5/#6 from blast 2 (direct-traced positions: (~20.8,~12.8), (15,20), and (27,27) respectively, all within the same widened attenuation range -- see that blast step's own note). Only #3, at (5,6), ~30m out, clears the wider radius. employeeCount 6, not 5 (issue #585): the excavator-course hire pushes every later hire's id up by one -- see that step's own note."
       }
     }
   ]

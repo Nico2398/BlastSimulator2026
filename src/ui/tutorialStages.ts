@@ -12,6 +12,7 @@
 
 import { TOOLBAR_TARGET } from './tutorialStepHelpers.js';
 import type { TileRegion } from './tutorialPickerRegion.js';
+import { TUTORIAL_STAGES_TRAINING } from './tutorialStagesTraining.js';
 
 export interface TutorialStage {
   /** Selector for the one control the player should use now. */
@@ -224,60 +225,9 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
     ...pickerStages('tutorial.stage.build_site', REGION.drivingCenter),
   ],
 
-  'train-driller': [
-    { target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.open_crew' },
-    // CrewPanel is single-expansion (expandedId) -- .bs-train-btn only
-    // renders once the driller's own row is expanded, so this stage cannot
-    // skip straight to it. The driller hired by 'hire-driller' is always
-    // employee #2 at this point in the campaign's own tutorial script.
-    // The train-btn target below is scoped to that same employee id --
-    // #555's train-digger stage found the unscoped selector matches
-    // whichever employee's row happens to still be expanded, once a single
-    // school (driving_center) offers more than one of the courses these
-    // back-to-back stages are each pointing at.
-    {
-      target: '#bs-employee-panel [data-employee-id="2"] .bs-detail-toggle',
-      hintKey: 'tutorial.stage.expand_driller',
-    },
-    {
-      target: '#bs-employee-panel [data-employee-id="2"] .bs-train-btn[data-skill="driving.drill_rig"]',
-      hintKey: 'tutorial.stage.train_drill_rig',
-    },
-  ],
-
-  'buy-drill-rig-assign': [
-    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
-    { target: '#bs-vehicle-panel [data-vtype="drill_rig"]', hintKey: 'tutorial.stage.vehicle_buy_drill_rig' },
-    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
-  ],
-
-  'train-digger': [
-    { target: TOOLBAR_TARGET.employees, hintKey: 'tutorial.stage.open_crew' },
-    // CrewPanel is single-expansion (expandedId) -- .bs-train-btn only
-    // renders once the digger's own row is expanded. The surveyor hired by
-    // 'hire-surveyor' -- idle since the survey step completed -- is always
-    // employee #1 at this point in the campaign's own tutorial script, the
-    // same fixed-id assumption train-driller makes for the driller (#2).
-    // The train-btn target is scoped to that id -- driving_center offers
-    // both driving.drill_rig and driving.excavator, so an unscoped selector
-    // matches the still-expanded driller's row from the previous stage
-    // (train-driller) before the player ever expands the digger's own row,
-    // making resolveStageIndex jump straight to this stage and skip it.
-    {
-      target: '#bs-employee-panel [data-employee-id="1"] .bs-detail-toggle',
-      hintKey: 'tutorial.stage.expand_digger',
-    },
-    {
-      target: '#bs-employee-panel [data-employee-id="1"] .bs-train-btn[data-skill="driving.excavator"]',
-      hintKey: 'tutorial.stage.train_excavator',
-    },
-  ],
-
-  'buy-rock-digger-assign': [
-    { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
-    { target: '#bs-vehicle-panel [data-vtype="rock_digger"]', hintKey: 'tutorial.stage.vehicle_buy_rock_digger' },
-    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
-  ],
+  // train-driller/buy-drill-rig-assign/train-digger/buy-rock-digger-assign:
+  // split into tutorialStagesTraining.ts (#557 — see that file's own header).
+  ...TUTORIAL_STAGES_TRAINING,
 
   'drill-plan': [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
@@ -293,6 +243,20 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   sequence: [
     { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
     { target: '#bs-blast-panel [data-action="auto-sequence"]', hintKey: 'tutorial.stage.auto_sequence' },
+  ],
+
+  // #557: open the Blast Workshop, then press the Fire step's own "Sound the
+  // Horn" button (FireStep.ts's hornBtn, dataset.action="sound-horn"). Scoped
+  // to #bs-blast-panel — the same button-role/panel-scoping convention every
+  // other stage list above uses (charge/sequence/blast) — not the toolbar
+  // target both stages used to share: resolveStageIndex (tutorialGuide.ts)
+  // resolves the LAST reachable stage, and a toolbar button that is always
+  // reachable once the panel is open made this stage indistinguishable from
+  // the one before it, so the rail could never actually highlight the real
+  // Sound the Horn control.
+  'evacuate-zone': [
+    { target: TOOLBAR_TARGET.blast, hintKey: 'tutorial.stage.open_blast' },
+    { target: '#bs-blast-panel [data-action="sound-horn"]', hintKey: 'tutorial.stage.sound_horn' },
   ],
 
   blast: [
@@ -321,7 +285,25 @@ export const TUTORIAL_STAGES: Record<string, TutorialStage[]> = {
   'vehicle-buy-assign': [
     { target: TOOLBAR_TARGET.vehicles, hintKey: 'tutorial.stage.open_vehicles' },
     { target: '#bs-vehicle-panel [data-vtype="debris_hauler"]', hintKey: 'tutorial.stage.vehicle_buy' },
-    { target: '#bs-vehicle-panel .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
+    // Scoped to a debris_hauler ROW specifically (FleetPanel.ts's own
+    // per-vehicle [data-vtype], #557 follow-up) — not the bare
+    // '.bs-vehicle-assign-btn' class this used to be, which resolveStageIndex
+    // (tutorialGuide.ts, "last reachable stage wins") would happily match
+    // against ANY owned vehicle's Assign button, jumping this stage straight
+    // to "assign" before debris_hauler was ever bought the instant an OLDER,
+    // still-licensed-crew-eligible vehicle sat undriven on the roster.
+    // Exactly what evacuateZone (Evacuation.ts) now makes routine: a real
+    // evacuation (#557), unlike the teleport it replaced, lets the drill_rig/
+    // rock_digger from earlier in this same tutorial survive the blast
+    // instead of being destroyed — undriven (their own driver dismounted once
+    // drilling/digging finished) but still fully eligible for the exact same
+    // licensed crew this stage's own debris_hauler purchase needs, so the
+    // Fleet panel already renders a live Assign control for them. Confirmed
+    // live: tutorial-steps-visual.json's own 'vehicle buy debris_hauler' step
+    // (module id="vehicle-buy-assign") found the buy button inert — "a
+    // tutorial rail or overlay is blocking it" — with the rail already
+    // pointing at .bs-vehicle-assign-btn for the surviving drill_rig.
+    { target: '#bs-vehicle-panel [data-vtype="debris_hauler"] .bs-vehicle-assign-btn', hintKey: 'tutorial.stage.vehicle_assign' },
   ],
 
   'build-storage': [

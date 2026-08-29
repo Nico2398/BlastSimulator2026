@@ -18,7 +18,8 @@ import {
 } from '../../core/entities/Building.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
-import { defineZone, clearZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
+import { defineZone, isZoneClear, type ZoneBounds } from '../../core/entities/Zone.js';
+import { evacuateZone } from '../../core/engine/Evacuation.js';
 
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { claimForAction, cellsInRect } from './siteExpansion.js';
@@ -259,10 +260,12 @@ export function zoneCommand(
       }
       const bounds: ZoneBounds = { x1, z1, x2, z2 };
       defineZone(state.zone, bounds);
-      const result = clearZone(bounds, state.vehicles, state.employees);
+      // Evacuate the normalized bounds defineZone just stored (state.zone.activeZone),
+      // not the raw, possibly-unordered `bounds` the player/UI passed in.
+      const result = evacuateZone(state, state.zone.activeZone!);
       return {
         success: true,
-        output: `Zone cleared. Moved ${result.movedVehicles} vehicles and ${result.movedEmployees} employees.`,
+        output: `Evacuation ordered. Routing ${result.orderedVehicleIds.length} vehicles and ${result.orderedEmployeeIds.length} employees clear of the zone.`,
       };
     }
     case 'status': {

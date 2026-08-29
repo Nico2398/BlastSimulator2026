@@ -1014,6 +1014,125 @@ describe('interruptActiveAction (#549)', () => {
     expect(stored.targetEmployeeId).toBe(empId);
   });
 
+  it('releases the pin (targetEmployeeId back to null) on a repeat walk-only interruption WHEN a different idle employee is closer to the target (#867 starvation fix)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    emp.x = 0; emp.z = 0;
+    // A second, idle employee sitting right next to the target — much closer
+    // than emp's own (0,0) starting position, matching tutorial-steps-visual.
+    // json's own freight_warehouse case: a well-rested employee standing at
+    // the site the whole time while the pinned one keeps getting yanked back
+    // to a distant rest.
+    addQualifiedEmployee(state, 'blasting', SEED + 1);
+    const closer = state.employees.employees.find(e => e.id !== empId)!;
+    closer.x = 88; closer.z = 20;
+
+    const action = makePendingAction({ id: 40, requiredSkill: 'blasting', targetX: 90, targetZ: 20 });
+    dispatchPendingAction(state, action);
+
+    // First mid-walk interruption: pins targetEmployeeId to this employee,
+    // matching "re-targets a still-walking open-pool action" above.
+    simulateClaimWalking(state, 40, empId, {
+      targetX: 90, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    interruptActiveAction(state, emp, 40);
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 40).targetEmployeeId).toBe(empId);
+
+    // Same employee resumes the walk (claimActionsTargetedAtEmployee would
+    // reclaim it for them exclusively) but is interrupted again before ever
+    // arriving — taskTicksRemaining is still null, exactly as before.
+    simulateClaimWalking(state, 40, empId, {
+      targetX: 90, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    expect(emp.taskTicksRemaining).toBeNull();
+    interruptActiveAction(state, emp, 40);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 40);
+    expect(stored.status).toBe('queued');
+    // Released, not re-pinned: a repeat walk-only interruption with no
+    // progress since the first pin, AND a genuinely closer idle employee
+    // available right now, means holding the pin only serves to lock that
+    // closer employee out for no benefit — under #867's three independent
+    // proactive-rest triggers, exactly this shape of starvation left
+    // tutorial-steps-visual.json's own freight_warehouse order stuck for
+    // 2000+ ticks pre-fix, with a second, idle, well-rested employee
+    // standing at the site the whole time (claimActionsTargetedAtEmployee
+    // reclaims a pinned action for its one target every tick, before
+    // claimOnePoolCandidate ever sees it as available to anyone else).
+    expect(stored.targetEmployeeId).toBeNull();
+  });
+
+  it('does NOT release the pin on a repeat walk-only interruption when no other idle employee is closer (#556 boundary — the original far-target relay stays fixed)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    emp.x = 40; emp.z = 20; // already partway to the target
+    // A second employee exists but starts no closer than the pinned one —
+    // matches building-placement-visual.json's own far-flung
+    // management_office order (target x:90, every employee clustered near
+    // the site's own living_quarters), where #556's fix must still hold:
+    // releasing here would just hand the walk to "whichever employee is
+    // idle first" again, with no cross-employee cost comparison, recreating
+    // the exact relay #556 exists to prevent.
+    addQualifiedEmployee(state, 'blasting', SEED + 1);
+    const other = state.employees.employees.find(e => e.id !== empId)!;
+    other.x = 0; other.z = 0; // farther from the target than emp already is
+
+    const action = makePendingAction({ id: 42, requiredSkill: 'blasting', targetX: 90, targetZ: 20 });
+    dispatchPendingAction(state, action);
+
+    simulateClaimWalking(state, 42, empId, {
+      targetX: 90, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    interruptActiveAction(state, emp, 42);
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 42).targetEmployeeId).toBe(empId);
+
+    simulateClaimWalking(state, 42, empId, {
+      targetX: 90, targetZ: 20, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    });
+    expect(emp.taskTicksRemaining).toBeNull();
+    interruptActiveAction(state, emp, 42);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 42);
+    expect(stored.status).toBe('queued');
+    // Still pinned: nobody closer exists, so releasing would help nobody.
+    expect(stored.targetEmployeeId).toBe(empId);
+  });
+
+  it('re-pins to the SAME employee (not released) when a THIRD interruption follows real progress in between (boundary)', () => {
+    addQualifiedEmployee(state, 'blasting', SEED);
+    const empId = state.employees.employees[0]!.id;
+    const emp = state.employees.employees.find(e => e.id === empId)!;
+    const action = makePendingAction({ id: 41, requiredSkill: 'blasting', targetX: 7, targetZ: 7 });
+    dispatchPendingAction(state, action);
+
+    // First mid-walk interruption pins the action to this employee.
+    simulateClaimWalking(state, 41, empId, {
+      targetX: 7, targetZ: 7, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    }, 24);
+    interruptActiveAction(state, emp, 41);
+    expect((state as any).pendingActions.find((a: PendingAction) => a.id === 41).targetEmployeeId).toBe(empId);
+
+    // This time the employee actually arrives and works a while before being
+    // interrupted again — real progress happened, so this is not the "never
+    // even arrived twice in a row" case the release above targets.
+    simulateClaimWalking(state, 41, empId, {
+      targetX: 7, targetZ: 7, requiredSkill: 'blasting', type: 'general_work', payload: {},
+    }, 24);
+    simulateArrival(state, 41, empId);
+    emp.taskTicksRemaining = 9;
+    interruptActiveAction(state, emp, 41);
+
+    const stored = (state as any).pendingActions.find((a: PendingAction) => a.id === 41);
+    // The arrived-and-working branch (payload.durationTicks stashing) owns
+    // this interruption instead — targetEmployeeId is untouched by either
+    // branch here (it was already this employee's own id going in), so the
+    // pin holds, and the remaining work is preserved for whoever resumes it.
+    expect(stored.targetEmployeeId).toBe(empId);
+    expect(stored.payload.durationTicks).toBe(9);
+  });
+
   it('leaves a rest action fully open-pool (never re-targets a rest action to itself)', () => {
     addQualifiedEmployee(state, 'blasting', SEED);
     const empId = state.employees.employees[0]!.id;

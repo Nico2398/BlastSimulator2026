@@ -13,6 +13,7 @@ import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach } from './RestActionHelpers.js';
+import { isMidEvacuationWalk } from './Evacuation.js';
 import { shouldForceRest, getEffectiveThresholds } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
 
@@ -156,8 +157,16 @@ export function forceShiftRestIfNeededByPolicy(
   // Mid-walk to board a vehicle from a manual `vehicle driver` command —
   // see this function's own doc comment above (#707).
   if (emp.pendingDriverVehicleId !== null) return;
+  // Mid-evacuation-walk (isMidEvacuationWalk — see its own doc comment,
+  // Evacuation.ts, #557): without this, the #707 "genuinely idle" branch
+  // below would read them as free to reassign and overwrite the evacuation
+  // destination with a walk back toward a living_quarters, possibly right
+  // back inside the danger zone they were just ordered out of.
+  if (isMidEvacuationWalk(emp)) return;
 
-  const snapshot = { id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked };
+  const snapshot = {
+    id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, breakNeed: emp.breakNeed, ticksWorked: emp.ticksWorked,
+  };
   if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
 
   // #678 follow-up: release the action this employee was actively working
@@ -190,10 +199,17 @@ export function forceShiftRestIfNeededByPolicy(
   // overdue) — works uniformly whether the rest was need-triggered (one gauge
   // already <= its threshold) or shift-duration-triggered (neither has
   // crossed yet): either way the gauge relatively furthest past due gets
-  // serviced.
+  // serviced. Extended to breakNeed (#867, chained rather than a flat 3-way
+  // min so the pre-existing hunger-vs-fatigue precedence — fatigue wins ties —
+  // is preserved exactly; breakNeed only displaces the hunger/fatigue winner
+  // on a STRICTLY greater deficit, same "only strictly-worse wins" rule the
+  // original two-way comparison already used).
   const hungerDeficit = emp.hunger - thresholds.hunger;
   const fatigueDeficit = emp.fatigue - thresholds.fatigue;
-  const needKey: NeedKey = hungerDeficit < fatigueDeficit ? 'hunger' : 'fatigue';
+  const breakNeedDeficit = emp.breakNeed - thresholds.social;
+  let needKey: NeedKey = hungerDeficit < fatigueDeficit ? 'hunger' : 'fatigue';
+  const needDeficit = needKey === 'hunger' ? hungerDeficit : fatigueDeficit;
+  if (breakNeedDeficit < needDeficit) needKey = 'breakNeed';
 
   // Find nearest living_quarters of any tier for target coordinates.
   const building = findNearestLivingQuarters(state, emp.x, emp.z);

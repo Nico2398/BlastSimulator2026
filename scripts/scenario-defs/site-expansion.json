@@ -336,6 +336,88 @@
       }
     },
     {
+      "command": "zone clear x1:-19 y1:-5 x2:49 y2:25",
+      "timeout": 180,
+      "description": "#557: evacuate the crew before firing. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for these two holes (34,10) and (-4,10) pads out to (-19,-5)-(49,25), matching the literal box declared here -- the same rectangle Fire.ts's Sound the Horn button computes and sends. All 5 staffed employees are standing inside it (two parked exactly on the holes they just drilled, the rest working nearby). Without this, Damage.ts's processProjections (attenuated out to the full 15m BLAST_DANGER_MARGIN_M, #557) kills the entire crew the instant the blast fires -- direct-traced: deathCount 0 -> 5, and with nobody left alive, the management_office order below never finishes (no driller left to build it), stalling `wait_until buildingCount equals:1` for the rest of the file. clearZone no longer teleports: this only orders a walkout, so the wait_until step right after is what proves it actually finished.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
+      }
+    },
+    {
+      "command": "tick 20",
+      "timeout": 180,
+      "description": "#557: drain the real walkout Sound the Horn just ordered before firing -- NOT a wait_until on dangerZoneClear, deliberately: this box (-19,-5)-(49,25) is nearly the whole not-yet-expanded world (worldSizeX 64 from minX -16 at this point in the file, before the post-blast drill_plan add that grows it to 160), so findSafeEvacuationCell (Evacuation.ts) genuinely has no reachable cell outside it for whoever starts deep inside -- direct-traced: employees #1/#2/#3 (and the drill_rig, vehicle #1) are reported stranded, standing exactly where they were; only #4/#5, already nearer the box edge, reach a real safe cell within this pad. dangerZoneClear can never read true here -- a wait_until on it would time out by construction, not by a bug -- so this stays a fixed pad, same class as this file's own earlier `tick 120` step. Split into 3x20-tick chunks with an `event choose 0` between each (rather than one bare `tick 60`) because a bare command-mode `tick N` stops dead the instant a spontaneous event fires mid-block and never resumes on its own (command-runner.ts's own runWaitUntil doc comment) -- unlike a wait_until step, a plain command has nothing to auto-resolve it.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#557: resolves a spontaneous event if one fired during the chunk above -- see that step's own note.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "blast",
       "description": "A blast spanning both the original site and ground claimed during play.",
       "timeout": 150,

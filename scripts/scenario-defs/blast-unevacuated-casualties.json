@@ -1,0 +1,201 @@
+{
+  "name": "blast-unevacuated-casualties",
+  "description": "The punishment path for issue #557: drill, charge and sequence a pattern, then fire WITHOUT ever running `zone clear` — the staffed driller/blaster crew and the drill_rig they drove out on are left standing exactly where their own work left them. Deterministic on seed 42: the crew dies, one vehicle is destroyed, and the incident record shows it. This is the cost the tutorial's evacuate-zone step (and blastCommand's tutorial-mode refusal) exist to prevent.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:100000 staffed:true",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 cash:100000 staffed:true"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "employeeCount": 5,
+          "deathCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:8 start:15,15",
+      "description": "3x3 grid at the grid tool's own default spacing (DEFAULT_SPACING_M=3) — the (15,15)-(21,21) drag needs no spacing-stepper click first.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"blast\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "dragTiles",
+          "x1": 15,
+          "z1": 15,
+          "x2": 21,
+          "z2": 21
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 9,
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "wait_until field:holeCount equals:9 max_ticks:300",
+      "description": "#553/#590: drain the ordered drill plan — sandbox-measured landing well inside 300 ticks for the staffed roster's lone driller/drill_rig on this 9-hole grid.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 9,
+          "maxTicks": 300,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0,
+          "holeCount": 9
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:boomite amount:8 stemming:0.5",
+      "description": "Deliberately under-stemmed (0.5m on 8m holes) — the reckless overcharge this file is built around, matching the flyrock-danger integration suite's own reckless config.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:200",
+      "description": "#554: drain the charge order(s) — sandbox-measured landing well inside 200 ticks.",
+      "timeout": 90,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 200,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "chargedCount": 9,
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "sequence auto delay_step:25",
+      "description": "The blast panel is already open (opened once in the drill_plan step and never closed) and, by the time the preceding charge order has drained, BlastWorkshop's own autoAdvance/suggestStep has already moved it to the Sequence tab on its own. A bare clickSelector on the toolbar's blast tab here would hit togglePanel's already-open branch and close the panel instead of a no-op, leaving the very next click on a hidden, zero-size auto-sequence button (UIManager.togglePanel, src/ui/UIManager.ts) — ensurePanel is idempotent and only clicks when the panel isn't already open.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"auto-sequence\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "sequencedCount": 9
+        }
+      }
+    },
+    {
+      "command": "blast",
+      "description": "No `zone clear` anywhere in this file — the crew that drilled and charged this pattern is left standing exactly where its own work left it, and so is the drill_rig it drove out on. This is what the evacuate-zone tutorial step and blastCommand's tutorial-mode refusal exist to prevent (#557).",
+      "timeout": 60,
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 2
+        },
+        "decreased": [
+          "vehicleCount"
+        ],
+        "note": "Deterministic on seed 42: the driller and blaster who charged this pattern die where they stood, and the drill_rig they drove out on is destroyed too (vehicleCount drops from 4 to 3). Nobody was evacuated — that's the whole point of this file."
+      }
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe",
+      "expect": {
+        "equals": {
+          "deathCount": 2
+        }
+      }
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 0,
+      "pitch": 45
+    },
+    {
+      "name": "aftermath",
+      "yaw": 90,
+      "pitch": 20
+    }
+  ]
+}

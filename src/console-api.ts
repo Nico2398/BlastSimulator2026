@@ -7,6 +7,7 @@ import type { MiningContext } from './console/commands/mining.js';
 import { summariseMuckPile, type MuckPileSummary } from './core/mining/MuckPileSummary.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
+import { isDangerZoneClear } from './core/entities/Zone.js';
 
 export { createRunner };
 export type { RunnerWithContext, CommandResult, MiningContext };
@@ -89,6 +90,16 @@ export interface SerializableGameState {
   storedMassKg: number;
   /** Sum across every material key in state.collectedOre (kg) — proves a delivery actually landed ore, not just spoil, without pinning to one material id a scenario's own RNG/terrain didn't guarantee (#671). */
   collectedOreTotal: number;
+  /**
+   * Whether computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) is
+   * clear of every vehicle and living employee — the same check Fire.ts's
+   * `check_zone_clear` preflight row and its Sound the Horn button both use.
+   * True when no drill plan exists yet (nothing to be clear of). Lets a
+   * scenario's wait_until prove an evacuation genuinely finished — arrived
+   * outside the padded zone — rather than merely that `zone clear` returned
+   * (#557).
+   */
+  dangerZoneClear: boolean;
 }
 
 /** Serialize ctx.state into the same shape as window.__gameState(). */
@@ -154,5 +165,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
       : null,
     storedMassKg: s.logistics.storedMassKg,
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
+    dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees),
   };
 }

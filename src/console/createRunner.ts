@@ -106,6 +106,17 @@ const META_EVENT_SUBCOMMANDS = ['status', 'dismiss'] as const;
  * that interaction mode never got for the identical no-op moment. Fixed by
  * only counting `event choose` when it actually resolved an event.
  */
+/**
+ * Stamps ctx.tutorialActive from the tutorial overlay's current state. Must
+ * be called before a command dispatches, not after: the tutorial-only blast
+ * refusal (blastCommand, mining/blast.ts) reads ctx.tutorialActive during
+ * runCommand itself — setting it only in a post-command UI sync would always
+ * be one command too late (#557).
+ */
+export function syncTutorialActive(ctx: MiningContext, isActive: boolean): void {
+  ctx.tutorialActive = isActive;
+}
+
 export function runCommand(engine: RunnerWithContext, cmd: string): CommandResult {
   const result = engine.runner.run(cmd);
   const parsed = parseCommand(cmd);
