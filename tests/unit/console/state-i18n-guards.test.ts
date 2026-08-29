@@ -14,6 +14,7 @@ import { newGameCommand } from '../../../src/console/commands/world.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { makeEmptyCtx } from './i18nGuardHelpers.js';
 
 function makeCtx(): MiningContext {
   const ctx: MiningContext = {
@@ -33,26 +34,14 @@ describe('state.ts inline no-game guard', () => {
   const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 
   it('returns the exact English literal when no game is loaded', () => {
-    const ctx: MiningContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     const result = stateCommand(ctx, [], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('differs from the English literal under locale fr', () => {
-    const ctx: MiningContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     setLocale('fr');
 
     const result = stateCommand(ctx, [], {});

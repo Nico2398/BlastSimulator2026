@@ -12,6 +12,7 @@ import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
 import { setPolicyCommand } from '../../../src/console/commands/policy.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { makeEmptyCtx } from './i18nGuardHelpers.js';
 
 function makeCtx(): GameContext {
   const ctx: GameContext = {
@@ -31,26 +32,14 @@ describe('policy.ts requireGame guard', () => {
   const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 
   it('returns the exact English literal when no game is loaded', () => {
-    const ctx: GameContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     const result = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
     expect(result.success).toBe(false);
     expect(result.output).toBe(NO_GAME_LOADED_EN);
   });
 
   it('differs from the English literal under locale fr', () => {
-    const ctx: GameContext = {
-      state: null,
-      grid: null,
-      landscape: null,
-      playableArea: null,
-      emitter: new EventEmitter(),
-    };
+    const ctx = makeEmptyCtx();
     setLocale('fr');
 
     const result = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
