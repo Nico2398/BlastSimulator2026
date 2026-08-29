@@ -6,6 +6,7 @@ import { tickCommand, eventCommand } from '../../../src/console/commands/events.
 import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../../src/console/commands/mining.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
+import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 
 /**
  * Create a fresh GameContext with a new game of the default mine preset.
@@ -178,6 +179,28 @@ export function performBlast(ctx: GameContext, originX: number, originZ: number)
   sequenceCommand(ctx as any, ['auto'], {});
   const result = blastCommand(ctx as any, [], {});
   return result.output;
+}
+
+/**
+ * Drive a fresh level context to completion and force-complete it: hires a
+ * driller (role 'driller'), assigns blasting skill at `skillLevel` to
+ * employee id '1', performs a standard blast via performBlast(ctx, 10, 10),
+ * advances `ticks` ticks via tickWithEvents, then force-completes the level
+ * via campaignCompleteCommand(ctx, [], {}). Shared "drive to level completion
+ * and assert" sequence extracted from level1-win.integration.test.ts and
+ * tutorial.integration.test.ts (#827) — every test-specific assertion stays
+ * in the calling test.
+ * @param ctx The game context.
+ * @param skillLevel The blasting skill level to assign to the hired driller.
+ * @param ticks Number of ticks to advance via tickWithEvents after blasting.
+ * @returns The blast command output text and the campaign-complete command result.
+ */
+export function driveToLevelCompletion(
+  _ctx: GameContext,
+  _skillLevel: number,
+  _ticks: number
+): { blastOutput: string; completeResult: CommandResult } {
+  throw new Error('not implemented');
 }
 
 /**
