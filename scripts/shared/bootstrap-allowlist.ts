@@ -1,13 +1,14 @@
 /**
  * BlastSimulator2026 — Bootstrap command allowlist
  *
- * Split out of interaction-executor.ts (#557): that file is already over the
- * 300-line budget and grandfathered at its own baseline (may only shrink,
- * per tests/unit/lint/FileSizeBudget.test.ts) — a genuinely new entry
- * (`employee cancel`, needed for vibration-budget.json) belongs in a new
- * module rather than growing it further. interaction-executor.ts still owns
- * `isAllowedBootstrapCommand`/`matchesBootstrapEntry`, which import this
- * array; nothing about the check itself moved.
+ * Split out of interaction-executor.ts (#557): that file already mixes
+ * several concerns, and the allowlist — a data table with its own
+ * per-entry justifications — is a single responsibility of its own,
+ * separate from the interaction-execution logic around it. A genuinely
+ * new entry (`employee cancel`, needed for vibration-budget.json) belongs
+ * here rather than growing that file further. interaction-executor.ts
+ * still owns `isAllowedBootstrapCommand`/`matchesBootstrapEntry`, which
+ * import this array; nothing about the check itself moved.
  *
  * @module shared/bootstrap-allowlist
  */

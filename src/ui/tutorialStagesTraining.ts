@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Tutorial stage table: drill-rig/rock-digger training
-// Split out of tutorialStages.ts (#557's evacuate-zone stage fix pushed that
-// file over its file-size budget — a grandfathered, may-only-shrink file per
-// tests/unit/lint/FileSizeBudget.test.ts). Click sequences for the
+// Split out of tutorialStages.ts (#557's evacuate-zone stage addition made
+// that file cover two unrelated concerns — the click sequences below are
+// their own single responsibility, separate from the rest of the stage
+// table). Click sequences for the
 // train-driller/buy-drill-rig-assign/train-digger/buy-rock-digger-assign
 // steps (#553/#555): licensing a driller and a digger, then buying and
 // crewing the vehicle each licence unlocks.

@@ -1,9 +1,9 @@
 // BlastSimulator2026 — Tutorial step definitions: closing sequence
-// Split out of tutorialSteps.ts (#557's evacuate-zone step pushed that file
-// over its file-size budget — a grandfathered, may-only-shrink file per
-// tests/unit/lint/FileSizeBudget.test.ts). Steps 19-22: apply the real shift
-// policy, let the clock run, hit the level's profit target, and the closing
-// card.
+// Split out of tutorialSteps.ts (#557's evacuate-zone step addition made
+// that file cover two unrelated concerns — the closing sequence below is
+// its own single responsibility, separate from the rest of the step list).
+// Steps 19-22: apply the real shift policy, let the clock run, hit the
+// level's profit target, and the closing card.
 
 import type { GameState } from '../core/state/GameState.js';
 import type { TutorialStep } from './tutorialSteps.js';
