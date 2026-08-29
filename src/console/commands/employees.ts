@@ -181,7 +181,7 @@ export function employeeCommand(
       // — since this call always sets targetEmployeeId, that check validates
       // employee #id specifically (not just "someone on the roster"), so a
       // targeted-but-unqualified dispatch rejects here instead of silently
-      // queuing forever (idleMatch in EmployeeDispatch.ts can never match anyone else) (#406).
+      // queuing forever (idleMatch in EmployeeDispatchSteps.ts can never match anyone else) (#406).
       const dispatch = dispatchPendingAction(state, {
         id: actionId,
         type: 'general_work',

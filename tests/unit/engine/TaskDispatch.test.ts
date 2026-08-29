@@ -282,7 +282,7 @@ describe('dispatchPendingAction — at least one qualified employee on roster', 
 // ── Section 3b: dispatchPendingAction — targetEmployeeId narrows eligibility ──
 //   Regression coverage for #406: a roster-wide "does anyone qualify" check is
 //   not sufficient once targetEmployeeId is set — tickEmployees' idleMatch
-//   (EmployeeDispatch.ts) can only ever be claimed by that one employee, so dispatch
+//   (EmployeeDispatchSteps.ts) can only ever be claimed by that one employee, so dispatch
 //   must reject when THAT employee specifically lacks requiredSkill, even if a
 //   different roster member holds it.
 
