@@ -187,10 +187,14 @@ describe('en.json / fr.json — key-set parity', () => {
     // singular is occupied by per-event content), and 3 tick.* keys.
     // economy.ts's two empty-contract-list strings reuse the pre-existing
     // ui.contracts.none/none_active keys instead of adding new ones.
+    // Baseline is now 3384 (up from 3357): #861 wired i18n keys for the
+    // campaign.ts/sandbox.ts/world.ts/siteExpansion.ts console command
+    // modules — 26 module-local keys + 1 shared console.staffed_suffix key,
+    // both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3357);
+    expect(Object.keys(en).length).toBe(3384);
   });
 });
 
