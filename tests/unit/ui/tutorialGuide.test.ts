@@ -17,6 +17,7 @@ import {
   DEFAULT_TICK_BUDGET,
   WORK_GRACE_TICKS,
 } from '../../../src/ui/tutorialGuide.js';
+import { TUTORIAL_STAGES } from '../../../src/ui/tutorialStages.js';
 import type { TutorialStage } from '../../../src/ui/tutorialStages.js';
 import type { ClockProgress } from '../../../src/ui/tutorialGuide.js';
 import { createGame } from '../../../src/core/state/GameState.js';
@@ -143,13 +144,104 @@ describe('resolveStageIndex — vehicle-buy-assign regression (#858)', () => {
   // (scoped by #877/#557). Before that fix the bare `.bs-vehicle-assign-btn`
   // selector also matched an unrelated undriven vehicle (drill_rig /
   // rock_digger) left over from the evacuation flow, so the rail advanced to
-  // Assign before a debris_hauler had even been bought. These stubs lock the
-  // scoped-selector behavior in place; bodies filled in by test-writer.
-  it.todo('resolves to Buy sub-stage when only dealership buttons and an unrelated undriven vehicle are present');
+  // Assign before a debris_hauler had even been bought.
+  //
+  // Fixtures below mirror the real FleetPanel DOM (src/ui/panels/FleetPanel.ts):
+  // a `#bs-vehicle-panel` root holding dealership tier buttons
+  // (`.bs-fleet-tier-btn[data-vtype]`) and, once owned, one card per vehicle
+  // (`[data-vtype]` on the card, `.bs-vehicle-assign-btn` inside when undriven).
+  const stages = TUTORIAL_STAGES['vehicle-buy-assign']!;
 
-  it.todo('resolves to Assign sub-stage once a debris_hauler is actually owned and undriven');
+  function toolbarVehiclesButton(): HTMLElement {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'bs-toolbar';
+    document.body.appendChild(toolbar);
+    const btn = document.createElement('button');
+    btn.setAttribute('data-panel', 'vehicles');
+    toolbar.appendChild(btn);
+    return withBox(btn);
+  }
 
-  it.todo('resolves to Buy sub-stage when no vehicles are owned at all (starting condition)');
+  function vehiclePanel(): HTMLElement {
+    const panel = document.createElement('div');
+    panel.id = 'bs-vehicle-panel';
+    document.body.appendChild(panel);
+    return panel;
+  }
+
+  function dealershipTierButton(panel: HTMLElement, vtype: string): HTMLElement {
+    const btn = document.createElement('button');
+    btn.className = 'bs-fleet-tier-btn';
+    btn.setAttribute('data-vtype', vtype);
+    panel.appendChild(btn);
+    return withBox(btn);
+  }
+
+  /** An owned vehicle's card. Undriven cards render a reachable Assign button. */
+  function ownedVehicleCard(panel: HTMLElement, vtype: string, opts: { driven?: boolean } = {}): HTMLElement {
+    const card = document.createElement('div');
+    card.setAttribute('data-vtype', vtype);
+    panel.appendChild(card);
+    withBox(card);
+    if (!opts.driven) {
+      const assignBtn = document.createElement('button');
+      assignBtn.className = 'bs-vehicle-assign-btn';
+      card.appendChild(assignBtn);
+      withBox(assignBtn);
+    }
+    return card;
+  }
+
+  it('resolves to Buy sub-stage when only dealership buttons and an unrelated undriven vehicle are present', () => {
+    toolbarVehiclesButton();
+    const panel = vehiclePanel();
+    // Dealership: every role has a live tier button, including debris_hauler.
+    dealershipTierButton(panel, 'debris_hauler');
+    dealershipTierButton(panel, 'rock_digger');
+    dealershipTierButton(panel, 'drill_rig');
+    // An unrelated, already-owned, undriven vehicle survives an earlier
+    // evacuation (#557) and has its own reachable Assign button — the exact
+    // shape that used to false-match the bare `.bs-vehicle-assign-btn` selector.
+    ownedVehicleCard(panel, 'drill_rig');
+
+    expect(resolveStageIndex(stages)).toBe(1);
+  });
+
+  it('resolves to Assign sub-stage once a debris_hauler is actually owned and undriven', () => {
+    toolbarVehiclesButton();
+    const panel = vehiclePanel();
+    dealershipTierButton(panel, 'debris_hauler');
+    dealershipTierButton(panel, 'rock_digger');
+    dealershipTierButton(panel, 'drill_rig');
+    ownedVehicleCard(panel, 'drill_rig');
+    // The debris_hauler purchase has now happened and it is still undriven.
+    ownedVehicleCard(panel, 'debris_hauler');
+
+    expect(resolveStageIndex(stages)).toBe(2);
+  });
+
+  it('resolves to Buy sub-stage when no vehicles are owned at all (starting condition)', () => {
+    toolbarVehiclesButton();
+    const panel = vehiclePanel();
+    dealershipTierButton(panel, 'debris_hauler');
+    dealershipTierButton(panel, 'rock_digger');
+    dealershipTierButton(panel, 'drill_rig');
+
+    expect(resolveStageIndex(stages)).toBe(1);
+  });
+
+  it('falls back to an earlier sub-stage when the Vehicles panel closes after the debris_hauler purchase, instead of staying stuck on Assign', () => {
+    toolbarVehiclesButton();
+    const panel = vehiclePanel();
+    dealershipTierButton(panel, 'debris_hauler');
+    ownedVehicleCard(panel, 'debris_hauler');
+    expect(resolveStageIndex(stages)).toBe(2);
+
+    // Player closes the Vehicles panel — its whole subtree (dealership
+    // buttons and owned-vehicle cards alike) stops being reachable.
+    panel.style.display = 'none';
+    expect(resolveStageIndex(stages)).toBe(0);
+  });
 });
 
 describe('allowedSelectors', () => {
