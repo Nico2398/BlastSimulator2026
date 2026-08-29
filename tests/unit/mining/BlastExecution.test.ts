@@ -247,6 +247,10 @@ describe('buildBlastReport', () => {
       clearedRegion: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
       destroyedBuildings: [],
       secondaryBlastEvents: [],
+      maxThrowDistance: 0,
+      projectileCount: 0,
+      flights: [],
+      clearedColumns: [],
     };
     const report = buildBlastReport(result, 0, 0);
     expect(report.maxProjectionDistanceM).toBe(0);

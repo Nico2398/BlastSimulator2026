@@ -30,6 +30,7 @@ function fragment(
 ): FragmentData {
   return {
     id: nextId++,
+    rockId: 'cruite',
     position: { x: pos[0], y: pos[1], z: pos[2] },
     volume: (half * 2) ** 3,
     mass: 2100 * (half * 2) ** 3,
