@@ -11,10 +11,22 @@ import {
 import { createEmployeeState, type Employee } from '../../../src/core/entities/Employee.js';
 import { createCorruptionState } from '../../../src/core/economy/Corruption.js';
 
+const EMPLOYEE_DEFAULTS = {
+  activeActionId: null, hunger: 100, fatigue: 100, breakNeed: 100,
+  collapsing: false, interruptedActionPayload: null, ticksWorked: 0,
+  restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+  activeTaskSkill: null, destinationX: null, destinationZ: null,
+  moveConsecutiveFailures: 0, isMoveStuck: false, pendingRestDuration: null,
+  pendingRestNeedKey: null, pendingTaskDuration: null, pendingActionType: null,
+  pendingActionPayload: null, pendingDriverVehicleId: null,
+} as const;
+
 function addTestEmployee(state: ReturnType<typeof createEmployeeState>, unionized = false): Employee {
   const emp: Employee = {
     id: state.nextId++, name: 'Test Worker', role: 'driller', salary: 500,
     morale: 60, unionized, injured: false, alive: true, x: 0, z: 0,
+    qualifications: [], trainingState: null, taskQueue: [],
+    ...EMPLOYEE_DEFAULTS,
   };
   state.employees.push(emp);
   return emp;

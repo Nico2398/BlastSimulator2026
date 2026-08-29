@@ -93,8 +93,8 @@ describe('Lawsuit events (6.7)', () => {
 
   it('lawsuit weights increase with low scores (safety, nuisance, ecology)', () => {
     const events = getEventsByCategory('lawsuit');
-    const badScores = { wellBeing: 10, safety: 10, ecology: 10, nuisance: 10 };
-    const goodScores = { wellBeing: 90, safety: 90, ecology: 90, nuisance: 90 };
+    const badScores = { wellBeing: 10, safety: 10, ecology: 10, nuisance: 10, decayRate: 0.05 };
+    const goodScores = { wellBeing: 90, safety: 90, ecology: 90, nuisance: 90, decayRate: 0.05 };
 
     // Most lawsuit events should be more likely when scores are low
     const moreWeightWhenBad = events.filter(
