@@ -30,7 +30,7 @@ describe('createSitePolicy() (3.12)', () => {
     expect(policy.shiftMode).toBe('shift_8h');
     expect(policy.hungerRestThreshold).toBe(60);
     expect(policy.fatigueRestThreshold).toBe(60);
-    expect(policy.socialBreakThreshold).toBe(20);
+    expect(policy.socialBreakThreshold).toBe(60);
   });
 
   // ── Test 2 ──────────────────────────────────────────────────────────────────
@@ -225,6 +225,68 @@ describe('shouldForceRest() — need-threshold enforcement (3.12)', () => {
   });
 });
 
+// ─── shouldForceRest() — breakNeed/social threshold logic (#867) ────────────
+//
+// socialBreakThreshold (and customThresholds[id].social) existed and were
+// genuinely settable (set_policy's own `social:` param) long before this —
+// shouldForceRest simply never read them back. These tests cover the gap:
+// breakNeed left unprotected by every site policy, including 'continuous',
+// was the dominant contributor to vibration-budget.json's worker_revolt.
+
+describe('shouldForceRest() — breakNeed/social threshold enforcement (#867)', () => {
+  it('returns true when breakNeed drops to or below socialBreakThreshold even though hunger/fatigue are healthy', () => {
+    const policy = createSitePolicy('shift_8h');
+    // hunger/fatigue comfortably above threshold; only breakNeed is overdue.
+    const employee = { hunger: 80, fatigue: 80, breakNeed: 40, ticksWorked: 2 };
+
+    const result = shouldForceRest(policy, employee, true);
+
+    expect(result).toBe(true);
+  });
+
+  it('returns true when breakNeed is exactly at socialBreakThreshold (boundary condition)', () => {
+    const policy = createSitePolicy('shift_8h');
+    const employee = { hunger: 80, fatigue: 80, breakNeed: policy.socialBreakThreshold, ticksWorked: 2 };
+
+    const result = shouldForceRest(policy, employee, true);
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when breakNeed is one point above socialBreakThreshold and hunger/fatigue are healthy', () => {
+    const policy = createSitePolicy('shift_8h');
+    const employee = { hunger: 80, fatigue: 80, breakNeed: policy.socialBreakThreshold + 1, ticksWorked: 3 };
+
+    const result = shouldForceRest(policy, employee, true);
+
+    expect(result).toBe(false);
+  });
+
+  it('treats an omitted breakNeed as fully rested (100) — does not spuriously trigger for callers that never set it', () => {
+    const policy = createSitePolicy('shift_8h');
+    // No breakNeed field at all — mirrors every EmployeeSnapshot literal predating #867.
+    const employee = { hunger: 80, fatigue: 80, ticksWorked: 3 };
+
+    const result = shouldForceRest(policy, employee, true);
+
+    expect(result).toBe(false);
+  });
+
+  it('uses the per-employee social override when shiftMode is custom and one exists for the employee id', () => {
+    const policy: SitePolicy = createSitePolicy('custom');
+    const employeeId = 4;
+    policy.customThresholds[employeeId] = { hunger: 10, fatigue: 10, social: 70 };
+
+    // breakNeed=60 is below the custom social threshold of 70 → should force rest,
+    // even though the policy-level default (20) would not have caught it.
+    const employee = { id: employeeId, hunger: 80, fatigue: 80, breakNeed: 60, ticksWorked: 1 };
+
+    const result = shouldForceRest(policy, employee, true);
+
+    expect(result).toBe(true);
+  });
+});
+
 // ─── shouldForceRest() — custom per-employee threshold overrides ─────────────
 
 describe("shouldForceRest() — 'custom' mode with per-employee overrides (3.12)", () => {
@@ -302,6 +364,7 @@ describe('getEffectiveThresholds() (#678)', () => {
     expect(result).toEqual({
       hunger: policy.hungerRestThreshold,
       fatigue: policy.fatigueRestThreshold,
+      social: policy.socialBreakThreshold,
     });
   });
 
@@ -313,7 +376,7 @@ describe('getEffectiveThresholds() (#678)', () => {
 
     const result = getEffectiveThresholds(policy, employeeId);
 
-    expect(result).toEqual({ hunger: 70, fatigue: 10 });
+    expect(result).toEqual({ hunger: 70, fatigue: 10, social: 10 });
   });
 
   // ── Test 3 ──────────────────────────────────────────────────────────────────
@@ -327,6 +390,7 @@ describe('getEffectiveThresholds() (#678)', () => {
     expect(result).toEqual({
       hunger: policy.hungerRestThreshold,
       fatigue: policy.fatigueRestThreshold,
+      social: policy.socialBreakThreshold,
     });
   });
 
@@ -340,6 +404,7 @@ describe('getEffectiveThresholds() (#678)', () => {
     expect(result).toEqual({
       hunger: policy.hungerRestThreshold,
       fatigue: policy.fatigueRestThreshold,
+      social: policy.socialBreakThreshold,
     });
   });
 });

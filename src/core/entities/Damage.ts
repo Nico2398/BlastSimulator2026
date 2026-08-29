@@ -10,6 +10,8 @@ import type { VehicleState, Vehicle } from './Vehicle.js';
 import { destroyVehicle } from './Vehicle.js';
 import type { EmployeeState, Employee } from './Employee.js';
 import { injureEmployee, killEmployee } from './Employee.js';
+import { BLAST_DANGER_MARGIN_M } from '../config/balance.js';
+import { isInZone, type ZoneBounds } from './Zone.js';
 
 // ── Config ──
 
@@ -60,6 +62,13 @@ export function createDamageState(): DamageState {
 /**
  * Process projection fragments against all entities.
  * Returns list of accidents that occurred.
+ *
+ * `dangerZone`, when given, bounds who can be hit at all — a fragment's real
+ * flyrock trajectory can land it well past computeDangerZone's padded box, and
+ * an entity that is clearly outside that box must not take a hit just because
+ * it happens to be near where a stray fragment came down (#557 audit). Passed
+ * null by callers with no zone to check against (e.g. unit tests exercising
+ * pure distance falloff), which disables the zone gate entirely.
  */
 export function processProjections(
   projections: FragmentData[],
@@ -68,8 +77,10 @@ export function processProjections(
   employees: EmployeeState,
   damage: DamageState,
   tick: number,
+  dangerZone: ZoneBounds | null = null,
 ): AccidentRecord[] {
   const newAccidents: AccidentRecord[] = [];
+  const inZone = (x: number, z: number): boolean => dangerZone === null || isInZone(x, z, dangerZone);
 
   for (const frag of projections) {
     if (!frag.isProjection) continue;
@@ -78,29 +89,56 @@ export function processProjections(
     const fx = frag.position.x;
     const fz = frag.position.z;
 
-    // Check buildings
+    // Check buildings — an exact hit (within HIT_RADIUS) uses the fragment's
+    // full kinetic energy; a near miss out to BLAST_DANGER_MARGIN_M still
+    // hits, at an inverse-square-attenuated energy, rather than being ignored
+    // outright the instant it's a fraction of a metre past the exact radius
+    // (#557 audit — debris was only ever hitting something dead-on). Either
+    // way the entity itself must be inside the danger zone first.
     for (const b of [...buildings.buildings]) {
-      if (isNearBuilding(fx, fz, b)) {
-        const acc = processBuildingHit(b, buildings, frag, ke, tick);
-        if (acc) newAccidents.push(acc);
-      }
+      const { cx, cz } = buildingCenter(b);
+      if (!inZone(cx, cz)) continue;
+      const dist = distanceBetween(fx, fz, cx, cz);
+      const effectiveKe = keAtDistance(ke, dist);
+      if (effectiveKe === null) continue;
+      const acc = processBuildingHit(b, buildings, frag, effectiveKe, tick);
+      if (acc) newAccidents.push(acc);
     }
 
     // Check vehicles
     for (const v of [...vehicles.vehicles]) {
-      if (isNear(fx, fz, v.x, v.z)) {
-        const acc = processVehicleHit(v, vehicles, frag, ke, tick);
-        if (acc) newAccidents.push(acc);
-      }
+      if (!inZone(v.x, v.z)) continue;
+      const dist = distanceBetween(fx, fz, v.x, v.z);
+      const effectiveKe = keAtDistance(ke, dist);
+      if (effectiveKe === null) continue;
+      const acc = processVehicleHit(v, vehicles, frag, effectiveKe, tick);
+      if (acc) newAccidents.push(acc);
     }
 
-    // Check employees
+    // Check employees. Only a dead employee is skipped outright — an already
+    // injured one must still be checked against every remaining fragment,
+    // not just the one that first injured them (#557 audit): before the
+    // debris-attenuation fix, a single blast could plausibly land more than
+    // one fragment within HIT_RADIUS of the same stationary employee only by
+    // rare coincidence, so this being a blast-wide (not per-fragment) skip
+    // barely mattered. Attenuating hits out to BLAST_DANGER_MARGIN_M means a
+    // multi-thousand-fragment blast routinely lands dozens of fragments
+    // within range of the same employee, and a blast-wide skip here meant
+    // whichever fragment merely injured them first (ke in [INJURY_THRESHOLD,
+    // DEATH_THRESHOLD)) made them immune to every later, possibly lethal one
+    // (ke >= DEATH_THRESHOLD) for the rest of that same blast — an early
+    // graze was silently better protection than armor. processEmployeeHit's
+    // own `injured` check (below) still no-ops a second sub-lethal graze
+    // (no duplicate morale penalty or accident record), so this only widens
+    // what a stronger, later fragment can still do to them.
     for (const emp of employees.employees) {
-      if (!emp.alive || emp.injured) continue;
-      if (isNear(fx, fz, emp.x, emp.z)) {
-        const acc = processEmployeeHit(emp, employees, frag, ke, tick, damage);
-        if (acc) newAccidents.push(acc);
-      }
+      if (!emp.alive) continue;
+      if (!inZone(emp.x, emp.z)) continue;
+      const dist = distanceBetween(fx, fz, emp.x, emp.z);
+      const effectiveKe = keAtDistance(ke, dist);
+      if (effectiveKe === null) continue;
+      const acc = processEmployeeHit(emp, employees, frag, effectiveKe, tick, damage);
+      if (acc) newAccidents.push(acc);
     }
   }
 
@@ -165,6 +203,11 @@ function processEmployeeHit(
     return { tick, type: 'death', entityId: emp.id, fragmentId: frag.id, kineticEnergy: ke };
   }
   if (ke >= INJURY_THRESHOLD) {
+    // Already injured (by an earlier, weaker fragment this same blast) —
+    // injureEmployee would re-apply its own morale penalty and this would
+    // log a second, redundant injury record for what is, from the caller's
+    // no-longer-blast-wide-skip loop above, just another non-lethal graze.
+    if (emp.injured) return null;
     injureEmployee(state, emp.id);
     return { tick, type: 'injury', entityId: emp.id, fragmentId: frag.id, kineticEnergy: ke };
   }
@@ -177,18 +220,32 @@ function kineticEnergy(massKg: number, velocityMs: number): number {
   return 0.5 * massKg * velocityMs * velocityMs;
 }
 
-function isNear(x1: number, z1: number, x2: number, z2: number): boolean {
+function distanceBetween(x1: number, z1: number, x2: number, z2: number): number {
   const dx = x1 - x2;
   const dz = z1 - z2;
-  return Math.sqrt(dx * dx + dz * dz) <= HIT_RADIUS;
+  return Math.sqrt(dx * dx + dz * dz);
 }
 
-function isNearBuilding(fx: number, fz: number, b: Building): boolean {
+function buildingCenter(b: Building): { cx: number; cz: number } {
   const def = getBuildingDef(b.type, b.tier);
   const { sizeX, sizeZ } = getDefSize(def);
-  const cx = b.x + sizeX / 2;
-  const cz = b.z + sizeZ / 2;
-  return isNear(fx, fz, cx, cz);
+  return { cx: b.x + sizeX / 2, cz: b.z + sizeZ / 2 };
+}
+
+/**
+ * Kinetic energy a fragment landing `distance` away from an entity actually
+ * delivers to it, or null when the entity is out of range entirely.
+ * Within HIT_RADIUS: full `ke` (the pre-existing exact-hit behaviour,
+ * unchanged). Beyond HIT_RADIUS but within BLAST_DANGER_MARGIN_M: inverse-
+ * square falloff (`ke * (HIT_RADIUS / distance)²`), which saturates to full
+ * `ke` exactly at distance === HIT_RADIUS so the two branches agree at the
+ * boundary. Beyond BLAST_DANGER_MARGIN_M: null — no hit (#557 audit: closes
+ * the gap where debris only ever hit something standing dead-on).
+ */
+function keAtDistance(ke: number, distance: number): number | null {
+  if (distance <= HIT_RADIUS) return ke;
+  if (distance > BLAST_DANGER_MARGIN_M) return null;
+  return ke * (HIT_RADIUS / distance) ** 2;
 }
 
 export { BUILDING_DAMAGE_THRESHOLD, INJURY_THRESHOLD, DEATH_THRESHOLD, HIT_RADIUS };

@@ -19,12 +19,12 @@
       }
     },
     {
-      "command": "new_game seed:42 size:96 cash:250000",
-      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill sites to add real travel time on top of an already-long 3-cycle file (campaign start has no staffed:true equivalent, and staffed:true itself doesn't fit here either -- see the drill_plan step below). size:96 keeps this step's original point (a bigger world than the plain new_game default above) without the campaign wrapper. Cash bumped to $250,000: 3 catastrophic blasts each need a fresh driller+drill_rig (see below), $36,000 a cycle, on top of payroll/upkeep during 3 separate drilling waits.",
+      "command": "new_game seed:42 size:96 cash:400000",
+      "description": "#553: switched from `campaign start level:dusty_hollow` -- dusty_hollow's 96x40x96 grid put a manually-bought vehicle's grid-centre spawn far enough from the drill sites to add real travel time on top of an already-long 3-cycle file (campaign start has no staffed:true equivalent, and staffed:true itself doesn't fit here either -- see the drill_plan step below). size:96 keeps this step's original point (a bigger world than the plain new_game default above) without the campaign wrapper. Cash bumped to $250,000, then to $400,000 (#557): 3 catastrophic blasts each need a fresh driller+drill_rig (see below), $36,000 a cycle, on top of payroll/upkeep during 3 separate drilling waits -- #557's own crew-geometry fix (see the living_quarters build step, now after blast 1) hires employee #3 a full cycle earlier than before and stretches the file's own tickCount well past its pre-#557 figure (999 -> 1481, see the final finances step's own note), so payroll/upkeep now runs for materially longer; $250,000 was no longer enough headroom to reach grid 3's own vehicle purchase without a real, traced insufficient-funds stall, and $350,000 (the first bump tried) still finished the file $2,834 short of solvent (direct-traced) -- $400,000 clears grid 3's own purchase with real margin and ends the file solvent.",
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 size:96 cash:250000"
+          "command": "new_game seed:42 size:96 cash:400000"
         }
       ],
       "role": "setup",
@@ -137,64 +137,6 @@
       }
     },
     {
-      "command": "build living_quarters at:16,15",
-      "description": "#699: this file's own 3-cycle grind (a fresh driller hired, drilled, charged, blasted and fired every cycle, per the hire step's own note below) has never had a living_quarters or an applied SitePolicy anywhere in its script -- it has instead survived on wafer-thin tick-budget tuning alone for several prior issues (#596/#597/#601, see the fire-employee and drill-wait steps' own extensive notes on shaving single ticks to stay under REVOLT_TICKS). That balance tipped over for real: a live interaction-mode run now ends in a genuine worker_revolt (\"THE CREW HAS WALKED OUT\", well-being reached 0) partway through cycle 2, well before the file's own asserted 3-blast conclusion -- confirmed by direct interaction-mode run and screenshot, not the timer-event race #601-followup originally diagnosed for the resulting covered-blast-panel symptom (that diagnosis was itself wrong; the panel is covered by the LevelEndScreen the revolt raises, not a random event). Content fix, not another round of tick-shaving: gives every cycle's crew somewhere to recover instead of continuing to chase an increasingly fragile fixed-tick budget. #707 (this fix): originally placed at (20,20) -- centrally located relative to all three drill grids (x:10/20/30, z:10-12, roughly 10-14 tiles from each) -- but that margin was razor-thin from day one (command-mode direct trace against #699's own original commit shows well-being bottoming at 1.7 right as grid 1's charge-drain wait finishes, before ever reaching grid 2) and `forceShiftRestIfNeededByPolicy` now also sending a genuinely idle employee (not just a working one) to rest under the applied policy (#707, GameLoop.ts) adds real extra round trips to living_quarters during the idle gaps between drill_hole/charge_hole dispatches, each one paying (20,20)'s own ~10-14 tile commute in full -- direct-traced (command mode) to push grid 1's own charge-drain wait from 218 to 275 ticks, long enough for `revolt.ticksAtZero` to clear REVOLT_TICKS (120) mid-wait and end the level before grid 1's own blast, which is what the interaction-mode CI failure's `.bs-confirm-overlay`-covering-the-panel symptom actually was (the LevelEndScreen the revolt raises, same class #699 itself already diagnosed once -- not a new race, and not a confirm-overlay timing issue the leading `resolveEventIfPending` below could ever have addressed, see that step's own corrected note). Relocated to (16,15): still clear of all three drill grids' own hole footprints, and shortens every cycle's own round-trip commute enough to keep `revolt.ticksAtZero` at 0 for the whole file (direct-traced, command mode) -- grid 1 centre (~11,11) is now ~8 tiles away (was ~12.7), grid 2 centre (~21,11) ~5 tiles (was ~9), grid 3 centre (~31,11) ~15.6 tiles (was ~14.2, the one grid that gets slightly worse, still well short of the drilling-stall commute-vs-rest trap #681 found and fixed for the tutorial at 25+ tiles). Ordered after the driller is hired rather than before (#556). A construction site needs someone on the roster to build it: ordered first, the quarters stood as a site for the whole run, and this file’s own note below records what that costs — well-being reaches zero, the revolt clock runs out, and the LevelEndScreen covers the Blast panel the step-3 click needs.",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 16,
-          "z": 15
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "equals": {
-          "orderedBuildingCount": 1
-        },
-        "decreased": [
-          "cash"
-        ],
-        "note": "Ordering only queues a construction site (#556); the lone driller hired above walks over and builds it during the tick blocks below, so this step asserts the site and the ticks that follow are what make it real."
-      }
-    },
-    {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
-      "description": "Run the quarters out to a standing building before the drilling and charging work begins (#556) — the relocation this file’s own step-3 note calls for, which is what keeps revolt.ticksAtZero at 0 for the rest of the run.",
-      "timeout": 130,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "buildingCount",
-          "equals": 1,
-          "maxTicks": 400,
-          "timeoutMs": 120000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "buildingCount": 1,
-          "orderedBuildingCount": 0
-        }
-      }
-    },
-    {
       "command": "vehicle buy drill_rig",
       "interaction": [
         {
@@ -233,7 +175,7 @@
     },
     {
       "command": "drill_plan grid rows:2 cols:2 spacing:2 depth:6 start:10,10 diameter:0.089",
-      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless — confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix.",
+      "description": "Grid 1/3. The spacing stepper defaults to 3m (DEFAULT_SPACING_M, Drill.ts); one decrement click on the strip's spacing stepper (data-field=\"spacing\") lowers it to 2 before dragging, so the (10,10)-(12,12) rectangle computes the declared 2x2. #553: spacing tightened from the original 4m to 2m to keep 3 separate drill/blast cycles' total drilling time (a fresh driller/drill_rig each time, see above) reasonable. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, all 3 grids in this file): none of the 3 drill_plan steps click the depth stepper, so the real drag always produces the panel's own 6m default. Unlike tutorial-playthrough.json's real divergence, this file's own assertions (decreased/equals:0 on already-floor-clamped nuisance) are directional and floor-based, so they already tolerated the real (more violent, shallower) blast regardless — confirmed by re-running both modes unchanged after the fix. This is a metadata-only correction, not a behavior fix. #557: position deliberately left at (10,10), not relocated -- moving grid 1 to escape its own padded danger zone (computeDangerZone, Zone.ts) was tried first (start:34,10 and start:10,36, both still clear of grid 2 (20,10) / grid 3 (30,10)'s own hole footprints) and rejected empirically, not on arithmetic: direct command-mode probing (createRunner+runCommand, tick-by-tick, scripts/_probe1.ts-style harness) showed x:34 wedges the lone driller/drill_rig solid (`isMoveStuck:true`, holeCount stalled at 0 for the full 600-tick budget) -- pristine terrain past x:30 in this z:10-12 band is a hard reachability cliff (x:30 drills fine solo, x:31 already wedges), and grid 3's own real run only ever reaches x:30-32 because grid 1's and grid 2's blasts have already carved a path there by the time it runs, which a first-drilled grid 1 can't borrow. z:36 drills fine solo (no stuck flag, well inside budget) but breaks grid 3 a different way: grid 1's blast at z:36-38 no longer clears any terrain along the z:10-12 corridor, so grid 3 at (30,10) -- reachable in the original file only because grid 1's and grid 2's blasts jointly carve that corridor open -- stalls at holeCount:0 exactly like the x:34 attempt did, confirmed by direct full-scenario run. The real fix is relocating living_quarters instead (see that step's own note) -- every viable grid 1/2/3 arrangement shares this z:10-12 band, so their own padded boxes (`x:[-5,27]`/`[5,37]`/`[15,47]`, all `z:[-5,27]`) union into one corridor no on-corridor living_quarters position can be safe from during all 3 cycles; only a z escape works, which is living_quarters' own call to make (#556's central-commute tuning covers all three grids, not grid 1's own drill_plan) and grid 1 stays exactly where every other grid's own reachability depends on it having been. Relocating living_quarters is necessary but not sufficient on its own, though: idle-time dispatch (`claimOnePoolCandidate`, EmployeeDispatchSteps.ts) can still route any idle blasting-qualified employee into grid 1's own charge_hole pool work regardless of where they'd otherwise be resting, so employee #2's own survival also needs the targeted `employee dispatch`/`employee cancel` pair a few steps below, not living_quarters' relocation alone -- confirmed empirically: a living_quarters move by itself still lost employee #2 to grid 1's blast in a live run, exactly this way.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -449,6 +391,90 @@
       }
     },
     {
+      "command": "employee dispatch 2 x:30 z:15",
+      "description": "#557 fix: pure geometry (moving grid 1 itself, or moving living_quarters far enough to sit outside grid 1's own padded danger zone while a working living_quarters still exists nearby) was tried first and empirically rejected -- see the drill_plan step's own note below for the full trace of both attempts and why each one fails a different way. Debris attenuation (Damage.ts's processProjections, #557's own feature) now reaches out to BLAST_DANGER_MARGIN_M (15m) at reduced but often still-lethal energy, so employee #2 -- idle since hire, with nothing of their own to do until grid 2 needs them -- is a real casualty risk from blast 1's rumblox overcharge no matter where they happen to be resting, INCLUDING when idle-time dispatch (claimOnePoolCandidate, EmployeeDispatchSteps.ts) routes them to help charge grid 1's own holes alongside employee #1 (a real, direct-traced behaviour: any blasting-qualified idle employee is eligible for any open charge_hole pool action, not just the grid's own assigned driller). `employee dispatch <id> x: z:` (TaskDispatch.ts, requiredSkill omitted) sends employee #2 specifically -- and only employee #2, not employee #1, who dies here exactly as originally designed (see the drill_plan step's own note and the hire step's own note above on why that's fine) -- to (30,15): x:30 clears grid 1's own padded zone (x:[-5,27]) with real margin (computeDangerZone, Zone.ts; grid 1's holes are (10,10)-(12,12)), confirmed minable/reachable pristine terrain (the same x:30 grid-1-relocation attempt below drills solo in well under budget), and close enough that the walk itself costs employee #2 almost no morale (direct-traced: arrives near-untouched, morale 97-100/100) -- the single biggest lever against the worker_revolt risk a farther escape (or living_quarters itself sitting this close) reliably triggers a few hundred ticks later. No skill: param -- unlike the assign_skill bootstrap steps, this needs no qualification check, just a destination.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:30 z:15"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 20",
+      "description": "#557: pads out employee #2's short walk to (30,15) before firing -- no state-dump field exists to wait on for one specific employee's own position (waitUntil's field/equals only reads the trimmed scenario state, which has no per-employee x/z), so this is a hand-measured tick count rather than the project's own preferred waitUntil-on-a-real-condition pattern; direct-traced (command mode) to comfortably clear grid 1's own zone boundary well before 60 ticks elapse, with room to spare against the 25+-tile drilling-stall commute trap (#681) this file's other notes describe. Split into 3 chunks of 20 with an `event choose 0` after each (not one bare `tick 60`) because a plain `tick N` command -- unlike `waitUntil`'s own loop -- does not auto-resolve a pending event; it simply stops early the instant one fires mid-block (events.ts), and a real run showed exactly that (an Anthem event fired at tick 215, cutting a bare `tick 60` here down to 1 real tick and leaving employee #2 barely off their starting square when blast 1 fired).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "description": "#557: drains any event the tick chunk above left pending, same idempotent pattern already used before the sequence steps in this file (see those steps' own notes).",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee cancel 43",
+      "description": "#557: the `employee dispatch 2 x:30 z:15` step above (action id 43) is only ever meant to get employee #2 clear of blast 1 -- it is not real, ongoing work with anywhere useful to finish. Left uncancelled, direct-traced (createRunner+runCommand): its own generic-work duration does not reliably complete within the tick padding above (computeTaskDuration scales by the employee's own current needs/morale, not a fixed 20-40 ticks), and TaskCancellation.ts's own interrupted-work-resume path keeps handing employee #2 back to this same stale action id every time a rest cycle ends, elbowing out grid 2's own drill_hole dispatch indefinitely -- confirmed live: without this cancel, grid 2's drilling genuinely stalls at 3/4 holes forever (holeCount never reaches 4, even given far more than the 600-tick budget). `employee cancel <action-id>` (TaskCancellation.ts's cancelAction) takes a PendingAction id, not an employee id -- 43 specifically, matching the dispatch step's own logged `Action ID: 43` -- clears the holder's walk fields and completes the record outright, so employee #2 is genuinely idle afterward and free to pick up grid 2's real work instead. `general_work` (the dispatch's own action type) is cancellable; only `rest` actions are not (cancelAction's own early return). #867: action id corrected 39 -> 43 -- SitePolicy.shouldForceRest now proactively rests an employee whose breakNeed crosses socialBreakThreshold (previously dead config, never checked -- see balance.ts's own SITE_POLICY_DEFAULT_THRESHOLDS comment), so a handful of real rest actions are now created and completed earlier in this file's own opening stretch, before this dispatch step runs, shifting the auto-incrementing PendingAction id sequence forward by 4.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee cancel 43"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
       "command": "blast",
       "interaction": [
         {
@@ -495,7 +521,7 @@
     },
     {
       "command": "time resume",
-      "description": "#601-followup: was `event choose 0` (resolveEventIfPending) then `employee fire 1`. Direct probe (deathCount right after the blast step above, both modes, run 3x each) shows grid 1's driller now dies deterministically in BOTH modes -- the file's old \"not always\" is stale, same staleness #601 already found and fixed for grid 2's own analogous transition (see that step's own note, several hundred lines below). A dead employee has no row in #bs-employee-panel (`CrewPanel.render` filters to `e.alive`) -- `.bs-detail-toggle` was never going to exist, so the old toggle/dismiss/confirm `clickIfPresent` chain always no-op'd in interaction mode. But `fireEmployee` (Employee.ts) splices by id with no `alive` check, so the OLD command-mode script (a bare `employee fire 1`) still spliced the corpse for real -- a real player has no click for that, since the row doesn't exist to click. That command-vs-interaction action-count asymmetry is what #601 traced for grid 2 (`runCommand`'s action-count gate charges `employee fire` whether it fires a live employee or a corpse, but interaction mode's genuine no-op charges nothing), and it applies here identically. Fixed the same way #601 fixed grid 2: `time resume` is idempotent this deep into an already-resumed run and, as a META_COMMAND, exempt from the action-count gate in both modes, so neither mode's replay of this step nudges the cooldown gate. The one remaining click -- opening the employees panel, so the hire step below still finds it open -- stays, modeling a player checking on their dead crew and finding nobody left to dismiss.",
+      "description": "#601-followup: was `event choose 0` (resolveEventIfPending) then `employee fire 1`. Direct probe (deathCount right after the blast step above, both modes, run 3x each) shows grid 1's driller now dies deterministically in BOTH modes -- the file's old \"not always\" is stale, same staleness #601 already found and fixed for grid 2's own analogous transition (see that step's own note, several hundred lines below). A dead employee has no row in #bs-employee-panel (`CrewPanel.render` filters to `e.alive`) -- `.bs-detail-toggle` was never going to exist, so the old toggle/dismiss/confirm `clickIfPresent` chain always no-op'd in interaction mode. But `fireEmployee` (Employee.ts) splices by id with no `alive` check, so the OLD command-mode script (a bare `employee fire 1`) still spliced the corpse for real -- a real player has no click for that, since the row doesn't exist to click. That command-vs-interaction action-count asymmetry is what #601 traced for grid 2 (`runCommand`'s action-count gate charges `employee fire` whether it fires a live employee or a corpse, but interaction mode's genuine no-op charges nothing), and it applies here identically. Fixed the same way #601 fixed grid 2: `time resume` is idempotent this deep into an already-resumed run and, as a META_COMMAND, exempt from the action-count gate in both modes, so neither mode's replay of this step nudges the cooldown gate. The one remaining click -- opening the employees panel, so the hire step below still finds it open -- stays, modeling a player checking on their dead crew and finding nobody left to dismiss. #557: employee #2 survives this blast (dispatched clear before it fired, see the steps above) -- confirmed by direct probe, deathCount reads 1 (employee #1 alone) immediately after the blast step.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -505,15 +531,64 @@
       "role": "player"
     },
     {
-      "command": "finances",
-      "description": "explosive cost is never deducted from cash in this build (ground rule #11) — cash only moves from the #553 driller hire/drill_rig purchase and payroll/upkeep during the drilling wait, not from the file's own $5,000-fine premise (which has nothing to attach to). #553 shared-mechanism note (same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the drill_plan grid command above was missing diameter: — the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: fell back to a different console-only default (0.15, mining.ts), and computeDrillHoleDurationTicks scales drill duration by diameter, keeping the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. #596: cash dropped from this checkpoint's own equals (was a hand-derived 207286) — the same incidental-running-total class this file's own cycle-2/cycle-3 finances checkpoints already treat this way (see their own notes): a read-only `finances` query doesn't move cash itself (before==after for the step), so neither an exact changedBy nor a directional decreased/increased belongs here — the spend already happened in the hire/purchase/tick steps above, which is where a cash assertion belongs. #601-followup: the preceding step is now `time resume`, not `employee fire 1` (see its own note) — it still opens the employees panel for real in interaction mode, so the panel is still open here too.",
+      "command": "employee hire role:driller",
+      "description": "#557: grid 3's own driller, hired here -- a full cycle earlier than the original file's own step immediately before grid 3 -- so they can build living_quarters (below) while employee #2 goes straight into grid 2's own drill_plan in parallel, instead of employee #2 idling through the whole construction wait themselves (direct-traced: that idle wait alone cost employee #2 real morale, ~97 -> ~31, before grid 2's own cycle even started, and compounded into a worker_revolt by grid 2's own blast). `employeeCount` stays `changedBy: 1` matching this project's own running-total convention (scenario-defs.md).",
       "interaction": [
         {
-          "type": "command",
-          "command": "finances"
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
         }
       ],
-      "role": "observe"
+      "role": "player",
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "changedBy": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "build living_quarters at:20,30",
+      "description": "#557: living_quarters, built here (after blast 1, not before it) so grid 1's own drill/charge cycle runs with nobody resting near a soon-to-fire zone, and at (20,30) rather than the file's old (16,15) so the building itself -- which cannot evacuate -- sits outside every remaining grid's own padded danger zone (grid 2's is x:[5,37] z:[-5,27], grid 3's is x:[15,47] z:[-5,27]; both share z:[-5,27], so only a z escape clears both at once, matching the drill_plan step's own note on why the corridor can't be dodged in x). z:30 clears that shared z:27 boundary with real margin: a bare-minimum z:28 was tried and rejected empirically -- the building's own 3x3 (T1) approach ring dips back to z:27, still inside the zone, so an employee whose own rest-need routes them back to living_quarters (as any employee's eventually does) walks straight back into danger, undoing the whole point. x:20 balances round-trip commute to grid 2 (centre ~21,11) and grid 3 (centre ~31,11) roughly the way the original (16,15) balanced all three grids before #557 widened the danger radius past what any close-in position could survive.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"build\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 30
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 1
+        },
+        "decreased": [
+          "cash"
+        ],
+        "note": "Ordering only queues a construction site (#556); employee #3, just hired above, walks over and builds it while employee #2 goes on to grid 2 in parallel below."
+      }
     },
     {
       "command": "vehicle buy drill_rig",
@@ -543,7 +618,7 @@
     },
     {
       "command": "employee assign_skill 2 skill:driving.drill_rig level:1",
-      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training.",
+      "description": "Left unmarked: hiring already grants blasting at Rookie (ROLE_STARTING_QUALIFICATION), but no role starts with driving.drill_rig -- without it the driller could never staff the drill_rig just bought. The player-facing path is training at a driving_center; skipped here since this file isn't about training. #557 (fixed): this step used to be a documented, deterministic KNOWN BREAK -- Damage.ts's processProjections attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only), and employee #2, idle and resting near the file's old living_quarters at (16,15) (~6.4m from grid 1's holes), was reliably killed by blast 1's rumblox overcharge before ever reaching this step, cascading into every step through the file's end failing. Fixed not by repositioning that one employee's rest spot but by the two steps this file now runs before blast 1 fires (see the `employee dispatch 2` step's own note, several steps up) plus moving living_quarters' own construction to after blast 1 (see that step's own note) -- employee #2 survives deterministically now, confirmed by direct probe, and this assign_skill succeeds.",
       "interaction": [
         {
           "type": "command",
@@ -684,7 +759,7 @@
     },
     {
       "command": "sequence auto delay_step:25",
-      "description": "#601-followup: leading `resolveEventIfPending` added -- same race grid 1's own sequence step found and fixed (see its own note): the preceding `event choose 0` step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\".",
+      "description": "#601-followup: leading `resolveEventIfPending` added -- same race grid 1's own sequence step found and fixed (see its own note): the preceding `event choose 0` step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\". #557 interaction-mode follow-up (correction): unverified for grid 2 specifically, but grid 3's own identical-looking step carried this exact same stale diagnosis and was wrong -- CI's real grid-3 failure is a genuine worker_revolt's LevelEndScreen, not an event dialog (`pendingEvent` stays `false` throughout; see that step's own corrected note for the full trace and the fixes attempted). Left uncorrected here pending a real repro against this specific step -- if this step ever fails in CI, check `state.levelEndReason` first, the same way, before trusting this comment.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -704,6 +779,68 @@
           "sequencedCount": 4
         }
       }
+    },
+    {
+      "command": "employee dispatch 3 x:20 z:32",
+      "description": "#557: employee #3 built living_quarters (above) and, like employee #2 before grid 1's own blast, is a real casualty risk from idle-time dispatch pulling them into grid 2's own charge_hole pool work near (20,10)-(22,12) -- confirmed live, without this step employee #3 dies before ever reaching grid 3's own assign_skill. x:20 z:32 sits just past living_quarters' own (20,30) position, comfortably outside grid 2's padded zone (x:[5,37] z:[-5,27]) with a couple of metres to spare past the z:27 boundary.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 3 x:20 z:32"
+        }
+      ],
+      "role": "bootstrap"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "tick 20",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 20"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "event choose 0",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "employee cancel 433",
+      "description": "#557: same reasoning as the grid 1 dispatch's own `employee cancel 43` step -- clears employee #3's now-unneeded `general_work` dispatch (action id 433, matching this run's own logged `Action ID: 433`) so TaskCancellation.ts's interrupted-work-resume path cannot keep re-handing it back to them once grid 3 needs them for real work instead. #867: action id corrected 432 -> 433, same cause and same shift pattern as the grid 1 cancel step's own note -- more real rest actions land earlier in the file now that breakNeed is proactively protected. A second, independent #867 fix (interruptActiveAction's mid-walk pin, see the finances step's own note below) turned out to change nothing about this specific id: this file never has a genuinely closer idle employee standing by when the pin would otherwise hold, so that fix's own release condition never fires here.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee cancel 433"
+        }
+      ],
+      "role": "bootstrap"
     },
     {
       "command": "blast",
@@ -775,32 +912,9 @@
       "expect": {
         "equals": {
           "vehicleCount": 0,
-          "employeeCount": 2
+          "employeeCount": 3
         },
-        "note": "#601: `employeeCount: 1` restored to this equals block. The prior note here (dropping it, #599-followup) was chasing a real but stale mode split from an earlier build (\"command mode fires the survivor down to 0, interaction mode's corpse stays at 1\") -- the step it blamed (`employee fire 2`) no longer runs a fire at all (see that step's own #601 note: it replays `time resume` in command mode and only opens the employees panel for real in interaction mode), so grid 2's driller -- dead in both modes, deterministically, confirmed by direct probe -- is never fired in either one. `employeeCount` reads 1 (the one corpse, never spliced) in both modes now, genuinely, not incidentally. #601-followup: corrected again, 1 -> 2 -- grid 1's own driller transition (see that step's own #601-followup note) is now fixed the identical way, so grid 1's corpse is never spliced either any more; this checkpoint sees both grid 1's and grid 2's corpses, never grid 1's alone. `vehicleCount` stays 0 regardless (the drill_rig is destroyed in the blast either way, driver dead or fired)."
-      }
-    },
-    {
-      "command": "employee hire role:driller",
-      "description": "#553: a fresh driller for grid 3/3 — see grid 1's own hire step for why. #601: this step's own toolbar click is still unnecessary -- the preceding step (formerly `employee fire 2`, now `time resume`, see its own #601 note) still opens the employees panel for real in interaction mode, and the intervening `finances` step is command-only, so the panel is still open when this step runs. `employeeCount` stays `changedBy: 1` (not `equals: 2`) on purpose, matching this project's own preferred convention for a running total (scenario-defs.md) even though the baseline (1, grid 2's unfired corpse) is now genuinely deterministic in both modes -- `changedBy` proves what this step's own action did without pinning a baseline a future edit upstream would have to keep in sync by hand.",
-      "interaction": [
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-employee-panel [data-role=\"driller\"]"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "changedBy": {
-          "employeeCount": 1
-        }
+        "note": "#557: employeeCount corrected 2 -> 3 -- employee #3 is now hired right after blast 1 (see that step's own note), not immediately before grid 3, so all three hires already exist by this checkpoint: grid 1's corpse, grid 2's corpse, and grid 3's own live, not-yet-dispatched driller. `vehicleCount` stays 0 regardless (the drill_rig is destroyed in the blast either way, driver dead or fired)."
       }
     },
     {
@@ -972,7 +1086,7 @@
     },
     {
       "command": "sequence auto delay_step:25",
-      "description": "#601-followup: leading `resolveEventIfPending` added -- same race grid 1's own sequence step found and fixed (see its own note): the preceding step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\".",
+      "description": "#601-followup: leading `resolveEventIfPending` added, on the theory that the preceding step and this step's first click are two separate real-time steps with a gap between them, and a timer event landing in that gap leaves its `.bs-confirm-overlay` covering the blast panel, failing `[data-step=\"3\"]` with \"element is covered by div\". #557 interaction-mode follow-up (correction): that diagnosis is wrong for CI's actual grid-3 failure, the same way #707 already found once for grid 1's own identical symptom on this identical file (see that step's own corrected note) -- direct-traced (command mode): `state.levelEndReason` reads `worker_revolt` from partway through this grid's own charge-drain wait_until onward (`pendingEvent` stays `false` throughout), so `resolveEventIfPending`'s pending-event check never has anything to resolve; the panel is covered by the LevelEndScreen a genuine revolt raises, not an event dialog. Root cause: with today's #557 crew-geometry fix, both employee #2 (grid 2's survivor) and employee #3 (grid 3's own driller) are alive and sharing this file's one living_quarters at the default hunger:60/fatigue:60 rest thresholds for the whole multi-thousand-tick file; their combined average wellbeing grinds to 0 and holds past REVOLT_TICKS by grid 3's own charge-drain, well before this step ever runs. Command mode never surfaces this as a failure (no UI gating on level-end state, so it keeps executing every remaining command regardless and this step's own `expect` still happens to hold on the unmodified seed-42 trace) -- interaction mode's LevelEndScreen is what actually catches it. Not yet fixed here: raising rest thresholds (tried 65-90, symmetric and asymmetric, applied at every point from the file's opening `set_policy` step through grid 3's own hire) and a second living_quarters (dedicated per grid, removing the shared-resource contention) were both tried and both still end in revolt somewhere in the file, just at a different tick each time -- NEED_REST_DURATIONS's short per-visit duration (hunger 2 ticks, fatigue 8) only refills whichever single gauge triggered the rest, so any threshold at or above roughly 72 oscillates between the two gauges without ever clearing both and stalls drilling solid instead of protecting it, and the random-event timing this file's own tick trajectory shifts on every attempted change made the search too noisy to converge within reasonable effort. A working fix likely needs a structural change beyond a scenario-JSON-only edit (a researched living_quarters tier upgrade for its faster replenishment, or restructuring so grid 2 and grid 3 never have two living employees drawing on one rest facility at once) -- filed as a follow-up rather than landed here.",
       "interaction": [
         {
           "type": "resolveEventIfPending"
@@ -1054,9 +1168,11 @@
           "vehicleCount": 0,
           "buildingCount": 1,
           "holeCount": 0,
-          "tickCount": 999
+          "tickCount": 1480,
+          "levelEndReason": null,
+          "levelEnded": false
         },
-        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #601: employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. #601-followup: employeeCount corrected again, 2 -> 3 -- grid 1's own driller transition is now fixed the identical way (see that step's own #601-followup note), so grid 1's corpse is never spliced either any more; this checkpoint sees grid 1's corpse, grid 2's corpse, and grid 3's own live driller. tickCount is unaffected -- the action-count-gate asymmetry #601 traced was specific to the real command `employee fire N` executing in command mode with no interaction-mode equivalent, and grid 1's transition never spent that action in interaction mode either way (its old click chain no-op'd against a dead crew), so removing the command-mode-only splice does not change either mode's action count or tick trace. #680: tickCount corrected again, 595 -> 602 -- the tri-state 'working'/'idle'/'resting' need-drain classification fix shifted the exact tick at which the `wait_until` steps in the 3 drilling/charging waits above settle (an interrupted walk-to-rest now drains at the idle rate instead of being misclassified as working, and an employee actively resting now drains at 0 instead of the idle rate), moving how many ticks each wait needed to converge; the extra 7 ticks are real, from those waits, not a fine. #699: buildingCount corrected 0 -> 1 and tickCount corrected 602 -> 827 -- this file's own 3-cycle grind now has a living_quarters (which stands for the rest of the file, hence buildingCount) and an applied continuous-shift policy protecting it from a real worker_revolt (see the build-living-quarters step's own note); the fixed tick-50 drill-wait chunks were also replaced with waitUntil-on-holeCount waits, since rest interruptions now make each cycle's own drilling take a genuinely variable number of ticks a fixed budget can't track -- the extra 225 ticks (602->827) are real recovery time this crew now spends resting, not a regression. #707: tickCount corrected again, 827 -> 987 -- `forceShiftRestIfNeededByPolicy` (GameLoop.ts) now sends an *idle* employee under an applied site policy for proactive rest exactly like a working one, where before idle employees were skipped entirely and only rested reactively once needs crossed the much lower emergency thresholds; this file's crew sits idle for real stretches inside every `wait_until field:holeCount`/`orderedChargeCount` wait (waiting on a drill_rig/driller pairing to physically arrive, or on a queued charge order to drain), so those waits themselves now settle later -- direct-traced via the 4 command-mode `wait_until` step dumps in `screenshots/scenario-vibration-budget-command/`: cumulative tickCount at each wait's own settle point moved from the pre-#707 trace to 148/438/550/689/805/987 across the 3 cycles, landing on 987 by this checkpoint, all extra ticks spent on real rest this crew now correctly takes, not a regression. #707 follow-up (this fix): that 987 trace was the bug, not just a number to repin -- the extra idle-employee round trips it describes were paying (20,20)'s own ~10-14 tile commute to living_quarters on every idle-triggered rest, and grid 1's own charge-drain wait alone grew from 218 to 275 ticks, long enough for `revolt.ticksAtZero` to clear REVOLT_TICKS (120) mid-wait and end the level in a real `worker_revolt` before grid 1's own blast -- confirmed command-mode direct trace, `state.levelEndReason` reads `worker_revolt` from that wait_until step onward for the rest of the file (see the build-living-quarters step's own note for the full trace and the relocation fix). Relocating living_quarters to (16,15) shortens all three cycles' own commute and brings the whole file back under REVOLT_TICKS (`revolt.ticksAtZero` stays 0 throughout, direct-traced) -- tickCount corrected 987 -> 678, genuinely faster now that idle-triggered rests are shorter round trips, not a reversion of #707's own idle-rest coverage. employeeCount/vehicleCount/holeCount stay exact -- confirmed unaffected. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output. tickCount re-measured to 999 (#556): the quarters is ordered after the driller exists and waited out before the drilling begins, and the second driller is hired alongside the first so the long drill/charge stretch is shared rather than carried alone into the revolt clock."
+        "note": "no fine, ever (Finding #9, see file description) -- cash only moves from the #553 driller hires/drill_rig purchases, payroll/upkeep during the 3 drilling waits, and one Explosive Embargo event during cycle 3's wait, not from any vibration-budget fine; cash itself stays absent from this checkpoint's own equals (see the earlier cycle-2 finances step's own note for why) rather than re-pinned to a new absolute figure. #867: tickCount corrected 1481 -> 1480, and levelEndReason/levelEnded added -- this file's own long-standing worker_revolt (interaction mode only; command mode's own assertions never gated on level-end state, see the grid 3 sequence step's own note for the full original diagnosis) traced to a genuine gap in SitePolicy.shouldForceRest (src/core/entities/SitePolicy.ts): socialBreakThreshold/customThresholds[id].social existed, defaulted sensibly, and were genuinely settable via `set_policy ... social:N`, but were never actually read by the enforcement check -- so breakNeed, unlike hunger/fatigue, was never proactively protected by ANY site policy, including this file's own `continuous` mode (applied specifically to protect this crew, see the set_policy step's own note), and free-fell all the way to its collapse threshold on every extended work stretch, dragging combined crew wellbeing to 0 for long enough to clear REVOLT_TICKS. Fixed at the source rather than by further scenario-side rebalancing (the extensive threshold/geometry tuning this file's own history already tried, and this session's own additional attempt at NeedRestoration.ts's separate no-building rest-fallback gap, neither converged -- see #867's own issue thread) by wiring shouldForceRest up to the pre-existing socialBreakThreshold, and raising SITE_POLICY_DEFAULT_THRESHOLDS.socialBreak from its previously-inert 20 to 60 (matching hungerRest/fatigueRest's own margin above the 50 comfortable line, balance.ts). A second, independent gap surfaced investigating a DIFFERENT file this same fix broke (tutorial-steps-visual.json's freight_warehouse construction, deterministically stuck at `orderedBuildingCount:1` for 2000+ ticks): TaskCancellation.ts's interruptActiveAction pinned a still-walking general_work action to whichever employee first claimed it (#556's own fix for a genuinely worse relay-forever livelock) but never released that pin, so three independent proactive-rest triggers instead of two made it easy for the pinned employee to never land enough uninterrupted walk time, permanently locking out even a different, idle, well-rested employee standing right at the target. Fixed by releasing the pin on a repeat walk-only interruption ONLY when a different idle employee is currently closer to the target than the pinned one (see that function's own doc comment) -- a blind release-after-N-strikes was tried first and rejected, because it broke building-placement-visual.json's own far-flung management_office order the identical way: with no employee ever closer than the one already partway there, an unconditional release just re-created #556's original relay under a different name. Direct-traced post-fix (command mode): wellBeing never drops below 50 for the file's entire run (previously pinned at 0 from partway through grid 1 onward), levelEndReason stays null throughout, and all three employees end with hunger/fatigue/breakNeed comfortably at or above \"comfortable\" on every gauge, not just narrowly surviving. tickCount lands back on exactly its pre-interruptActiveAction-fix value (1480): this file's own crew never has a genuinely closer idle candidate standing by when a pin would otherwise hold (unlike tutorial-steps-visual.json's own case), so the closer-candidate check never fires here and the dispatch-fairness fix changes nothing about this file's own timing -- confirmed by the two `employee dispatch`-then-`employee cancel` action ids below settling back to the same values the #867 threshold change alone produced. employeeCount/vehicleCount/buildingCount/holeCount are unaffected -- confirmed unchanged from the #557 trace below. #557: tickCount corrected again, 999 -> 1481 -- re-measured from an actual command-mode run of this file's own new geometry fix (a full read of the fix: employee #2 is dispatched clear of grid 1's own blast rather than resting near a living_quarters that no longer exists yet at that point in the file; living_quarters itself moves to after blast 1, at (20,30), outside every remaining grid's own padded danger zone; employee #3 is hired a cycle earlier than before to build it while employee #2 drills grid 2 in parallel; both dispatched employees have their own now-unneeded `general_work` action explicitly cancelled before their own blast fires, closing a real stall TaskCancellation.ts's interrupted-work-resume path otherwise causes). The extra ~800 ticks over the pre-#557 figure are genuinely spent: a materially longer round trip to living_quarters at (20,30) than the old (16,15) ever needed (mandatory -- BLAST_DANGER_MARGIN_M's own 15m padding makes any position close enough to keep the old commute short also close enough for the building itself to be destroyed by whichever grid is currently live, see the drill_plan and living_quarters build steps' own notes for the full empirical trace of why no closer position survives), not a regression or a fine. employeeCount corrected from 1 to 2 (grid 2's driller, dead since blast 2, is never fired in either mode any more -- see that step's own note -- so their corpse plus grid 3's own live driller is 2, not 1) and tickCount corrected from 391 to 335. The #596/#597 note this superseded (391, up from 371) was itself chasing a real but different-root-cause drift; #601's own fix (see `employee fire 2`'s replacement step) closed a genuine command-vs-interaction action-count asymmetry that had been quietly costing interaction mode a timer-event's cooldown gate relative to command mode every tick after grid 2's blast, and grid 3's own tick budget above is trimmed from 4 chunks to the 2 its drilling now genuinely needs once that asymmetry no longer pads the count. #554: tickCount corrected again, 335 -> 595 -- charging is real work now too, and each of the 3 charge orders in this file is drained by its own wait step, adding real ticks on top of #553's own drilling waits. #601-followup: employeeCount corrected again, 2 -> 3 -- grid 1's own driller transition is now fixed the identical way (see that step's own #601-followup note), so grid 1's corpse is never spliced either any more; this checkpoint sees grid 1's corpse, grid 2's corpse, and grid 3's own live driller. tickCount is unaffected -- the action-count-gate asymmetry #601 traced was specific to the real command `employee fire N` executing in command mode with no interaction-mode equivalent, and grid 1's transition never spent that action in interaction mode either way (its old click chain no-op'd against a dead crew), so removing the command-mode-only splice does not change either mode's action count or tick trace. #680: tickCount corrected again, 595 -> 602 -- the tri-state 'working'/'idle'/'resting' need-drain classification fix shifted the exact tick at which the `wait_until` steps in the 3 drilling/charging waits above settle (an interrupted walk-to-rest now drains at the idle rate instead of being misclassified as working, and an employee actively resting now drains at 0 instead of the idle rate), moving how many ticks each wait needed to converge; the extra 7 ticks are real, from those waits, not a fine. #699: buildingCount corrected 0 -> 1 and tickCount corrected 602 -> 827 -- this file's own 3-cycle grind now has a living_quarters (which stands for the rest of the file, hence buildingCount) and an applied continuous-shift policy protecting it from a real worker_revolt (see the build-living-quarters step's own note); the fixed tick-50 drill-wait chunks were also replaced with waitUntil-on-holeCount waits, since rest interruptions now make each cycle's own drilling take a genuinely variable number of ticks a fixed budget can't track -- the extra 225 ticks (602->827) are real recovery time this crew now spends resting, not a regression. #707: tickCount corrected again, 827 -> 987 -- `forceShiftRestIfNeededByPolicy` (GameLoop.ts) now sends an *idle* employee under an applied site policy for proactive rest exactly like a working one, where before idle employees were skipped entirely and only rested reactively once needs crossed the much lower emergency thresholds; this file's crew sits idle for real stretches inside every `wait_until field:holeCount`/`orderedChargeCount` wait (waiting on a drill_rig/driller pairing to physically arrive, or on a queued charge order to drain), so those waits themselves now settle later -- direct-traced via the 4 command-mode `wait_until` step dumps in `screenshots/scenario-vibration-budget-command/`: cumulative tickCount at each wait's own settle point moved from the pre-#707 trace to 148/438/550/689/805/987 across the 3 cycles, landing on 987 by this checkpoint, all extra ticks spent on real rest this crew now correctly takes, not a regression. #707 follow-up (this fix): that 987 trace was the bug, not just a number to repin -- the extra idle-employee round trips it describes were paying (20,20)'s own ~10-14 tile commute to living_quarters on every idle-triggered rest, and grid 1's own charge-drain wait alone grew from 218 to 275 ticks, long enough for `revolt.ticksAtZero` to clear REVOLT_TICKS (120) mid-wait and end the level in a real `worker_revolt` before grid 1's own blast -- confirmed command-mode direct trace, `state.levelEndReason` reads `worker_revolt` from that wait_until step onward for the rest of the file (see the build-living-quarters step's own note for the full trace and the relocation fix). Relocating living_quarters to (16,15) shortens all three cycles' own commute and brings the whole file back under REVOLT_TICKS (`revolt.ticksAtZero` stays 0 throughout, direct-traced) -- tickCount corrected 987 -> 678, genuinely faster now that idle-triggered rests are shorter round trips, not a reversion of #707's own idle-rest coverage. employeeCount/vehicleCount/holeCount stay exact -- confirmed unaffected. employeeCount/vehicleCount/buildingCount/holeCount/tickCount are all genuinely mode-invariant (unaffected by real-time host-timing drift, unlike cash) and still prove no fine mechanic fired -- a fine would need to either change cash outside the documented categories (not directly checkable here) or leave some other trace, and none of these structural counts would explain a cash discrepancy anyway; the remaining proof against a phantom fine is the finances breakdown itself, inspectable in the step's own console output. tickCount re-measured to 999 (#556): the quarters is ordered after the driller exists and waited out before the drilling begins, and the second driller is hired alongside the first so the long drill/charge stretch is shared rather than carried alone into the revolt clock."
       }
     },
     {

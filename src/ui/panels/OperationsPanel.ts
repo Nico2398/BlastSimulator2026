@@ -15,11 +15,12 @@
 
 import { t } from '../../core/i18n/I18n.js';
 import { el, card, sectionHeader, emptyState, chip, button } from '../dom.js';
-import { iconEl, type IconName } from '../icons.js';
+import { iconEl } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getFragmentCounts } from '../../core/economy/Logistics.js';
 import { getOre } from '../../core/world/OreCatalog.js';
+import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
 import type { ShiftMode } from '../../core/entities/SitePolicy.js';
 import type { GameState, PendingAction, PendingActionStatus } from '../../core/state/GameState.js';
 import type { AccidentRecord } from '../../core/entities/Damage.js';
@@ -37,17 +38,6 @@ const WORK_QUEUE_STATUS_KEY: Record<PendingActionStatus, string> = {
   queued: 'ui.operations.work_queue_status_queued',
   assigned: 'ui.operations.work_queue_status_assigned',
   in_progress: 'ui.operations.work_queue_status_in_progress',
-};
-
-const INCIDENT_STYLE: Record<AccidentRecord['type'], { icon: IconName; critical: boolean }> = {
-  injury: { icon: 'injured', critical: false },
-  death: { icon: 'skull', critical: true },
-  building_damage: { icon: 'build', critical: false },
-  building_destroyed: { icon: 'build', critical: true },
-  seismic_damage: { icon: 'build', critical: false },
-  seismic_destroyed: { icon: 'build', critical: true },
-  vehicle_damage: { icon: 'vehicle', critical: false },
-  vehicle_destroyed: { icon: 'vehicle', critical: true },
 };
 
 export class OperationsPanel {
@@ -367,7 +357,7 @@ export class OperationsPanel {
   }
 
   private makeIncidentRow(a: AccidentRecord, state: GameState): HTMLElement {
-    const style = INCIDENT_STYLE[a.type];
+    const style = ACCIDENT_STYLE[a.type];
     const color = style.critical ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
     const day = Math.floor(a.tick / 24) + 1;
 
@@ -378,40 +368,12 @@ export class OperationsPanel {
       el('div', {
         attrs: { style: 'display:flex;flex-direction:column;gap:3px;flex:1' },
         children: [
-          el('span', { text: this.incidentText(a, state), attrs: { style: 'font:500 11px/1.3 var(--bsx-font-ui)' } }),
+          el('span', { text: accidentText(a, state), attrs: { style: 'font:500 11px/1.3 var(--bsx-font-ui)' } }),
           el('span', { text: t('ui.operations.day_label', { day }), attrs: { style: 'font:400 11px/1 var(--bsx-font-mono);color:var(--bsx-text-micro)' } }),
         ],
       }),
     );
     return row;
-  }
-
-  private incidentText(a: AccidentRecord, state: GameState): string {
-    switch (a.type) {
-      case 'injury':
-      case 'death': {
-        const name = state.employees.employees.find(e => e.id === a.entityId)?.name ?? t('ui.operations.incident_unknown_worker');
-        return t(a.type === 'death' ? 'ui.operations.incident_death' : 'ui.operations.incident_injury', { name });
-      }
-      case 'building_damage':
-      case 'building_destroyed': {
-        const building = a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
-        return t(a.type === 'building_destroyed' ? 'ui.operations.incident_building_destroyed' : 'ui.operations.incident_building_damage', { building });
-      }
-      // Kept distinct from building_damage/destroyed — SeismicSurveyDamage.ts
-      // uses its own accident types specifically so the log doesn't misattribute
-      // a seismic survey's shockwave damage to a blast fragment.
-      case 'seismic_damage':
-      case 'seismic_destroyed': {
-        const building = a.entityLabel ? t(`building.${a.entityLabel}.name`) : t('ui.operations.incident_unknown_building');
-        return t(a.type === 'seismic_destroyed' ? 'ui.operations.incident_seismic_destroyed' : 'ui.operations.incident_seismic_damage', { building });
-      }
-      case 'vehicle_damage':
-      case 'vehicle_destroyed': {
-        const vehicle = a.entityLabel ? t(`vehicle_type.${a.entityLabel}`) : t('ui.operations.incident_unknown_vehicle');
-        return t(a.type === 'vehicle_destroyed' ? 'ui.operations.incident_vehicle_destroyed' : 'ui.operations.incident_vehicle_damage', { vehicle });
-      }
-    }
   }
 
   // ── Site policy ──

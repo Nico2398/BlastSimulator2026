@@ -16,11 +16,13 @@
 
 import { t } from '../../core/i18n/I18n.js';
 import { el, statGrid } from '../dom.js';
-import { iconEl } from '../icons.js';
+import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
+import { ACCIDENT_STYLE, accidentText } from '../accidentLookup.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
+import type { AccidentRecord } from '../../core/entities/Damage.js';
 
 const RATING_COLOR: Record<BlastRating, string> = {
   perfect: 'var(--bsx-positive)',
@@ -29,6 +31,16 @@ const RATING_COLOR: Record<BlastRating, string> = {
   bad: 'var(--bsx-critical-text)',
   catastrophic: 'var(--bsx-critical-text)',
 };
+
+/**
+ * Accident types rendered as their own casualty note-card on the blast
+ * report (#557) — building_damage/destroyed are deliberately excluded:
+ * those are already covered by report.destroyedBuildings' own dedicated
+ * card just below, and OperationsPanel's incident log covers every
+ * AccidentRecord type generically for the full history. Icon and text
+ * come from accidentLookup.ts, shared with OperationsPanel.
+ */
+const REPORT_ACCIDENT_TYPES = new Set<AccidentRecord['type']>(['death', 'injury', 'vehicle_destroyed', 'vehicle_damage']);
 
 // Real-time delay between a blast report becoming available and the modal
 // actually opening (#545), so the fragment-collapse animation plays in the
@@ -223,6 +235,13 @@ export class BlastReportModal {
       notes.push(this.makeNoteCard('build', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
         t('ui.blast_workshop.report.building_destroyed', { type: t(`building.${b.type}.name`), id: b.buildingId })));
     }
+    for (const a of report.accidents ?? []) {
+      if (!REPORT_ACCIDENT_TYPES.has(a.type)) continue;
+      const style = ACCIDENT_STYLE[a.type];
+      const bgPrefix = style.critical ? 'rgba(255,91,76,' : 'rgba(255,176,46,';
+      const fg = style.critical ? 'var(--bsx-critical-text)' : 'var(--bsx-amber)';
+      notes.push(this.makeNoteCard(style.icon, bgPrefix, fg, accidentText(a, state)));
+    }
     if (report.oversizedFragments > 0) {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
         t('ui.blast_workshop.report.oversized_hint', { count: report.oversizedFragments, vehicle: t('vehicle_type.rock_fragmenter') })));
@@ -256,7 +275,7 @@ export class BlastReportModal {
     return wrap;
   }
 
-  private makeNoteCard(icon: 'build' | 'rock', bgPrefix: string, fg: string, text: string): HTMLElement {
+  private makeNoteCard(icon: IconName, bgPrefix: string, fg: string, text: string): HTMLElement {
     const wrap = el('div');
     wrap.style.cssText = `display:flex;gap:10px;padding:12px;border-radius:5px;background:${bgPrefix}.08);border:1px solid ${bgPrefix}.28)`;
     wrap.append(

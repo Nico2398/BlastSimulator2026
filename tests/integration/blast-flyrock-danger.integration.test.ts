@@ -19,6 +19,9 @@ import { resetHoleIds } from '../../src/core/mining/DrillPlan.js';
 import { hireEmployee } from '../../src/core/entities/Employee.js';
 import { Random } from '../../src/core/math/Random.js';
 import { purchaseVehicle } from '../../src/core/entities/Vehicle.js';
+import { placeBuilding } from '../../src/core/entities/Building.js';
+import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
+import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 
 function makeCtx(): MiningContext {
@@ -252,5 +255,103 @@ describe('Blast flyrock — danger reaches the crew', () => {
     const output = blastCommand(reckless, [], {}).output;
 
     expect(output).toMatch(/Furthest throw: \d+\.\d m/);
+  });
+
+  it('destroys a building whose footprint overlaps a cleared voxel, however well stemmed', () => {
+    const ctx = makeCtx();
+    const placed = placeBuilding(
+      ctx.state!.buildings, 'living_quarters', 18, 18,
+      ctx.state!.world!.sizeX, ctx.state!.world!.sizeZ, 1,
+    );
+    expect(placed.success, placed.error).toBe(true);
+
+    blastAt(ctx, '2'); // a careful blast — the footprint still disappears
+
+    expect(ctx.state!.buildings.buildings.some(b => b.id === placed.building!.id)).toBe(false);
+  });
+
+  it('nothing outside computeDangerZone\'s padded bounds is touched, regardless of proximity to a landed projectile', () => {
+    const ctx = makeCtx();
+    resetHoleIds();
+    drillPlanCommand(ctx, ['grid'], { rows: '3', cols: '3', spacing: '3', depth: '8', start: '15,15' });
+    driveDrillPlanToCompletion(ctx);
+    const zone = computeDangerZone(ctx.state!.drillHoles, BLAST_DANGER_MARGIN_M)!;
+    expect(zone).not.toBeNull();
+
+    // Just past the padded zone's east edge — well clear by construction,
+    // whatever a bad plan happens to throw.
+    const safeX = zone.x2 + 1;
+    const safeZ = 15;
+    expect(isInZone(safeX, safeZ, zone)).toBe(false);
+
+    const rng = new Random(21);
+    const farAway = hireEmployee(ctx.state!.employees, 'driver', rng, safeX, safeZ).employee;
+    const farVehicle = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', safeX, safeZ + 1).vehicle;
+
+    chargeCommand(ctx, [], { hole: '*', explosive: 'boomite', amount: '8', stemming: '0.5' });
+    driveChargePlanToCompletion(ctx);
+    sequenceCommand(ctx, ['auto'], { delay_step: '25' });
+    const result = blastCommand(ctx, [], {});
+    expect(result.success, result.output).toBe(true);
+
+    expect(farAway.alive).toBe(true);
+    expect(farAway.injured).toBe(false);
+    expect(ctx.state!.vehicles.vehicles.some(v => v.id === farVehicle.id)).toBe(true);
+  });
+
+  // ── The audited damage-model gap (#557) ──────────────────────────────────
+  // BLAST_DANGER_MARGIN_M (15) pads the danger zone far past HIT_RADIUS (2,
+  // Damage.ts) — someone standing a few metres inside the zone, off any
+  // column the blast actually clears, currently has near-zero chance of
+  // landing within 2 units of any one fragment's real resting position, so
+  // processProjections does nothing to them. These pin the OUTCOME the fix
+  // must produce (a real injury/death/damage/destruction from a
+  // distance-attenuated kinetic-energy model), not today's silent miss —
+  // they are expected to fail until that attenuation exists.
+  //
+  // (26,15)/(27,16)/(26,21) sit 3-6m past the reckless pattern's own cleared
+  // footprint (x14-23, z13-22 for this exact plan/seed) — inside
+  // BLAST_DANGER_MARGIN_M, outside HIT_RADIUS of where the current model's
+  // fragments actually land, and confirmed (40-seed sweep) to take zero
+  // outcome under the current hard 2m cutoff every single time.
+  describe('the distance-attenuated debris gap: a few metres inside the zone, off any cleared column', () => {
+    it('hurts or kills an employee standing just past the cleared footprint', () => {
+      const ctx = makeCtx();
+      const rng = new Random(2000);
+      const bystander = hireEmployee(ctx.state!.employees, 'driver', rng, 26, 15).employee;
+
+      blastAt(ctx, '0.5');
+
+      const tookOutcome = !bystander.alive || bystander.injured;
+      expect(tookOutcome, 'bystander a few metres inside the zone took no outcome at all').toBe(true);
+    });
+
+    it('damages or destroys a vehicle standing just past the cleared footprint', () => {
+      const ctx = makeCtx();
+      const parked = purchaseVehicle(ctx.state!.vehicles, 'debris_hauler', 27, 16).vehicle;
+
+      blastAt(ctx, '0.5');
+
+      const destroyed = !ctx.state!.vehicles.vehicles.some(v => v.id === parked.id);
+      const damaged = ctx.state!.damage.accidents.some(a =>
+        a.entityId === parked.id && (a.type === 'vehicle_damage' || a.type === 'vehicle_destroyed'));
+      expect(destroyed || damaged, 'vehicle a few metres inside the zone took no outcome at all').toBe(true);
+    });
+
+    it('damages or destroys a building standing just past the cleared footprint', () => {
+      const ctx = makeCtx();
+      const placed = placeBuilding(
+        ctx.state!.buildings, 'living_quarters', 26, 21,
+        ctx.state!.world!.sizeX, ctx.state!.world!.sizeZ, 1,
+      );
+      expect(placed.success, placed.error).toBe(true);
+
+      blastAt(ctx, '0.5');
+
+      const destroyed = !ctx.state!.buildings.buildings.some(b => b.id === placed.building!.id);
+      const damaged = ctx.state!.damage.accidents.some(a =>
+        a.entityId === placed.building!.id && (a.type === 'building_damage' || a.type === 'building_destroyed'));
+      expect(destroyed || damaged, 'building a few metres inside the zone took no outcome at all').toBe(true);
+    });
   });
 });

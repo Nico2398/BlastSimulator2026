@@ -18,6 +18,7 @@ import {
 import { claimPendingAction } from './TaskDispatch.js';
 import { reserveVehicle, findVehicleForClaim, promoteVehicleGatedAction } from './VehicleReservation.js';
 import { isHaulOrFragmentActionClaimable } from '../economy/HaulDispatch.js';
+import { isEvacuationHoldActive } from './Evacuation.js';
 import { MAX_EMPLOYEE_TASK_QUEUE_DEPTH } from '../config/balance.js';
 
 export interface TickEmployeesResult {
@@ -42,7 +43,11 @@ export function claimActionsTargetedAtEmployee(state: GameState, employee: Emplo
       // remaining storage room, stays queued rather than being claimed and
       // immediately failing at pickup — mirrors the vehicle-availability
       // check (findVehicleForClaim) just below.
-      && isHaulOrFragmentActionClaimable(state, a))
+      && isHaulOrFragmentActionClaimable(state, a)
+      // #557: never re-claim a stale evacuation-relay leftover while its
+      // zone is still occupied — see isEvacuationHoldActive's own doc
+      // comment (Evacuation.ts).
+      && !isEvacuationHoldActive(state, a))
     .sort((a, b) => a.id - b.id);
 
   for (const action of targeted) {
@@ -167,7 +172,12 @@ export function claimOnePoolCandidate(state: GameState, employee: Employee): Sel
     a.targetEmployeeId === null &&
     (a.requiredSkill === null || employee.qualifications.some(q => q.category === a.requiredSkill)) &&
     // #552: see claimActionsTargetedAtEmployee's own comment on the same check.
-    isHaulOrFragmentActionClaimable(state, a),
+    isHaulOrFragmentActionClaimable(state, a) &&
+    // #557: an open-pool action CAN carry EVACUATION_HOLD_KEY now (see that
+    // constant's own doc comment, Evacuation.ts); clearResolvedEvacuationHolds
+    // (called once per tick from tickEmployees) means this never permanently
+    // blocks later work once the zone genuinely clears.
+    !isEvacuationHoldActive(state, a)
   );
 
   const selection = selectBestActionForEmployee(

@@ -55,6 +55,14 @@ type EmployeeSnapshot = {
   id?: number;
   hunger: number;
   fatigue: number;
+  /**
+   * Optional (#867) — most callers care only about hunger/fatigue, and this
+   * type predates breakNeed's own inclusion here. Omitted is treated as 100
+   * (fully rested), so a caller that never sets it never trips the
+   * breakNeed/social check below; the real tick path (ForceShiftRest.ts)
+   * always supplies the employee's actual gauge.
+   */
+  breakNeed?: number;
   ticksWorked: number;
 };
 
@@ -64,10 +72,32 @@ type EmployeeSnapshot = {
  * Rules (evaluated in order):
  *  1. If !isWorking → false (already resting, nothing to force).
  *  2. For shift_8h / shift_12h → true if ticksWorked >= shift duration ticks.
- *  3. For all modes → true if hunger or fatigue are at or below their rest thresholds.
- *     In 'custom' mode, per-employee overrides (customThresholds[id]) take precedence
- *     over the policy-level defaults when present.
+ *  3. For all modes → true if hunger, fatigue, or breakNeed are at or below their
+ *     rest thresholds (breakNeed against socialBreakThreshold — #867: this gauge
+ *     was previously never checked here at all, see below). In 'custom' mode,
+ *     per-employee overrides (customThresholds[id]) take precedence over the
+ *     policy-level defaults when present.
  *  4. Otherwise → false.
+ *
+ * #867: breakNeed was completely unprotected by any site policy, including
+ * this file's own 'continuous' mode — despite SitePolicy.socialBreakThreshold
+ * (and customThresholds[id].social) existing, defaulting sensibly, and being
+ * genuinely settable via `set_policy ... social:N` (console/commands/policy.ts)
+ * since the type was first written. Nothing ever read the value back: this
+ * function checked only hunger/fatigue. breakNeed drains only while working
+ * (NEED_DRAIN_RATES.breakNeed.working, no idle drain at all) with no
+ * proactive routing under any policy, so on a work-heavy crew it free-fell,
+ * uninterrupted, all the way to its COLLAPSE threshold (15, well inside
+ * needsMoraleEffect's "suffering"/-1.5-per-tick band, EmployeeNeeds.ts) before
+ * anything intervened — and even then, a collapse rest services only the one
+ * gauge that collapsed, topping breakNeed back up to roughly 45 (still short
+ * of the 50 "comfortable" line), never the healthy margin hunger/fatigue's
+ * own 60 default keeps them at. Confirmed as the dominant contributor to
+ * `scripts/scenario-defs/vibration-budget.json`'s long-standing
+ * `worker_revolt` (issue #867): a multi-employee, work-heavy, multi-thousand-
+ * tick file grinds combined crew morale to 0 well within REVOLT_TICKS purely
+ * from this one permanently-unaddressed gauge, independent of how well
+ * hunger/fatigue are otherwise protected.
  */
 export function shouldForceRest(
   policy: SitePolicy,
@@ -83,10 +113,11 @@ export function shouldForceRest(
   }
 
   // Determine effective thresholds
-  const { hunger: hungerThreshold, fatigue: fatigueThreshold } = getEffectiveThresholds(policy, employee.id);
+  const { hunger: hungerThreshold, fatigue: fatigueThreshold, social: socialThreshold } = getEffectiveThresholds(policy, employee.id);
 
-  // Need-based rest check
-  if (employee.hunger <= hungerThreshold || employee.fatigue <= fatigueThreshold) {
+  // Need-based rest check — breakNeed included alongside hunger/fatigue (#867).
+  if (employee.hunger <= hungerThreshold || employee.fatigue <= fatigueThreshold
+      || (employee.breakNeed ?? 100) <= socialThreshold) {
     return true;
   }
 
@@ -94,21 +125,25 @@ export function shouldForceRest(
 }
 
 /**
- * Returns the effective hunger/fatigue rest thresholds for an employee under
- * this policy — per-employee `customThresholds` override (in 'custom' mode)
- * take precedence over the policy-level defaults when present.
+ * Returns the effective hunger/fatigue/social (breakNeed) rest thresholds for
+ * an employee under this policy — per-employee `customThresholds` override
+ * (in 'custom' mode) take precedence over the policy-level defaults when
+ * present. `social` names the breakNeed threshold, matching customThresholds'
+ * and socialBreakThreshold's own field name (#867).
  */
-export function getEffectiveThresholds(policy: SitePolicy, employeeId?: number): { hunger: number; fatigue: number } {
+export function getEffectiveThresholds(policy: SitePolicy, employeeId?: number): { hunger: number; fatigue: number; social: number } {
   let hungerThreshold = policy.hungerRestThreshold;
   let fatigueThreshold = policy.fatigueRestThreshold;
+  let socialThreshold = policy.socialBreakThreshold;
 
   if (policy.shiftMode === 'custom' && employeeId !== undefined) {
     const override = policy.customThresholds[employeeId];
     if (override !== undefined) {
       hungerThreshold = override.hunger;
       fatigueThreshold = override.fatigue;
+      socialThreshold = override.social;
     }
   }
 
-  return { hunger: hungerThreshold, fatigue: fatigueThreshold };
+  return { hunger: hungerThreshold, fatigue: fatigueThreshold, social: socialThreshold };
 }

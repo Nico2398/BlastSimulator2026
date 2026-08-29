@@ -3,7 +3,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { deductRestCost } from '../../../src/core/engine/RestActionHelpers.js';
+import { Random } from '../../../src/core/math/Random.js';
+import { hireEmployee } from '../../../src/core/entities/Employee.js';
+import { placeBuilding } from '../../../src/core/entities/Building.js';
+import { defineZone } from '../../../src/core/entities/Zone.js';
+import { deductRestCost, findNearestBuildingOfType } from '../../../src/core/engine/RestActionHelpers.js';
 import { NEED_REST_COSTS } from '../../../src/core/config/balance.js';
 
 const DEDUCT_SEED = 42;
@@ -114,5 +118,67 @@ describe('deductRestCost', () => {
     deductRestCost(state, 'fatigue');
 
     expect(state.finances.transactions.find(t => t.category === 'needs')).toBeUndefined();
+  });
+});
+
+describe('findNearestBuildingOfType — active-zone exclusion (#557)', () => {
+  it('excludes a building sitting inside a still-occupied zone, picking a farther one outside instead', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    const rng = new Random(DEDUCT_SEED);
+    // Closer, but inside the zone about to be defined below.
+    const inside = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(inside.success).toBe(true);
+    // Farther, outside the zone.
+    const outside = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
+    expect(outside.success).toBe(true);
+
+    defineZone(state.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
+    hireEmployee(state.employees, 'driller', rng, 5, 5); // keeps the zone occupied -> not clear
+
+    const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(found?.id).toBe(outside.building!.id);
+  });
+
+  it('stops excluding once the zone reports clear — the nearer, in-zone building is eligible again (boundary)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    const inside = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(inside.success).toBe(true);
+    placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
+
+    defineZone(state.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
+    // No employees/vehicles at all -> the zone is trivially clear.
+
+    const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(found?.id).toBe(inside.building!.id);
+  });
+
+  it('keeps excluding once the zone reports clear of occupants, while a live blast plan still overlaps it (#557 follow-up)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    const inside = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(inside.success).toBe(true);
+    const outside = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
+    expect(outside.success).toBe(true);
+
+    defineZone(state.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
+    // No employees/vehicles at all -> occupancy alone would say "clear" —
+    // but a charged, un-fired blast plan squarely inside the same footprint
+    // means it genuinely is not safe to route anyone back here yet.
+    state.drillHoles.push({ id: 'H1', x: 5, z: 5, depth: 6, diameter: 0.089 });
+
+    const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(found?.id).toBe(outside.building!.id);
+  });
+
+  it('applies no exclusion at all when no zone has ever been defined (rejection — nothing to exclude)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    const near = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(near.success).toBe(true);
+
+    const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(found?.id).toBe(near.building!.id);
   });
 });

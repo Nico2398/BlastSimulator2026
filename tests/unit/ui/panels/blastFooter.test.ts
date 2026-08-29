@@ -5,6 +5,8 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import { addHole, resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
 import { createCharge } from '../../../../src/core/mining/ChargePlan.js';
 import { setLocale } from '../../../../src/core/i18n/I18n.js';
+import { hireEmployee } from '../../../../src/core/entities/Employee.js';
+import { Random } from '../../../../src/core/math/Random.js';
 
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -122,5 +124,49 @@ describe('BlastFooter', () => {
     const { footer, container } = makeFooter();
     footer.dispose();
     expect(container.contains(footer.root)).toBe(false);
+  });
+
+  // #557: the tutorial teaches evacuating the blast zone before firing, so
+  // FIRE mirrors the console `blast` command's own tutorial-only refusal —
+  // a disabled control with a stated reason, not a silent no-op.
+  describe('tutorial-only zone-occupied refusal (#557)', () => {
+    it('disables FIRE with the zone-occupied reason when tutorialActive and the danger zone is occupied', () => {
+      const { footer } = makeFooter();
+      const state = makeState();
+      chargeAndSequence(state); // hole at (10, 10), fully charged + sequenced — otherwise fireable
+      hireEmployee(state.employees, 'driller', new Random(1), 10, 10); // standing right on the hole
+
+      footer.update(state, true);
+
+      const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
+      expect(fireBtn.disabled).toBe(true);
+      expect(footer.root.textContent).toContain('1 still in the blast zone. Evacuate before firing.');
+    });
+
+    it('keeps FIRE enabled outside the tutorial even with an occupied danger zone', () => {
+      const { footer } = makeFooter();
+      const state = makeState();
+      chargeAndSequence(state);
+      hireEmployee(state.employees, 'driller', new Random(1), 10, 10);
+
+      footer.update(state, false);
+
+      const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
+      expect(fireBtn.disabled).toBe(false);
+      expect(footer.root.textContent).not.toContain('still in the blast zone');
+    });
+
+    it('leaves FIRE enabled during the tutorial once the danger zone is clear', () => {
+      const { footer } = makeFooter();
+      const state = makeState();
+      chargeAndSequence(state);
+      hireEmployee(state.employees, 'driller', new Random(1), 200, 200); // well outside the zone
+
+      footer.update(state, true);
+
+      const fireBtn = footer.root.querySelector('#bs-blast-fire') as HTMLButtonElement;
+      expect(fireBtn.disabled).toBe(false);
+      expect(footer.root.textContent).not.toContain('still in the blast zone');
+    });
   });
 });

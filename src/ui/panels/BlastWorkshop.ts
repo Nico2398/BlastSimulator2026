@@ -168,7 +168,7 @@ export class BlastWorkshop {
    */
   get currentStep(): StepId { return this.activeStep; }
 
-  update(state: GameState, weather?: WeatherState): void {
+  update(state: GameState, weather?: WeatherState, tutorialActive: boolean = false): void {
     if (this.autoAdvance) {
       const suggested = suggestStep(state);
       if (suggested !== this.activeStep) this.setActiveStep(suggested, false);
@@ -180,7 +180,7 @@ export class BlastWorkshop {
     this.sequenceStep.update(state);
     this.previewStep.update(state);
     this.fireStep.update(state, weather);
-    this.footer.update(state);
+    this.footer.update(state, tutorialActive);
   }
 
   refreshLocale(): void {

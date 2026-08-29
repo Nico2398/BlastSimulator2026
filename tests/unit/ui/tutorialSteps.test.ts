@@ -5,8 +5,8 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 
 describe('tutorialSteps', () => {
   // ── 1 ────────────────────────────────────────────────────────────────────
-  it('has exactly 31 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy)', () => {
-    expect(TUTORIAL_STEPS.length).toBe(31);
+  it('has exactly 32 entries (#553 adds build-driving-center/train-driller/buy-drill-rig-assign, #555 adds train-digger/buy-rock-digger-assign, #681 adds build-living-quarters/set-early-policy, #557 adds evacuate-zone)', () => {
+    expect(TUTORIAL_STEPS.length).toBe(32);
     expect(TUTORIAL_STEPS.length).toBe(TOTAL_TUTORIAL_STEPS);
   });
 
@@ -103,6 +103,9 @@ describe('tutorialSteps', () => {
       'drill-plan',
       'charge',
       'sequence',
+      // #557: the blast zone must be evacuated before firing. Inserted right
+      // before 'blast' so the rail cannot skip past it.
+      'evacuate-zone',
       'blast',
       'scores',
       'event-fire-resolve',
@@ -306,7 +309,7 @@ describe('tutorialSteps', () => {
       'time-speed', 'hire-surveyor', 'survey', 'hire-driller',
       'build-driving-center', 'train-driller', 'buy-drill-rig-assign',
       'train-digger', 'buy-rock-digger-assign',
-      'drill-plan', 'charge', 'sequence', 'blast',
+      'drill-plan', 'charge', 'sequence', 'evacuate-zone', 'blast',
       'scores', 'event-fire-resolve', 'hire-manager',
       'hire-driver', 'vehicle-buy-assign', 'build-storage', 'contract-accept', 'haul-debris', 'contract-deliver',
       'finances', 'box-cut', 'needs', 'tick-advance',
@@ -511,7 +514,7 @@ describe('tutorialSteps', () => {
     // the player: the card never completes and there is nothing left to click.
     // vehicle-buy-assign did exactly that — assigning a driver sends them
     // walking to the vehicle, and ArrivalGate only seats them on arrival.
-    const SIMULATION_OWNED = ['survey', 'train-driller', 'buy-drill-rig-assign', 'train-digger', 'buy-rock-digger-assign', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver'];
+    const SIMULATION_OWNED = ['survey', 'train-driller', 'buy-drill-rig-assign', 'train-digger', 'buy-rock-digger-assign', 'vehicle-buy-assign', 'haul-debris', 'contract-deliver', 'evacuate-zone'];
 
     for (const id of SIMULATION_OWNED) {
       it(`"${id}" waits on work and is given a tick allowance`, () => {
@@ -528,6 +531,72 @@ describe('tutorialSteps', () => {
       // and no licence at all, so the command it suggested could only fail.
       const step = TUTORIAL_STEPS.find((s) => s.id === 'vehicle-buy-assign')!;
       expect(step.commands).toContain('vehicle driver 1 4');
+    });
+  });
+
+  // ── evacuate-zone (#557) ─────────────────────────────────────────────────
+  // The tutorial enforces the same safety drill the blast console command
+  // itself is meant to refuse without: nobody standing in the drill plan's
+  // danger zone (computeDangerZone(drillHoles, BLAST_DANGER_MARGIN_M),
+  // mirroring PreflightModal.ts/blastSteps/Fire.ts's own use of that pair)
+  // when the player tries to move on to 'blast'.
+  describe('evacuate-zone step (#557)', () => {
+    const step = TUTORIAL_STEPS.find((s) => s.id === 'evacuate-zone')!;
+
+    it('exists between sequence and blast', () => {
+      const ids = TUTORIAL_STEPS.map((s) => s.id);
+      const idx = ids.indexOf('evacuate-zone');
+      expect(idx).toBeGreaterThan(-1);
+      expect(ids[idx - 1]).toBe('sequence');
+      expect(ids[idx + 1]).toBe('blast');
+    });
+
+    it('waits on work and is given a tick allowance — walking out takes ticks', () => {
+      expect(step.waitsOnWork).toBe(true);
+      expect(step.tickBudget ?? 0).toBeGreaterThan(0);
+    });
+
+    it('has a blast-toolbar highlightTarget', () => {
+      expect(step.highlightTarget).toBe('#bs-toolbar [data-panel="blast"]');
+    });
+
+    it('does not complete while an employee still stands inside the drill plan danger zone', () => {
+      const state = {
+        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
+        employees: { employees: [{ id: 1, x: 20, z: 20, alive: true }] },
+        vehicles: { vehicles: [] },
+      } as unknown as GameState;
+      expect(step.isComplete(state, {})).toBe(false);
+    });
+
+    it('does not complete while a vehicle still stands inside the drill plan danger zone', () => {
+      const state = {
+        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
+        employees: { employees: [] },
+        vehicles: { vehicles: [{ id: 1, x: 20, z: 20 }] },
+      } as unknown as GameState;
+      expect(step.isComplete(state, {})).toBe(false);
+    });
+
+    it('completes once every employee and vehicle has cleared the danger zone', () => {
+      const state = {
+        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
+        employees: { employees: [{ id: 1, x: 100, z: 100, alive: true }] },
+        vehicles: { vehicles: [{ id: 1, x: 100, z: 100 }] },
+      } as unknown as GameState;
+      expect(step.isComplete(state, {})).toBe(true);
+    });
+
+    it('does not falsely complete on a dead employee left inside the zone — only living crew must clear it', () => {
+      // isZoneClear (Zone.ts) already skips !emp.alive; this pins the same
+      // contract at the tutorial step boundary so a regression here is caught
+      // even if the step stops delegating to isZoneClear directly.
+      const state = {
+        drillHoles: [{ id: 'h1', x: 20, z: 20, depth: 8, diameter: 0.1 }],
+        employees: { employees: [{ id: 1, x: 20, z: 20, alive: false }] },
+        vehicles: { vehicles: [] },
+      } as unknown as GameState;
+      expect(step.isComplete(state, {})).toBe(true);
     });
   });
 });
