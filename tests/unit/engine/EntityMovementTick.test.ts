@@ -9,7 +9,7 @@ import { Random } from '../../../src/core/math/Random.js';
 import { tickVehicle, tickEmployeeMovement, tickVehicleTaskState } from '../../../src/core/engine/EntityMovementTick.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, type VehicleTask } from '../../../src/core/entities/Vehicle.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import {
@@ -226,7 +226,7 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
     const MAX_TICKS = VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 20;
     let maxWaitingTicksSeen = 0;
     let ticks = 0;
-    while (!(vehicle.x === 4 && vehicle.z === 1 && vehicle.task === 'idle') && ticks < MAX_TICKS) {
+    while (!(vehicle.x === 4 && vehicle.z === 1 && (vehicle.task as VehicleTask) === 'idle') && ticks < MAX_TICKS) {
       tickVehicle(state, vehicle, emitter);
       expect(vehicle.isMoveStuck).toBe(false);
       maxWaitingTicksSeen = Math.max(maxWaitingTicksSeen, vehicle.waitingTicks);
@@ -381,7 +381,7 @@ describe('tickVehicle — occupancy-block reroute/stuck escalation (issue #591)'
 
     const MAX_TICKS = VEHICLE_OCCUPANCY_REROUTE_THRESHOLD + 20;
     let ticks = 0;
-    while (!(vehicle.x === 2 && vehicle.z === 1 && vehicle.task === 'idle') && ticks < MAX_TICKS) {
+    while (!(vehicle.x === 2 && vehicle.z === 1 && (vehicle.task as VehicleTask) === 'idle') && ticks < MAX_TICKS) {
       tickVehicle(state, vehicle, emitter);
       tickVehicle(state, blocker, emitter);
       ticks++;

@@ -12,10 +12,36 @@ import { createDamageState, processProjections } from '../../../src/core/entitie
 import { createBuildingState } from '../../../src/core/entities/Building.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
+/** Default fields for hand-built Employee test fixtures below (mirrors hireEmployee's defaults). */
+const EMPLOYEE_DEFAULTS = {
+  activeActionId: null,
+  hunger: 100,
+  fatigue: 100,
+  breakNeed: 100,
+  collapsing: false,
+  interruptedActionPayload: null,
+  ticksWorked: 0,
+  restTicksRemaining: null,
+  restNeedKey: null,
+  taskTicksRemaining: null,
+  activeTaskSkill: null,
+  destinationX: null,
+  destinationZ: null,
+  moveConsecutiveFailures: 0,
+  isMoveStuck: false,
+  pendingRestDuration: null,
+  pendingRestNeedKey: null,
+  pendingTaskDuration: null,
+  pendingActionType: null,
+  pendingActionPayload: null,
+  pendingDriverVehicleId: null,
+} as const;
+
 function addEmployee(state: ReturnType<typeof createEmployeeState>, x: number, z: number): Employee {
   const emp: Employee = {
     id: state.nextId++, name: 'Test', role: 'driller', salary: 500,
     morale: 60, unionized: false, injured: false, alive: true, x, z,
+    qualifications: [], trainingState: null, taskQueue: [], ...EMPLOYEE_DEFAULTS,
   };
   state.employees.push(emp);
   return emp;
@@ -59,6 +85,7 @@ describe('Zone clearing and evacuation', () => {
       rockId: 'sandite', oreDensities: {},
       initialVelocity: { x: 30, y: 0, z: 0 }, // KE = 0.5*10*900 = 4500J → death
       isProjection: true,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 0,
     };
 
     const damage = createDamageState();
@@ -85,6 +112,7 @@ describe('Zone clearing and evacuation', () => {
       rockId: 'sandite', oreDensities: {},
       initialVelocity: { x: 30, y: 0, z: 0 },
       isProjection: true,
+      halfExtents: { x: 0.3, y: 0.3, z: 0.3 }, shapeSeed: 0,
     };
 
     const damage = createDamageState();

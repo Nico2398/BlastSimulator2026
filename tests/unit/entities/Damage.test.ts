@@ -14,12 +14,39 @@ import {
   type Employee,
 } from '../../../src/core/entities/Employee.js';
 
+/** Default fields for hand-built Employee test fixtures below (mirrors hireEmployee's defaults). */
+const EMPLOYEE_DEFAULTS = {
+  activeActionId: null,
+  hunger: 100,
+  fatigue: 100,
+  breakNeed: 100,
+  collapsing: false,
+  interruptedActionPayload: null,
+  ticksWorked: 0,
+  restTicksRemaining: null,
+  restNeedKey: null,
+  taskTicksRemaining: null,
+  activeTaskSkill: null,
+  destinationX: null,
+  destinationZ: null,
+  moveConsecutiveFailures: 0,
+  isMoveStuck: false,
+  pendingRestDuration: null,
+  pendingRestNeedKey: null,
+  pendingTaskDuration: null,
+  pendingActionType: null,
+  pendingActionPayload: null,
+  pendingDriverVehicleId: null,
+} as const;
+
 function makeProjection(id: number, x: number, z: number, mass: number, velocity: number): FragmentData {
   return {
     id, position: { x, y: 0, z }, volume: mass / 2.5, mass,
     rockId: 'sandite', oreDensities: {},
     initialVelocity: { x: velocity, y: 0, z: 0 },
     isProjection: true,
+    halfExtents: { x: 0.3, y: 0.3, z: 0.3 },
+    shapeSeed: id,
   };
 }
 
@@ -63,11 +90,13 @@ describe('Damage and casualty system', () => {
       id: 1, name: 'Bob', role: 'driller', salary: 500,
       morale: 60, unionized: false, injured: false, alive: true,
       x: 10, z: 10,
+      qualifications: [], trainingState: null, taskQueue: [], ...EMPLOYEE_DEFAULTS,
     };
     const emp2: Employee = {
       id: 2, name: 'Chuck', role: 'blaster', salary: 700,
       morale: 60, unionized: false, injured: false, alive: true,
       x: 20, z: 20,
+      qualifications: [], trainingState: null, taskQueue: [], ...EMPLOYEE_DEFAULTS,
     };
     employees.employees.push(emp1, emp2);
     employees.nextId = 3;
@@ -93,6 +122,7 @@ describe('Damage and casualty system', () => {
       id: 1, name: 'Test', role: 'driller', salary: 500,
       morale: 60, unionized: false, injured: false, alive: true,
       x: 5, z: 5,
+      qualifications: [], trainingState: null, taskQueue: [], ...EMPLOYEE_DEFAULTS,
     });
 
     const frag = makeProjection(1, 5, 5, 30, 20); // KE = 6000J → death
@@ -113,6 +143,7 @@ describe('Damage and casualty system', () => {
       id: 1, name: 'Test', role: 'driller', salary: 500,
       morale: 60, unionized: false, injured: false, alive: true,
       x: 5, z: 5,
+      qualifications: [], trainingState: null, taskQueue: [], ...EMPLOYEE_DEFAULTS,
     });
 
     const frag = makeProjection(1, 5, 5, 30, 20);
