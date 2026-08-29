@@ -1,7 +1,7 @@
 ---
 model: opencode/deepseek-v4-flash-free
 reasoningEffort: max
-description:  Code quality reviewer. Flags architecture violations, naming issues, dead code, file size limits, TypeScript strictness, config hardcoding. Read-only.
+description:  Code quality reviewer. Flags architecture violations, naming issues, dead code, single-responsibility violations, TypeScript strictness, config hardcoding. Read-only.
 mode: subagent
 permission:
   bash:
@@ -20,7 +20,7 @@ Adjust review depth based on `risk_tier` from context:
 
 | Tier | Depth | Focus |
 |------|-------|-------|
-| trivial | Light | Architecture + PRNG only. Skip i18n, file size, config checks. |
+| trivial | Light | Architecture + PRNG only. Skip i18n, cohesion, config checks. |
 | lite | Standard | All checks. Skip cross-file impact analysis. |
 | full | Deep | All checks + cross-file impact + regression risk. |
 
@@ -35,10 +35,9 @@ Adjust review depth based on `risk_tier` from context:
 - **PRNG** — `Math.random()` used directly. Must use `src/core/math/Random.ts`.
 - **TypeScript strict** — `any` outside test fixtures. Excessive `as` assertions.
 - **Config** — hardcoded balance numbers. Must use `src/core/config/`.
-- **File size** — owned by `tests/unit/lint/FileSizeBudget.test.ts`, never reported here. A length that test accepts is not a finding.
 - **Dead code** — unreachable branches, unused imports, commented-out code.
 - **Naming** — inconsistent identifiers vs conventions in `dev-coding-conventions` skill.
-- **SOLID principles** — violations of single responsibility (class/function does too much), dependency inversion (high-level depends on low-level details), or interface segregation (bloated interfaces) per `dev-coding-conventions` skill.
+- **SOLID principles** — violations of single responsibility (function, class, or file doing too much — no lint test owns file cohesion, judge it here), dependency inversion (high-level depends on low-level details), or interface segregation (bloated interfaces) per `dev-coding-conventions` skill.
 
 ### Coding Conventions (Naming & Intent)
 - **Names translate intent** — a reader unfamiliar with the codebase must understand what a
