@@ -23,13 +23,13 @@ import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
-import { createRunner, runCommand } from './console/createRunner.js';
+import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLandscape, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
-import { getLivingEmployees } from './core/entities/Employee.js';
+import { getLivingEmployees } from './core/entities/Employee.js'; import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
@@ -434,7 +434,7 @@ console.log = (...args: unknown[]) => {
  * other caller gets the immediate sync.
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
-  const prevState = ctx.state;
+  const prevState = ctx.state; syncTutorialActive(ctx, tutorial.isActive);
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -501,7 +501,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 
   // Update UI after every command
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive);
     // A game exists — reveal HUD chrome unless the player is looking at the
     // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
     // command so no entry point (button, console, scenario harness) can miss it.
@@ -628,8 +628,8 @@ window.__gameState = () => {
     // delivered (not just spoil) needs a single numeric field to check
     // increased/decreased/changedBy against (#671).
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
-    lastCommandOutput,
-    frameCount: scene.frameCount,
+    dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees), // mirrors serializeGameState (#557)
+    lastCommandOutput, frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
     consoleLogs: consoleLogs.splice(0, 50),
     // Sample voxels at blast center to check if they're cleared
@@ -1082,7 +1082,7 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive);
     if (!mainMenu.visible) uiManager.show();
     savesModal.onTick(ctx.state);
   }

@@ -494,6 +494,13 @@ export const VOXEL_SIZE_CM = 100;
  */
 export const BLAST_DANGER_MARGIN_M = 15;
 
+/**
+ * Metres a vehicle or employee must be moved beyond the zone boundary to
+ * count as evacuated (Evacuation.ts findSafeEvacuationCell). Placeholder —
+ * tuned by implementer/tests (#557).
+ */
+export const EVACUATION_CLEARANCE_M = 5;
+
 // ─── Fragment Velocity Simulation ────────────────────────────────────────────────
 
 /** Decay rate for surface proximity effect based on distance to air voxel. */

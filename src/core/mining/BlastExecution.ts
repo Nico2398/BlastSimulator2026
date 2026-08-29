@@ -34,6 +34,7 @@ import { getOre } from '../world/OreCatalog.js';
 import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
+import type { AccidentRecord } from '../entities/Damage.js';
 import {
   BLAST_ZONE_RADIUS,
   GRAVITY,
@@ -146,25 +147,19 @@ export interface BlastReport {
   oversizedFragments: number;
   totalRockVolume: number;
   projectionCount: number;
-  /**
-   * Estimated maximum throw distance in metres, from the fastest projected
-   * fragment's launch speed — standard unresisted 45°-launch range
-   * (v² / g), the angle that maximises range and the one already implied by
-   * `calculateInitialVelocity`'s 45° default. An estimate, not a traced
-   * trajectory: real fragments launch at whatever angle the blast geometry
-   * gives them and lose speed to drag, so this is an upper bound a report
-   * card can show next to the count, not a per-fragment prediction.
-   */
+  /** Estimated max throw distance (m), from the fastest projected fragment's launch speed — unresisted 45°-launch range (v²/g); an upper bound, not a per-fragment prediction. */
   maxProjectionDistanceM: number;
   /** Total value of ore actually recovered, per BlastCalc's pricing. */
   totalOreValue: number;
   /** Total cost of the charges spent on this blast (kg × explosive $/kg, summed before the plan was cleared). */
   spent: number;
   destroyedBuildings: DestroyedBuildingInfo[];
+  /** Casualties/damage this blast caused (#557). Optional: pre-existing literal fixtures omit it; buildBlastReport defaults to `[]`. */
+  accidents?: AccidentRecord[];
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = []): BlastReport {
   return {
     tick,
     rating: result.rating,
@@ -178,6 +173,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     totalOreValue: result.totalOreValue,
     spent,
     destroyedBuildings: result.destroyedBuildings,
+    accidents,
   };
 }
 

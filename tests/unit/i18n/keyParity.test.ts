@@ -173,10 +173,15 @@ describe('en.json / fr.json — key-set parity', () => {
     // construction-site flow, both locales translated, and removed the
     // orphaned ui.build.placed key — BuildMenu.ts uses ui.build.ordered
     // instead, and nothing in src/ referenced ui.build.placed anymore.
+    // Baseline is now 3328 (up from 3323): #557 added 5 new keys for the
+    // evacuate-zone tutorial step and its tutorial-only blast refusal —
+    // tutorial.step_evacuate(.title), tutorial.stage.sound_horn,
+    // ui.blast_workshop.footer.fire_reason_zone_occupied, and
+    // mining.blast.refused_zone_occupied — both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3323);
+    expect(Object.keys(en).length).toBe(3328);
   });
 });
 

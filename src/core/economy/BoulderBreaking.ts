@@ -197,8 +197,13 @@ function highestFragmentId(state: GameState): number {
  * successful split (see tickBreakProgress's own inlined success cleanup) —
  * without this the vehicle would stay permanently reserved for an action
  * nothing will ever complete.
+ *
+ * Exported for Evacuation.ts (#557): mirrors HaulingTask.ts's abortHaul — a
+ * vehicle mid-break is driven by this file's own tickBreakProgress loop, and
+ * evacuating one needs breakPhase cleared first so it stops fighting the
+ * evacuation's own moveVehicle target.
  */
-function abortBreak(vehicle: Vehicle): void {
+export function abortBreak(vehicle: Vehicle): void {
   vehicle.breakFragmentId = null;
   vehicle.breakPhase = null;
   vehicle.task = 'idle';

@@ -16,19 +16,19 @@
   ],
   "steps": [
     {
-      "command": "campaign start level:tutorial_pit cash:320000",
+      "command": "campaign start level:tutorial_pit cash:340000",
       "timeout": 30,
-      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered.",
+      "description": "Setup: load Tutorial Pit — the level regenerates the terrain at its own size and re-frames the camera. #553: cash bumped from $80,000 to $250,000 -- drill_hole is now a queued, vehicle-gated action, so this file needs a driving_center/training/drill_rig it never used to, on top of the original manager/driver/hauler/warehouse shopping list. #555: bumped again to $320,000 -- dig_ramp_segment is now gated the same way, so this file also needs a driving.excavator course and a rock_digger ($52,500 together) plus the extra payroll/fuel/maintenance drain of the real ticks box-cut now spends actually digging instead of completing in the same tick it was ordered. #557: bumped again to $340,000 -- evacuateZone (Evacuation.ts) now genuinely routes the crew out to a reachable safe cell and back, instead of the previous no-op teleport, so the drill/charge/blast sequence spends real additional ticks (and payroll) on the walk; by build-storage this file's own `build freight_warehouse at:6,6` step was landing $9,182 short of the $15,000 cost (direct-traced, command mode) at the old $320,000 headroom.",
       "role": "setup",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:tutorial_pit cash:320000"
+          "command": "campaign start level:tutorial_pit cash:340000"
         }
       ],
       "expect": {
         "equals": {
-          "cash": 320000
+          "cash": 340000
         }
       }
     },
@@ -739,7 +739,7 @@
     {
       "command": "sequence auto",
       "timeout": 30,
-      "description": "sequence complete: Auto Sequence clicked, delay labels appear on every hole",
+      "description": "sequence complete: Auto Sequence clicked, delay labels appear on every hole. #557: the tutorial now advances to 'evacuate-zone' next, not straight to 'blast' -- the new step between them.",
       "role": "player",
       "interaction": [
         {
@@ -748,14 +748,54 @@
         },
         {
           "type": "waitForTutorialStep",
-          "stepId": "blast"
+          "stepId": "evacuate-zone"
         }
       ],
       "expect": {
-        "tutorialStep": "blast",
+        "tutorialStep": "evacuate-zone",
         "increased": [
           "sequencedCount"
         ]
+      }
+    },
+    {
+      "command": "zone clear x1:5 y1:5 x2:41 y2:41",
+      "timeout": 180,
+      "description": "#557: evacuate-zone. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this exact 3x3/spacing:3 grid at (20,20) pads out to (5,5)-(41,41) -- on tutorial_pit's 32x32 map that covers nearly the whole site, so the driller (parked at the pattern they just finished charging) and the surveyor (idle since the survey step) are both still inside it. autoAdvance has kept the Blast Workshop on step 5 (Fire) since sequencing completed -- no tab click needed before Sound the Horn is reachable. Sound the Horn sends the same box this command declares (Fire.ts's soundHorn(), computed live). clearZone no longer teleports (#557): this only sets a destination for whoever is inside, so the wait_until step right after is what proves the walkout actually finished, not this click itself.",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        }
+      ],
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
+      }
+    },
+    {
+      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
+      "timeout": 180,
+      "description": "#557: drain the real walkout Sound the Horn just ordered -- the tutorial card only advances to 'blast' once dangerZoneClear genuinely reports true, matching the drill-plan/charge wait_until steps above.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "dangerZoneClear",
+          "equals": true,
+          "maxTicks": 300,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "tutorialStep": "blast",
+        "equals": {
+          "dangerZoneClear": true
+        }
       }
     },
     {
@@ -1109,7 +1149,7 @@
         "equals": {
           "activeContractCount": 0
         },
-        "note": "A genuinely completed delivery again — which is what #653/#585/#707’s own history here describes, and what #817 recorded as no longer true. The contract is accepted after the warehouse stands now (tutorialSteps.ts’s reordered canonical sequence, #556), so its deadline is not spent watching a construction site and it is still live when this runs. activeContractCount drops to 0 by completion, not by expiry, and the payout is what proves the difference. The payout itself is not asserted here: in interaction mode the payroll accrued across the step’s own clicks can outweigh a small delivery, so the direction of cash is not a stable claim. What is stable, and what #817 was about, is that the count drops by completion — the contract is still live when this runs instead of having expired during a construction wait."
+        "note": "A genuinely completed delivery again — which is what #653/#585/#707’s own history here describes, and what #817 recorded as no longer true at the time. #557: the file's own starting cash (see the new_game step's own history) needed one more bump — with it, build-storage completes well within every rubble_disposal offer's deadline again (direct-traced, command mode), so #817's genuine game-balance conflict (max contract deadline vs. real construction+interruption time) no longer manifests on this file's own current timings; the underlying conflict itself is unchanged and #817 stays open for whatever crew/timing combination reproduces it. activeContractCount drops to 0 by completion, not by expiry, and the payout is what proves the difference. The payout itself is not asserted here: in interaction mode the payroll accrued across the step’s own clicks can outweigh a small delivery, so the direction of cash is not a stable claim."
       }
     },
     {

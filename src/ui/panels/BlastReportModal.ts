@@ -16,11 +16,12 @@
 
 import { t } from '../../core/i18n/I18n.js';
 import { el, statGrid } from '../dom.js';
-import { iconEl } from '../icons.js';
+import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { BlastReport, BlastRating } from '../../core/mining/BlastExecution.js';
+import type { AccidentRecord } from '../../core/entities/Damage.js';
 
 const RATING_COLOR: Record<BlastRating, string> = {
   perfect: 'var(--bsx-positive)',
@@ -28,6 +29,20 @@ const RATING_COLOR: Record<BlastRating, string> = {
   mediocre: 'var(--bsx-amber)',
   bad: 'var(--bsx-critical-text)',
   catastrophic: 'var(--bsx-critical-text)',
+};
+
+/**
+ * Note-card style per casualty accident type shown on the blast report
+ * (#557) — building_damage/destroyed are deliberately excluded: those are
+ * already covered by report.destroyedBuildings' own dedicated card just
+ * below, and OperationsPanel's incident log covers every AccidentRecord
+ * type generically for the full history.
+ */
+const ACCIDENT_NOTE_STYLE: Partial<Record<AccidentRecord['type'], { icon: IconName; bgPrefix: string; fg: string }>> = {
+  death: { icon: 'skull', bgPrefix: 'rgba(255,91,76,', fg: 'var(--bsx-critical-text)' },
+  injury: { icon: 'injured', bgPrefix: 'rgba(255,176,46,', fg: 'var(--bsx-amber)' },
+  vehicle_destroyed: { icon: 'vehicle', bgPrefix: 'rgba(255,91,76,', fg: 'var(--bsx-critical-text)' },
+  vehicle_damage: { icon: 'vehicle', bgPrefix: 'rgba(255,176,46,', fg: 'var(--bsx-amber)' },
 };
 
 // Real-time delay between a blast report becoming available and the modal
@@ -223,6 +238,11 @@ export class BlastReportModal {
       notes.push(this.makeNoteCard('build', 'rgba(255,91,76,', 'var(--bsx-critical-text)',
         t('ui.blast_workshop.report.building_destroyed', { type: t(`building.${b.type}.name`), id: b.buildingId })));
     }
+    for (const a of report.accidents ?? []) {
+      const style = ACCIDENT_NOTE_STYLE[a.type];
+      if (!style) continue;
+      notes.push(this.makeNoteCard(style.icon, style.bgPrefix, style.fg, this.accidentText(a, state)));
+    }
     if (report.oversizedFragments > 0) {
       notes.push(this.makeNoteCard('rock', 'rgba(255,176,46,', 'var(--bsx-amber)',
         t('ui.blast_workshop.report.oversized_hint', { count: report.oversizedFragments, vehicle: t('vehicle_type.rock_fragmenter') })));
@@ -256,7 +276,17 @@ export class BlastReportModal {
     return wrap;
   }
 
-  private makeNoteCard(icon: 'build' | 'rock', bgPrefix: string, fg: string, text: string): HTMLElement {
+  /** Mirrors OperationsPanel.ts's incidentText — same i18n keys, same real-name-lookup pattern, scoped to the four accident types this report card shows. */
+  private accidentText(a: AccidentRecord, state: GameState): string {
+    if (a.type === 'death' || a.type === 'injury') {
+      const name = state.employees.employees.find(e => e.id === a.entityId)?.name ?? t('ui.operations.incident_unknown_worker');
+      return t(a.type === 'death' ? 'ui.operations.incident_death' : 'ui.operations.incident_injury', { name });
+    }
+    const vehicle = a.entityLabel ? t(`vehicle_type.${a.entityLabel}`) : t('ui.operations.incident_unknown_vehicle');
+    return t(a.type === 'vehicle_destroyed' ? 'ui.operations.incident_vehicle_destroyed' : 'ui.operations.incident_vehicle_damage', { vehicle });
+  }
+
+  private makeNoteCard(icon: IconName, bgPrefix: string, fg: string, text: string): HTMLElement {
     const wrap = el('div');
     wrap.style.cssText = `display:flex;gap:10px;padding:12px;border-radius:5px;background:${bgPrefix}.08);border:1px solid ${bgPrefix}.28)`;
     wrap.append(

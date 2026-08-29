@@ -38,7 +38,15 @@ export function tickNeedRestoration(state: GameState): NeedRestorationResult {
   const result: NeedRestorationResult = { routed: [], noBuilding: [] };
 
   for (const emp of state.employees.employees) {
-    if (!emp.alive || emp.injured || emp.activeActionId !== null) continue;
+    // destinationX !== null with activeActionId === null is an employee
+    // walking outside the claim system entirely — currently only
+    // evacuateZone's direct-field walk order (Zone.ts's clearZone,
+    // Evacuation.ts). Without this guard they read as idle and this routine
+    // would happily self-claim a fresh rest action, overwriting the
+    // evacuation destination with a walk back toward whatever building is
+    // nearest — same failure class EmployeeDispatch.ts's own mid-walk guard
+    // exists for (#557).
+    if (!emp.alive || emp.injured || emp.activeActionId !== null || emp.destinationX !== null) continue;
     const needsRest =
       emp.hunger  < NEED_WARNING_THRESHOLDS.hunger ||
       emp.fatigue < NEED_WARNING_THRESHOLDS.fatigue;
@@ -94,6 +102,23 @@ export function tickCollapse(state: GameState, _firedEvents?: FiredEvent[], _emi
 
   for (const emp of state.employees.employees) {
     if (!emp.alive || emp.injured) continue;
+    // Mid-walk to a safe cell (evacuateZone, Evacuation.ts/Zone.ts's
+    // clearZone) — destinationX/Z set directly outside the claim system, no
+    // activeActionId behind it. Without this guard, an employee whose needs
+    // cross the collapse threshold while mid-evacuation gets redirected here
+    // to the nearest suitable building — which, for an employee who was just
+    // evacuated FROM the area around that same building, routes them right
+    // back inside the danger zone they were ordered out of, and does so on
+    // every subsequent tick once the resulting rest completes, since
+    // evacuateZone only ever runs once at `zone clear` time and never
+    // re-fires to correct it. Same failure class EmployeeDispatch.ts's/
+    // NeedRestoration.ts's tickNeedRestoration's/ForceShiftRest.ts's own
+    // mid-walk guards exist for (#557); this is the fourth site the walk can
+    // be hijacked from and was the one still missing it — confirmed live via
+    // tutorial-interactive.json's `wait_until dangerZoneClear` never
+    // resolving because two evacuating employees collapsed mid-walk and
+    // orbited back to their pre-evacuation living_quarters forever.
+    if (emp.activeActionId === null && emp.destinationX !== null) continue;
 
     // checkCollapse nulls activeActionId itself on collapse, so the previous
     // active action (if any) must be captured before calling it — otherwise

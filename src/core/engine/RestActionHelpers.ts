@@ -13,6 +13,7 @@ import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
 import { addExpense } from '../economy/Finance.js';
+import { isInZone, isZoneClear } from '../entities/Zone.js';
 import { NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS } from '../config/balance.js';
 
 /**
@@ -46,14 +47,48 @@ export function createRestPendingAction(
   };
 }
 
-/** Find the nearest active building of `buildingType` to (empX, empZ). */
+/**
+ * Find the nearest active building of `buildingType` to (empX, empZ),
+ * excluding any candidate that falls inside the player-declared safety zone
+ * (state.zone.activeZone) while an evacuation of it is still in progress
+ * (!isZoneClear) — narrower than gating on the live drill-plan danger zone
+ * for as long as any hole exists (that would keep every need-driven rest
+ * path routing around a site's own living_quarters for the whole drilling
+ * phase, not just the evacuation itself), but exactly enough to stop the
+ * specific defeat this closes.
+ *
+ * Without this exclusion, every need-driven rest path (tickCollapse,
+ * tickNeedRestoration, ForceShiftRest, autoInsertNeedTasks — all routed
+ * through this one helper) will happily send an employee walking straight
+ * back into the zone it was just evacuated from the instant the nearest
+ * matching building happens to sit inside it, undoing the evacuation —
+ * confirmed live via tutorial-interactive.json's `wait_until dangerZoneClear`
+ * never resolving: an employee evacuated clean, then ForceShiftRest's own
+ * shift-cycle policy immediately re-routed them straight back to the
+ * living_quarters sitting under the drill grid the instant they arrived
+ * (#557). Returns null — same as "no building of this type exists at all" —
+ * when every matching building sits inside the not-yet-clear zone, rather
+ * than routing there anyway: a degraded rest-in-place (NEED_REST_NO_BUILDING_CAP)
+ * is the one outcome that can never walk anyone back into a zone still being
+ * cleared. Self-deactivates the moment the zone reports clear (every alive
+ * employee/vehicle out of it) — the routing this exists to stop only applies
+ * while the walkout is still in flight.
+ */
 export function findNearestBuildingOfType(
   state: GameState,
   buildingType: BuildingType,
   empX: number,
   empZ: number,
 ): Building | null {
-  return findNearestActiveBuildingOfType(state.buildings, buildingType, empX, empZ);
+  const zone = state.zone.activeZone;
+  if (zone === null || isZoneClear(zone, state.vehicles, state.employees)) {
+    return findNearestActiveBuildingOfType(state.buildings, buildingType, empX, empZ);
+  }
+
+  const outsideZone = state.buildings.buildings.filter(b => !isInZone(b.x, b.z, zone));
+  return findNearestActiveBuildingOfType(
+    { ...state.buildings, buildings: outsideZone }, buildingType, empX, empZ,
+  );
 }
 
 /** Find the nearest active living_quarters building to (empX, empZ). */

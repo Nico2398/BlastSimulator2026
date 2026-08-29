@@ -370,7 +370,7 @@ export class UIManager {
     this.notify({ severity: 'warn', title: message, body: '' });
   }
 
-  update(state: GameState, weatherCycle?: WeatherCycleState, rng?: Random): void {
+  update(state: GameState, weatherCycle?: WeatherCycleState, rng?: Random, tutorialActive: boolean = false): void {
     const weather = weatherCycle?.current;
     this.topBar.update(state, weatherCycle, rng, this.notificationCenter);
     this.toasts.update(this.notificationCenter);
@@ -394,7 +394,7 @@ export class UIManager {
     }
 
     // Update active panel
-    if (this.blastUI.visible) this.blastUI.update(state, weather);
+    if (this.blastUI.visible) this.blastUI.update(state, weather, tutorialActive);
     // Unconditional, like eventModal below: each is cheap when not relevant
     // (PreflightModal no-ops while closed; BlastReportModal no-ops until
     // lastBlastReport's tick actually changes) and neither's visibility is

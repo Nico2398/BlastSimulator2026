@@ -219,3 +219,66 @@ function actionOrderCost(action: PendingAction): number {
   if (typeof method !== 'string' || !(method in SURVEY_COSTS)) return 0;
   return SURVEY_COSTS[method as SurveyMethod];
 }
+
+/**
+ * Releases every PendingAction still targeting or held by `employeeId` back
+ * to the open pool — called once, right after that employee is confirmed
+ * dead (killEmployee returns true). Without this, a death mid-claim orphans
+ * the action forever: a personally-targeted one (targetEmployeeId ===
+ * employeeId, still 'queued') can never be claimed by anyone else — only the
+ * named target is allowed to (dispatchPendingAction's own targetId gate,
+ * claimActionsTargetedAtEmployee's own filter) — and a held one ('assigned'/
+ * 'in_progress', holderId === employeeId) is invisible to
+ * claimOnePoolCandidate's pool query, which only ever looks at 'queued'
+ * actions. Confirmed live: evacuateZone's own EVACUATION_HOLD_KEY relay
+ * (Evacuation.ts) re-targets an interrupted, not-yet-started action back at
+ * the employee it interrupted so THEY resume it once safe — but an employee
+ * who is stranded (no reachable safe cell, Evacuation.ts's own documented
+ * "silently stranded" case) and then dies in the very blast they couldn't
+ * escape leaves that action permanently targeted at a corpse, stalling
+ * whatever it was for (a management_office construction, say) forever
+ * regardless of how many other qualified, living employees remain.
+ *
+ * Mirrors interruptActiveAction's own release shape (status -> 'queued',
+ * holderId -> null, vehicle reservation released) but has no living Employee
+ * to call clearHolderWalkFields on — the dead employee's own fields no
+ * longer matter, only the action record does. A personally-targeted action
+ * is opened to the whole pool (targetEmployeeId -> null) rather than left
+ * targeted at nobody: the original target is gone, and whatever qualified
+ * work this was is still worth finishing.
+ */
+export function releaseDeadEmployeeActions(state: GameState, employeeId: number): void {
+  // A snapshot, not the live array: a 'rest' action below is removed via
+  // completePendingAction, which splices state.pendingActions — iterating
+  // the live array while splicing it skips whatever shifted into the
+  // just-vacated index.
+  for (const action of [...state.pendingActions]) {
+    // 'rest' is always personal — never opened to the pool below, since
+    // nobody else can rest on a dead employee's behalf. Their own body no
+    // longer needs the sleep either, so the record (and its ghost) is
+    // discarded outright rather than released, the same "not completed by an
+    // employee, but the removal shape is the same" reasoning
+    // completePendingAction's own doc comment already documents for a
+    // superseded rest (tickCollapse, NeedRestoration.ts).
+    if (action.type === 'rest' && (action.targetEmployeeId === employeeId || action.holderId === employeeId)) {
+      completePendingAction(state, action.id);
+      continue;
+    }
+    if (action.status === 'queued') {
+      if (action.targetEmployeeId === employeeId) action.targetEmployeeId = null;
+      continue;
+    }
+    if ((action.status === 'assigned' || action.status === 'in_progress') && action.holderId === employeeId) {
+      action.status = 'queued';
+      action.holderId = null;
+      if (action.targetEmployeeId === employeeId) action.targetEmployeeId = null;
+      releaseVehicleReservation(state, action.id);
+
+      const ghost = state.ghostPreviews.find(g => g.id === action.id);
+      if (ghost) {
+        ghost.claimed = false;
+        state.ghostPreviewsRevision++;
+      }
+    }
+  }
+}

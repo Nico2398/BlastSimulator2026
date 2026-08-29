@@ -430,6 +430,44 @@
       }
     },
     {
+      "command": "zone clear x1:5 y1:5 x2:39 y2:39",
+      "description": "#557: evacuate the crew before firing. computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M) for this exact 2x2/spacing:4 grid at (20,20) pads out to (5,5)-(39,39), matching the literal box declared here -- the same rectangle Fire.ts's Sound the Horn button computes and sends. Both drillers (#1, #2) are parked exactly on the holes they just finished drilling (20,20) and (24,20), squarely inside it. Without this, Damage.ts's processProjections (attenuated out to the full 15m BLAST_DANGER_MARGIN_M, #557) kills both the instant the blast fires -- direct-traced: deathCount 0 -> 2, and with nobody left alive, payroll/maintenance stop accruing and every `cash should have decreased` checkpoint for the rest of this file reads a frozen figure instead. clearZone no longer teleports: this only orders a walkout, so the wait_until step right after is what proves it actually finished.",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
+      }
+    },
+    {
+      "command": "wait_until field:dangerZoneClear equals:true max_ticks:300",
+      "timeout": 180,
+      "description": "#557: drain the real walkout Sound the Horn just ordered before firing.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "dangerZoneClear",
+          "equals": true,
+          "maxTicks": 300,
+          "timeoutMs": 180000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "dangerZoneClear": true
+        }
+      }
+    },
+    {
       "command": "blast",
       "description": "Vibration from this blast dips Ecology and Nuisance immediately — the following checkpoints show them decaying back toward neutral while Safety/Well-being climb from the buildings above.",
       "interaction": [

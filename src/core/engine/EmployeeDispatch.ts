@@ -98,6 +98,19 @@ export function tickEmployees(state: GameState): TickEmployeesResult {
     // leaves it to resolve on its own first; dispatch resumes for this
     // employee the very next tick either way (#552).
     if (employee.pendingDriverVehicleId !== null) continue;
+    // An employee mid-walk to a safe cell (evacuateZone, Evacuation.ts/
+    // Zone.ts's clearZone) is, like the boarding case just above, walking
+    // outside the claim system entirely: destinationX/Z set directly, no
+    // PendingAction and no activeActionId behind it. Without this guard they
+    // read as idle too, and claimActionsTargetedAtEmployee would happily
+    // promote a pre-existing targeted action (most often a proactive rest
+    // whose target is wherever the employee was already standing —
+    // NeedTaskInsertion.ts) straight to active, overwriting the evacuation
+    // destination with the employee's OWN current position — inside the
+    // danger zone they were just ordered out of — before they ever take a
+    // step (#557). Dispatch resumes for them the very next tick once they've
+    // arrived and destinationX clears, same as the boarding case.
+    if (employee.activeActionId === null && employee.destinationX !== null) continue;
     claimActionsTargetedAtEmployee(state, employee, result);
     if (employee.activeActionId === null) {
       fillIdleEmployeeFromQueueOrPool(state, employee, result);

@@ -6,7 +6,7 @@ import type { GameState, PendingAction } from '../state/GameState.js';
 export type { PendingAction };
 
 export { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
-export { cancelAction, interruptActiveAction } from './TaskCancellation.js';
+export { cancelAction, interruptActiveAction, releaseDeadEmployeeActions } from './TaskCancellation.js';
 export type { CancelActionResult } from './TaskCancellation.js';
 
 /**
