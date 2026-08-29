@@ -26,11 +26,17 @@ import { releasePlannedHoleForCancelledAction } from './mining.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
+import { t } from '../../core/i18n/I18n.js';
 
 const VALID_SKILL_CATEGORIES: SkillCategory[] = [
   'driving.truck', 'driving.excavator', 'driving.drill_rig',
   'blasting', 'management', 'geology',
 ];
+
+// Skeleton-phase marker: `t` is wired into the `case` branches below by the
+// implementer step (#883). Referenced here only so `noUnusedLocals` passes
+// until then. TODO: implement — replace with real t('employees.xxx', {...}) calls.
+void t;
 
 export function employeeCommand(
   ctx: GameContext,
