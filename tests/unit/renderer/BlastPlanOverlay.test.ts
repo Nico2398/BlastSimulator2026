@@ -9,6 +9,7 @@ function makeHole(id: string, x: number, z: number): HoleOverlayData {
   return {
     hole: { id, x, z, depth: 5, diameter: 0.1 },
     delayMs: parseInt(id.replace('H', '')) * 50,
+    drilled: false,
     surfaceY: 8,
     charge: { explosiveId: 'anfo', amountKg: 50, stemmingM: 1.5 },
     predictedFragSizeCm: 20,
