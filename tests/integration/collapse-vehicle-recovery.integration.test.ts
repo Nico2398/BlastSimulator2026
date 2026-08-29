@@ -5,9 +5,9 @@
 // permanently stuck COLLAPSING after their first rest: a Tier-1
 // living_quarters' single-visit replenishment (~11, gameplay-employee-needs)
 // lands well under the gauge's own warning threshold, so the instant the
-// collapse-rest completed, autoInsertNeedTasks (GameLoop.ts) queued another
+// collapse-rest completed, autoInsertNeedTasks (NeedTaskInsertion.ts) queued another
 // rest self-targeted at the same employee — and claimActionsTargetedAtEmployee
-// (tickEmployees, GameLoop.ts) claims and promotes a self-targeted action
+// (tickEmployees, EmployeeDispatchSteps.ts) claims and promotes a self-targeted action
 // unconditionally, ahead of ever giving fillIdleEmployeeFromQueueOrPool's
 // cost-based pool selection a chance to resume the employee's own
 // interrupted, still-queued drill_hole action. The employee cycled rest to
@@ -79,7 +79,7 @@ describe('Vehicle-driving employee collapse recovery (#593)', () => {
 
     // Before the fix: autoInsertNeedTasks re-trapped the driller in another
     // rest the instant this one completed, self-targeted and zero distance
-    // away, and claimActionsTargetedAtEmployee (GameLoop.ts) claimed and
+    // away, and claimActionsTargetedAtEmployee (EmployeeDispatchSteps.ts) claimed and
     // promoted it unconditionally ahead of ever reaching the cost-based pool
     // selection that would resume the interrupted drill_hole — the driller
     // cycled rest-to-rest at the building forever and never reboarded. The

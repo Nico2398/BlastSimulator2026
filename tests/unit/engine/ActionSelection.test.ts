@@ -11,7 +11,7 @@
 // computeActionWorkTicks / resolveRestNeedKey get their own direct coverage
 // below too (#549 code review finding: they need their own tests per
 // .claude/rules/core-purity.md, not just transitive coverage through
-// GameLoop.ts's tickEmployees tests).
+// EmployeeDispatch.test.ts's tickEmployees tests).
 
 import { describe, it, expect, vi } from 'vitest';
 import {
@@ -438,7 +438,7 @@ describe('selectBestActionForEmployee', () => {
     const emp = makeEmployee(state, 0, 0);
 
     // 10 unclaimable candidates, cheapest-ranked of the whole pool — a
-    // caller-side gate (e.g. GameLoop.ts's vehicle-availability check)
+    // caller-side gate (e.g. EmployeeDispatchSteps.ts's vehicle-availability check)
     // rejects every one of them, well past the attempt budget.
     const unclaimable: PendingAction[] = [];
     for (let i = 1; i <= 10; i++) {
@@ -491,7 +491,7 @@ describe('selectBestActionForEmployee', () => {
 // computeActionWorkTicks / resolveRestNeedKey
 //
 // Direct unit coverage for these two ActionSelection.ts exports, not already
-// exercised transitively through GameLoop.ts's tickEmployees tests (#549 code
+// exercised transitively through EmployeeDispatch.test.ts's tickEmployees tests (#549 code
 // review finding). Follows the fixture/helper conventions already established
 // in tests/unit/engine/TaskDispatch.test.ts (makeGame/addQualifiedEmployee
 // shape).
@@ -603,7 +603,7 @@ describe('computeActionWorkTicks (#549)', () => {
     const state = makeGame();
     const employee = addQualifiedEmployee(state, 'blasting', 1);
     // No needKey at all — the Bunkhouse Tier 2+ shift-cycle rest shape
-    // (forceShiftRestIfNeeded, GameLoop.ts), which never routes through here
+    // (forceShiftRestIfNeeded, ForceShiftRest.ts), which never routes through here
     // in practice but exercises the documented fallback branch directly.
     const action = makeWorkAction({
       type: 'rest',

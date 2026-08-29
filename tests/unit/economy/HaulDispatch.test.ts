@@ -85,7 +85,7 @@ describe('syncHaulDispatch — creates haul_debris actions', () => {
       // licence check happens at claim time via requiredVehicleRole/
       // findVehicleForClaim (VehicleReservation.ts's isLicensedForRole), not
       // via requiredSkill. Setting it here would make tickEmployees'
-      // roster-wide "does anyone qualify" scan (GameLoop.ts) flag this action
+      // roster-wide "does anyone qualify" scan (EmployeeDispatch.ts) flag this action
       // unqualified — auto-pausing the game with an unqualified_task_error
       // event — the instant it's queued on a fresh site with no licensed
       // driver hired yet, instead of letting it sit queued silently (see

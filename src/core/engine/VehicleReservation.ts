@@ -3,7 +3,7 @@
 // claim, reserving it, promoting the claim to an active walk-to-vehicle
 // transition, and releasing it — whether that's on completion, cancellation,
 // needs-interruption, or the vehicle being destroyed underneath it.
-// GameLoop.ts's claim/promotion sites call into this module rather than
+// EmployeeDispatchSteps.ts's claim/promotion sites call into this module rather than
 // duplicating any of it. Core-pure: imports only from entities/, state/,
 // EntityMovementTick.js (one-way, EntityMovementTick.ts never imports back),
 // and — for the haul_debris/fragment_debris continuity case (#552) —
@@ -64,7 +64,7 @@ export function reserveVehicle(vehicle: Vehicle, actionId: number): void {
 }
 
 /**
- * Vehicle-gate check shared by both of GameLoop.ts's claim sites (#550): for
+ * Vehicle-gate check shared by both of EmployeeDispatchSteps.ts's claim sites (#550): for
  * a non-vehicle action this is always a pass-through no-op; for a
  * vehicle-gated one it finds (but does not yet reserve) a qualifying free
  * vehicle via findFreeVehicleForRole above. `ok: false` means this employee
@@ -87,7 +87,7 @@ export function findVehicleForClaim(
  * own target, the employee walks to (or, already driving it — the
  * continuity tie-break in findFreeVehicleForRole above — skips straight
  * past) the vehicle reserved for this action at claim time. Called by
- * GameLoop.ts's promoteActionToActive when action.requiredVehicleRole is set.
+ * EmployeeDispatchSteps.ts's promoteActionToActive when action.requiredVehicleRole is set.
  *
  * Deliberately does not call seedTaskTimerFields here — that only happens
  * once the VEHICLE (not the employee) reaches action.targetX/targetZ, via

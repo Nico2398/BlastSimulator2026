@@ -212,7 +212,7 @@ export interface EmployeeMovementResult {
 /**
  * Advance every alive employee with a destination (set by tickEmployees on
  * claim, or by the rest self-claim paths in tickCollapse/tickNeedRestoration/
- * forceShiftRestIfNeeded, all in GameLoop.ts) one tick's worth of movement
+ * forceShiftRestIfNeeded, now split between NeedRestoration.ts and ForceShiftRest.ts) one tick's worth of movement
  * toward it, using the NavGrid-aware A* pathfinder (Pathfinding.findPath) and
  * the generic per-tick advancer (AgentMovement.advanceAgent) — the "already
  * implemented, already unit-tested" navmesh pieces that nothing wired to a

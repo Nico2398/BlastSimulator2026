@@ -141,7 +141,7 @@ describe('tickArrivalGate — task arrival', () => {
     expect(employee.taskTicksRemaining).toBe(4);
     expect(employee.pendingTaskDuration).toBeNull();
     // pendingActionType/pendingActionPayload are consumed by tickTaskProgress
-    // at actual completion (GameLoop.ts), not here — see survey resolution,
+    // at actual completion (TaskProgress.ts), not here — see survey resolution,
     // which needs to know what kind of task just finished.
     expect(employee.pendingActionType).toBe('survey');
     expect(employee.pendingActionPayload).toEqual({ method: 'core_sample', centerX: 16, centerZ: 16 });

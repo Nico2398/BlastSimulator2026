@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Unit tests for computeXpPerTick (issue #619)
 //
 // computeXpPerTick lives in src/core/entities/EmployeeXpRules.ts and was
-// extracted from GameLoop.ts's tickTaskProgress
+// extracted from TaskProgress.ts's tickTaskProgress
 // (`const xpPerTick = 1 + Math.floor(currentLevel * 0.5);`).
 //
 // Formula: XP_PER_TICK_BASE + floor(proficiencyLevel * XP_PER_TICK_LEVEL_SCALE)
@@ -67,7 +67,7 @@ describe('computeXpPerTick', () => {
 //
 // Replaces tickTaskProgress's direct single-skill `gainXp` call with a pure
 // rule function returning a list of awards, so future multi-skill task types
-// can award more than one category per tick without touching GameLoop.ts.
+// can award more than one category per tick without touching TaskProgress.ts.
 
 describe('computeTaskXpAwards', () => {
   const SEED = 42;
