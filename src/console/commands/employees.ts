@@ -138,7 +138,7 @@ export function employeeCommand(
     case 'dispatch': {
       // Pushes a generic work PendingAction targeting a specific employee —
       // the same pending-action pool tickEmployees() already claims idle
-      // employees from (see GameLoop.ts). Exists so console/scenario driving
+      // employees from (see EmployeeDispatch.ts). Exists so console/scenario driving
       // can put an employee to genuine, ticksWorked-incrementing work without
       // a full drill/haul pipeline: no console command currently creates one
       // (drill_plan and build both mutate state directly, and survey completes
@@ -181,7 +181,7 @@ export function employeeCommand(
       // — since this call always sets targetEmployeeId, that check validates
       // employee #id specifically (not just "someone on the roster"), so a
       // targeted-but-unqualified dispatch rejects here instead of silently
-      // queuing forever (idleMatch in GameLoop.ts can never match anyone else) (#406).
+      // queuing forever (idleMatch in EmployeeDispatchSteps.ts can never match anyone else) (#406).
       const dispatch = dispatchPendingAction(state, {
         id: actionId,
         type: 'general_work',

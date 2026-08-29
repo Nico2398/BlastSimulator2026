@@ -104,7 +104,7 @@ export function forceShiftRestIfNeeded(
  * already walking to a queued rest (pendingRestDuration !== null), or mid-walk
  * to board a vehicle from a manual `vehicle driver` command
  * (pendingDriverVehicleId !== null — mirrors tickEmployees' own guard on the
- * same field, GameLoop.ts's #552 comment) — overwriting activeActionId/
+ * same field, EmployeeDispatch.ts's #552 comment) — overwriting activeActionId/
  * destinationX/Z on that employee here would silently cancel the boarding
  * walk underneath the player. Otherwise runs for an idle employee
  * (activeActionId === null) exactly like a working one (#707 fix): earlier
@@ -223,7 +223,7 @@ export function forceShiftRestIfNeededByPolicy(
   // early, infrastructure-light site (exactly what tutorial_pit's own
   // scripted tutorial is — no living_quarters exists there at all) twice
   // for the one condition the policy exists to make survivable in the
-  // first place. tests/unit/engine/GameLoop.test.ts's own "no living_quarters
+  // first place. tests/unit/engine/ShiftCycle.test.ts's own "no living_quarters
   // at all" case documents this — previously pinned to the doubled value.
 
   // The rest timer itself does not start until ArrivalGate.tickArrivalGate

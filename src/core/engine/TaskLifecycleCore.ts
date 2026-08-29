@@ -10,7 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 
 /**
  * Clears the fields an employee's active-task claim sets, shared by
- * tickTaskProgress's completion path (GameLoop.ts) and cancelAction
+ * tickTaskProgress's completion path (TaskProgress.ts) and cancelAction
  * (TaskCancellation.ts) — both need the task/skill bookkeeping reset once an
  * action stops occupying the employee, whether it finished normally or was
  * cancelled mid-flight.

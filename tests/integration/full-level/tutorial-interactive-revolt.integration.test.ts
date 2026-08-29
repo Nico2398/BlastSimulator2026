@@ -39,7 +39,7 @@
 // (4e5846b) and was NOT sufficient on its own: run this test against that
 // commit alone and it still fails with a worker_revolt. The actual
 // dominant cause was deeper -- `forceShiftRestIfNeededByPolicy`
-// (src/core/engine/GameLoop.ts) unconditionally skipped idle employees, so
+// (src/core/engine/ForceShiftRest.ts) unconditionally skipped idle employees, so
 // an idle employee under an applied site policy never received proactive
 // rest and crashed to 0 well-being purely from sitting idle, independent
 // of who ended up doing the charging. That fix landed second (e12fad1).

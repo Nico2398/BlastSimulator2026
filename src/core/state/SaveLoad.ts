@@ -305,7 +305,7 @@ export function deserialize(json: string): GameState {
   // claimed). A pre-v8 save's *dispatched-and-idle-claimed* actions were
   // deleted from pendingActions the instant they were claimed (the bug #547
   // fixes) — but rest actions created by tickCollapse/tickNeedRestoration/
-  // forceShiftRestIfNeeded (GameLoop.ts) already self-claimed synchronously
+  // forceShiftRestIfNeeded (now split between NeedRestoration.ts and ForceShiftRest.ts) already self-claimed synchronously
   // at creation even pre-#547: they push the action to pendingActions AND
   // set the claiming employee's activeActionId immediately, removing it only
   // at rest completion. So a save taken mid-rest genuinely has a surviving

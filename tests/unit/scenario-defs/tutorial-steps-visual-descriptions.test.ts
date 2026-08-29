@@ -126,7 +126,7 @@ describe('tutorial-steps-visual.json descriptions', () => {
         expect(step.description).not.toContain('z:20-29');
         expect(step.description).not.toContain('4x4');
 
-        // #707 (converged): forceShiftRestIfNeededByPolicy's (GameLoop.ts)
+        // #707 (converged): forceShiftRestIfNeededByPolicy's (ForceShiftRest.ts)
         // idle-employee proactive-rest fix changed BOTH employees' fates
         // here, not just the surveyor's (Walt Dusty) -- Kurt Pickaxe (the
         // driller) also gets routed away from the grid once idle. A

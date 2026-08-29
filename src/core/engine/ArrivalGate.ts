@@ -94,7 +94,7 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
       emp.activeTaskTotalTicks = emp.pendingTaskDuration;
       emp.pendingTaskDuration = null;
       // pendingActionType/pendingActionPayload deliberately survive arrival —
-      // tickTaskProgress (GameLoop.ts) reads them at actual task completion
+      // tickTaskProgress (TaskProgress.ts) reads them at actual task completion
       // to know what work just finished (e.g. resolving a survey) and clears
       // them itself. Clearing them here would make every task's completion
       // handler blind to what it just did (see survey.integration.test.ts).
@@ -174,8 +174,8 @@ export function tickArrivalGate(state: GameState, emitter?: EventEmitter): Arriv
   }
 
   // Vehicle-gated actions (#550): drive every boarded, reserved vehicle
-  // toward the target GameLoop.promoteActionToActive/promoteVehicleGatedAction
-  // set on claim (moveVehicle, or on the tick a boarding above just
+  // toward the target promoteActionToActive (EmployeeDispatchSteps.ts) or
+  // promoteVehicleGatedAction (VehicleReservation.ts) set on claim (moveVehicle, or on the tick a boarding above just
   // completed) — the sole place a reserved vehicle's x/z is ever advanced,
   // per this file's header comment. Once it arrives, seed the holder's
   // work-timer fields (deferred at claim time specifically for this) and

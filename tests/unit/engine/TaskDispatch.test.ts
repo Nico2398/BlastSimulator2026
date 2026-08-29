@@ -89,7 +89,7 @@ function addQualifiedEmployee(
 }
 
 /**
- * Simulates tickEmployees' claim-time field writes (GameLoop.ts) on top of
+ * Simulates tickEmployees' claim-time field writes (EmployeeDispatch.ts) on top of
  * claimPendingAction — the latter only flips status/holderId, not the
  * employee's own walking/pending-task bookkeeping, which a real claim always
  * sets alongside it. Shared by the cancelAction (#548) and
@@ -282,7 +282,7 @@ describe('dispatchPendingAction — at least one qualified employee on roster', 
 // ── Section 3b: dispatchPendingAction — targetEmployeeId narrows eligibility ──
 //   Regression coverage for #406: a roster-wide "does anyone qualify" check is
 //   not sufficient once targetEmployeeId is set — tickEmployees' idleMatch
-//   (GameLoop.ts) can only ever be claimed by that one employee, so dispatch
+//   (EmployeeDispatchSteps.ts) can only ever be claimed by that one employee, so dispatch
 //   must reject when THAT employee specifically lacks requiredSkill, even if a
 //   different roster member holds it.
 
