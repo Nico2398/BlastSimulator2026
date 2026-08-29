@@ -176,19 +176,19 @@ export function interruptActiveAction(
  * to 'queued'/holderId:null, releases any vehicle reservation held for it
  * (releaseVehicleReservation no-ops on its own when nothing is reserved for
  * this action id, so no gate on requiredVehicleRole is needed), and
- * un-claims its ghost preview (bumping ghostPreviewsRevision). Used by both
- * interruptActiveAction (single-action interrupt-with-resume, above) and
- * releaseDeadEmployeeActions (bulk death cleanup, below) — each keeps its
- * own distinct surrounding logic (targetEmployeeId handling,
- * interruptedActionPayload stashing, durationTicks preservation, the dead-
- * employee snapshot loop) and calls this only for the four fields the two
- * used to duplicate verbatim.
+ * un-claims its ghost preview (bumping ghostPreviewsRevision). Used by
+ * interruptActiveAction (above) and releaseDeadEmployeeActions (below) — each
+ * keeps its own distinct surrounding logic and calls this only for the four
+ * fields the two used to duplicate verbatim. Exported (#557 fix) for
+ * EvacuationHold.ts's releaseInZoneTaskQueueEntries — a taskQueue entry an
+ * evacuated employee claimed but never started walking to, with no
+ * per-employee walk state of its own to unwind.
  *
  * options.keepVehicleDriver (#552): see interruptActiveAction's own call
  * site above — releaseDeadEmployeeActions never passes this, a dead
  * employee has no boarding-continuity case to protect.
  */
-function releaseActionToOpenPool(
+export function releaseActionToOpenPool(
   state: GameState,
   action: PendingAction,
   options?: { keepVehicleDriver?: boolean },

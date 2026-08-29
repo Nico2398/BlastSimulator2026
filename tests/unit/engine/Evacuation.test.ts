@@ -6,9 +6,8 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import type { PendingAction } from '../../../src/core/state/GameState.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
-import {
-  findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk, isEvacuationHoldActive, clearResolvedEvacuationHolds,
-} from '../../../src/core/engine/Evacuation.js';
+import { findSafeEvacuationCell, evacuateZone, isMidEvacuationWalk } from '../../../src/core/engine/Evacuation.js';
+import { isEvacuationHoldActive } from '../../../src/core/engine/EvacuationHold.js';
 import { isInZone, type ZoneBounds } from '../../../src/core/entities/Zone.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
@@ -186,8 +185,13 @@ describe('isMidEvacuationWalk (#557 review)', () => {
   });
 });
 
-describe('isEvacuationHoldActive / clearResolvedEvacuationHolds (#557 review)', () => {
-  const holdZone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
+// isEvacuationHoldActive/clearResolvedEvacuationHolds/discardStaleRestAction/
+// releaseInZoneTaskQueueEntries moved to EvacuationHold.ts (#557 follow-up
+// file-size split) — their own tests moved to EvacuationHold.test.ts.
+// evacuateZone's own use of the latter two is covered below.
+
+describe('evacuateZone — stale rest targets and taskQueue entries (#557 follow-up)', () => {
+  const zone: ZoneBounds = { x1: 10, z1: 10, x2: 20, z2: 20 };
 
   function makeAction(overrides: Partial<PendingAction> & { id: number }): PendingAction {
     return {
@@ -203,101 +207,55 @@ describe('isEvacuationHoldActive / clearResolvedEvacuationHolds (#557 review)', 
     };
   }
 
-  describe('isEvacuationHoldActive', () => {
-    it('true when the action carries the hold marker and a living employee is still inside the zone', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.zone.activeZone = holdZone;
-      const rng = new Random(EVACUATION_SEED);
-      hireEmployee(state.employees, 'driller', rng, 15, 15); // still inside the zone
-      const action = makeAction({ id: 1, payload: { evacuationHold: true } });
-
-      expect(isEvacuationHoldActive(state, action)).toBe(true);
+  it('discards an active rest action whose target is inside the zone, instead of leaving it as a reclaimable hold', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    state.zone.activeZone = zone;
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15); // inside the zone
+    const restAction = makeAction({
+      id: 1, type: 'rest', targetX: 12, targetZ: 12, targetEmployeeId: employee.id,
+      holderId: employee.id, status: 'assigned',
     });
+    state.pendingActions.push(restAction);
+    employee.activeActionId = restAction.id;
+    employee.pendingRestDuration = 4;
+    employee.pendingRestNeedKey = 'hunger';
 
-    it('false once the zone has genuinely cleared of living employees', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.zone.activeZone = holdZone; // no employees at all -> trivially clear
-      const action = makeAction({ id: 2, payload: { evacuationHold: true } });
+    evacuateZone(state, zone);
 
-      expect(isEvacuationHoldActive(state, action)).toBe(false);
-    });
-
-    it('false when the action carries no hold marker at all, even with the zone occupied (boundary)', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.zone.activeZone = holdZone;
-      const rng = new Random(EVACUATION_SEED);
-      hireEmployee(state.employees, 'driller', rng, 15, 15);
-      const action = makeAction({ id: 3, payload: {} });
-
-      expect(isEvacuationHoldActive(state, action)).toBe(false);
-    });
-
-    it('false when no zone is active at all, even with the marker present (rejection)', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      // state.zone.activeZone stays null — fresh game, nothing was ever evacuated.
-      const action = makeAction({ id: 4, payload: { evacuationHold: true } });
-
-      expect(isEvacuationHoldActive(state, action)).toBe(false);
-    });
-
-    it('never mutates the action payload — pure check', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.zone.activeZone = holdZone; // no employees hired -> would read "clear"
-      const payload = { evacuationHold: true };
-      const action = makeAction({ id: 5, payload });
-
-      isEvacuationHoldActive(state, action);
-
-      expect(action.payload).toBe(payload); // same reference — never reassigned
-      expect(action.payload['evacuationHold']).toBe(true);
-    });
+    // Gone outright — not sitting 'queued'/hold-marked, waiting to be reclaimed
+    // with the same stale, still-in-zone target.
+    expect(state.pendingActions.find(a => a.id === 1)).toBeUndefined();
+    expect(employee.pendingRestDuration).toBeNull();
+    expect(employee.pendingRestNeedKey).toBeNull();
+    // Sent on the real evacuation walk instead, like any other in-zone employee.
+    expect(employee.destinationX).not.toBeNull();
+    expect(isInZone(employee.destinationX!, employee.destinationZ!, zone)).toBe(false);
   });
 
-  describe('clearResolvedEvacuationHolds', () => {
-    it('strips the hold marker from every action once the zone has genuinely cleared, keeping the rest of the payload', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.zone.activeZone = holdZone; // no employees hired -> trivially clear
-      state.pendingActions.push(makeAction({ id: 1, payload: { evacuationHold: true, other: 'kept' } }));
-
-      clearResolvedEvacuationHolds(state);
-
-      const stored = state.pendingActions.find(a => a.id === 1)!;
-      expect(stored.payload['evacuationHold']).toBeUndefined();
-      expect(stored.payload['other']).toBe('kept');
+  it('releases an in-zone taskQueue entry to the open pool, evacuation-held, instead of leaving it silently claimable', () => {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = flatWalkableGrid(40);
+    state.zone.activeZone = zone;
+    const rng = new Random(EVACUATION_SEED);
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 15, 15); // inside the zone
+    const queuedWork = makeAction({
+      id: 1, type: 'dig_ramp_segment', targetX: 16, targetZ: 16, targetEmployeeId: null,
+      holderId: employee.id, status: 'assigned',
     });
+    state.pendingActions.push(queuedWork);
+    employee.taskQueue = [queuedWork.id];
+    // No activeActionId — this employee is idle-but-for-the-taskQueue-claim, the
+    // exact shape claimActionsTargetedAtEmployee leaves a busy-at-claim-time
+    // employee in.
 
-    it('leaves the marker in place while a living employee is still inside the zone (rejection)', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.zone.activeZone = holdZone;
-      const rng = new Random(EVACUATION_SEED);
-      hireEmployee(state.employees, 'driller', rng, 15, 15); // still in zone
-      state.pendingActions.push(makeAction({ id: 2, payload: { evacuationHold: true } }));
+    evacuateZone(state, zone);
 
-      clearResolvedEvacuationHolds(state);
-
-      expect(state.pendingActions.find(a => a.id === 2)!.payload['evacuationHold']).toBe(true);
-    });
-
-    it('is a no-op with no active zone at all (boundary)', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.pendingActions.push(makeAction({ id: 3, payload: { evacuationHold: true } }));
-
-      clearResolvedEvacuationHolds(state);
-
-      expect(state.pendingActions.find(a => a.id === 3)!.payload['evacuationHold']).toBe(true);
-    });
-
-    it('never re-arms on a later, unrelated re-entry into the same zone footprint — the marker stays stripped for good', () => {
-      const state = createGame({ seed: EVACUATION_SEED });
-      state.zone.activeZone = holdZone;
-      state.pendingActions.push(makeAction({ id: 4, payload: { evacuationHold: true } }));
-
-      clearResolvedEvacuationHolds(state); // zone genuinely clear right now -> strips it
-
-      const rng = new Random(EVACUATION_SEED);
-      hireEmployee(state.employees, 'driller', rng, 15, 15); // a LATER, unrelated re-entry into the same zone
-
-      expect(isEvacuationHoldActive(state, state.pendingActions.find(a => a.id === 4)!)).toBe(false);
-    });
+    expect(employee.taskQueue).toEqual([]);
+    const stored = state.pendingActions.find(a => a.id === 1)!;
+    expect(stored.status).toBe('queued');
+    expect(stored.holderId).toBeNull();
+    expect(isEvacuationHoldActive(state, stored)).toBe(true);
   });
 });

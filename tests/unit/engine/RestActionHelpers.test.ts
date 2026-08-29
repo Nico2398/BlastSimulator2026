@@ -154,6 +154,24 @@ describe('findNearestBuildingOfType — active-zone exclusion (#557)', () => {
     expect(found?.id).toBe(inside.building!.id);
   });
 
+  it('keeps excluding once the zone reports clear of occupants, while a live blast plan still overlaps it (#557 follow-up)', () => {
+    const state = createGame({ seed: DEDUCT_SEED });
+    const inside = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);
+    expect(inside.success).toBe(true);
+    const outside = placeBuilding(state.buildings, 'living_quarters', 50, 50, 100, 100);
+    expect(outside.success).toBe(true);
+
+    defineZone(state.zone, { x1: 0, z1: 0, x2: 10, z2: 10 });
+    // No employees/vehicles at all -> occupancy alone would say "clear" —
+    // but a charged, un-fired blast plan squarely inside the same footprint
+    // means it genuinely is not safe to route anyone back here yet.
+    state.drillHoles.push({ id: 'H1', x: 5, z: 5, depth: 6, diameter: 0.089 });
+
+    const found = findNearestBuildingOfType(state, 'living_quarters', 0, 0);
+
+    expect(found?.id).toBe(outside.building!.id);
+  });
+
   it('applies no exclusion at all when no zone has ever been defined (rejection — nothing to exclude)', () => {
     const state = createGame({ seed: DEDUCT_SEED });
     const near = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100);

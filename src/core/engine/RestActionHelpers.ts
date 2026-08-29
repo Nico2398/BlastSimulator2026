@@ -13,7 +13,7 @@ import { findBuildingApproachCell } from '../nav/BuildingApproach.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import { replenishNeed } from '../entities/EmployeeNeeds.js';
 import { addExpense } from '../economy/Finance.js';
-import { isInZone, isZoneClear } from '../entities/Zone.js';
+import { isInZone, isZoneClear, isZoneStillBlastThreatened } from '../entities/Zone.js';
 import { NEED_REST_DURATIONS, NEED_REST_NO_BUILDING_CAP, NEED_REST_COSTS } from '../config/balance.js';
 
 /**
@@ -50,12 +50,15 @@ export function createRestPendingAction(
 /**
  * Find the nearest active building of `buildingType` to (empX, empZ),
  * excluding any candidate that falls inside the player-declared safety zone
- * (state.zone.activeZone) while an evacuation of it is still in progress
- * (!isZoneClear) — narrower than gating on the live drill-plan danger zone
- * for as long as any hole exists (that would keep every need-driven rest
- * path routing around a site's own living_quarters for the whole drilling
- * phase, not just the evacuation itself), but exactly enough to stop the
- * specific defeat this closes.
+ * (state.zone.activeZone) while an evacuation of it is still in progress OR
+ * its blast plan is still live (!isZoneClear || isZoneStillBlastThreatened)
+ * — narrower than gating on the live drill-plan danger zone for as long as
+ * any hole exists anywhere (that would keep every need-driven rest path
+ * routing around a site's own living_quarters for the whole drilling phase,
+ * not just the evacuation itself: the isZoneStillBlastThreatened half only
+ * ever runs once `zone` is non-null, i.e. only after a `zone clear` has
+ * actually been drawn), but exactly enough to stop the specific defeat this
+ * closes.
  *
  * Without this exclusion, every need-driven rest path (tickCollapse,
  * tickNeedRestoration, ForceShiftRest, autoInsertNeedTasks — all routed
@@ -63,16 +66,25 @@ export function createRestPendingAction(
  * back into the zone it was just evacuated from the instant the nearest
  * matching building happens to sit inside it, undoing the evacuation —
  * confirmed live via tutorial-interactive.json's `wait_until dangerZoneClear`
- * never resolving: an employee evacuated clean, then ForceShiftRest's own
- * shift-cycle policy immediately re-routed them straight back to the
- * living_quarters sitting under the drill grid the instant they arrived
- * (#557). Returns null — same as "no building of this type exists at all" —
- * when every matching building sits inside the not-yet-clear zone, rather
- * than routing there anyway: a degraded rest-in-place (NEED_REST_NO_BUILDING_CAP)
+ * never resolving, in two stages (#557 and its own follow-up):
+ *  1. An employee evacuated clean, then ForceShiftRest's own shift-cycle
+ *     policy immediately re-routed them straight back to the living_quarters
+ *     sitting under the drill grid the instant they arrived — closed by the
+ *     original !isZoneClear exclusion below.
+ *  2. Even with every entity genuinely, simultaneously out of the zone (no
+ *     stale claim involved at all — a fresh rest request, created after
+ *     arrival), the SAME living_quarters was still reachable the moment
+ *     isZoneClear read true — which happens the instant evacuation succeeds,
+ *     regardless of whether the blast that evacuation was FOR has actually
+ *     fired yet. Closed by also requiring !isZoneStillBlastThreatened (#557
+ *     follow-up) — see that function's own doc comment (Zone.ts) for why
+ *     occupancy alone is the wrong "safe to return" signal.
+ * Returns null — same as "no building of this type exists at all" — when
+ * every matching building sits inside the not-yet-safe zone, rather than
+ * routing there anyway: a degraded rest-in-place (NEED_REST_NO_BUILDING_CAP)
  * is the one outcome that can never walk anyone back into a zone still being
- * cleared. Self-deactivates the moment the zone reports clear (every alive
- * employee/vehicle out of it) — the routing this exists to stop only applies
- * while the walkout is still in flight.
+ * cleared, or still armed. Self-deactivates the moment both conditions clear
+ * — the routing this exists to stop only applies until then.
  */
 export function findNearestBuildingOfType(
   state: GameState,
@@ -81,7 +93,10 @@ export function findNearestBuildingOfType(
   empZ: number,
 ): Building | null {
   const zone = state.zone.activeZone;
-  if (zone === null || isZoneClear(zone, state.vehicles, state.employees)) {
+  if (zone === null || (
+    isZoneClear(zone, state.vehicles, state.employees)
+    && !isZoneStillBlastThreatened(state.drillHoles, zone)
+  )) {
     return findNearestActiveBuildingOfType(state.buildings, buildingType, empX, empZ);
   }
 

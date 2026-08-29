@@ -189,6 +189,63 @@ export function computeDangerZone(holes: readonly { x: number; z: number }[], ma
   return { x1: x1 - marginM, z1: z1 - marginM, x2: x2 + marginM, z2: z2 + marginM };
 }
 
+/** True when two axis-aligned ZoneBounds share at least one point. */
+function boundsOverlap(a: ZoneBounds, b: ZoneBounds): boolean {
+  return a.x1 <= b.x2 && b.x1 <= a.x2 && a.z1 <= b.z2 && b.z1 <= a.z2;
+}
+
+/**
+ * True when a live, un-fired blast plan (`drillHoles`, at the standard
+ * BLAST_DANGER_MARGIN_M — the same margin computeDangerZone's every other
+ * caller uses) still overlaps `zone`. The shared "has this zone genuinely
+ * stopped being dangerous" check for anything that only wants to know "is it
+ * safe to send someone back here" — as opposed to isZoneClear/
+ * isZoneClearOfEmployees, which answer a different, narrower question:
+ * "is anyone standing here RIGHT NOW."
+ *
+ * That occupancy-only question is the wrong one for a "safe to return"
+ * decision: it reads true the INSTANT an evacuation succeeds — the whole
+ * point of ordering one — which is exactly the moment the zone is still MOST
+ * dangerous (holes charged and sequenced, nobody has fired yet), not the
+ * moment it is actually safe to walk back in. Confirmed live via
+ * tutorial-interactive.json (#557 follow-up) at two independent call sites
+ * that had each been built against occupancy alone:
+ *  - Evacuation.ts's isEvacuationHoldActive/clearResolvedEvacuationHolds: an
+ *    interrupted action's hold released the instant the zone read clear of
+ *    employees, so the very next evacuee to arrive immediately re-claimed it
+ *    and walked back in.
+ *  - RestActionHelpers.ts's findNearestBuildingOfType: once every entity
+ *    had evacuated (zone genuinely unoccupied, but the blast plan still very
+ *    much live), a FRESH need-driven rest request — created after arrival,
+ *    with no stale target to blame — routed straight back to the
+ *    living_quarters sitting under the still-armed drill grid, because
+ *    isZoneClear alone was already satisfied.
+ * Both now additionally require this function to read false before treating
+ * the zone as resolved.
+ *
+ * Keyed to the LIVE drill-hole-derived danger box (computeDangerZone — the
+ * same one Fire.ts's Sound the Horn/occupant list and `dangerZoneClear`
+ * itself already use) rather than to `zone` (typically
+ * `state.zone.activeZone`) reading non-null on its own: the player-drawn
+ * zone never resets once drawn (defineZone only ever assigns it), so testing
+ * for its mere existence would never resolve at all. Testing for overlap
+ * with the CURRENT plan instead self-resolves the moment either the blast
+ * fires (drillHoles empties, computeDangerZone returns null) or the player
+ * starts a new, non-overlapping plan elsewhere on an expanded site
+ * (confirmed still true live via site-expansion.json, whose whole premise is
+ * a second, far-away drill_plan added moments after the first blast) — never
+ * blocking indefinitely on a stale zone the way a flat "any holes exist
+ * anywhere" check would.
+ */
+export function isZoneStillBlastThreatened(
+  drillHoles: readonly { x: number; z: number }[],
+  zone: ZoneBounds,
+): boolean {
+  const dangerZone = computeDangerZone(drillHoles, BLAST_DANGER_MARGIN_M);
+  if (dangerZone === null) return false;
+  return boundsOverlap(dangerZone, zone);
+}
+
 /**
  * Whether the live drill plan's own danger zone (computeDangerZone over
  * `drillHoles` at BLAST_DANGER_MARGIN_M — the same box Fire.ts's occupant

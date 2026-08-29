@@ -2,107 +2,26 @@
 // Finds safe destinations for entities standing inside a blast danger zone
 // and routes them out before the blast fires (#557).
 
-import type { GameState, PendingAction } from '../state/GameState.js';
+import type { GameState } from '../state/GameState.js';
 import type { ZoneBounds, EvacuationDestination, EvacuationResult } from '../entities/Zone.js';
-import { clearZone, isInZone, isZoneClearOfEmployees } from '../entities/Zone.js';
+import { clearZone, isInZone } from '../entities/Zone.js';
 import { findPath } from '../nav/Pathfinding.js';
 import { interruptActiveAction } from './TaskCancellation.js';
 import { abortHaul } from '../economy/HaulingTask.js';
 import { abortBreak } from '../economy/BoulderBreaking.js';
 import type { Employee } from '../entities/Employee.js';
 import { EVACUATION_CLEARANCE_M } from '../config/balance.js';
+import {
+  EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries,
+} from './EvacuationHold.js';
 
-/**
- * PendingAction.payload key evacuateZone stamps on any action it interrupts
- * whose own target falls inside the zone being evacuated (#557) — whether
- * interruptActiveAction's relay re-targeted it back at the same employee (an
- * action claimed but not yet started, TaskCancellation.ts's own re-target
- * branch) or left it in the open pool untouched (an action already
- * mid-progress — taskTicksRemaining > 0 — takes interruptActiveAction's other
- * branch instead, which never touches targetEmployeeId). Dispatch
- * (isEvacuationHoldActive below, checked from EmployeeDispatchSteps.ts's
- * claimActionsTargetedAtEmployee and claimOnePoolCandidate filters) refuses to
- * reclaim a so-marked action while the zone it was interrupted in is still
- * active and not yet clear — otherwise either the relay hands the action
- * right back to the just-evacuated employee, or (the case the mid-progress
- * branch needs covering too) it sits in the open pool and gets picked up by
- * whichever qualified employee goes idle first — including, confirmed live
- * via tutorial-interactive.json's `wait_until dangerZoneClear`, the very
- * employee who just finished evacuating, the instant they arrive at their
- * own safe cell. Either way the target walks someone straight back into the
- * danger zone.
- *
- * Deliberately NOT a blanket "any pending action whose target falls in any
- * zone" rule evaluated fresh at claim time: `state.zone.activeZone` has no
- * way to become null again once set (defineZone only ever assigns it), so a
- * zone a player drew once, for an entirely unrelated reason (site-prep
- * clearing well before any blast plan exists — confirmed live via
- * safety-projection-visual.json's own `zone clear` step, issued before its
- * drill_plan even runs), stays "active" for the rest of the session. A rule
- * like that would also catch every ordinary future action — a building
- * ordered long after this evacuation completed, still sitting inside the
- * same old footprint — for as long as anyone is legitimately working inside
- * it, permanently blocking work the zone was cleared FOR. Stamping only the
- * specific actions THIS evacuateZone call itself interrupted avoids that
- * false-positive entirely: the marker is set once, only on actions that
- * existed at this exact moment, never re-evaluated against a fresh action's
- * geography later.
- */
-export const EVACUATION_HOLD_KEY = 'evacuationHold';
-
-/**
- * Pure check: true when `action` is still evacuation-hold-blocked — carries
- * EVACUATION_HOLD_KEY and the zone it was interrupted in has not yet cleared
- * of living employees. Checked against isZoneClearOfEmployees, not the
- * broader isZoneClear (see that function's own doc comment): a vehicle
- * alone left inside — including one permanently stranded — must never block
- * this forever.
- *
- * Called from EmployeeDispatchSteps.ts's claimActionsTargetedAtEmployee and
- * claimOnePoolCandidate .filter() predicates, so this never mutates
- * `action` or any other state — a reader has no reason to expect a
- * .filter() predicate to have side effects. The one-shot marker removal
- * that used to happen inline here (stripping EVACUATION_HOLD_KEY the moment
- * the zone reads clear) is clearResolvedEvacuationHolds below instead,
- * called once per tick from tickEmployees rather than implicitly from
- * inside a filter (#557 review).
- */
-export function isEvacuationHoldActive(state: GameState, action: PendingAction): boolean {
-  if (action.payload[EVACUATION_HOLD_KEY] !== true) return false;
-  const zone = state.zone.activeZone;
-  if (zone === null) return false;
-  return !isZoneClearOfEmployees(zone, state.employees);
-}
-
-/**
- * One-shot cleanup: strips EVACUATION_HOLD_KEY from every PendingAction that
- * still carries it, once the zone it was interrupted in has genuinely
- * cleared of living employees. Without this, the marker would sit on the
- * action forever — `state.zone.activeZone` never becomes null again once
- * set (defineZone only ever assigns it), so a LATER, ordinary re-entry into
- * the same footprint (post-blast debris cleanup, say) would make
- * isEvacuationHoldActive read the zone as occupied again and re-arm a block
- * on an action with no remaining connection to the evacuation that created
- * it — confirmed live via site-expansion.json, where a cleanup trip kept an
- * unrelated building order hold-blocked forever.
- *
- * Called once per tick (tickEmployees, EmployeeDispatch.ts) rather than
- * lazily from inside isEvacuationHoldActive's own .filter() call sites — see
- * that function's own doc comment for why the mutation moved out of the
- * pure check. A no-op tick (no active zone, or the zone not yet clear, or
- * nothing left carrying the marker) touches nothing.
- */
-export function clearResolvedEvacuationHolds(state: GameState): void {
-  const zone = state.zone.activeZone;
-  if (zone === null) return;
-  if (!isZoneClearOfEmployees(zone, state.employees)) return;
-
-  for (const action of state.pendingActions) {
-    if (action.payload[EVACUATION_HOLD_KEY] !== true) continue;
-    const { [EVACUATION_HOLD_KEY]: _removed, ...rest } = action.payload;
-    action.payload = rest;
-  }
-}
+// Re-exported so EmployeeDispatch.ts/EmployeeDispatchSteps.ts keep importing
+// evacuation-hold bookkeeping from this one file — the split into
+// EvacuationHold.ts (#557 follow-up file-size split) is an internal
+// organization detail, not a change to who imports what. See
+// EvacuationHold.ts for EVACUATION_HOLD_KEY's own doc comment and both
+// functions'.
+export { EVACUATION_HOLD_KEY, isEvacuationHoldActive, clearResolvedEvacuationHolds } from './EvacuationHold.js';
 
 /**
  * True when `employee` is currently walking a route the claim system knows
@@ -225,15 +144,37 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
     if (!isInZone(emp.x, emp.z, zone)) continue;
+
     const actionId = emp.activeActionId;
     if (actionId !== null) {
+      // Captured before interruptActiveAction mutates it (which flips status
+      // to 'queued' and can re-target it) — see discardStaleRestAction's own
+      // doc comment (EvacuationHold.ts) for why a 'rest' action with an
+      // in-zone target must be discarded outright rather than left to
+      // survive the interrupt.
+      const action = state.pendingActions.find(a => a.id === actionId);
+      const isStaleRest = action !== undefined && action.type === 'rest'
+        && isInZone(action.targetX, action.targetZ, zone);
+
       // interruptActiveAction always leaves the action 'queued' (whether
       // TaskCancellation's relay re-targeted it back at `emp.id` or left it
       // in the open pool untouched) — the blanket 'queued'-action stamping
       // loop below picks it up from there, so no separate stamp is needed
       // here.
       interruptActiveAction(state, emp, actionId);
+
+      if (isStaleRest) discardStaleRestAction(state, emp, actionId);
     }
+
+    // A second, independent claim an evacuated employee can be carrying:
+    // up to MAX_EMPLOYEE_TASK_QUEUE_DEPTH-1 further actions already claimed
+    // (status 'assigned', holderId === emp.id) but not yet promoted to
+    // activeActionId — EmployeeDispatchSteps.ts's claimActionsTargetedAtEmployee
+    // pushes onto taskQueue instead of promoting when the employee was
+    // already busy the tick it claimed them. See
+    // releaseInZoneTaskQueueEntries' own doc comment (EvacuationHold.ts) for
+    // why the loop above never reaches these.
+    releaseInZoneTaskQueueEntries(state, emp, zone);
   }
 
   for (const vehicle of state.vehicles.vehicles) {
@@ -256,11 +197,14 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
   // who just finished evacuating, the moment they reach their own safe cell —
   // and walks them right back into the zone being cleared. Scoped to actions
   // that are 'queued' (not 'assigned'/'in_progress' — those are still
-  // genuinely held by someone outside the zone, or will be caught by the
-  // per-employee loop above if that holder is inside it) at the exact moment
-  // THIS evacuateZone call runs, same "existed at this moment, never
+  // genuinely held by someone outside the zone, or will already have been
+  // released back to 'queued' by the per-employee loop above — activeActionId
+  // via interruptActiveAction, a taskQueue entry via
+  // releaseInZoneTaskQueueEntries — if that holder is inside the zone) at the
+  // exact moment THIS evacuateZone call runs, same "existed at this moment, never
   // re-evaluated later" scoping EVACUATION_HOLD_KEY's own doc comment
-  // describes for why this isn't the blanket rule that doc comment rules out.
+  // (EvacuationHold.ts) describes for why this isn't the blanket rule that
+  // doc comment rules out.
   for (const action of state.pendingActions) {
     if (action.status !== 'queued') continue;
     if (!isInZone(action.targetX, action.targetZ, zone)) continue;
