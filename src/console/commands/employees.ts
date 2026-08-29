@@ -26,6 +26,7 @@ import { releasePlannedHoleForCancelledAction } from './mining.js';
 import { Random } from '../../core/math/Random.js';
 import { requireGame, noEmployeesMessage } from './commandUtils.js';
 import { NavGrid } from '../../core/nav/NavGrid.js';
+import { t } from '../../core/i18n/I18n.js';
 
 const VALID_SKILL_CATEGORIES: SkillCategory[] = [
   'driving.truck', 'driving.excavator', 'driving.drill_rig',
@@ -61,7 +62,7 @@ export function employeeCommand(
       const role = (named['role'] ?? '') as EmployeeRole;
       const validRoles: EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
       if (!validRoles.includes(role)) {
-        return { success: false, output: `Usage: employee hire role:(${validRoles.join('|')})` };
+        return { success: false, output: t('employees.hire_usage', { roles: validRoles.join('|') }) };
       }
       // Affordability is checked here, not after hireEmployee, because
       // hireEmployee *mutates* — it pushes the employee and bumps nextId
@@ -73,7 +74,10 @@ export function employeeCommand(
       if (state.cash < hiringCost) {
         return {
           success: false,
-          output: `Insufficient funds: need $${formatMoney(hiringCost)}, have $${formatMoney(state.cash)}`,
+          output: t('console.insufficient_funds', {
+            need: formatMoney(hiringCost),
+            have: formatMoney(state.cash),
+          }),
         };
       }
       const rawEmpX = state.world ? state.world.minX + state.world.sizeX / 2 + (state.employees.employees.length % 5) * 2 : 32;
@@ -97,43 +101,49 @@ export function employeeCommand(
       const { employee } = hireEmployee(state.employees, role, rng, empX, empZ, state.tickCount);
       state.cash -= hiringCost;
       addExpense(state.finances, hiringCost, 'salaries', `Hire ${role}: ${employee.name}`, state.tickCount);
-      return { success: true, output: `Hired ${employee.name} (${role}). Cost: $${hiringCost}` };
+      return {
+        success: true,
+        output: t('employees.hire_success', { name: employee.name, role, cost: hiringCost }),
+      };
     }
     case 'raise': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
       const amount = parseFloat(named['amount'] ?? '0');
       if (isNaN(id) || !Number.isFinite(amount) || amount <= 0) {
-        return { success: false, output: 'Usage: employee raise <id> amount:500' };
+        return { success: false, output: t('employees.raise_usage') };
       }
       if (!giveRaise(state.employees, id, amount)) {
-        return { success: false, output: `Employee #${id} not found.` };
+        return { success: false, output: t('employees.employee_not_found', { id }) };
       }
-      return { success: true, output: `Raise of $${amount} given to employee #${id}.` };
+      return { success: true, output: t('employees.raise_success', { amount, id }) };
     }
     case 'fire': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: employee fire <id>' };
+      if (isNaN(id)) return { success: false, output: t('employees.fire_usage') };
       const result = fireEmployee(state.employees, id);
       if (!result.success) return { success: false, output: result.error! };
-      return { success: true, output: `Employee #${id} fired.` };
+      return { success: true, output: t('employees.fire_success', { id }) };
     }
     case 'assign_skill': {
       const id = parseInt(args[1] ?? '', 10);
       const skillRaw = named['skill'] ?? '';
       const levelRaw = named['level'] ?? '';
       const level = parseInt(levelRaw, 10);
-      const usageMsg = 'Usage: employee assign_skill <id> skill:<category> level:1-5';
+      const usageMsg = t('employees.assign_skill_usage');
 
       if (isNaN(id)) return { success: false, output: usageMsg };
       if (!VALID_SKILL_CATEGORIES.includes(skillRaw as SkillCategory)) return { success: false, output: usageMsg };
       if (isNaN(level) || level < 1 || level > 5) return { success: false, output: usageMsg };
 
       const emp = state.employees.employees.find(e => e.id === id);
-      if (!emp) return { success: false, output: `Employee #${id} not found.` };
-      if (!emp.alive) return { success: false, output: `Employee #${id} is dead and cannot be assigned a skill.` };
+      if (!emp) return { success: false, output: t('employees.employee_not_found', { id }) };
+      if (!emp.alive) return { success: false, output: t('employees.assign_skill_dead', { id }) };
 
       assignSkill(state.employees, id, skillRaw as SkillCategory, level as 1 | 2 | 3 | 4 | 5);
-      return { success: true, output: `Employee #${id} assigned skill: ${skillRaw} (level ${level}).` };
+      return {
+        success: true,
+        output: t('employees.assign_skill_success', { id, skill: skillRaw, level }),
+      };
     }
     case 'dispatch': {
       // Pushes a generic work PendingAction targeting a specific employee —
@@ -145,7 +155,7 @@ export function employeeCommand(
       // synchronously), which left the Bunkhouse shift-cycle unreachable from
       // any player-facing flow.
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      const usageMsg = 'Usage: employee dispatch <id> x:<X> z:<Z> [skill:<category>]';
+      const usageMsg = t('employees.dispatch_usage');
       if (isNaN(id)) return { success: false, output: usageMsg };
       const x = parseFloat(named['x'] ?? '');
       const z = parseFloat(named['z'] ?? '');
@@ -168,11 +178,11 @@ export function employeeCommand(
           : null;
 
       const emp = state.employees.employees.find(e => e.id === id);
-      if (!emp) return { success: false, output: `Employee #${id} not found.` };
-      if (!emp.alive) return { success: false, output: `Employee #${id} is not available.` };
-      if (emp.injured) return { success: false, output: `Employee #${id} is injured and cannot be dispatched.` };
+      if (!emp) return { success: false, output: t('employees.employee_not_found', { id }) };
+      if (!emp.alive) return { success: false, output: t('employees.dispatch_not_available', { id }) };
+      if (emp.injured) return { success: false, output: t('employees.dispatch_injured', { id }) };
       if (emp.trainingState !== null) {
-        return { success: false, output: `Employee #${id} is in training and cannot be dispatched.` };
+        return { success: false, output: t('employees.dispatch_in_training', { id }) };
       }
 
       const actionId = state.nextPendingActionId++;
@@ -199,21 +209,21 @@ export function employeeCommand(
         // else might" — the two need different messages or the latter wrongly
         // reads as "nobody qualifies" (#406).
         const message = dispatch.reason === 'target-unqualified'
-          ? `Employee #${id} (${emp.name}) does not hold skill: ${requiredSkill}.`
+          ? t('employees.dispatch_target_unqualified', { id, name: emp.name, skill: requiredSkill! })
           : requiredSkill !== null
-            ? `No employee on the roster holds skill: ${requiredSkill}.`
-            : `Dispatch rejected: no eligible employee on the roster.`;
+            ? t('employees.dispatch_no_skill_holder', { skill: requiredSkill })
+            : t('employees.dispatch_no_eligible');
         return { success: false, output: message };
       }
       return {
         success: true,
-        output: `Employee #${id} dispatched to work at (${x}, ${z}). Action ID: ${actionId}.`,
+        output: t('employees.dispatch_success', { id, x, z, actionId }),
       };
     }
     case 'train': {
       const id = parseInt(args[1] ?? '', 10);
       const skillRaw = named['skill'] ?? '';
-      const usageMsg = 'Usage: employee train <id> skill:<category> [building:<id>]';
+      const usageMsg = t('employees.train_usage');
 
       if (isNaN(id)) return { success: false, output: usageMsg };
       if (!VALID_SKILL_CATEGORIES.includes(skillRaw as SkillCategory)) {
@@ -222,11 +232,11 @@ export function employeeCommand(
       const skill = skillRaw as SkillCategory;
 
       const emp = state.employees.employees.find(e => e.id === id);
-      if (!emp) return { success: false, output: `Employee #${id} not found.` };
+      if (!emp) return { success: false, output: t('employees.employee_not_found', { id }) };
 
       // Pick the school: the one named, else any built one that teaches this skill.
       const schoolType = schoolFor(skill);
-      if (!schoolType) return { success: false, output: `No building teaches ${skill}.` };
+      if (!schoolType) return { success: false, output: t('employees.train_no_school', { skill }) };
 
       const buildingRaw = named['building'];
       const candidates = state.buildings.buildings.filter(
@@ -241,15 +251,15 @@ export function employeeCommand(
         return {
           success: false,
           output: buildingRaw !== undefined
-            ? `Building #${buildingRaw} does not teach ${skill}.`
-            : `No ${schoolType} on site. Build one to train ${skill}.`,
+            ? t('employees.train_building_no_teach', { buildingId: buildingRaw, skill })
+            : t('employees.train_no_building_on_site', { schoolType, skill }),
         };
       }
 
       const plan = planTraining(emp, skill, building.tier);
-      if (!plan) return { success: false, output: `${emp.name} is already a Master of ${skill}.` };
+      if (!plan) return { success: false, output: t('employees.train_already_master', { name: emp.name, skill }) };
       if (state.cash < plan.fee) {
-        return { success: false, output: `Insufficient funds: course costs $${plan.fee}.` };
+        return { success: false, output: t('employees.train_insufficient_funds', { fee: plan.fee }) };
       }
 
       const result = enrolInTraining(state.employees, id, building, skill);
@@ -259,32 +269,42 @@ export function employeeCommand(
       addExpense(state.finances, plan.fee, 'salaries', `Train ${emp.name}: ${skill}`, state.tickCount);
       return {
         success: true,
-        output: `${emp.name} enrolled at ${building.type} #${building.id}: ${skill} `
-          + `level ${plan.targetLevel} in ${plan.ticks} ticks ($${plan.fee}).`,
+        output: t('employees.train_success', {
+          name: emp.name,
+          buildingType: building.type,
+          buildingId: building.id,
+          skill,
+          targetLevel: plan.targetLevel,
+          ticks: plan.ticks,
+          fee: plan.fee,
+        }),
       };
     }
     case 'cancel': {
       const id = parseInt(args[1] ?? named['id'] ?? '', 10);
-      if (isNaN(id)) return { success: false, output: 'Usage: employee cancel <action-id>' };
+      if (isNaN(id)) return { success: false, output: t('employees.cancel_usage') };
 
       const result = cancelAction(state, id);
       if (!result.success) {
         const message = result.error === 'not-cancellable'
-          ? `Action #${id} cannot be cancelled.`
-          : `Action #${id} not found.`;
+          ? t('employees.cancel_not_cancellable', { id })
+          : t('employees.cancel_action_not_found', { id });
         return { success: false, output: message };
       }
       // A cancelled drill_hole/charge_hole order still has a ghost in
       // plannedDrillHoles/plannedChargesByHole — cancelAction only removes
       // the generic PendingAction record (#554 code review).
       releasePlannedHoleForCancelledAction(state, result.action!);
-      const refundMsg = result.refunded && result.refunded > 0
-        ? ` $${formatMoney(result.refunded)} refunded.`
+      const refundSuffix = result.refunded && result.refunded > 0
+        ? t('employees.cancel_refund_suffix', { amount: formatMoney(result.refunded) })
         : '';
-      return { success: true, output: `Action #${id} (${result.action!.type}) cancelled.${refundMsg}` };
+      return {
+        success: true,
+        output: t('employees.cancel_success', { id, actionType: result.action!.type, refundSuffix }),
+      };
     }
     default:
-      return { success: false, output: 'Usage: employee (list|hire|raise|fire|assign_skill|dispatch|train|cancel)' };
+      return { success: false, output: t('employees.usage') };
   }
 }
 

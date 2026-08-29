@@ -197,10 +197,23 @@ describe('en.json / fr.json — key-set parity', () => {
     // t(). 7 new mafia.* keys — target_not_found, accident_success,
     // accident_failed, frame_started, frame_no_ready, frame_success,
     // frame_detected — both locales translated.
+    // Baseline is now 3422 (up from 3391): #883 wired the last raw-literal
+    // console command strings in src/console/commands/employees.ts through
+    // t() — 31 new employees.* keys covering hire/raise/fire usage and
+    // success, the shared employee_not_found rejection (4 call sites),
+    // assign_skill's dead-employee and success messages, dispatch's
+    // not_available/injured/in_training/target_unqualified/no_skill_holder/
+    // no_eligible/success messages, train's no_school/building_no_teach/
+    // no_building_on_site/already_master/insufficient_funds/success
+    // messages, cancel's not_cancellable/action_not_found/refund_suffix/
+    // success messages, and the default-subcommand usage string — both
+    // locales translated. employees.ts's hire guard reuses the pre-existing
+    // console.insufficient_funds key, already covered by
+    // insufficient-funds-guards.test.ts, so no new key was needed there.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3391);
+    expect(Object.keys(en).length).toBe(3422);
   });
 });
 
