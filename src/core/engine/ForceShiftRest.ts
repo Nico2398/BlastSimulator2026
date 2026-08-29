@@ -7,7 +7,7 @@
 // out of GameLoop.ts as part of #759's file-size split; re-exported there so
 // GameLoop.ts stays the single public surface for tick-orchestration callers.
 
-import type { GameState } from '../state/GameState.js';
+import type { GameState, PendingAction } from '../state/GameState.js';
 import type { Employee, NeedKey } from '../entities/Employee.js';
 import type { FiredEvent } from '../events/EventSystem.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
@@ -15,6 +15,28 @@ import { interruptActiveAction } from './TaskDispatch.js';
 import { createRestPendingAction, findNearestLivingQuarters, resolveBuildingApproach } from './RestActionHelpers.js';
 import { shouldForceRest, getEffectiveThresholds } from '../entities/SitePolicy.js';
 import { WORK_DURATION_TICKS, SHIFT_SLEEP_DURATION_TICKS, NEED_REST_DURATIONS } from '../config/balance.js';
+
+/**
+ * Shared tail of forceShiftRestIfNeeded and forceShiftRestIfNeededByPolicy:
+ * queues restAction, updates emp's activeActionId/destination, records the
+ * shift-change bookkeeping (shiftRested/firedEvents/emitter).
+ */
+function finishForceRest(
+  state: GameState,
+  emp: Employee,
+  restAction: PendingAction,
+  firedEvents: FiredEvent[],
+  shiftRested: number[],
+  _emitter?: EventEmitter,
+): void {
+  state.pendingActions.push(restAction);
+  emp.activeActionId = restAction.id;
+  emp.destinationX = restAction.targetX;
+  emp.destinationZ = restAction.targetZ;
+  shiftRested.push(emp.id);
+  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
+  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+}
 
 /**
  * If an active employee has worked enough ticks, force a shift rest:
@@ -69,13 +91,7 @@ export function forceShiftRestIfNeeded(
     payload: { needType: 'fatigue', triggeredBy: 'shift_cycle', buildingId },
   }, emp.id);
 
-  state.pendingActions.push(restAction);
-  emp.activeActionId = restAction.id;
-  emp.destinationX = targetX;
-  emp.destinationZ = targetZ;
-  shiftRested.push(emp.id);
-  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
 }
 
 /**
@@ -223,11 +239,5 @@ export function forceShiftRestIfNeededByPolicy(
     payload: { needKey, triggeredBy: 'shift_cycle_policy', buildingId },
   }, emp.id);
 
-  state.pendingActions.push(restAction);
-  emp.activeActionId = restAction.id;
-  emp.destinationX = targetX;
-  emp.destinationZ = targetZ;
-  shiftRested.push(emp.id);
-  firedEvents.push({ eventId: 'employee_shift_change', firedAtTick: state.tickCount });
-  _emitter?.emit('employee:shift_change', { employeeId: emp.id });
+  finishForceRest(state, emp, restAction, firedEvents, shiftRested, _emitter);
 }
