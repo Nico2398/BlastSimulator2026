@@ -164,7 +164,9 @@ export function forceShiftRestIfNeededByPolicy(
   // back inside the danger zone they were just ordered out of.
   if (isMidEvacuationWalk(emp)) return;
 
-  const snapshot = { id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, ticksWorked: emp.ticksWorked };
+  const snapshot = {
+    id: emp.id, hunger: emp.hunger, fatigue: emp.fatigue, breakNeed: emp.breakNeed, ticksWorked: emp.ticksWorked,
+  };
   if (!shouldForceRest(state.sitePolicy, snapshot, true)) return;
 
   // #678 follow-up: release the action this employee was actively working
@@ -197,10 +199,17 @@ export function forceShiftRestIfNeededByPolicy(
   // overdue) — works uniformly whether the rest was need-triggered (one gauge
   // already <= its threshold) or shift-duration-triggered (neither has
   // crossed yet): either way the gauge relatively furthest past due gets
-  // serviced.
+  // serviced. Extended to breakNeed (#867, chained rather than a flat 3-way
+  // min so the pre-existing hunger-vs-fatigue precedence — fatigue wins ties —
+  // is preserved exactly; breakNeed only displaces the hunger/fatigue winner
+  // on a STRICTLY greater deficit, same "only strictly-worse wins" rule the
+  // original two-way comparison already used).
   const hungerDeficit = emp.hunger - thresholds.hunger;
   const fatigueDeficit = emp.fatigue - thresholds.fatigue;
-  const needKey: NeedKey = hungerDeficit < fatigueDeficit ? 'hunger' : 'fatigue';
+  const breakNeedDeficit = emp.breakNeed - thresholds.social;
+  let needKey: NeedKey = hungerDeficit < fatigueDeficit ? 'hunger' : 'fatigue';
+  const needDeficit = needKey === 'hunger' ? hungerDeficit : fatigueDeficit;
+  if (breakNeedDeficit < needDeficit) needKey = 'breakNeed';
 
   // Find nearest living_quarters of any tier for target coordinates.
   const building = findNearestLivingQuarters(state, emp.x, emp.z);

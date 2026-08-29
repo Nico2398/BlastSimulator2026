@@ -2775,6 +2775,21 @@
       "commandOutcome": "either"
     },
     {
+      "command": "charge hole:H26 explosive:boomite amount:8 stemming:0.5",
+      "description": "#867 follow-up: a 13th straggler, same class as the #707 follow-up batch above (H21/H36/H49/H58) -- #867's own fix (SitePolicy.shouldForceRest now also proactively rests an employee whose breakNeed crosses socialBreakThreshold, previously dead config, see src/core/entities/SitePolicy.ts) shifts this file's dispatch timing enough that one more hole lands after the main Charge All snapshot (step 128) under seed:42/command mode. Joins, rather than replaces, the existing 12 -- `commandOutcome: either` covers a hole that turns out to not need reissuing (redundant, harmless) or was never drilled (refused, harmless) either way, same reasoning as every other straggler step here.",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-blast-panel [data-hole=\"H26\"] [data-action=\"charge-hole\"]"
+        }
+      ],
+      "role": "player",
+      "commandOutcome": "either"
+    },
+    {
       "command": "wait_until field:orderedChargeCount equals:0 max_ticks:400",
       "description": "#682: drains the straggler sweep above -- a handful of holes across 32 charge-capable workers, so this is fast relative to the main charge-drain wait, not a repeat of it. Quality-review followup: equals:{orderedChargeCount:0} alone is tautological here too (same issue step 129's own note above diagnoses) -- added increased:[chargedCount] since a direct probe (two full command-mode runs, screenshots/scenario-blast-execution-visual-command/step-129 vs step-138 state dumps) shows chargedCount reliably moving 53 -> 61 across this batch on this file's seed, i.e. all 8 stragglers (H33/H37/H41/H42/H50/H51/H57/H60) genuinely land and charge every run, not just some. #682 fix (real interaction-mode finding, live-diagnosed, not the reported overlay theory): `increased:[chargedCount]` dropped again -- it was only ever verified against command-mode runs, and does not hold in interaction mode on this seed. Live state dumps prove the 8 straggler clicks themselves are NOT blocked (orderedChargeCount genuinely climbs 0->7 across steps 130-137, one real order per click, so the buttons are clickable and reachable) -- interaction mode's real click-driven drilling pace simply saturates the grid (holeCount:62, chargedCount:62, orderedChargeCount:0) during step 129's own wait, before any straggler exists to charge, so every one of the 8 straggler clicks is a legitimate redundant re-order of an already-charged hole (harmless, matching this step's own `commandOutcome: either` reasoning) and chargedCount has nothing left to increase to. Command mode's own 53->61 trace is real and unaffected -- this is a genuine cross-mode pacing divergence (interaction mode's real click dispatch finishes the grid faster than command mode's bulk `tick`), not a bug in either mode, so the one shared `expect` block can only assert what holds in both: the drain itself completing.",
       "interaction": [

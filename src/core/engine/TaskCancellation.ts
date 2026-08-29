@@ -11,6 +11,7 @@ import { addIncome } from '../economy/Finance.js';
 import type { Employee } from '../entities/Employee.js';
 import { releaseVehicleReservation, releaseVehicleReservationKeepDriver } from './VehicleReservation.js';
 import { clearActiveTaskFields, completePendingAction } from './TaskLifecycleCore.js';
+import { octileHeuristic } from '../nav/Pathfinding.js';
 
 export interface CancelActionResult {
   success: boolean;
@@ -138,6 +139,31 @@ export function cancelAction(state: GameState, actionId: number): CancelActionRe
  * ever set by the non-vehicle branch of `promoteActionToActive`, so this
  * condition never matches one).
  */
+/**
+ * True when a different alive, uninjured, genuinely idle employee (not mid-
+ * task, not mid-rest, not walking anywhere) is currently closer — by the same
+ * cheap octile-distance estimate ActionSelection.ts's own estimateActionCost
+ * ranks candidates with — to `action`'s target than `pinnedEmployee` is right
+ * now. Used only to decide whether releasing a #556 walk-only pin (see
+ * interruptActiveAction's own doc comment) is actually worth doing: a closer
+ * idle employee could finish the remaining walk faster than the pinned one's
+ * own repeatedly-interrupted crawl; with nobody closer, releasing would just
+ * hand the action to "whichever employee is idle first" again with no
+ * benefit — exactly the relay #556 fixed in the first place.
+ */
+function hasCloserIdleCandidate(state: GameState, pinnedEmployee: Employee, action: PendingAction): boolean {
+  const ownDistance = octileHeuristic(pinnedEmployee.x, pinnedEmployee.z, action.targetX, action.targetZ);
+  return state.employees.employees.some(other =>
+    other.id !== pinnedEmployee.id
+    && other.alive
+    && !other.injured
+    && other.activeActionId === null
+    && other.restTicksRemaining === null
+    && other.pendingDriverVehicleId === null
+    && octileHeuristic(other.x, other.z, action.targetX, action.targetZ) < ownDistance,
+  );
+}
+
 export function interruptActiveAction(
   state: GameState,
   employee: Employee,
@@ -152,12 +178,63 @@ export function interruptActiveAction(
       if (employee.taskTicksRemaining !== null && employee.taskTicksRemaining > 0) {
         action.payload = { ...action.payload, durationTicks: employee.taskTicksRemaining };
       } else if (
-        action.targetEmployeeId === null
-        && action.type !== 'rest'
+        action.type !== 'rest'
         && employee.pendingTaskDuration !== null
         && employee.taskTicksRemaining === null
       ) {
-        action.targetEmployeeId = employee.id;
+        // First mid-walk interruption of this action for this employee: pin
+        // it to them (see this function's own doc comment / #556) so their
+        // walk progress isn't discarded by a different, still-at-base
+        // employee relaying it next tick. Marked with walkOnlyPinnedBy (in
+        // payload, not just targetEmployeeId) specifically so this is
+        // distinguishable from an action that arrived here ALREADY targeted
+        // at this employee for an unrelated reason (a manual `employee
+        // dispatch` order, say) — that kind of targeting is permanent by
+        // design and must never be released; only a pin THIS branch itself
+        // created is ever a candidate for release below.
+        //
+        // A REPEAT walk-only interruption of a pin THIS branch set —
+        // walkOnlyPinnedBy already reads this employee's own id, meaning
+        // they still haven't reached taskTicksRemaining even once since
+        // being pinned — releases it (targetEmployeeId back to null,
+        // genuinely open pool) ONLY when a different idle employee is
+        // currently CLOSER to the target than this one (#867). Permanently
+        // pinning regardless of distance is #556's own fix for a genuinely
+        // worse problem — a target far from every employee relayed forever,
+        // never once, because each new claimant restarted the walk from
+        // base — confirmed by this exact reasoning still needing to hold for
+        // building-placement-visual.json's own far-flung management_office
+        // order, which a blind release-after-N-strikes broke by handing the
+        // action to "whichever employee is idle first" again with no cross-
+        // employee cost comparison, recreating the original relay. But under
+        // three independent proactive-rest triggers instead of two (#867),
+        // the pinned employee can ALSO end up too far from every rest
+        // destination to ever land enough uninterrupted walk time — and if a
+        // different, idle, well-rested employee is standing right at (or
+        // much nearer) the target the whole time, permanent pinning locks
+        // them out for no benefit: claimActionsTargetedAtEmployee (step 1)
+        // reclaims the action for the pinned employee alone every tick,
+        // before claimOnePoolCandidate (step 2) ever sees it as available to
+        // anyone else. Confirmed live via tutorial-steps-visual.json's own
+        // freight_warehouse order: pinned to one employee relaying between
+        // distant rests, never released once in 2000+ ticks, while a second,
+        // idle, well-rested employee stood at the site the whole time. The
+        // octile-distance check below is the same cheap estimate
+        // ActionSelection.ts's own estimateActionCost already uses to rank
+        // candidates — real pathfinding is not needed just to decide whether
+        // reassignment is even worth considering.
+        if (action.targetEmployeeId === null) {
+          action.targetEmployeeId = employee.id;
+          action.payload = { ...action.payload, walkOnlyPinnedBy: employee.id };
+        } else if (
+          action.targetEmployeeId === employee.id
+          && action.payload['walkOnlyPinnedBy'] === employee.id
+          && hasCloserIdleCandidate(state, employee, action)
+        ) {
+          action.targetEmployeeId = null;
+          const { walkOnlyPinnedBy: _unused, ...rest } = action.payload;
+          action.payload = rest;
+        }
       }
 
       // options.keepVehicleDriver (#552) skips the dismount for the one

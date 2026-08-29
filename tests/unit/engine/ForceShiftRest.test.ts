@@ -243,6 +243,41 @@ describe('forceShiftRestIfNeededByPolicy (#678 policy-aware variant)', () => {
     expect(employee.pendingRestNeedKey).toBe('fatigue');
   });
 
+  it('fires on a breakNeed-threshold trigger (#867)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    const threshold = state.sitePolicy.socialBreakThreshold;
+    employee.activeActionId = 220;
+    employee.ticksWorked = 1;
+    employee.hunger = 100;
+    employee.fatigue = 100;
+    employee.breakNeed = threshold;
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestNeedKey).toBe('breakNeed');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.breakNeed);
+  });
+
+  it('picks breakNeed as the more-overdue gauge when it is further past its own threshold than hunger or fatigue (#867)', () => {
+    const state = createGame({ seed: SEED });
+    const rng = new Random(SEED);
+    applyPolicy(state, { shiftMode: 'shift_8h' });
+    const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
+    employee.activeActionId = 302;
+    employee.ticksWorked = 1;
+    employee.hunger = 50;     // deficit vs. default threshold 60: -10
+    employee.fatigue = 50;    // deficit vs. default threshold 60: -10
+    employee.breakNeed = 10;  // deficit vs. default threshold 60: -50 — most overdue
+
+    forceShiftRestIfNeededByPolicy(state, employee, [], []);
+
+    expect(employee.pendingRestNeedKey).toBe('breakNeed');
+    expect(employee.pendingRestDuration).toBe(NEED_REST_DURATIONS.breakNeed);
+  });
+
   it('no-op when restTicksRemaining is already set', () => {
     const state = createGame({ seed: SEED });
     const rng = new Random(SEED);

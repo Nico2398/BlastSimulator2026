@@ -1116,11 +1116,50 @@ export const SHIFT_DURATIONS_TICKS = {
  * not a cliff: wellBeing stays comfortably above 0 for the acceptance
  * criterion's full run. These thresholds keep gauges out of the *severe*
  * penalty band, not out of the mild one entirely.
+ *
+ * socialBreak raised 20 -> 60 (#867): SitePolicy.shouldForceRest never
+ * actually read socialBreakThreshold until #867 wired it up — this value was
+ * chosen while the field was dead config, so it was never checked against
+ * the same "stay above comfortable" reasoning the paragraph above documents
+ * for hunger/fatigue. 20 sits inside needsMoraleEffect's "suffering" band
+ * (<30, -1.5/tick) and just above its "critical" floor (<15, -3.0/tick) —
+ * wiring shouldForceRest up to the old default meant breakNeed was already
+ * deep in morale-penalty territory before a policy-forced rest ever
+ * triggered. 60 matches hungerRest/fatigueRest's own margin above the 50
+ * comfortable line — direct-traced against vibration-budget.json (#867's own
+ * motivating case, a multi-thousand-tick, work-heavy multi-employee file):
+ * wellBeing never drops below 50 for the file's entire run at 60 (was pinned
+ * at 0 from partway through grid 1 onward pre-fix); 40 and 50 were both
+ * tried and both still end the same file in a real worker_revolt — breakNeed
+ * drains slower than fatigue (NEED_DRAIN_RATES.breakNeed.working = 0.8/tick
+ * vs 2/tick, and not at all while idle) but this file's own sustained
+ * working stretches are long enough that only the full 60 margin actually
+ * closes the gap with real headroom, not a razor's-edge pass.
+ *
+ * Three independent proactive triggers (hunger, fatigue, breakNeed) all
+ * armed at 60 does cost something: any ONE of the three tripping mid-walk is
+ * enough to interrupt, so an employee crossing real distance — not just
+ * working in place — gets interrupted more often than when only two gauges
+ * could trip. Direct-traced against tutorial-steps-visual.json: at 60 (and
+ * still at 50), a freight_warehouse construction order sat at
+ * `orderedBuildingCount:1` for 2000+ ticks straight, the claiming employee
+ * repeatedly yanked back into a rest before ever completing the walk from
+ * living_quarters to the site — a genuine, deterministic livelock for that
+ * file's own seed, not just a slow convergence (2000 ticks never once
+ * succeeded). Lowering the global default to 40 does clear that file, but
+ * reopens vibration-budget's own revolt — the two files pull the one shared
+ * threshold in opposite directions, and neither is a coincidence: each was
+ * already living close to its own margin before #867 (vibration-budget's
+ * multi-cycle length, tutorial-steps-visual's cross-map commute — see #816's
+ * own construction-livelock history on the latter). The fix that holds both
+ * is on the scenario side, not the threshold: tutorial-steps-visual.json
+ * shortens the walk (see its own `build freight_warehouse` step's note)
+ * rather than this default trading vibration-budget's margin away.
  */
 export const SITE_POLICY_DEFAULT_THRESHOLDS = {
   hungerRest:  60,
   fatigueRest: 60,
-  socialBreak: 20,
+  socialBreak: 60,
 } as const;
 
 /** Number of ticks an employee works before shift cycle rest is forced. */
