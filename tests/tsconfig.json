@@ -121,6 +121,22 @@
     // GameContext literal was missing landscape/playableArea. No test
     // logic or assertions changed. Freshly measured 75 errors remain across
     // the 39 still-excluded files.
+    // #844 fixed the ./unit/renderer/*.test.ts cluster (39 -> 34 entries), 14
+    // errors: BlastPlanOverlay.test.ts's makeHole HoleOverlayData literal was
+    // missing drilled; CharacterMesh.test.ts's makeEmployee Employee literal
+    // was missing the qualifications-onward field block (matching the same
+    // convention already used in TaskProgressBar.test.ts); GameRenderer.test.ts
+    // (7 errors) had makeCtx's MiningContext literal and four separate
+    // makeLandscapeCtx() helpers plus one inline finishLevelLoad() call all
+    // missing playableArea, plus one ghostPreviews.push() GhostPreview literal
+    // missing claimed; LandscapeMesh.test.ts's makeFakeHandle LandscapeHandle
+    // literal was missing groundLevelY/structureSet, and its makeBumpyTile
+    // helper had an unused step param renamed to _step (TS6133);
+    // TaskProgressBar.test.ts's makeEmployee Employee literal was missing
+    // taskQueue, and two group.quaternion.equals() sites needed a
+    // guard-and-throw on the array-destructured `group` (already this file's
+    // own findFillMesh() idiom) under noUncheckedIndexedAccess. No test logic
+    // or assertions changed.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -147,11 +163,6 @@
     "./unit/mining/SurveyCalc.test.ts",
     "./unit/nav/AgentMovement.test.ts",
     "./unit/recording-format.test.ts",
-    "./unit/renderer/BlastPlanOverlay.test.ts",
-    "./unit/renderer/CharacterMesh.test.ts",
-    "./unit/renderer/GameRenderer.test.ts",
-    "./unit/renderer/LandscapeMesh.test.ts",
-    "./unit/renderer/TaskProgressBar.test.ts",
     "./unit/scenario-defs-validation/issue-regressions.test.ts",
     "./unit/scenario-defs-validation/step-tagging.test.ts",
     "./unit/scenario/survey-post-blast-ore-report.test.ts",
