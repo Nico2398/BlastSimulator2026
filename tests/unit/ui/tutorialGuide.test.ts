@@ -137,6 +137,21 @@ describe('resolveStageIndex', () => {
   });
 });
 
+describe('resolveStageIndex — vehicle-buy-assign regression (#858)', () => {
+  // Sub-stage 3 of the vehicle-buy-assign tutorial stage targets
+  // `#bs-vehicle-panel [data-vtype="debris_hauler"] .bs-vehicle-assign-btn`
+  // (scoped by #877/#557). Before that fix the bare `.bs-vehicle-assign-btn`
+  // selector also matched an unrelated undriven vehicle (drill_rig /
+  // rock_digger) left over from the evacuation flow, so the rail advanced to
+  // Assign before a debris_hauler had even been bought. These stubs lock the
+  // scoped-selector behavior in place; bodies filled in by test-writer.
+  it.todo('resolves to Buy sub-stage when only dealership buttons and an unrelated undriven vehicle are present');
+
+  it.todo('resolves to Assign sub-stage once a debris_hauler is actually owned and undriven');
+
+  it.todo('resolves to Buy sub-stage when no vehicles are owned at all (starting condition)');
+});
+
 describe('allowedSelectors', () => {
   it('is just the target when a stage has no helpers', () => {
     expect(allowedSelectors({ target: '#a', hintKey: 'k' })).toEqual(['#a']);
