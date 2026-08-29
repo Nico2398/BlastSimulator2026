@@ -172,6 +172,19 @@
     // its makeFragment helper (inside computeBlastOreReport) was missing
     // halfExtents/shapeSeed (TS2739), same fixture-vs-interface drift pattern as
     // the #804/#806/#845 clusters. No test logic or assertions changed.
+    // #847 un-excluded the ./unit/{engine,entities,nav} fixture-drift cluster
+    // (26 -> 19 entries): ActionSelection-ore-priority.test.ts,
+    // EntityMovementTick.test.ts, entities/Damage.test.ts,
+    // entities/EmployeeActivity.test.ts, entities/VehicleStatus.test.ts,
+    // entities/Zone.test.ts, and nav/AgentMovement.test.ts. Same
+    // fixture-vs-interface drift pattern as the earlier clusters above --
+    // Employee/Vehicle/FragmentData/AgentState object literals missing
+    // fields their interfaces have since grown (TS2739/TS2740/TS2345/
+    // TS2322/TS2375), plus one non-fixture TS2367 in
+    // EntityMovementTick.test.ts (a vehicle.task narrowing artifact, not a
+    // logic bug). Un-excluding only -- the fixtures themselves still have
+    // real type errors and are fixed in a following commit blind to this
+    // one, per the TDD red-phase split.
     "./integration/tutorial.integration.test.ts",
     "./unit/benchmarks/benchmarks.test.ts",
     "./unit/campaign/SuccessTracker.test.ts",
@@ -185,14 +198,7 @@
     "./unit/economy/HaulDispatch.test.ts",
     "./unit/economy/HaulingTask.test.ts",
     "./unit/economy/Logistics.test.ts",
-    "./unit/engine/ActionSelection-ore-priority.test.ts",
-    "./unit/engine/EntityMovementTick.test.ts",
-    "./unit/entities/Damage.test.ts",
-    "./unit/entities/EmployeeActivity.test.ts",
-    "./unit/entities/VehicleStatus.test.ts",
-    "./unit/entities/Zone.test.ts",
     "./unit/lint/NoDanglingDocReferences.test.ts",
-    "./unit/nav/AgentMovement.test.ts",
     "./unit/recording-format.test.ts",
     "./unit/scenario-defs-validation/issue-regressions.test.ts",
     "./unit/scenario-defs-validation/step-tagging.test.ts",

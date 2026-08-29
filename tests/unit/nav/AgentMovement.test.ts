@@ -233,13 +233,13 @@ describe('advanceAgent — edge cases', () => {
 
 describe('advanceAgent — immutability', () => {
   it('does not mutate the original AgentState object', () => {
-    const original: AgentState = {
+    const original: AgentState = makeState({
       x: 0,
       z: 0,
       waypoints: [{ x: 3, z: 0 }, { x: 6, z: 0 }],
       waypointIndex: 0,
       walkSpeed: 2,
-    };
+    });
     // Snapshot original values
     const origX = original.x;
     const origZ = original.z;
@@ -780,7 +780,7 @@ describe('isAgentStuck — stuck status check', () => {
 
   it('returns false for undefined isStuck (defensive)', () => {
     // Cast a partial object to test defensive handling of undefined field
-    const partial = { x: 0, z: 0, waypoints: [], waypointIndex: 0, walkSpeed: 1, destinationX: 0, destinationZ: 0 } as AgentState;
+    const partial = { x: 0, z: 0, waypoints: [], waypointIndex: 0, walkSpeed: 1, destinationX: 0, destinationZ: 0 } as unknown as AgentState;
     expect(isAgentStuck(partial)).toBe(false);
   });
 
