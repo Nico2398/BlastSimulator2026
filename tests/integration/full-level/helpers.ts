@@ -1,11 +1,13 @@
 // BlastSimulator2026 — Shared helper functions for full-level integration tests
 
+import { expect } from 'vitest';
 import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../../src/console/commands/campaign.js';
 import { tickCommand, eventCommand } from '../../../src/console/commands/events.js';
 import { drillPlanCommand, chargeCommand, sequenceCommand, blastCommand } from '../../../src/console/commands/mining.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { campaignCompleteCommand } from '../../../src/console/commands/campaign.js';
+import { stateCommand } from '../../../src/console/commands/state.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { recordProfit } from '../../../src/core/campaign/Campaign.js';
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
@@ -208,6 +210,54 @@ export function driveToLevelCompletion(
   tickWithEvents(ctx, ticks);
   const completeResult = campaignCompleteCommand(ctx, [], {});
   return { blastOutput, completeResult };
+}
+
+/**
+ * Drive a fresh level context to completion (via driveToLevelCompletion) and
+ * assert the standard "level ended, force-completed" outcome: the
+ * campaign-complete command result, and state.levelEnded/levelEndReason.
+ * Shared assertion block extracted from level1-win.integration.test.ts and
+ * tutorial.integration.test.ts (#827) — a caller that also needs the blast
+ * output (tutorial's test asserts it contains 'BLAST REPORT') can read it off
+ * the returned object.
+ * @param ctx The game context.
+ * @param skillLevel The blasting skill level to assign to the hired driller.
+ * @param ticks Number of ticks to advance via tickWithEvents after blasting.
+ * @returns The blast command output text and the campaign-complete command result.
+ */
+export function assertLevelCompletion(
+  ctx: GameContext,
+  skillLevel: number,
+  ticks: number
+): { blastOutput: string; completeResult: CommandResult } {
+  const { blastOutput, completeResult } = driveToLevelCompletion(ctx, skillLevel, ticks);
+  expect(completeResult.success).toBe(true);
+  expect(completeResult.output).toContain('force-completed');
+
+  expect(ctx.state!.levelEnded).toBe(true);
+  expect(ctx.state!.levelEndReason).toBe('completed');
+
+  const summary = getStateSummary(ctx);
+  expect(summary.levelEnded).toBe(true);
+  expect(summary.levelEndReason).toBe('completed');
+
+  return { blastOutput, completeResult };
+}
+
+/**
+ * Assert that the `state summary` console command reflects level completion.
+ * Does not drive the level to completion itself — callers must call
+ * driveToLevelCompletion (or assertLevelCompletion, if they also need those
+ * assertions) first. Shared assertion block extracted from
+ * level1-win.integration.test.ts and tutorial.integration.test.ts (#827).
+ * @param ctx The game context.
+ */
+export function assertStateSummaryCompletion(ctx: GameContext): void {
+  const statsResult = stateCommand(ctx as any, ['summary'], {});
+  expect(statsResult.success).toBe(true);
+  const parsed = JSON.parse(statsResult.output) as Record<string, unknown>;
+  expect(parsed.levelEnded).toBe(true);
+  expect(parsed.levelEndReason).toBe('completed');
 }
 
 /**
