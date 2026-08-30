@@ -23,6 +23,68 @@ export function serialize(state: GameState): string {
 }
 
 /**
+ * Sets `container[key]` to `defaultValue` when the current value fails
+ * `predicate`. No-ops when `container` is undefined. Mutates in place.
+ * Idempotent: a value that already satisfies `predicate` is left untouched.
+ */
+function ensureField(
+  container: Record<string, unknown> | undefined,
+  key: string,
+  predicate: (value: unknown) => boolean,
+  defaultValue: unknown,
+): void {
+  if (!container) return;
+  if (!predicate(container[key])) {
+    container[key] = defaultValue;
+  }
+}
+
+/**
+ * For every item in `obj[listContainerKey][listKey]` (an array of records),
+ * default each field in `fields` when it fails its own predicate.
+ */
+function ensureFieldsOnEach(
+  obj: Record<string, unknown>,
+  listContainerKey: string,
+  listKey: string,
+  fields: Array<{ key: string; predicate: (value: unknown) => boolean; defaultValue: unknown }>,
+): void {
+  const container = obj[listContainerKey] as Record<string, unknown> | undefined;
+  if (!container) return;
+  const list = container[listKey] as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(list)) return;
+  for (const item of list) {
+    for (const field of fields) {
+      if (!field.predicate(item[field.key])) {
+        item[field.key] = field.defaultValue;
+      }
+    }
+  }
+}
+
+/**
+ * Restores a Set<string> field serialized by `serialize`'s replacer
+ * (`{ __type: 'Set', values: [...] }`), a raw array (pre-Set-encoding
+ * saves), or replaces anything else with an empty Set. A `__type` tag
+ * present but not `'Set'` falls through and touches nothing, matching
+ * the original if/else-if/else exactly.
+ */
+function restoreSetField(container: Record<string, unknown> | undefined, key: string): void {
+  if (!container) return;
+  const raw = container[key];
+  if (raw && typeof raw === 'object' && '__type' in (raw as Record<string, unknown>)) {
+    const setData = raw as { __type: string; values: string[] };
+    if (setData.__type === 'Set') {
+      container[key] = new Set(setData.values);
+    }
+  } else if (Array.isArray(raw)) {
+    container[key] = new Set(raw as string[]);
+  } else {
+    container[key] = new Set<string>();
+  }
+}
+
+/**
  * v8 -> v9: Employee gained a `taskQueue: number[]` field (#549 cost-based
  * per-employee action selection). A pre-v9 save has no queue for any
  * employee — the field defaults to an empty array so the employee is simply
@@ -30,17 +92,9 @@ export function serialize(state: GameState): string {
  * matching every other migration block in `deserialize` below.
  */
 function migrateV8ToV9(obj: Record<string, unknown>): Record<string, unknown> {
-  const employeesRaw = obj['employees'] as Record<string, unknown> | undefined;
-  if (employeesRaw) {
-    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>> | undefined;
-    if (Array.isArray(employeeList)) {
-      for (const e of employeeList) {
-        if (!Array.isArray(e['taskQueue'])) {
-          e['taskQueue'] = [];
-        }
-      }
-    }
-  }
+  ensureFieldsOnEach(obj, 'employees', 'employees', [
+    { key: 'taskQueue', predicate: Array.isArray, defaultValue: [] },
+  ]);
   return obj;
 }
 
@@ -52,17 +106,9 @@ function migrateV8ToV9(obj: Record<string, unknown>): Record<string, unknown> {
  * every other migration block in `deserialize` below.
  */
 function migrateV9ToV10(obj: Record<string, unknown>): Record<string, unknown> {
-  const vehiclesRaw = obj['vehicles'] as Record<string, unknown> | undefined;
-  if (vehiclesRaw) {
-    const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>> | undefined;
-    if (Array.isArray(vehicleList)) {
-      for (const v of vehicleList) {
-        if (v['reservedForActionId'] === undefined) {
-          v['reservedForActionId'] = null;
-        }
-      }
-    }
-  }
+  ensureFieldsOnEach(obj, 'vehicles', 'vehicles', [
+    { key: 'reservedForActionId', predicate: v => v !== undefined, defaultValue: null },
+  ]);
   return obj;
 }
 
@@ -75,9 +121,7 @@ function migrateV9ToV10(obj: Record<string, unknown>): Record<string, unknown> {
  * below.
  */
 function migrateV10ToV11(obj: Record<string, unknown>): Record<string, unknown> {
-  if (!Array.isArray(obj['plannedDrillHoles'])) {
-    obj['plannedDrillHoles'] = [];
-  }
+  ensureField(obj, 'plannedDrillHoles', Array.isArray, []);
   return obj;
 }
 
@@ -90,9 +134,7 @@ function migrateV10ToV11(obj: Record<string, unknown>): Record<string, unknown> 
  * block in `deserialize` below.
  */
 function migrateV11ToV12(obj: Record<string, unknown>): Record<string, unknown> {
-  if (typeof obj['plannedChargesByHole'] !== 'object' || obj['plannedChargesByHole'] === null) {
-    obj['plannedChargesByHole'] = {};
-  }
+  ensureField(obj, 'plannedChargesByHole', v => typeof v === 'object' && v !== null, {});
   return obj;
 }
 
@@ -113,16 +155,14 @@ function migrateV11ToV12(obj: Record<string, unknown>): Record<string, unknown> 
  * block in `deserialize` below.
  */
 function migrateV12ToV13(obj: Record<string, unknown>): Record<string, unknown> {
-  if (!Array.isArray(obj['plannedRamps'])) {
-    obj['plannedRamps'] = [];
-  }
-  if (typeof obj['nextPlannedRampId'] !== 'number') {
-    obj['nextPlannedRampId'] = 1;
-  }
-  const scoresRaw = obj['scores'] as Record<string, unknown> | undefined;
-  if (scoresRaw && typeof scoresRaw['decayRate'] !== 'number') {
-    scoresRaw['decayRate'] = SCORE_DECAY_RATE;
-  }
+  ensureField(obj, 'plannedRamps', Array.isArray, []);
+  ensureField(obj, 'nextPlannedRampId', v => typeof v === 'number', 1);
+  ensureField(
+    obj['scores'] as Record<string, unknown> | undefined,
+    'decayRate',
+    v => typeof v === 'number',
+    SCORE_DECAY_RATE,
+  );
   return obj;
 }
 
@@ -138,12 +178,8 @@ function migrateV12ToV13(obj: Record<string, unknown>): Record<string, unknown> 
  * yet implemented — filled in during the implementation phase.
  */
 function migrateV13ToV14(obj: Record<string, unknown>): Record<string, unknown> {
-  if (!Array.isArray(obj['plannedBuildings'])) {
-    obj['plannedBuildings'] = [];
-  }
-  if (typeof obj['nextPlannedBuildingId'] !== 'number') {
-    obj['nextPlannedBuildingId'] = 1;
-  }
+  ensureField(obj, 'plannedBuildings', Array.isArray, []);
+  ensureField(obj, 'nextPlannedBuildingId', v => typeof v === 'number', 1);
   return obj;
 }
 
@@ -175,85 +211,35 @@ export function deserialize(json: string): GameState {
   // v2 → v3: waitingTicks added to Vehicle interface.
   // Older saves may have vehicles without this field — default to 0.
   if ((obj['version'] as number) < 3) {
-    const vehiclesRaw = obj['vehicles'] as Record<string, unknown> | undefined;
-    if (vehiclesRaw) {
-      const vehicleList = vehiclesRaw['vehicles'] as Array<Record<string, unknown>> | undefined;
-      if (Array.isArray(vehicleList)) {
-        for (const v of vehicleList) {
-          if (typeof v['waitingTicks'] !== 'number') {
-            v['waitingTicks'] = 0;
-          }
-        }
-      }
-    }
+    ensureFieldsOnEach(obj, 'vehicles', 'vehicles', [
+      { key: 'waitingTicks', predicate: v => typeof v === 'number', defaultValue: 0 },
+    ]);
   }
 
   // Restore Set<string> for surveyedPositions
-  const raw = obj['surveyedPositions'] as unknown;
-  if (raw && typeof raw === 'object' && '__type' in (raw as Record<string, unknown>)) {
-    const setData = raw as { __type: string; values: string[] };
-    if (setData.__type === 'Set') {
-      (obj as Record<string, unknown>)['surveyedPositions'] = new Set(setData.values);
-    }
-  } else if (Array.isArray(raw)) {
-    (obj as Record<string, unknown>)['surveyedPositions'] = new Set(raw as string[]);
-  } else {
-    (obj as Record<string, unknown>)['surveyedPositions'] = new Set<string>();
-  }
+  restoreSetField(obj, 'surveyedPositions');
 
   // Restore Set<string> for levelStats.uniqueOresExtracted
   const levelStatsRaw = obj['levelStats'] as Record<string, unknown> | undefined;
-  if (levelStatsRaw) {
-    const ores = levelStatsRaw['uniqueOresExtracted'];
-    if (ores && typeof ores === 'object' && '__type' in (ores as Record<string, unknown>)) {
-      const setData = ores as { __type: string; values: string[] };
-      if (setData.__type === 'Set') {
-        levelStatsRaw['uniqueOresExtracted'] = new Set(setData.values);
-      }
-    } else if (Array.isArray(ores)) {
-      levelStatsRaw['uniqueOresExtracted'] = new Set(ores as string[]);
-    } else {
-      levelStatsRaw['uniqueOresExtracted'] = new Set<string>();
-    }
-  }
+  restoreSetField(levelStatsRaw, 'uniqueOresExtracted');
 
   // Ensure event system fields exist for saves created before they were added
   const eventsRaw = obj['events'] as Record<string, unknown> | undefined;
-  if (eventsRaw) {
-    if (!Array.isArray(eventsRaw['firedEventIds'])) {
-      eventsRaw['firedEventIds'] = [];
-    }
-    if (typeof eventsRaw['lastEventTick'] !== 'number') {
-      eventsRaw['lastEventTick'] = 0;
-    }
-    if (typeof eventsRaw['actionCountSinceEvent'] !== 'number') {
-      eventsRaw['actionCountSinceEvent'] = 0;
-    }
-    if (typeof eventsRaw['cooldownMinIntervalTicks'] !== 'number') {
-      eventsRaw['cooldownMinIntervalTicks'] = null;
-    }
-  }
+  ensureField(eventsRaw, 'firedEventIds', Array.isArray, []);
+  ensureField(eventsRaw, 'lastEventTick', v => typeof v === 'number', 0);
+  ensureField(eventsRaw, 'actionCountSinceEvent', v => typeof v === 'number', 0);
+  ensureField(eventsRaw, 'cooldownMinIntervalTicks', v => typeof v === 'number', null);
 
   // Ensure restNeedKey exists on employees saved before the field was added.
   // Absent means "not resting under the general rest path", which is what null
   // encodes — an employee frozen mid-rest in such a save is released by the
   // rest action still sitting in pendingActions.
-  const employeesRaw = obj['employees'] as Record<string, unknown> | undefined;
-  if (employeesRaw) {
-    const employeeList = employeesRaw['employees'] as Array<Record<string, unknown>> | undefined;
-    if (Array.isArray(employeeList)) {
-      for (const e of employeeList) {
-        if (e['restNeedKey'] === undefined) {
-          e['restNeedKey'] = null;
-        }
-        // Ensure activeTaskSkill exists on employees saved before the field was
-        // added. Absent means "no dispatched-task skill tracked", encoded as null.
-        if (e['activeTaskSkill'] === undefined) {
-          e['activeTaskSkill'] = null;
-        }
-      }
-    }
-  }
+  // Ensure activeTaskSkill exists on employees saved before the field was
+  // added. Absent means "no dispatched-task skill tracked", encoded as null.
+  ensureFieldsOnEach(obj, 'employees', 'employees', [
+    { key: 'restNeedKey', predicate: v => v !== undefined, defaultValue: null },
+    { key: 'activeTaskSkill', predicate: v => v !== undefined, defaultValue: null },
+  ]);
 
   // #681: RevoltState.immune was removed as a field entirely (no dedicated
   // save-version bump). A save from before the removal — or a hand-edited
@@ -267,24 +253,18 @@ export function deserialize(json: string): GameState {
   }
 
   // v4 → v5: collectedOre field added
-  if (typeof obj['collectedOre'] !== 'object' || obj['collectedOre'] === null) {
-    (obj as Record<string, unknown>)['collectedOre'] = {};
-  }
+  ensureField(obj, 'collectedOre', v => typeof v === 'object' && v !== null, {});
 
   // ghostPreviewsRevision added alongside the renderer's dirty-check gate
   // (#761) — no dedicated save-version bump, so this can't be gated behind
   // a `version < N` check: every save that predates the PR, including the
   // current v13, is missing it. Read unconditionally, like collectedOre/
   // softwareTier above.
-  if (typeof obj['ghostPreviewsRevision'] !== 'number') {
-    (obj as Record<string, unknown>)['ghostPreviewsRevision'] = 0;
-  }
+  ensureField(obj, 'ghostPreviewsRevision', v => typeof v === 'number', 0);
 
   // v6 → v7: softwareTier/tubingState moved onto GameState from the
   // console-only MiningContext, so a save from before this had neither.
-  if (typeof obj['softwareTier'] !== 'number') {
-    (obj as Record<string, unknown>)['softwareTier'] = 0;
-  }
+  ensureField(obj, 'softwareTier', v => typeof v === 'number', 0);
   if (typeof obj['tubingState'] !== 'object' || obj['tubingState'] === null) {
     (obj as Record<string, unknown>)['tubingState'] = { inventory: 0, installedHoles: new Set<string>() };
   } else {
