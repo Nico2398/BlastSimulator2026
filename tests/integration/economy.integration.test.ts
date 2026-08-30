@@ -2,7 +2,7 @@
 // Covers finance, contracts, negotiation, and logistics subsystems.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { financesCommand, contractCommand } from '../../src/console/commands/economy.js';
 import { buildCommand } from '../../src/console/commands/entities.js';
 import { employeeCommand } from '../../src/console/commands/employees.js';
@@ -15,7 +15,6 @@ import {
   blastCommand,
 } from '../../src/console/commands/mining.js';
 import { findReachableGroundFragment } from '../../src/core/economy/HaulingTask.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createFinanceState,
   addIncome,
@@ -36,6 +35,7 @@ import {
 import { negotiateContract } from '../../src/core/economy/Negotiation.js';
 import { Random } from '../../src/core/math/Random.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 // ── Contract fixture helpers ─────────────────────────────────────────────────
 
@@ -100,9 +100,7 @@ function pushStoredFragment(
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
 }
 
 /**
@@ -982,7 +980,7 @@ describe('Economy', () => {
   // collectedOre stays {} for the whole tick window below.
 
   it('collects ore automatically once ore-priority ranking lets ore-bearing fragments jump a full warehouse queue (#671)', () => {
-    newGameCommand(ctx, [], { mine_type: 'desert', seed: '20', size: '64', staffed: 'true', cash: '200000' });
+    ctx = makeGameContext({ mineType: 'desert', seed: '20', size: '64', staffed: true, cash: '200000' });
 
     const drillResult = drillPlanCommand(ctx as any, ['grid'], {
       origin: '18,19', rows: '3', cols: '3', spacing: '3', depth: '8',

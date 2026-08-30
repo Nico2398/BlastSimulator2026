@@ -2,11 +2,11 @@
 // Covers purchase, listing, driver assignment, movement, task assignment, and tick.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
 import { employeeCommand } from '../../src/console/commands/entities.js';
 import { tickCommand } from '../../src/console/commands/events.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { makeGameContext, makeEmptyGameContext } from '../helpers/gameContext.js';
 import {
   createVehicleState,
   purchaseVehicle,
@@ -45,9 +45,7 @@ import { createRunner, runCommand } from '../../src/console/createRunner.js';
  * so the fix is to fund the fixture, not to weaken the guard.
  */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '1000000' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32, cash: 1000000 });
 }
 
 /** Hire one employee and return their numeric ID (always 1 on a fresh state). */
@@ -373,7 +371,7 @@ describe('Vehicle fleet', () => {
   // ── move without game context ──
 
   it('vehicle command errors when no game is loaded', () => {
-    const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+    const emptyCtx: GameContext = makeEmptyGameContext();
     const result = vehicleCommand(emptyCtx, ['list'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');

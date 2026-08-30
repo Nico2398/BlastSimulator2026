@@ -1,20 +1,18 @@
 // BlastSimulator2026 — Integration tests for employee and set_policy commands (task 3.15)
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand } from '../../src/console/commands/entities.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
 import { drillPlanCommand, type MiningContext } from '../../src/console/commands/mining.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { killEmployee } from '../../src/core/entities/Employee.js';
+import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
 }
 
 /** Hire one employee and return their numeric ID (always 1 on a fresh state). */
@@ -278,7 +276,7 @@ describe('Console — set_policy', () => {
   });
 
   it('errors when no game is loaded', () => {
-    const emptyCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+    const emptyCtx = makeEmptyGameContext();
     const result = setPolicyCommand(emptyCtx, [], { mode: 'shift_8h' });
 
     expect(result.success).toBe(false);
@@ -345,7 +343,7 @@ describe('Console — needs command', () => {
   });
 
   it('handles no game loaded', () => {
-    const emptyCtx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+    const emptyCtx = makeEmptyGameContext();
     const result = needsCommand(emptyCtx, [], {});
 
     expect(result.success).toBe(false);
@@ -594,9 +592,7 @@ describe('Console — employee hire — spawn position on a site grown into nega
   // (buggy) coordinate is asserted directly, isolating the offset bug from
   // NavGrid.findNearestReachableCell's separate reachability snapping (#437).
   function makeMiningCtx(): MiningContext {
-    const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-    newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-    return ctx;
+    return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
   }
 
   it('spawns at minX + sizeX/2 (not sizeX/2) once the site has grown west/south', () => {

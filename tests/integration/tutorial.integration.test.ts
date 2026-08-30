@@ -5,16 +5,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import type { MiningContext } from '../../src/console/commands/mining.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
+import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  return { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
+  return makeEmptyGameContext();
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ describe('Tutorial flow', () => {
 
   it('followed by campaign start level:tutorial_pit sets up tutorial level', () => {
     // First set up the game environment
-    newGameCommand(ctx, [], { seed: '42', size: '24' });
+    ctx = makeGameContext({ seed: '42', size: '24' });
 
     // Then start the tutorial level
     const result = campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
@@ -83,7 +83,7 @@ describe('Tutorial flow', () => {
     //   window.__gameConsole('campaign start level:tutorial_pit')
     //   tutorial.start()
 
-    newGameCommand(ctx, [], { seed: '42', size: '24' });
+    ctx = makeGameContext({ seed: '42', size: '24' });
     campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     // Verify game context is fully set up

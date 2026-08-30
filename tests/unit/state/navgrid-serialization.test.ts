@@ -4,7 +4,7 @@ import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import type { NavCell, NavCellType } from '../../../src/core/nav/NavGrid.js';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
+import { makeEmptyGameContext } from '../../helpers/gameContext.js';
 
 // ── Helper factories ────────────────────────────────────────────────────────
 
@@ -70,13 +70,7 @@ function makeMixedGrid(): NavGrid {
 
 /** Create a minimal MiningContext wrapping the given GameState. */
 function makeCtx(state: ReturnType<typeof createGame>): MiningContext {
-  return {
-    state,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
+  return makeEmptyGameContext({ state });
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -215,13 +209,7 @@ describe('stateCommand — navGrid serialization', () => {
   });
 
   it('stateCommand with no game returns failure', () => {
-    const ctx: MiningContext = {
-      state: null,
-      grid: null,
-      emitter: new EventEmitter(),
-      landscape: null,
-      playableArea: null,
-    };
+    const ctx: MiningContext = makeEmptyGameContext();
     const result = stateCommand(ctx, ['full'], {});
     expect(result.success).toBe(false);
     expect(result.output).toContain('No game loaded');

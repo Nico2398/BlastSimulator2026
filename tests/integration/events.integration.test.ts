@@ -3,9 +3,8 @@
 // event lifecycle (pending, clear, follow-up), and time/pause console commands.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { tickCommand, eventCommand, timeCommand } from '../../src/console/commands/events.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import {
   createEventSystemState,
   tickEventSystem,
@@ -34,14 +33,13 @@ import {
   SCORE_DECAY_RATE,
 } from '../../src/core/config/balance.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
 }
 
 /** Minimal EventContext for core-API calls that don't need a full GameState. */

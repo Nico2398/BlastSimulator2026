@@ -3,11 +3,11 @@
 // warehouse storage, explosives inventory, and research tier-unlock.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
 import { tickCommand } from '../../src/console/commands/events.js';
 import type { PlaceBuildingActionPayload } from '../../src/console/commands/buildOrder.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 import {
   createBuildingState,
   placeBuilding,
@@ -36,9 +36,7 @@ import {
 
 /** Build a fresh context with a real GameState (seed=42, desert biome, 32×32 grid). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32 });
 }
 
 /**
@@ -47,9 +45,7 @@ function makeCtx(): GameContext {
  * has someone idle to walk to it and work it.
  */
 function makeStaffedCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', staffed: 'true' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32, staffed: true });
 }
 
 /** Tick until every ordered building has landed (or maxTicks is exhausted). */

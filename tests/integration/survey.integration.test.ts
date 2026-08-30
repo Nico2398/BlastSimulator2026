@@ -3,11 +3,11 @@
 // stale surveys, console command pipeline, and post-blast ore reporting.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand, buildCommand } from '../../src/console/commands/entities.js';
 import { surveyCommand } from '../../src/console/commands/mining.js';
 import { tickCommand } from '../../src/console/commands/events.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 import {
   estimateSurveyResult,
   isSurveyStale,
@@ -30,9 +30,7 @@ import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
 }
 
 /**

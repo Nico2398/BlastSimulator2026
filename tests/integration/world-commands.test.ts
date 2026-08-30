@@ -8,16 +8,16 @@ import {
   ensureLandscape,
 } from '../../src/console/commands/world.js';
 import { getBiome } from '../../src/core/world/BiomeCatalog.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { STARTING_CASH, STARTING_SITE_STAFFED_COMPOSITION } from '../../src/core/config/balance.js';
 import type { Employee } from '../../src/core/entities/Employee.js';
 import type { Vehicle } from '../../src/core/entities/Vehicle.js';
+import { makeEmptyGameContext, makeGameContext } from '../helpers/gameContext.js';
 
 describe('Console — world commands', () => {
   let ctx: GameContext;
 
   beforeEach(() => {
-    ctx = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+    ctx = makeEmptyGameContext();
   });
 
   describe('new_game', () => {
@@ -120,7 +120,7 @@ describe('Console — world commands', () => {
     });
 
     it('rejects staffed:banana, leaving any existing game state untouched', () => {
-      newGameCommand(ctx, [], { seed: '7' });
+      ctx = makeGameContext({ seed: '7' });
       const before = ctx.state;
 
       const result = newGameCommand(ctx, [], { seed: '42', staffed: 'banana' });
@@ -133,7 +133,7 @@ describe('Console — world commands', () => {
 
   describe('inspect', () => {
     beforeEach(() => {
-      newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+      ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
     });
 
     it('returns rock type and density for a solid voxel', () => {
@@ -159,7 +159,7 @@ describe('Console — world commands', () => {
     });
 
     it('errors with no game loaded', () => {
-      const emptyCtx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+      const emptyCtx = makeEmptyGameContext();
       const result = inspectCommand(emptyCtx, ['10,5,3'], {});
       expect(result.success).toBe(false);
     });
@@ -167,7 +167,7 @@ describe('Console — world commands', () => {
 
   describe('survey', () => {
     beforeEach(() => {
-      newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+      ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
     });
 
     it('returns human-readable rock and ore information', () => {
@@ -188,7 +188,7 @@ describe('Console — world commands', () => {
 
   describe('terrain_info', () => {
     it('shows grid dimensions and mine type', () => {
-      newGameCommand(ctx, [], { mine_type: 'mountain', seed: '99', size: '32' });
+      ctx = makeGameContext({ mineType: 'mountain', seed: '99', size: '32' });
       const result = terrainInfoCommand(ctx, [], {});
       expect(result.success).toBe(true);
       expect(result.output).toContain('32x32x32');
@@ -198,7 +198,7 @@ describe('Console — world commands', () => {
 
   describe('ensureLandscape groundLevelY (#458 T5.2/A21)', () => {
     it('exposes groundOffset + centerHeight as the aerial-perspective height reference', () => {
-      newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+      ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
       const biome = getBiome(ctx.state!.mineType)!;
       const handle = ensureLandscape(ctx, {
         seed: ctx.state!.seed, climateBias: biome.climateCenter,
@@ -212,7 +212,7 @@ describe('Console — world commands', () => {
     });
 
     it('is cached — a second call with different params still returns the first handle', () => {
-      newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
+      ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
       const biome = getBiome(ctx.state!.mineType)!;
       const params = { seed: ctx.state!.seed, climateBias: biome.climateCenter, sizeX: 32, sizeY: 32, sizeZ: 32 };
       const first = ensureLandscape(ctx, params);
