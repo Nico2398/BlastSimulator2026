@@ -30,6 +30,10 @@ export const KNOWN_INTERACTION_ACTION_TYPES = [
   // active, instead of a step assuming what a preceding one left in place
   // (PR #616 review round, item 7). See InteractionStepAction.
   'ensurePanel', 'ensureStep',
+  // Polls a DOM property until it matches, bounded by timeoutMs — the
+  // condition-based alternative to padding with a flat `wait` for something
+  // the browser settles asynchronously (PR #888). See InteractionStepAction.
+  'waitForProperty',
 ] as const;
 
 export const PLAYTHROUGH_SCENARIO_NAMES = [

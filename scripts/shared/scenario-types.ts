@@ -72,6 +72,15 @@ export type InteractionStepAction =
   | { type: 'waitForTutorialStep'; stepId: string | string[]; timeout?: number; maxTicks?: number }
   | { type: 'type'; selector: string; text: string; delay?: number }
   | { type: 'assert'; selector?: string; property?: string; expectedValue?: unknown }
+  // Polls a DOM property until it equals `expectedValue`, bounded by
+  // `timeoutMs`, then fails naming the last value it saw. This is the
+  // condition-based counterpart to `assert` for anything the browser settles
+  // asynchronously: `page.mouse.wheel()` resolving does not mean Chrome has
+  // committed the scroll, since it can land on the compositor thread after the
+  // CDP call returns. Reach for this rather than padding with a flat `wait` —
+  // a fixed delay encodes one machine's timing, passes locally, and fails in
+  // CI on a different browser version under a shared browser (PR #888).
+  | { type: 'waitForProperty'; selector: string; property: string; expectedValue: unknown; timeoutMs?: number }
   | { type: 'viewport'; width: number; height: number }
   | { type: 'command'; command: string }
   | { type: 'screenshot' }

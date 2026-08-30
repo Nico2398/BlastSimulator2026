@@ -79,6 +79,14 @@ export class UIManager {
     // P4-P9; P1 only replaces the shell around them).
     const leftCol = document.createElement('div');
     leftCol.id = 'bs-left-col';
+    // max-height, not height: when the column's content overflows, max-height
+    // clamps its used height to a definite value, which is what each panel's
+    // own `max-height:100%` (BuildMenu.ts and its 8 siblings) resolves
+    // against — so the panels are bounded and their bodies scroll without
+    // this needing to be a fixed height. Verified against
+    // crew-panel-short-viewport.json: reverting this line alone keeps that
+    // scenario green, while reverting CrewPanel's roster-row `flex-shrink:0`
+    // fails it.
     leftCol.style.cssText = 'position:fixed;top:70px;left:8px;z-index:100;display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 80px);overflow-y:auto;pointer-events:none';
 
     // Right column — minimap

@@ -77,11 +77,13 @@ Four independent channels prove a change works. Each catches what the others mis
 
 **When a channel is genuinely unavailable** (no browser, dev server unreachable, screenshots never written), say so explicitly and mark the work unverified for that channel. Never substitute a state JSON dump for an image you were unable to inspect, and never report PASS for a channel you did not run.
 
-## ▶ Claude Code only — some channels belong to CI, not to your session
+**▶ Passing the channels is not finishing.** Landing the work — pushing, opening the pull request, labelling it, and reading what CI says about the pushed head rather than assuming it — is its own procedure with its own failure modes. Load `dev-finishing-work` before claiming any coding task complete, and whenever a push, a pull request, or a CI result is involved.
 
-**Deliberately not mirrored into `.github/copilot-instructions.md` or `.opencode/AGENTS.md`.** Entry points are the one layer whose bodies are allowed to diverge — each runtime holds its own, and `validate:context` checks only that all three name the same gates and channels, not that they read alike. This section describes how *this* runtime executes: which channels it runs itself, which it hands to CI, and how it runs a command that outlives one Bash call. The other two runtimes drive their harnesses differently, so their authors decide their own wording. Its absence there is intentional; do not sync it.
+## ▶ Claude Code only — running a command that outlives one Bash call
 
-### ▶ There is no later turn — how to run a command that outlives one Bash call
+**Deliberately not mirrored into `.github/copilot-instructions.md` or `.opencode/AGENTS.md`.** Entry points are the one layer whose bodies are allowed to diverge — each runtime holds its own, and `validate:context` checks only that all three name the same gates and channels, not that they read alike. This section describes how *this* harness executes a long command. The other two runtimes drive their harnesses differently, so their authors decide their own wording. Its absence there is intentional; do not sync it. What is true of the project rather than the harness — which channels CI owns, how a pull request is labelled, how a CI result is read — lives in `dev-finishing-work`, where all three runtimes share it.
+
+### ▶ There is no later turn
 
 **A backgrounded command whose result you plan to collect later is a lost run.** The Bash tool caps one foreground call at 600 000 ms, and three of the commands this project requires sit at or past that ceiling — `npm run scenarios` is ~9 m 20 s in a sandbox and slower on a 2-core runner, `npm run ci:await` waits as long as CI takes. So they have to be detached. *How* you come back for the result is what decides whether the run survives.
 
@@ -104,28 +106,7 @@ npm run long -- wait scenarios      # blocks one bounded slice
 
 Two hooks enforce this, because prose did not hold: `require-foreground-bash.sh` refuses a `run_in_background` Bash call or raw `nohup`/`setsid`/`disown`/trailing-`&` detach, and `require-settled-turn.sh` refuses to let a turn (or a sub-agent's turn) end while a `npm run long` handle is unfinished. A human at an interactive CLI, where a later turn genuinely exists, can set `AGENTIC_ALLOW_BACKGROUND_BASH=1`; no pipeline workflow sets it.
 
-Without a GPU the terrain material costs ~6 s **per frame** in software rasterisation (#475). Loading a level is cheap — a `new_game` is ~4 s and a campaign start ~16 s. What is expensive is *waiting on frames*: the browser harnesses poll the page over CDP, and every such call waits a full frame, so a single player action costs tens of seconds and an interaction-mode scenario beat costs minutes. That is long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened.
-
-The game's own simulation is not the cost — turning ticking off changes the frame by 1.7%. Do not go looking for it in world size, navgrid rebuilds, or terrain generation.
-
-| Run | Where |
-|-----|-------|
-| `typecheck`, `test`, `scenarios` (command mode) | Either. CI runs all three on every push and PR. |
-| `screenshot`, one named scenario in interaction mode | Your session — this is the visual channel's working loop. |
-| `build` (production bundle) | CI job `Production build` on push/schedule/dispatch, or PRs labeled `build-check`. |
-| All scenarios in interaction mode | CI job `Scenarios (interaction mode)` (label the PR `full-ci`). |
-
-The interaction-mode job is gated behind the `full-ci` label because the terrain material costs ~6.4 s/frame without a GPU (#475): the harness waits on the render loop for every probe, so one beat costs minutes. Shard count is a repo variable (`SCENARIO_INTERACTION_SHARDS`, a plain integer, default 4 shards as of #530) rather than fixed in the workflow — `run-all-scenarios.ts`'s `--shard i/N` already accepts any `N`, so `strategy.job-total` carries the count through. The GitHub Actions expression language has no range/loop primitive, so a tiny `shard-config` job turns the integer into the `[1..N]` matrix array with one shell step (`seq`/`jq`, no checkout); everything downstream reads its output. #530's 4-way split cut the harness's own overhead ~30% (3367s → ~2350s single-threaded, sandbox-measured) and, confirmed in real CI on #530 itself, brings the sharded job to ~12 minutes wall clock — of each shard's ~11-12 min, ~30s is fixed per-job setup (checkout, npm ci, Chrome install, build, dev-server boot) that does not shrink with more shards, the rest is the harness's own batch time, which scales down roughly with shard count. Still real added time to the merge path, so the label goes on a PR whose change an interaction-mode scenario actually drives, or which touches machinery every scenario runs through — not on every diff that a player can see. `agentic-pipeline-pr-management` holds the test and the cost.
-
-The `Production build` job is gated behind `build-check` because it doesn't need proving on every diff — `typecheck` already catches what would break the bundle far more often than a Vite-specific build failure does. Apply `build-check` when a change touches build config (`vite.config.ts`, `tsconfig*.json`, `package.json`'s dependencies) or anything about bundling/chunking itself. Independent of `full-ci`: a PR can drive the interaction-mode scenarios without proving the bundle, and vice versa.
-
-Push, then read the CI job — its result *is* the channel's result, and its artifacts carry the FAIL screenshots. Locally, run one named definition you are actively debugging, never the whole suite.
-
-A channel that belongs to CI is **covered**, never pending: an autonomous run marks its PR `READY TO MERGE` and the merge machinery waits for the job and decides on its result. Handing a channel to CI is not a reason to withhold the marker — `agentic-pipeline-pr-management` again.
-
-**Covered means the report gets read, not that you may leave before it arrives.** A red CI is announced to nobody: `agentic-auto-merge.yml` declines a failed CI run, and the watchdog skips any issue with a linked PR. So an autonomous run's last step is `npm run ci:await -- --pr <number>`, which blocks until every workflow run on the PR head reports — green ends the run, red is work on the same branch. PR #581 is what skipping it costs: green on every channel its session ran, marked, two interaction shards red, and issue #552 held the queue until a human looked. `agentic-pipeline-finalization` holds the step and its bounded fix loop; `agentic-pipeline-ci-fix` is the pipeline for a red CI handed back to a later session.
-
-**While any browser-driven run is in flight: change no file** (Vite reloads the page and kills the run with `Execution context was destroyed`, which looks like a game bug and is not), **start no second browser harness**, and **wait for the run's own terminal line** — in this turn, through `npm run long -- wait`, never by ending the turn on it. Slow is not stuck. A run you interrupted produced no result — report the channel as pending CI, never as passed.
+**Slow is not stuck.** Without a GPU a browser-driven run costs minutes per scenario beat (#475) — long enough that a session watching one concludes it hung, kills it, and reports a stall that never happened. Wait for the run's own terminal line, in this turn, through `npm run long -- wait`, never by ending the turn on it. `dev-finishing-work` holds the cost breakdown, the rules for a run in flight, and which channels CI owns.
 
 ## ▶ Capability Gate
 
