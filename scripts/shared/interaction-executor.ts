@@ -670,6 +670,37 @@ export async function executeActionOnPage(
       }
       break;
     }
+    case 'waitForProperty': {
+      // Poll rather than pad: the property is read until it matches or the
+      // budget runs out, so a machine that settles in 20ms costs 20ms and a
+      // slower one still passes, instead of a fixed delay that is either
+      // wasted time or too short somewhere else.
+      const deadline = Date.now() + (action.timeoutMs ?? 5000);
+      const wanted = JSON.stringify(action.expectedValue);
+      let seen: unknown;
+      let found = false;
+      for (;;) {
+        const element = await page.$(action.selector);
+        if (element) {
+          found = true;
+          seen = await element.evaluate(
+            (el: Element, prop: string) => (el as unknown as Record<string, unknown>)[prop],
+            action.property,
+          );
+          if (JSON.stringify(seen) === wanted) break;
+        }
+        if (Date.now() > deadline) {
+          throw new Error(
+            found
+              ? `waitForProperty: "${action.selector}" ${action.property} never became ${wanted}`
+                + ` — last saw ${JSON.stringify(seen)}`
+              : `waitForProperty: selector "${action.selector}" not found`,
+          );
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      break;
+    }
     case 'viewport':
       await page.setViewport({ width: action.width, height: action.height });
       break;

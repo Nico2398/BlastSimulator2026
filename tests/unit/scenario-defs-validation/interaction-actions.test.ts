@@ -103,6 +103,22 @@ const ACTION_TYPE_CHECKS: ActionTypeCheck[] = [
     expect(a.selector.length).toBeGreaterThan(0);
   }),
   defineActionCheck(
+    'waitForProperty',
+    'waitForProperty actions name a selector, a property, and a value to wait for',
+    (a) => {
+      expect(typeof a.selector).toBe('string');
+      expect(a.selector.length).toBeGreaterThan(0);
+      expect(typeof a.property).toBe('string');
+      expect(a.property.length).toBeGreaterThan(0);
+      // An undefined target would match a missing property and pass instantly.
+      expect(a.expectedValue).toBeDefined();
+      if (a.timeoutMs !== undefined) {
+        expect(typeof a.timeoutMs).toBe('number');
+        expect(a.timeoutMs).toBeGreaterThan(0);
+      }
+    },
+  ),
+  defineActionCheck(
     'waitForTutorialStep',
     'waitForTutorialStep actions name at least one step id',
     (a, i) => {
