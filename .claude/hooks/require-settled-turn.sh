@@ -115,7 +115,10 @@ process exits, the notification you are waiting for is never delivered, and
 everything this run has not pushed dies with the runner. PR #604 ended exactly
 here, on "pausing here until it reports back", after 3h11m of finished work.
 
-Wait for it now, in this turn:
+Wait for it now, in this turn. Pass an explicit timeout of at least 600000 ms
+on the call itself — without one, this harness's own shorter default can
+background the \`wait\` call before it reports anything, which reproduces the
+same failure one level up:
 
 $(for label in ${pending}; do echo "    npm run long -- wait ${label}"; done)
 

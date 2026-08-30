@@ -1,11 +1,18 @@
 /**
  * BlastSimulator2026 — Run a command longer than one Bash call, inside one turn
  *
- * The Bash tool caps a foreground call at 600s. Three of this project's own
- * required commands sit past that cap or close enough to it that a slower runner
- * crosses it:
+ * The Bash tool caps a foreground call at 600s. Below that cap is not the same
+ * question as "safe to run in the foreground without this wrapper": the harness
+ * silently backgrounds a foreground call that outruns its own (shorter, and
+ * smaller than 600s) default per-call timeout, and an agent that does not
+ * override that default with an explicit one gets no warning before it happens.
+ * Three of this project's own required commands are past the 600s cap, close
+ * enough to it that a slower runner crosses it, or have already been hit by the
+ * silent-background failure at their actual size:
  *
- *   npm run test      ~186s   fits
+ *   npm run test      ~500s on a 2-core runner, grown from ~186s as the suite
+ *                      grew — backgrounded mid-run in production twice (issue
+ *                      #842's rescue, PR #872) despite being "under the cap"
  *   npm run scenarios ~559s   fits in a sandbox, not on a 2-core runner
  *   npm run ci:await  minutes to tens of minutes, by design — it waits on CI
  *
