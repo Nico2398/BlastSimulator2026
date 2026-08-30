@@ -341,10 +341,11 @@ describe('vehicle.ts — scrap success message', () => {
   it('matches the exact English literal, embedding the real id/residual value', () => {
     const ctx = makeCtx();
     const vehicle = buyTestVehicle(ctx);
+    // Fresh debris_hauler tier 1: hp === maxHp, so hpFraction is 1 and
+    // residualValue is purchaseCost (25_000) * VEHICLE_SCRAP_RESIDUAL_FRACTION (0.4) = 10_000.
     const result = vehicleCommand(ctx, ['scrap', String(vehicle.id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).toMatch(/^Vehicle #\d+ scrapped\. Residual value: \$\d+$/);
-    expect(result.output).toContain(`Vehicle #${vehicle.id} scrapped.`);
+    expect(result.output).toBe(`Vehicle #${vehicle.id} scrapped. Residual value: $10000`);
   });
 
   it('differs from the English literal under locale fr', () => {
@@ -353,7 +354,7 @@ describe('vehicle.ts — scrap success message', () => {
     setLocale('fr');
     const result = vehicleCommand(ctx, ['scrap', String(vehicle.id)], {});
     expect(result.success).toBe(true);
-    expect(result.output).not.toMatch(/^Vehicle #\d+ scrapped\. Residual value: \$\d+$/);
+    expect(result.output).not.toBe(`Vehicle #${vehicle.id} scrapped. Residual value: $10000`);
   });
 });
 
