@@ -1,10 +1,10 @@
-// BlastSimulator2026 — Shared GameContext test-fixture builder (skeleton, #830)
+// BlastSimulator2026 — Shared GameContext test-fixture builder (#830)
 //
 // Consolidates the repeated `{ state: null, grid: null, landscape: null,
 // playableArea: null, emitter: new EventEmitter() }` + newGameCommand(...)
-// boilerplate scattered across test files into one shared builder. Bodies
-// are stubs only — implementer fills these in on a separate branch that
-// never sees the tests written against this API.
+// boilerplate that used to be hand-rolled across test files into two shared
+// builders: `makeEmptyGameContext` for a bare, no-game-started context, and
+// `makeGameContext` for one with a fresh game already started.
 
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { newGameCommand, type GameContext, type LandscapeHandle } from '../../src/console/commands/world.js';
@@ -14,8 +14,6 @@ import type { PlayableArea } from '../../src/core/world/PlayableArea.js';
 
 // Re-exported so callers of this module don't need to reach into
 // console/commands/world.js separately just to type a ctx.
-// Implementer will import `newGameCommand` (value import) from that module
-// directly inside makeGameContext's body once it's filled in.
 export type { GameContext };
 
 /** Per-field overrides for `makeEmptyGameContext`. Omitted fields default to null/a fresh EventEmitter. */
