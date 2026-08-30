@@ -40,24 +40,23 @@ function ensureField(
 }
 
 /**
- * For every item in `obj[listContainerKey][listKey]` (an array of records),
- * default each field in `fields` when it fails its own predicate.
+ * For every item in `obj[listKey][listKey]` (an array of records), default
+ * each field in `fields` when it fails its own predicate. The nested list is
+ * always read from the same key as its container in this codebase's save
+ * shape (e.g. `obj.employees.employees`), so a single key covers both.
  */
 function ensureFieldsOnEach(
   obj: Record<string, unknown>,
-  listContainerKey: string,
   listKey: string,
   fields: Array<{ key: string; predicate: (value: unknown) => boolean; defaultValue: unknown }>,
 ): void {
-  const container = obj[listContainerKey] as Record<string, unknown> | undefined;
+  const container = obj[listKey] as Record<string, unknown> | undefined;
   if (!container) return;
   const list = container[listKey] as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(list)) return;
   for (const item of list) {
     for (const field of fields) {
-      if (!field.predicate(item[field.key])) {
-        item[field.key] = field.defaultValue;
-      }
+      ensureField(item, field.key, field.predicate, field.defaultValue);
     }
   }
 }
@@ -92,7 +91,7 @@ function restoreSetField(container: Record<string, unknown> | undefined, key: st
  * matching every other migration block in `deserialize` below.
  */
 function migrateV8ToV9(obj: Record<string, unknown>): Record<string, unknown> {
-  ensureFieldsOnEach(obj, 'employees', 'employees', [
+  ensureFieldsOnEach(obj, 'employees', [
     { key: 'taskQueue', predicate: Array.isArray, defaultValue: [] },
   ]);
   return obj;
@@ -106,7 +105,7 @@ function migrateV8ToV9(obj: Record<string, unknown>): Record<string, unknown> {
  * every other migration block in `deserialize` below.
  */
 function migrateV9ToV10(obj: Record<string, unknown>): Record<string, unknown> {
-  ensureFieldsOnEach(obj, 'vehicles', 'vehicles', [
+  ensureFieldsOnEach(obj, 'vehicles', [
     { key: 'reservedForActionId', predicate: v => v !== undefined, defaultValue: null },
   ]);
   return obj;
@@ -211,7 +210,7 @@ export function deserialize(json: string): GameState {
   // v2 → v3: waitingTicks added to Vehicle interface.
   // Older saves may have vehicles without this field — default to 0.
   if ((obj['version'] as number) < 3) {
-    ensureFieldsOnEach(obj, 'vehicles', 'vehicles', [
+    ensureFieldsOnEach(obj, 'vehicles', [
       { key: 'waitingTicks', predicate: v => typeof v === 'number', defaultValue: 0 },
     ]);
   }
@@ -236,7 +235,7 @@ export function deserialize(json: string): GameState {
   // rest action still sitting in pendingActions.
   // Ensure activeTaskSkill exists on employees saved before the field was
   // added. Absent means "no dispatched-task skill tracked", encoded as null.
-  ensureFieldsOnEach(obj, 'employees', 'employees', [
+  ensureFieldsOnEach(obj, 'employees', [
     { key: 'restNeedKey', predicate: v => v !== undefined, defaultValue: null },
     { key: 'activeTaskSkill', predicate: v => v !== undefined, defaultValue: null },
   ]);
@@ -265,21 +264,17 @@ export function deserialize(json: string): GameState {
   // v6 → v7: softwareTier/tubingState moved onto GameState from the
   // console-only MiningContext, so a save from before this had neither.
   ensureField(obj, 'softwareTier', v => typeof v === 'number', 0);
-  if (typeof obj['tubingState'] !== 'object' || obj['tubingState'] === null) {
-    (obj as Record<string, unknown>)['tubingState'] = { inventory: 0, installedHoles: new Set<string>() };
-  } else {
-    const tubingRaw = obj['tubingState'] as Record<string, unknown>;
-    const installed = tubingRaw['installedHoles'];
-    if (installed && typeof installed === 'object' && '__type' in (installed as Record<string, unknown>)) {
-      const setData = installed as { __type: string; values: string[] };
-      if (setData.__type === 'Set') tubingRaw['installedHoles'] = new Set(setData.values);
-    } else if (Array.isArray(installed)) {
-      tubingRaw['installedHoles'] = new Set(installed as string[]);
-    } else if (!(installed instanceof Set)) {
-      tubingRaw['installedHoles'] = new Set<string>();
-    }
-    if (typeof tubingRaw['inventory'] !== 'number') tubingRaw['inventory'] = 0;
+  ensureField(
+    obj,
+    'tubingState',
+    v => typeof v === 'object' && v !== null,
+    { inventory: 0, installedHoles: new Set<string>() },
+  );
+  const tubingRaw = obj['tubingState'] as Record<string, unknown>;
+  if (!(tubingRaw['installedHoles'] instanceof Set)) {
+    restoreSetField(tubingRaw, 'installedHoles');
   }
+  ensureField(tubingRaw, 'inventory', v => typeof v === 'number', 0);
 
   // v7 → v8: PendingAction/GhostPreview gained a lifecycle (status/holderId,
   // claimed). A pre-v8 save's *dispatched-and-idle-claimed* actions were
