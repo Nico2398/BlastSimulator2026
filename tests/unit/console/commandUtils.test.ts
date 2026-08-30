@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { requireGame, noEmployeesMessage, parseStaffedFlag } from '../../../src/console/commands/commandUtils.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import type { GameContext } from '../../../src/console/commands/world.js';
+import { makeEmptyGameContext } from '../../helpers/gameContext.js';
 
 // #795: commandUtils' static, user-facing guard messages (requireGame's
 // "No game loaded" text, NO_EMPLOYEES_MSG, and parseStaffedFlag's invalid-value
@@ -15,13 +15,7 @@ const NO_GAME_LOADED_EN = 'No game loaded. Use new_game first.';
 const NO_EMPLOYEES_EN = 'No employees.';
 
 function makeEmptyContext(): GameContext {
-  return {
-    state: null,
-    grid: null,
-    landscape: null,
-    playableArea: null,
-    emitter: new EventEmitter(),
-  };
+  return makeEmptyGameContext();
 }
 
 afterEach(() => setLocale('en'));

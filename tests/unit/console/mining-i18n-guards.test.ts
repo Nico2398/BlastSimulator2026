@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import {
   blastCommand,
@@ -18,6 +16,7 @@ import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import { makeEmptyCtx } from './i18nGuardHelpers.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 import * as BlastExecutionModule from '../../../src/core/mining/BlastExecution.js';
 import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 
@@ -30,20 +29,12 @@ import * as SurveyCalcModule from '../../../src/core/mining/SurveyCalc.js';
 // so a hardcoded string that merely matches en.json cannot pass.
 
 function makeMiningContext(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    landscape: null,
-    playableArea: null,
-    emitter: new EventEmitter(),
-  };
   // Staffed: several assertions below need a hole to actually land in
   // state.drillHoles (not just plannedDrillHoles), which requires a
   // qualified employee + drill_rig vehicle to complete the queued
   // drill_hole action — mirrors mining-commands.test.ts's own
   // makeMiningContext.
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', staffed: 'true' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
 }
 
 /** Mirrors mining-commands.test.ts's own helper — ticks until every ordered hole lands. */

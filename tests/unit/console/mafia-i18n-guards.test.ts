@@ -21,24 +21,16 @@
 // that outcome is covered directly in MafiaActions.test.ts instead.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import { mafiaCommand } from '../../../src/console/commands/mafia.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { FRAME_EVIDENCE_TICKS } from '../../../src/core/events/MafiaActions.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(seed = 1): GameContext {
-  const ctx: GameContext = {
-    state: null,
-    grid: null,
-    landscape: null,
-    playableArea: null,
-    emitter: new EventEmitter(),
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: String(seed), size: '24' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed, size: 24 });
 }
 
 function makeUnlockedCtx(seed = 1): GameContext {

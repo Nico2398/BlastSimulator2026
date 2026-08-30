@@ -9,22 +9,13 @@
 // matches en.json cannot pass.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
 import { corruptCommand } from '../../../src/console/commands/corruption.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import * as CorruptionModule from '../../../src/core/economy/Corruption.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
-function makeCtx(): GameContext {
-  const ctx: GameContext = {
-    state: null,
-    grid: null,
-    landscape: null,
-    playableArea: null,
-    emitter: new EventEmitter(),
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '24' });
-  return ctx;
+function makeCtx() {
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
 }
 
 afterEach(() => setLocale('en'));

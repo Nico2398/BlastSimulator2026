@@ -2,20 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { stateCommand } from '../../../src/console/commands/state.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { createGame } from '../../../src/core/state/GameState.js';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import type { TrackedFragment } from '../../../src/core/economy/Logistics.js';
+import { makeEmptyGameContext } from '../../helpers/gameContext.js';
 
 // ── Helper factories ────────────────────────────────────────────────────────
 
 /** Create a minimal MiningContext wrapping the given GameState. */
 function makeCtx(state: ReturnType<typeof createGame>): MiningContext {
-  return {
-    state,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
+  return makeEmptyGameContext({ state });
 }
 
 function makeFragment(id: number, fragState: TrackedFragment['state']): TrackedFragment {

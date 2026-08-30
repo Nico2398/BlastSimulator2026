@@ -6,8 +6,6 @@
 // properly is what stops it.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../src/console/commands/world.js';
 import {
   blastCommand,
   drillPlanCommand,
@@ -23,21 +21,14 @@ import { placeBuilding } from '../../src/core/entities/Building.js';
 import { computeDangerZone, isInZone } from '../../src/core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../src/core/config/balance.js';
 import { tickCommand } from '../../src/console/commands/events.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    landscape: null,
-    playableArea: null,
-    emitter: new EventEmitter(),
-  };
   // Staffed (#553): drill_plan grid now queues one drill_hole PendingAction
   // per hole instead of writing them straight into state.drillHoles — a
   // 'blasting'-qualified employee and a drill_rig vehicle are needed for any
   // hole to actually land.
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '48', staffed: 'true' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 48, staffed: true });
 }
 
 /**

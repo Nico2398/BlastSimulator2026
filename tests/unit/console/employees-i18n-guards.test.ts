@@ -30,8 +30,7 @@
 // instead, proving the i18n layer itself is correct.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { hireEmployee, assignSkill, HIRING_COSTS, type EmployeeRole } from '../../../src/core/entities/Employee.js';
@@ -39,13 +38,10 @@ import { placeBuilding, type BuildingType, type BuildingTier } from '../../../sr
 import { formatMoney } from '../../../src/core/economy/formatMoney.js';
 import { Random } from '../../../src/core/math/Random.js';
 import * as EmployeeTrainingModule from '../../../src/core/entities/EmployeeTraining.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(cash = 1_000_000): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  ctx.state!.cash = cash;
-  ctx.state!.finances.cash = cash;
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32, cash });
 }
 
 /** Hires directly through the core function — bypasses cash and the console layer entirely. */

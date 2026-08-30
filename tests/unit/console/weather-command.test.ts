@@ -4,32 +4,18 @@
 // mining-commands.test.ts).
 
 import { describe, it, expect } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import { weatherCommand } from '../../../src/console/commands/mining.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { ALL_WEATHER_STATES } from '../../../src/core/weather/WeatherCycle.js';
+import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32 });
 }
 
 describe('weatherCommand', () => {
   it('requires a loaded game', () => {
-    const ctx: MiningContext = {
-      state: null, grid: null,
-      emitter: new EventEmitter(),
-      landscape: null,
-      playableArea: null,
-    };
+    const ctx = makeEmptyGameContext();
     const result = weatherCommand(ctx, [], {});
     expect(result.success).toBe(false);
   });

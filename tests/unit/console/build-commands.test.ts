@@ -2,25 +2,17 @@
 // Tests tier placement, upgrade, and demolish-with-cost behaviour.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
 import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
   // Staffed (#556): confirming a placement only queues a construction site —
   // an idle employee is needed to actually walk over and finish the
   // `place_building` work before any of these tests can see a real building.
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', staffed: 'true' });
+  const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
   // These tests exercise tier placement/upgrade mechanics directly, not the
   // research gate — pre-unlock every tier so placement isn't blocked.
   ctx.state!.buildings.unlockedTiers.management_office = 3;
