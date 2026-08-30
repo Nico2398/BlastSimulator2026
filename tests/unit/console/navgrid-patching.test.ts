@@ -4,8 +4,6 @@
 // resulting NavGrid cell types directly (NOT via events).
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import {
   blastCommand,
@@ -17,22 +15,16 @@ import {
 import { resetHoleIds } from '../../../src/core/mining/DrillPlan.js';
 import { NavGrid } from '../../../src/core/nav/NavGrid.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
   // Staffed (#553): the "NavGrid patching — blast" describe below drills a
   // hole through drill_plan add, which now queues a drill_hole PendingAction
   // instead of writing the hole straight into state.drillHoles — it needs a
   // 'blasting'-qualified employee and a drill_rig vehicle to ever land.
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32', staffed: 'true' });
+  const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
   // These tests exercise NavGrid patching on placement/upgrade, not the
   // research gate — pre-unlock every tier so placement isn't blocked.
   ctx.state!.buildings.unlockedTiers.management_office = 3;

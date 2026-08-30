@@ -17,22 +17,14 @@
 // use for module-level functions).
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import { claimForAction } from '../../../src/console/commands/siteExpansion.js';
 import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = {
-    state: null,
-    grid: null,
-    emitter: new EventEmitter(),
-    landscape: null,
-    playableArea: null,
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32 });
 }
 
 /** A cell definitely outside the freshly-generated site, so claimForAction's own offSite filter always calls into (the mocked) claimArea. */

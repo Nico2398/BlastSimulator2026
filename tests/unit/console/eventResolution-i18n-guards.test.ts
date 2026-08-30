@@ -8,21 +8,13 @@
 // hardcoded string that merely matches en.json cannot pass.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import { eventCommand } from '../../../src/console/commands/eventResolution.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
+import { makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = {
-    state: null,
-    grid: null,
-    landscape: null,
-    playableArea: null,
-    emitter: new EventEmitter(),
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '24' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
 }
 
 afterEach(() => setLocale('en'));

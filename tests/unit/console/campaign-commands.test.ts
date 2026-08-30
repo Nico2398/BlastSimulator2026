@@ -8,19 +8,17 @@
 // produces, without needing a DOM.
 
 import { describe, it, expect } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { newGameCommand } from '../../../src/console/commands/world.js';
 import { campaignStartCommand, tutorialStartCommand } from '../../../src/console/commands/campaign.js';
 import type { GameContext } from '../../../src/console/commands/world.js';
+import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function makeCtx(): GameContext {
-  return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+  return makeEmptyGameContext();
 }
 
 describe('tutorial_start command', () => {
   it('pauses the game and reports success once a level is active', () => {
-    const ctx = makeCtx();
-    newGameCommand(ctx, [], { seed: '42', size: '24' });
+    const ctx = makeGameContext({ seed: 42, size: 24 });
     campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
     expect(ctx.state!.isPaused).toBe(false);
 

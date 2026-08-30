@@ -13,8 +13,7 @@
 // en.json cannot pass.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
-import { type GameContext, newGameCommand } from '../../../src/console/commands/world.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import {
   campaignStatusCommand,
   campaignCompleteCommand,
@@ -25,15 +24,14 @@ import { getLevel } from '../../../src/core/campaign/Level.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import * as BiomeCatalogModule from '../../../src/core/world/BiomeCatalog.js';
 import { makeEmptyCtx } from './i18nGuardHelpers.js';
+import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
 
 function freshCtx(): GameContext {
-  return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+  return makeEmptyGameContext();
 }
 
 function makeCtx(): GameContext {
-  const ctx = freshCtx();
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '1', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 1, size: 32 });
 }
 
 afterEach(() => {

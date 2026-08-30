@@ -2,21 +2,16 @@
 // either grows the site or says why it cannot, and never silently no-ops.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { newGameCommand, terrainConfigOf } from '../../src/console/commands/world.js';
+import { terrainConfigOf } from '../../src/console/commands/world.js';
 import { drillPlanCommand, buildRampCommand, surveyCommand, type MiningContext } from '../../src/console/commands/mining.js';
 import { buildCommand, employeeCommand } from '../../src/console/commands/entities.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { PlayableArea } from '../../src/core/world/PlayableArea.js';
 import type { ProtectedStructures } from '../../src/core/world/Structures.js';
 import { SURVEY_COVERAGE_RADIUS } from '../../src/core/config/balance.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 function makeCtx(): MiningContext {
-  const ctx: MiningContext = {
-    state: null, grid: null, landscape: null, playableArea: null,
-    emitter: new EventEmitter(),
-  };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32', cash: '500000' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: 42, size: 32, cash: 500000 });
 }
 
 /** Hire a surveyor with geology skill so runSurvey()'s qualification guard passes. */
