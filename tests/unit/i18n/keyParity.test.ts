@@ -210,10 +210,16 @@ describe('en.json / fr.json — key-set parity', () => {
     // locales translated. employees.ts's hire guard reuses the pre-existing
     // console.insufficient_funds key, already covered by
     // insufficient-funds-guards.test.ts, so no new key was needed there.
+    // Baseline is now 3428 (up from 3422): #885 adds 6 new mafia.status_*
+    // keys (status_unlocked_yes, status_unlocked_no, status_exposure,
+    // status_smuggling_active, status_smuggling_inactive,
+    // status_pending_frames) so mafia.ts's 'status' case can route through
+    // t() instead of building its output from hardcoded English literals,
+    // both locales translated.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3422);
+    expect(Object.keys(en).length).toBe(3428);
   });
 });
 

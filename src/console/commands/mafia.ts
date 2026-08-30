@@ -36,10 +36,14 @@ export function mafiaCommand(
   switch (sub) {
     case 'status': {
       const lines = [
-        `Mafia unlocked: ${state.corruption.mafiaUnlocked ? 'YES' : 'No'}`,
-        `Exposure risk: ${(state.mafia.exposureRisk * 100).toFixed(0)}%`,
-        `Smuggling: ${state.mafia.smugglingActive ? `ACTIVE ($${state.mafia.smugglingIncome}/tick)` : 'inactive'}`,
-        `Pending frames: ${state.mafia.pendingFrames.length}`,
+        state.corruption.mafiaUnlocked
+          ? t('mafia.status_unlocked_yes')
+          : t('mafia.status_unlocked_no'),
+        t('mafia.status_exposure', { pct: (state.mafia.exposureRisk * 100).toFixed(0) }),
+        state.mafia.smugglingActive
+          ? t('mafia.status_smuggling_active', { income: state.mafia.smugglingIncome })
+          : t('mafia.status_smuggling_inactive'),
+        t('mafia.status_pending_frames', { count: state.mafia.pendingFrames.length }),
       ];
       return { success: true, output: lines.join('\n') };
     }
