@@ -3,11 +3,11 @@
 // Defines 10 real tests against the core EmployeeNeeds API and the needs console command.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand, needsCommand, buildCommand } from '../../src/console/commands/entities.js';
 import { tickCommand, eventCommand } from '../../src/console/commands/events.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 import {
   tickNeedGauges,
@@ -29,9 +29,7 @@ import {
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
 }
 
 /** Hire one employee and return their numeric ID (always 1 on a fresh state). */

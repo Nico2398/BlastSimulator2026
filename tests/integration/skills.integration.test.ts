@@ -3,10 +3,10 @@
 // firing mechanics, and task-duration computation.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { employeeCommand } from '../../src/console/commands/entities.js';
 import { vehicleCommand } from '../../src/console/commands/vehicle.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 import {
   createEmployeeState,
   hireEmployee,
@@ -29,9 +29,7 @@ import { SURVEY_DURATION_TICKS, XP_THRESHOLDS } from '../../src/core/config/bala
 
 /** Build a fresh context with a real GameState (seed=42, desert biome). */
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '32' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '32' });
 }
 
 /**

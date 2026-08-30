@@ -15,12 +15,12 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { hireEmployee } from '../../../src/core/entities/Employee.js';
 import { defineZone } from '../../../src/core/entities/Zone.js';
 import { Random } from '../../../src/core/math/Random.js';
-import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { placeBuilding } from '../../../src/core/entities/Building.js';
 import { purchaseVehicle } from '../../../src/core/entities/Vehicle.js';
 import { addHole, holeNumericId } from '../../../src/core/mining/DrillPlan.js';
 import type { SurveyResult } from '../../../src/core/mining/SurveyCalc.js';
 import { GhostMesh } from '../../../src/renderer/GhostMesh.js';
+import { makeGameContext, makeEmptyGameContext } from '../../helpers/gameContext.js';
 
 function makeMockSceneManager() {
   const scene = new THREE.Scene();
@@ -51,12 +51,7 @@ function makeMockSceneManager() {
 function makeCtx(seed = 42): MiningContext {
   const state = createGame({ seed, startingCash: 100_000 });
   const grid = new VoxelGrid(32, 16, 32);
-  return {
-    state,
-    grid,
-    landscape: null, playableArea: null,
-    emitter: new EventEmitter(),
-  };
+  return makeEmptyGameContext({ state, grid });
 }
 
 describe('GameRenderer — diagnostics accessors', () => {
@@ -425,14 +420,7 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
   // (newGameCommand) to get a real biome + StructureSet (villages/rivers/
   // trees) landscape actually builds from.
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
-    const { newGameCommand } = await import('../../../src/console/commands/world.js');
-    const ctx: MiningContext = {
-      state: null, grid: null, landscape: null, playableArea: null,
-      emitter: new EventEmitter(),
-    };
-    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
-    expect(result.success).toBe(true); // guard: the rest of the test is meaningless if setup itself failed
-    return ctx;
+    return makeGameContext({ mineType, seed: '42', size: '64' });
   }
 
   it('syncFromContext builds vegetation (and, seed/biome permitting, water) from the real StructureSet', async () => {
@@ -489,14 +477,7 @@ describe('GameRenderer — birds, smoke, water, vegetation (#458 T7.2/D12/A26)',
 
 describe('GameRenderer — per-biome ambient extras (#458 T7.3)', () => {
   async function makeLandscapeCtx(mineType: string): Promise<MiningContext> {
-    const { newGameCommand } = await import('../../../src/console/commands/world.js');
-    const ctx: MiningContext = {
-      state: null, grid: null, landscape: null, playableArea: null,
-      emitter: new EventEmitter(),
-    };
-    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
-    expect(result.success).toBe(true);
-    return ctx;
+    return makeGameContext({ mineType, seed: '42', size: '64' });
   }
 
   it('builds dust devils, not fireflies, on an arid biome', async () => {
@@ -885,14 +866,7 @@ describe('GameRenderer — survey confidence overlay visibility preference (#496
 
 describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
-    const { newGameCommand } = await import('../../../src/console/commands/world.js');
-    const ctx: MiningContext = {
-      state: null, grid: null, landscape: null, playableArea: null,
-      emitter: new EventEmitter(),
-    };
-    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
-    expect(result.success).toBe(true); // guard: the rest of the test is meaningless if setup itself failed
-    return ctx;
+    return makeGameContext({ mineType, seed: '42', size: '64' });
   }
 
   it('playableCut(grid).meshClaimsColumn delegates to grid.claimsColumnForMeshing', async () => {
@@ -971,11 +945,7 @@ describe('GameRenderer — playableCut/meshClaimsColumn wiring (#559)', () => {
 
 describe('GameRenderer — staged level load (#474)', () => {
   async function makeLandscapeCtx(mineType = 'green_foothills'): Promise<MiningContext> {
-    const { newGameCommand } = await import('../../../src/console/commands/world.js');
-    const ctx: MiningContext = { state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() };
-    const result = newGameCommand(ctx, [], { mine_type: mineType, seed: '42', size: '64' });
-    expect(result.success).toBe(true);
-    return ctx;
+    return makeGameContext({ mineType, seed: '42', size: '64' });
   }
 
   it('buildPlayableMesh() + buildLandscapeMesh() + buildAmbient() + finishLevelLoad(), run as separate staged calls, reach the same end state as one syncFromContext() call', async () => {
@@ -1020,7 +990,7 @@ describe('GameRenderer — staged level load (#474)', () => {
 
   it('finishLevelLoad() is a no-op without a loaded state/grid, rather than throwing', () => {
     const renderer = new GameRenderer(makeMockSceneManager() as any);
-    expect(() => renderer.finishLevelLoad({ state: null, grid: null, landscape: null, playableArea: null, emitter: new EventEmitter() })).not.toThrow();
+    expect(() => renderer.finishLevelLoad(makeEmptyGameContext())).not.toThrow();
   });
 });
 

@@ -10,19 +10,19 @@
 //   - tutorial.start(ctx.state ?? undefined)     ← the FIX
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { campaignStartCommand } from '../../src/console/commands/campaign.js';
 import { TutorialOverlay } from '../../src/ui/TutorialOverlay.js';
 import type { GameState } from '../../src/core/state/GameState.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { createRunner } from '../../src/console/createRunner.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
 import { TutorialRails } from '../../src/ui/tutorialRails.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeCtx(): GameContext {
-  return { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
+  return makeGameContext({ seed: '42', size: '24' });
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -55,7 +55,6 @@ describe('Tutorial pause behaviour (#371)', () => {
     //   window.__gameConsole('new_game seed:42 size:24')
     //   window.__gameConsole('campaign start level:tutorial_pit')
     //   tutorial.start(ctx.state ?? undefined)     ← the FIX
-    newGameCommand(ctx, [], { seed: '42', size: '24' });
     campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     const tutorial = new TutorialOverlay(container);
@@ -85,7 +84,6 @@ describe('Tutorial pause behaviour (#371)', () => {
   // ── 3. skip unpauses ─────────────────────────────────────────────────────
 
   it('finishing resets isPaused to false', () => {
-    newGameCommand(ctx, [], { seed: '42', size: '24' });
     campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     // There is no skip(): the tutorial cannot be abandoned, so the only route
@@ -108,7 +106,6 @@ describe('Tutorial pause behaviour (#371)', () => {
   // ── 4. start(undefined) with existing state does not pause ───────────────
 
   it('start(undefined) does not modify isPaused when state exists', () => {
-    newGameCommand(ctx, [], { seed: '42', size: '24' });
     campaignStartCommand(ctx, [], { level: 'tutorial_pit' });
 
     const tutorial = new TutorialOverlay(container);

@@ -5,15 +5,13 @@
 // force changes none of them. These tests pin the signal that replaced it.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { type GameContext, newGameCommand } from '../../src/console/commands/world.js';
+import type { GameContext } from '../../src/console/commands/world.js';
 import { setPolicyCommand } from '../../src/console/commands/policy.js';
-import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { TUTORIAL_STEPS } from '../../src/ui/tutorialSteps.js';
+import { makeGameContext } from '../helpers/gameContext.js';
 
 function makeCtx(): GameContext {
-  const ctx: GameContext = { state: null, grid: null, emitter: new EventEmitter(), landscape: null, playableArea: null };
-  newGameCommand(ctx, [], { mine_type: 'desert', seed: '42', size: '24' });
-  return ctx;
+  return makeGameContext({ mineType: 'desert', seed: '42', size: '24' });
 }
 
 describe('set_policy', () => {
