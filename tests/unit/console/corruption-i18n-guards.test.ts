@@ -10,11 +10,12 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { corruptCommand } from '../../../src/console/commands/corruption.js';
+import { type GameContext } from '../../../src/console/commands/world.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import * as CorruptionModule from '../../../src/core/economy/Corruption.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
-function makeCtx() {
+function makeCtx(): GameContext {
   return makeGameContext({ mineType: 'desert', seed: 1, size: 24 });
 }
 
