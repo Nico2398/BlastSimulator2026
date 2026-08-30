@@ -47,7 +47,8 @@ export interface MafiaActionResult {
   success: boolean;
   cost: number;
   exposureIncrease: number;
-  message: string;
+  outcomeKey: string;
+  outcomeParams?: Record<string, string | number>;
   investigationTriggered: boolean;
 }
 
@@ -65,7 +66,7 @@ export function arrangeAccident(
   const emp = employees.employees.find(e => e.id === targetId);
   if (!emp || !emp.alive) {
     return { success: false, cost: 0, exposureIncrease: 0,
-      message: 'Target not found', investigationTriggered: false };
+      outcomeKey: 'mafia.target_not_found', investigationTriggered: false };
   }
 
   const exposureIncrease = 0.1;
@@ -75,14 +76,14 @@ export function arrangeAccident(
     killEmployee(employees, targetId);
     return {
       success: true, cost: ACCIDENT_COST, exposureIncrease,
-      message: `A tragic "accident" befell ${emp.name}. Very unfortunate.`,
+      outcomeKey: 'mafia.accident_success', outcomeParams: { name: emp.name },
       investigationTriggered: false,
     };
   }
 
   return {
     success: false, cost: ACCIDENT_COST, exposureIncrease: exposureIncrease + 0.1,
-    message: `The "accident" was botched. ${emp.name} is suspicious. Police may investigate.`,
+    outcomeKey: 'mafia.accident_failed', outcomeParams: { name: emp.name },
     investigationTriggered: true,
   };
 }
@@ -100,7 +101,7 @@ export function startFraming(
   const emp = employees.employees.find(e => e.id === targetId);
   if (!emp || !emp.alive) {
     return { success: false, cost: 0, exposureIncrease: 0,
-      message: 'Target not found', investigationTriggered: false };
+      outcomeKey: 'mafia.target_not_found', investigationTriggered: false };
   }
 
   mafia.pendingFrames.push({
@@ -114,7 +115,7 @@ export function startFraming(
 
   return {
     success: true, cost: FRAME_COST, exposureIncrease,
-    message: `Evidence is being planted against ${emp.name}. Ready in ${FRAME_EVIDENCE_TICKS} ticks.`,
+    outcomeKey: 'mafia.frame_started', outcomeParams: { name: emp.name, ticks: FRAME_EVIDENCE_TICKS },
     investigationTriggered: false,
   };
 }
@@ -135,7 +136,7 @@ export function completeFrame(
   );
   if (frameIdx < 0) {
     return { success: false, cost: 0, exposureIncrease: 0,
-      message: 'No ready frame for this employee', investigationTriggered: false };
+      outcomeKey: 'mafia.frame_no_ready', investigationTriggered: false };
   }
 
   mafia.pendingFrames.splice(frameIdx, 1);
@@ -145,7 +146,7 @@ export function completeFrame(
     if (idx >= 0) employees.employees.splice(idx, 1);
     return {
       success: true, cost: 0, exposureIncrease: 0,
-      message: 'Evidence was convincing. Employee terminated for cause.',
+      outcomeKey: 'mafia.frame_success',
       investigationTriggered: false,
     };
   }
@@ -154,7 +155,7 @@ export function completeFrame(
   mafia.exposureRisk = Math.min(1, mafia.exposureRisk + exposureIncrease);
   return {
     success: false, cost: 0, exposureIncrease,
-    message: 'The frame was detected! Internal affairs is investigating.',
+    outcomeKey: 'mafia.frame_detected',
     investigationTriggered: true,
   };
 }

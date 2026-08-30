@@ -224,6 +224,18 @@ CI has 3 tiers of scenario testing:
 
 **Label convention:** Add `full-ci` to a PR when an interaction-mode scenario drives the change, or when it touches machinery every scenario runs through. The `full-ci` label on an issue MUST transfer to the opened PR. Most PRs — docs, config, logic-only, and UI no definition reaches — skip both browser jobs safely; the `visual` channel covers those against the one scenario that exercises them. Rule and cost: `agentic-pipeline-pr-management`.
 
+## Wait on Conditions, Never on a Fixed Delay
+
+A test that sleeps encodes the authoring machine's timing. The delay is simultaneously too long everywhere it passes and too short somewhere it has not run yet — CI on a different browser version, a shared browser under a sharded job, a loaded runner. It is the single most common source of a suite that is both slow and flaky.
+
+Wait on the thing the test actually needs, so it costs only the time really taken and fails by name when the thing never happens:
+
+- **Simulation time** — `waitUntil` on the state field the step is waiting for, never a hand-measured `tick N` pad.
+- **DOM state** — `waitForProperty` (a property settling), `waitForSelector` (existence), `awaitUsable` (genuine clickability).
+- **Wall-clock delays in UI code** — inject the clock. A component that waits on real time takes `now: () => number` defaulting to `performance.now`, so tests advance a fake clock instead of sleeping through the real one (`dev-coding-conventions`).
+
+A fixed-duration wait is legitimate only where no observable condition exists to poll. There, keep it bounded and state in the test or step what could not be polled — an unexplained sleep is a defect, not a passing test.
+
 ## Regression Test Policy
 
 Any bug fix must include new unit or integration test that:

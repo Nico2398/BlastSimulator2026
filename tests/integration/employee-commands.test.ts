@@ -206,8 +206,8 @@ describe('Console — set_policy', () => {
     const result = setPolicyCommand(ctx, [], { mode: 'shift_8h' });
 
     expect(result.success).toBe(true);
-    // Default thresholds from balance.ts: hunger=60 fatigue=60 social=20
-    expect(result.output).toBe('Policy updated: mode=shift_8h hunger=60 fatigue=60 social=20');
+    // Default thresholds from balance.ts: hunger=60 fatigue=60 social=60 (#867)
+    expect(result.output).toBe('Policy updated: mode=shift_8h hunger=60 fatigue=60 social=60');
   });
 
   it('updates policy to shift_12h mode', () => {

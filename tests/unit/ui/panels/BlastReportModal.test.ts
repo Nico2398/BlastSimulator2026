@@ -5,9 +5,33 @@ import { createGame } from '../../../../src/core/state/GameState.js';
 import { resetHoleIds } from '../../../../src/core/mining/DrillPlan.js';
 import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { BlastReport } from '../../../../src/core/mining/BlastExecution.js';
+import type { AccidentRecord } from '../../../../src/core/entities/Damage.js';
+import type { Employee } from '../../../../src/core/entities/Employee.js';
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
+}
+
+function addEmployee(state: GameState, overrides: Partial<Employee> = {}): Employee {
+  const emp: Employee = {
+    id: state.employees.nextId++, name: 'Walt Diggins', role: 'driller', salary: 500,
+    morale: 60, unionized: false, injured: false, alive: true, x: 5, z: 5,
+    qualifications: [], trainingState: null, activeActionId: null,
+    hunger: 0, fatigue: 0, breakNeed: 0, collapsing: false, interruptedActionPayload: null,
+    ticksWorked: 0, restTicksRemaining: null, restNeedKey: null, taskTicksRemaining: null,
+    activeTaskSkill: null, destinationX: null, destinationZ: null,
+    moveConsecutiveFailures: 0, isMoveStuck: false,
+    pendingRestDuration: null, pendingRestNeedKey: null, pendingTaskDuration: null,
+    pendingActionType: null, pendingActionPayload: null, pendingDriverVehicleId: null,
+    taskQueue: [],
+    ...overrides,
+  };
+  state.employees.employees.push(emp);
+  return emp;
+}
+
+function makeAccident(overrides: Partial<AccidentRecord> = {}): AccidentRecord {
+  return { tick: 0, type: 'injury', entityId: 1, fragmentId: 1, kineticEnergy: 200, ...overrides };
 }
 
 /**
@@ -388,5 +412,103 @@ describe('BlastReportModal', () => {
     const { modal, container } = makeModal();
     modal.dispose();
     expect(container.contains(modal.root)).toBe(false);
+  });
+
+  // ── casualty/loss note-cards (#557, item #5) ────────────────────────────
+  // Icon + text come from accidentLookup.ts, shared with OperationsPanel's
+  // incident log — these prove the report card's own rendering (icon choice,
+  // which 4 of the 8 accident types get a card here) rather than the shared
+  // lookup's text resolution, which OperationsPanel.test.ts already covers
+  // for all 8 types.
+
+  describe('casualty/loss note-cards (#557)', () => {
+    it('renders a death note-card with the real employee name and skull icon', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      const emp = addEmployee(state, { name: 'Oz Trill' });
+      state.lastBlastReport = makeReport({ accidents: [makeAccident({ type: 'death', entityId: emp.id })] });
+
+      openReport(modal, state, setNow);
+
+      expect(modal.root.textContent).toContain('Oz Trill was killed by a projection');
+      expect(modal.root.querySelector('bs-icon[name="skull"]')).not.toBeNull();
+    });
+
+    it('renders an injury note-card with the real employee name and injured icon', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      const emp = addEmployee(state, { name: 'Dorian Kask' });
+      state.lastBlastReport = makeReport({ accidents: [makeAccident({ type: 'injury', entityId: emp.id })] });
+
+      openReport(modal, state, setNow);
+
+      expect(modal.root.textContent).toContain('Dorian Kask was injured by a projection');
+      expect(modal.root.querySelector('bs-icon[name="injured"]')).not.toBeNull();
+    });
+
+    it('renders a vehicle_destroyed note-card naming the real vehicle type, with vehicle icon', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        accidents: [makeAccident({ type: 'vehicle_destroyed', entityId: 12, entityLabel: 'debris_hauler' })],
+      });
+
+      openReport(modal, state, setNow);
+
+      expect(modal.root.textContent).toContain('Debris Hauler was destroyed by a projection');
+      expect(modal.root.querySelector('bs-icon[name="vehicle"]')).not.toBeNull();
+    });
+
+    it('renders a vehicle_damage note-card naming the real vehicle type', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        accidents: [makeAccident({ type: 'vehicle_damage', entityId: 12, entityLabel: 'rock_fragmenter' })],
+      });
+
+      openReport(modal, state, setNow);
+
+      expect(modal.root.textContent).toContain('Rock Fragmenter took projection damage');
+    });
+
+    it('falls back to a generic worker label when the accident\'s employee can\'t be found', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({ accidents: [makeAccident({ type: 'injury', entityId: 999 })] });
+
+      openReport(modal, state, setNow);
+
+      expect(modal.root.textContent).toContain('A worker was injured by a projection');
+    });
+
+    it('does not render a note-card for a building accident — destroyedBuildings has its own dedicated card, and OperationsPanel covers the full incident history', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      state.lastBlastReport = makeReport({
+        accidents: [makeAccident({ type: 'building_destroyed', entityId: 3, entityLabel: 'living_quarters' })],
+      });
+
+      openReport(modal, state, setNow);
+
+      expect(modal.root.textContent).not.toContain('Living Quarters was destroyed');
+    });
+
+    it('renders one note-card per accident when several land on the same blast', () => {
+      const { modal, setNow } = makeModal();
+      const state = makeState();
+      const empA = addEmployee(state, { name: 'Oz Trill' });
+      const empB = addEmployee(state, { name: 'Dorian Kask' });
+      state.lastBlastReport = makeReport({
+        accidents: [
+          makeAccident({ type: 'death', entityId: empA.id }),
+          makeAccident({ type: 'injury', entityId: empB.id }),
+        ],
+      });
+
+      openReport(modal, state, setNow);
+
+      expect(modal.root.textContent).toContain('Oz Trill was killed by a projection');
+      expect(modal.root.textContent).toContain('Dorian Kask was injured by a projection');
+    });
   });
 });

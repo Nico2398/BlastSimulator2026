@@ -9,6 +9,11 @@ export function noEmployeesMessage(): string {
   return t('console.no_employees');
 }
 
+/** Trailing " Staffed." suffix (or '') shared by new_game/campaign start/sandbox start success messages. */
+export function staffedSuffix(staffed: boolean): string {
+  return staffed ? t('console.staffed_suffix') : '';
+}
+
 /** Guard every command that needs a loaded game. */
 export function requireGame(ctx: GameContext): CommandResult | null {
   if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };

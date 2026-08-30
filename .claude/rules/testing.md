@@ -13,6 +13,7 @@ Tests are the `logic` verification channel. They run in Node.js with no browser 
 - Seed every PRNG (`{ seed: 42 }`). A test that calls `Math.random()` is a flaky test.
 - `tests/integration/` exercises console command sequences through the real game loop. No DOM, no Three.js.
 - A bug fix ships with a test that fails on the old code and passes on the fix.
+- **Never sleep to wait.** Wait on the condition — a state field, a DOM property, an injected clock you advance yourself. A fixed delay encodes one machine's timing and fails on another. Where nothing is pollable, bound it and say why. Options per layer: `dev-testing-strategy`.
 
 Suite inventory, coverage targets, and performance budgets: `dev-testing-strategy` skill.
 

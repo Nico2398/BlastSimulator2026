@@ -173,19 +173,62 @@ describe('en.json / fr.json — key-set parity', () => {
     // construction-site flow, both locales translated, and removed the
     // orphaned ui.build.placed key — BuildMenu.ts uses ui.build.ordered
     // instead, and nothing in src/ referenced ui.build.placed anymore.
-    // Baseline is now 3352 (up from 3323): #821 wired the last raw-literal
-    // console command strings in corruption.ts, mafia.ts, time.ts,
-    // eventResolution.ts, tick.ts and economy.ts through t() — 29 new keys
-    // total: console.insufficient_funds (shared), 5 corruption.* keys,
-    // 6 mafia.* keys, 5 time.* keys, 9 eventResolution.* keys (the command's
-    // own guard/usage text — event.* singular is occupied by per-event
-    // content), and 3 tick.* keys. economy.ts's two empty-contract-list
-    // strings reuse the pre-existing ui.contracts.none/none_active keys
-    // instead of adding new ones.
+    // Baseline is now 3328 (up from 3323): #557 added 5 new keys for the
+    // evacuate-zone tutorial step and its tutorial-only blast refusal —
+    // tutorial.step_evacuate(.title), tutorial.stage.sound_horn,
+    // ui.blast_workshop.footer.fire_reason_zone_occupied, and
+    // mining.blast.refused_zone_occupied — both locales translated.
+    // Baseline is now 3357 (up from 3323, merged with #557's own +5 above):
+    // #821 wired the last raw-literal console command strings in
+    // corruption.ts, mafia.ts, time.ts, eventResolution.ts, tick.ts and
+    // economy.ts through t() — 29 new keys total: console.insufficient_funds
+    // (shared), 5 corruption.* keys, 6 mafia.* keys, 5 time.* keys,
+    // 9 eventResolution.* keys (the command's own guard/usage text — event.*
+    // singular is occupied by per-event content), and 3 tick.* keys.
+    // economy.ts's two empty-contract-list strings reuse the pre-existing
+    // ui.contracts.none/none_active keys instead of adding new ones.
+    // Baseline is now 3384 (up from 3357): #861 wired i18n keys for the
+    // campaign.ts/sandbox.ts/world.ts/siteExpansion.ts console command
+    // modules — 26 module-local keys + 1 shared console.staffed_suffix key,
+    // both locales translated.
+    // Baseline is now 3391 (up from 3384): #862 reshaped MafiaActions.ts's
+    // MafiaActionResult from a hardcoded `message: string` to
+    // `outcomeKey`/`outcomeParams`, wired through mafia.ts's 3 call sites via
+    // t(). 7 new mafia.* keys — target_not_found, accident_success,
+    // accident_failed, frame_started, frame_no_ready, frame_success,
+    // frame_detected — both locales translated.
+    // Baseline is now 3422 (up from 3391): #883 wired the last raw-literal
+    // console command strings in src/console/commands/employees.ts through
+    // t() — 31 new employees.* keys covering hire/raise/fire usage and
+    // success, the shared employee_not_found rejection (4 call sites),
+    // assign_skill's dead-employee and success messages, dispatch's
+    // not_available/injured/in_training/target_unqualified/no_skill_holder/
+    // no_eligible/success messages, train's no_school/building_no_teach/
+    // no_building_on_site/already_master/insufficient_funds/success
+    // messages, cancel's not_cancellable/action_not_found/refund_suffix/
+    // success messages, and the default-subcommand usage string — both
+    // locales translated. employees.ts's hire guard reuses the pre-existing
+    // console.insufficient_funds key, already covered by
+    // insufficient-funds-guards.test.ts, so no new key was needed there.
+    // Baseline is now 3428 (up from 3422): #885 adds 6 new mafia.status_*
+    // keys (status_unlocked_yes, status_unlocked_no, status_exposure,
+    // status_smuggling_active, status_smuggling_inactive,
+    // status_pending_frames) so mafia.ts's 'status' case can route through
+    // t() instead of building its output from hardcoded English literals,
+    // both locales translated.
+    // Baseline is now 3464 (up from 3428): #887 wired the last raw-literal
+    // console command strings in src/console/commands/entities.ts (17 new
+    // entities.* keys) and src/console/commands/vehicle.ts (19 new vehicle.*
+    // keys) through t() — both locales translated. entities.ts's build
+    // destroy/upgrade/move and vehicle.ts's vehicle buy reuse the
+    // pre-existing shared console.insufficient_funds key; vehicle.ts's
+    // top-level guard was switched from a hand-rolled literal to
+    // requireGame(ctx), reusing console.no_game_loaded — no new keys needed
+    // for either reuse.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3352);
+    expect(Object.keys(en).length).toBe(3464);
   });
 });
 

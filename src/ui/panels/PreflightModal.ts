@@ -5,8 +5,8 @@
 // holes sitting on a building footprint (checkProtectedPositions — not
 // currently enforced by blastCommand itself, so this is the only place a
 // player learns about it before firing), wet holes, and who's still
-// standing in the danger zone (computeDangerZone + isInZone, same real
-// zone Fire step's occupant list uses).
+// standing in the danger zone (computeDangerZone + countZoneOccupants, same
+// real zone Fire step's occupant list uses).
 //
 // Kept on the `.bs-confirm-overlay` class (not a new one) so the tutorial
 // rail's modal carve-out (tutorialGuide.ts's MODAL_SELECTOR) and
@@ -21,7 +21,7 @@ import { assembleBlastPlan, checkProtectedPositions, validateBlastPlan } from '.
 import { estimateBlastOreValue } from '../../core/mining/BlastValueEstimate.js';
 import { getExplosive } from '../../core/world/ExplosiveCatalog.js';
 import { wetHoles } from '../../core/mining/WetHoles.js';
-import { computeDangerZone, isInZone } from '../../core/entities/Zone.js';
+import { computeDangerZone, countZoneOccupants } from '../../core/entities/Zone.js';
 import { BLAST_DANGER_MARGIN_M } from '../../core/config/balance.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { WeatherState } from '../../core/weather/WeatherCycle.js';
@@ -122,10 +122,7 @@ export class PreflightModal {
 
     const wet = weather ? wetHoles(state, weather) : [];
     const zone = computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M);
-    const occupantCount = zone
-      ? state.employees.employees.filter(e => e.alive && isInZone(e.x, e.z, zone)).length
-        + state.vehicles.vehicles.filter(v => isInZone(v.x, v.z, zone)).length
-      : 0;
+    const occupantCount = zone ? countZoneOccupants(zone, state.vehicles, state.employees) : 0;
     const protectedHoles = checkProtectedPositions(state.drillHoles, state.buildings);
     const loadingHoleIds = new Set(Object.keys(state.plannedChargesByHole));
     const validationErrors = validateBlastPlan(plan, loadingHoleIds);

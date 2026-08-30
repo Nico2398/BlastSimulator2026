@@ -18,4 +18,6 @@ export interface MiningContext extends GameContext {
   lastBlastHoles?: import('../../../core/mining/DrillPlan.js').DrillHole[];
   /** Each fragment's journey from where it broke to where it settled — the renderer animates these. */
   lastBlastFlights?: import('../../../core/mining/BlastResolve.js').FragmentFlight[];
+  /** True while the tutorial rail is active — gates blast refusal messaging on an occupied zone (#557). */
+  tutorialActive?: boolean;
 }

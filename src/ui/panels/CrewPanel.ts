@@ -68,7 +68,11 @@ export class CrewPanel {
     closeBtn.addEventListener('click', () => this.onCloseCb?.());
     header.append(iconChip, titleEl, closeBtn);
 
-    this.bodyEl = el('div');
+    // Class, not just the id-scoped selector CrewPanel already exposes:
+    // scenario coverage needs a stable hook onto the actual scrolling
+    // element (this.el itself only clips — overflow:hidden — bodyEl is
+    // where overflow-y:auto and the real scrollTop live).
+    this.bodyEl = el('div', { className: 'bsx-panel-body' });
     this.bodyEl.style.cssText = 'flex:1 1 auto;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px';
 
     this.el.append(header, this.bodyEl);
@@ -216,7 +220,12 @@ export class CrewPanel {
   private makeRosterCard(e: Employee, state: GameState): HTMLElement {
     const expanded = e.id === this.expandedId;
     const row = el('div', { attrs: { 'data-employee-id': String(e.id) } });
-    row.style.cssText = `border-radius:var(--bsx-r-card);overflow:hidden;border:1px solid ${
+    // flex-shrink:0 — overflow:hidden (for the rounded corners) drops this
+    // row's automatic min-height from content-based to 0, which without this
+    // lets bodyEl's flex layout compress an expanded row to fit instead of
+    // leaving it at natural size and scrolling past it (the panel's own
+    // overflow-y:auto is otherwise a no-op: nothing left to overflow with).
+    row.style.cssText = `border-radius:var(--bsx-r-card);overflow:hidden;flex-shrink:0;border:1px solid ${
       expanded ? 'rgba(255,176,46,.4)' : e.collapsing ? 'rgba(255,91,76,.4)' : 'var(--bsx-hairline)'
     };background:${expanded ? 'rgba(255,176,46,.07)' : 'var(--bsx-card)'}`;
 

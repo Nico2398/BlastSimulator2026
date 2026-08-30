@@ -1565,7 +1565,7 @@ describe('running the assign action end to end', () => {
           // the convention, `pipeline/feature-<N>-<runId>` since.
           listMatchingRefs: async ({ ref }: { ref: string }) => {
             const match = /heads\/pipeline\/feature-(\d+)$/.exec(ref);
-            const found = match ? state.get(parseInt(match[1], 10)) : undefined;
+            const found = match ? state.get(parseInt(match[1]!, 10)) : undefined;
             const branch = found?.pipelineBranch;
             return { data: branch ? [{ ref: `refs/heads/${branch}` }] : [] };
           },
@@ -1574,7 +1574,7 @@ describe('running the assign action end to end', () => {
           list: async (params: { head?: string }) => {
             if (params.head) {
               const match = /pipeline\/feature-(\d+)(?:-[A-Za-z0-9._-]+)?$/.exec(params.head);
-              const found = match ? state.get(parseInt(match[1], 10)) : undefined;
+              const found = match ? state.get(parseInt(match[1]!, 10)) : undefined;
               const onThisBranch =
                 !found?.pipelineBranch || params.head.endsWith(`:${found.pipelineBranch}`);
               const pr = onThisBranch ? found?.pipelinePr : null;
@@ -1670,8 +1670,8 @@ describe('running the assign action end to end', () => {
       { issue: 20, label: 'ready' },
       { issue: 20, label: 'paused' },
     ]);
-    expect(result.comments[0].body).toContain('@claude');
-    expect(result.comments[0].body).toContain('issue #20');
+    expect(result.comments[0]!.body).toContain('@claude');
+    expect(result.comments[0]!.body).toContain('issue #20');
   });
 
   // 17 Aug 2026: every candidate skipped on a 503, three dispatches in a row,
@@ -1836,7 +1836,7 @@ describe('running the assign action end to end', () => {
 
     const first = await run(scenario);
     expect(first.comments).toHaveLength(1);
-    expect(first.comments[0].body).toContain(marker);
+    expect(first.comments[0]!.body).toContain(marker);
 
     const second = await run({ ...scenario, existingComments: first.comments });
     expect(second.comments).toHaveLength(1);

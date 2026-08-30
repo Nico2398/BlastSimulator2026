@@ -21,7 +21,7 @@ describe('state schema', () => {
   it('declares a type matching each emitted value', () => {
     const { runner, ctx } = createRunner();
     runner.run('new_game mine_type:desert seed:42');
-    const state = serializeGameState(ctx as MiningContext)! as Record<string, unknown>;
+    const state = serializeGameState(ctx as MiningContext)! as unknown as Record<string, unknown>;
 
     for (const [field, spec] of Object.entries(GAME_STATE_SCHEMA)) {
       const value = state[field];

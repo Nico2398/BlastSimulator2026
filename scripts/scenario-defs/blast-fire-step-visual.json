@@ -157,7 +157,7 @@
     {
       "command": "state",
       "timeout": 30,
-      "description": "The plan is complete once H1 is sequenced, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire) — the danger zone shows clear (nobody nearby), Sound the Horn is disabled, and the pre-flight checklist reads all-clear. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
+      "description": "The plan is complete once H1 is sequenced, so the still-armed autoAdvance walks the already-open Blast Workshop straight to step 5 (Fire). #557 correction: the danger zone is NOT clear here — the single-hole plan's own driller (employee #1) and the drill_rig they drove out on (vehicle #1) both come to rest exactly on top of H1 (10,10) once drilling and charging finish, squarely inside computeDangerZone([H1], BLAST_DANGER_MARGIN_M) (confirmed via direct trace: both sit at (10,10) right at this point) — so Sound the Horn is enabled and the occupant list shows both of them, not the 'nobody nearby' the file used to claim. The toolbar click that used to open the panel here is gone: the panel has been open since the charge step above, and #bs-toolbar [data-panel=\"blast\"] is a toggle (UIManager.togglePanel), so clicking it again would have closed it.",
       "interaction": [
         {
           "type": "wait",
@@ -174,6 +174,56 @@
       "role": "player",
       "expect": {
         "usable": "#bs-blast-panel [data-action=\"execute\"]"
+      }
+    },
+    {
+      "command": "state",
+      "timeout": 30,
+      "description": "Occupant list + horn button visible with a real occupant in the zone (#557) — the driller and drill_rig confirmed above, before either has moved.",
+      "interaction": [
+        {
+          "type": "screenshot"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"sound-horn\"]"
+      }
+    },
+    {
+      "command": "zone clear x1:-5 y1:-5 x2:25 y2:25",
+      "timeout": 90,
+      "description": "#557: Sound the Horn — the real, multi-tick evacuation walkout, not an instant clear. computeDangerZone([H1={10,10}], BLAST_DANGER_MARGIN_M) is (-5,-5) to (25,25), the exact box this command declares and the one soundHorn() computes and sends live. clearZone no longer teleports (#557): this only sets a destination for the driller and the drill_rig, so the zone is not clear the instant this command returns — the wait_until step right after proves the walk actually finishes.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"sound-horn\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "usable": "#bs-blast-panel [data-action=\"execute\"]",
+        "note": "clearZone sets destinations, not positions -- the walkout itself is proven by the wait_until step immediately below."
+      }
+    },
+    {
+      "command": "wait_until field:dangerZoneClear equals:true max_ticks:200",
+      "timeout": 90,
+      "description": "#557: drain the real walkout Sound the Horn just ordered -- both the driller and the drill_rig have to genuinely arrive outside the padded zone before dangerZoneClear reports true.",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "dangerZoneClear",
+          "equals": true,
+          "maxTicks": 200,
+          "timeoutMs": 90000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "dangerZoneClear": true
+        }
       }
     },
     {

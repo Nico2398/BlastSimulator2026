@@ -9,6 +9,7 @@
 import { buildGameNavGrid, syncWorldBounds } from '../../core/state/GameState.js';
 import type { ClaimRefusalReason } from '../../core/world/PlayableArea.js';
 import type { GameContext } from './world.js';
+import { t } from '../../core/i18n/I18n.js';
 
 export interface ClaimOutcome {
   /** False when at least one cell was refused — the caller must abort the action. */
@@ -19,11 +20,12 @@ export interface ClaimOutcome {
   expanded: boolean;
 }
 
-const REFUSAL_TEXT: Record<ClaimRefusalReason, string> = {
-  protected_structure: 'protected ground — a village, river or landmark stands there and the site can never take it',
-  not_adjacent: 'too far — the site cannot bridge that much ground in a single action',
-  too_far: 'too far — the site cannot bridge that much ground in a single action',
-  expansion_disabled: 'outside the site, and this site cannot be expanded',
+/** i18n keys, not resolved text — resolved at call time so a runtime setLocale() switch is reflected (see commandUtils.ts's noEmployeesMessage). */
+const REFUSAL_KEY: Record<ClaimRefusalReason, string> = {
+  protected_structure: 'siteExpansion.refusal_protected_structure',
+  not_adjacent: 'siteExpansion.refusal_not_adjacent',
+  too_far: 'siteExpansion.refusal_too_far',
+  expansion_disabled: 'siteExpansion.refusal_expansion_disabled',
 };
 
 /**
@@ -52,7 +54,10 @@ export function claimForAction(
     return {
       ok: false,
       expanded: false,
-      output: `Cannot ${what} at chunk (${result.chunk.cx}, ${result.chunk.cz}): ${REFUSAL_TEXT[result.reason]}.`,
+      output: t('siteExpansion.claim_refused', {
+        what, cx: result.chunk.cx, cz: result.chunk.cz,
+        reason: t(REFUSAL_KEY[result.reason]),
+      }),
     };
   }
   if (!result.expanded || !result.rect) return { ok: true, expanded: false };

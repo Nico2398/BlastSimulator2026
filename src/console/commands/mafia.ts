@@ -36,10 +36,14 @@ export function mafiaCommand(
   switch (sub) {
     case 'status': {
       const lines = [
-        `Mafia unlocked: ${state.corruption.mafiaUnlocked ? 'YES' : 'No'}`,
-        `Exposure risk: ${(state.mafia.exposureRisk * 100).toFixed(0)}%`,
-        `Smuggling: ${state.mafia.smugglingActive ? `ACTIVE ($${state.mafia.smugglingIncome}/tick)` : 'inactive'}`,
-        `Pending frames: ${state.mafia.pendingFrames.length}`,
+        state.corruption.mafiaUnlocked
+          ? t('mafia.status_unlocked_yes')
+          : t('mafia.status_unlocked_no'),
+        t('mafia.status_exposure', { pct: (state.mafia.exposureRisk * 100).toFixed(0) }),
+        state.mafia.smugglingActive
+          ? t('mafia.status_smuggling_active', { income: state.mafia.smugglingIncome })
+          : t('mafia.status_smuggling_inactive'),
+        t('mafia.status_pending_frames', { count: state.mafia.pendingFrames.length }),
       ];
       return { success: true, output: lines.join('\n') };
     }
@@ -59,7 +63,7 @@ export function mafiaCommand(
       const result = arrangeAccident(state.mafia, state.employees, state.corruption, empId, rng);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Arranged accident', state.tickCount);
-      return { success: true, output: result.message };
+      return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
     }
 
     case 'frame': {
@@ -72,7 +76,7 @@ export function mafiaCommand(
       );
       if (pending) {
         const result = completeFrame(state.mafia, state.employees, empId, state.tickCount, rng);
-        return { success: true, output: result.message };
+        return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
       }
 
       if (state.cash < FRAME_COST) {
@@ -87,7 +91,7 @@ export function mafiaCommand(
       const result = startFraming(state.mafia, state.employees, empId, state.tickCount);
       state.cash -= result.cost;
       addExpense(state.finances, result.cost, 'mafia', 'Frame job', state.tickCount);
-      return { success: true, output: result.message };
+      return { success: true, output: t(result.outcomeKey, result.outcomeParams) };
     }
 
     case 'smuggle': {

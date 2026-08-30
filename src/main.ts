@@ -7,7 +7,7 @@ import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { SavesModal } from './ui/panels/SavesModal.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
-import { TUTORIAL_STEPS } from './ui/tutorialSteps.js';
+import { probeTutorialState } from './ui/tutorialStateProbe.js';
 import { KeyboardShortcuts } from './ui/KeyboardShortcuts.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { WorldMap } from './ui/screens/WorldMap.js';
@@ -23,13 +23,14 @@ import { AudioManager } from './audio/AudioManager.js';
 import { AudioHooks } from './audio/AudioHooks.js';
 import { IndexedDBPersistence } from './persistence/IndexedDBPersistence.js';
 import { DownloadPersistence } from './persistence/DownloadPersistence.js';
-import { createRunner, runCommand } from './console/createRunner.js';
+import { createRunner, runCommand, syncTutorialActive } from './console/createRunner.js';
 import { parseCommand } from './console/ConsoleRunner.js';
 import { regenerateGrid, restoreGrid, terrainGenDatum, terrainConfigOf, ensureLandscape, DEFAULT_GRID_SIZE } from './console/commands/world.js';
 import { encodeVoxelGrid } from './core/state/VoxelGridCodec.js';
 import { getBiome } from './core/world/BiomeCatalog.js';
 import { BASE_TICK_MS } from './core/engine/GameLoop.js';
 import { getLivingEmployees } from './core/entities/Employee.js';
+import { isDangerZoneClear } from './core/entities/Zone.js';
 import { totalCollectedOreKg } from './core/economy/Logistics.js';
 import { probeUiActions, probeSelector } from './ui/uiActionProbe.js';
 import { t, getLocale, setLocale, type Locale } from './core/i18n/I18n.js';
@@ -435,6 +436,7 @@ console.log = (...args: unknown[]) => {
  */
 function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): CommandResult {
   const prevState = ctx.state;
+  syncTutorialActive(ctx, tutorial.isActive);
   const result = runCommand({ runner, ctx, emitter }, cmd);
   // Cap what __gameState relays: every harness round-trips this string over
   // CDP on every step, and an unbounded command output (a `state full` once
@@ -501,7 +503,7 @@ function runGameCommand(cmd: string, opts?: { syncRenderer?: boolean }): Command
 
   // Update UI after every command
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive);
     // A game exists — reveal HUD chrome unless the player is looking at the
     // menu on purpose (Quit, or mid-game Site Map). Self-correcting on every
     // command so no entry point (button, console, scenario harness) can miss it.
@@ -628,6 +630,7 @@ window.__gameState = () => {
     // delivered (not just spoil) needs a single numeric field to check
     // increased/decreased/changedBy against (#671).
     collectedOreTotal: totalCollectedOreKg(s.collectedOre),
+    dangerZoneClear: isDangerZoneClear(s.drillHoles, s.vehicles, s.employees), // mirrors serializeGameState (#557)
     lastCommandOutput,
     frameCount: scene.frameCount,
     ctxGridId: ctx.grid?.id ?? null,
@@ -743,26 +746,7 @@ window.__probeSelector = (selector: string) => probeSelector(selector);
 
 // Where the tutorial believes it is. A harness that only checks for thrown
 // errors cannot tell a completed step from a silently stuck one.
-window.__tutorialState = () => {
-  const el = document.querySelector('.bs-tutorial-box .bs-panel-title');
-  const counter = document.querySelector('.bs-tutorial-progress');
-  const parsed = /(\d+)\s*\/\s*(\d+)/.exec(counter?.textContent ?? '');
-  const stage = tutorial.stageProgress;
-  const paused = document.querySelector('.bs-tutorial-paused') as HTMLElement | null;
-  return {
-    active: tutorial.isActive,
-    stepIndex: parsed ? Number(parsed[1]) - 1 : -1,
-    stepId: TUTORIAL_STEPS[parsed ? Number(parsed[1]) - 1 : -1]?.id ?? null,
-    title: el?.textContent ?? '',
-    total: parsed ? Number(parsed[2]) : 0,
-    // Which click of the step the player is on — a step is several controls,
-    // and a harness that only knew the step could not tell them apart.
-    stageIndex: stage.index,
-    stageTotal: stage.total,
-    stageTarget: stage.target,
-    clockHeld: paused !== null && paused.style.display !== 'none',
-  };
-};
+window.__tutorialState = () => probeTutorialState(tutorial);
 
 // Camera control bridges (used by scenario-test.ts for multi-angle screenshots)
 window.__cameraOrbit = (yaw: number, pitch: number) => {
@@ -1082,7 +1066,7 @@ scene.start((dt) => {
 
   // Update UI from current state on each frame
   if (ctx.state) {
-    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng);
+    uiManager.update(ctx.state, ctx.weatherCycle, ctx.rng, tutorial.isActive);
     if (!mainMenu.visible) uiManager.show();
     savesModal.onTick(ctx.state);
   }

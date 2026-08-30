@@ -37,6 +37,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     pendingActionType: null,
     pendingActionPayload: null,
     pendingDriverVehicleId: null,
+    taskQueue: [],
     ...overrides,
   };
 }
@@ -232,6 +233,7 @@ describe('TaskProgressBar', () => {
 
     bar.sync([emp], NO_VEHICLES, id => (id === 1 ? anchor : null));
     const [group] = anchor.children;
+    if (!group) throw new Error('no bar group found under anchor');
     // Sanity: freshly-created bar starts at THREE's default identity rotation,
     // distinct from the camera's — otherwise the assertion below would pass
     // even if update() never ran.

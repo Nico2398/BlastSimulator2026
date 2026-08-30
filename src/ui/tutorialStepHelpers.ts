@@ -5,6 +5,8 @@ import type { GameState } from '../core/state/GameState.js';
 import type { NavCell } from '../core/nav/NavGrid.js';
 import type { EmployeeRole } from '../core/entities/Employee.js';
 import type { TutorialStep } from './tutorialSteps.js';
+import { computeDangerZone, isZoneClear } from '../core/entities/Zone.js';
+import { BLAST_DANGER_MARGIN_M } from '../core/config/balance.js';
 
 /**
  * Selectors for the toolbar buttons that open each panel. The panels themselves
@@ -241,4 +243,38 @@ export function countVehiclesWithDriver(state: GameState): number {
 export function isBlastReportOutstanding(): boolean {
   const overlay = document.querySelector('[data-blast-report-modal]') as HTMLElement | null;
   return overlay?.dataset['outstanding'] === 'true';
+}
+
+/**
+ * True once the same danger zone the FIRE gate/console blast refusal compute
+ * (computeDangerZone(state.drillHoles, BLAST_DANGER_MARGIN_M)) reads clear of
+ * every vehicle and alive employee — the evacuate-zone tutorial step's
+ * completion check (#557).
+ */
+export function isEvacuationZoneClear(state: GameState): boolean {
+  // state.drillHoles may be absent on a minimal/mock GameState (tutorialSteps.test.ts's
+  // isComplete-never-throws check) — an empty array is exactly "no danger zone yet",
+  // matching computeDangerZone's own null-for-no-holes contract.
+  const zone = computeDangerZone(state.drillHoles ?? [], BLAST_DANGER_MARGIN_M);
+  return zone !== null && isZoneClear(zone, state.vehicles, state.employees);
+}
+
+/**
+ * Helper: create the evacuate-zone step (#557) — completes once
+ * isEvacuationZoneClear reads true. tickBudget 20 comfortably covers a
+ * ~15-20m walk at AGENT_WALK_SPEED (2 cells/tick — 7.5-10 ticks one way).
+ * Kept as a factory (like the other create*Step helpers above) so
+ * tutorialSteps.ts — a grandfathered, may-only-shrink file — carries just the
+ * one call site instead of the full step object.
+ */
+export function createEvacuateZoneStep(): TutorialStep {
+  return {
+    id: 'evacuate-zone',
+    titleKey: 'tutorial.step_evacuate.title',
+    textKey: 'tutorial.step_evacuate',
+    highlightTarget: TOOLBAR_TARGET.blast,
+    tickBudget: 20,
+    waitsOnWork: true,
+    isComplete: isEvacuationZoneClear,
+  };
 }

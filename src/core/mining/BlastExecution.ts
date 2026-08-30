@@ -34,6 +34,7 @@ import { getOre } from '../world/OreCatalog.js';
 import { VoxelGrid, computeVoxelColumnSurfaceY } from '../world/VoxelGrid.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { getBuildingDef, destroyBuilding, type BuildingState, type Building, type BuildingType } from '../entities/Building.js';
+import type { AccidentRecord } from '../entities/Damage.js';
 import {
   BLAST_ZONE_RADIUS,
   GRAVITY,
@@ -161,10 +162,12 @@ export interface BlastReport {
   /** Total cost of the charges spent on this blast (kg × explosive $/kg, summed before the plan was cleared). */
   spent: number;
   destroyedBuildings: DestroyedBuildingInfo[];
+  /** Casualties/damage this blast caused (#557). Optional: pre-existing literal fixtures omit it; buildBlastReport defaults to `[]`. */
+  accidents?: AccidentRecord[];
 }
 
 /** Build a BlastReport from a completed BlastResult. `spent` must be computed by the caller before the plan is cleared. */
-export function buildBlastReport(result: BlastResult, tick: number, spent: number): BlastReport {
+export function buildBlastReport(result: BlastResult, tick: number, spent: number, accidents: AccidentRecord[] = []): BlastReport {
   return {
     tick,
     rating: result.rating,
@@ -178,6 +181,7 @@ export function buildBlastReport(result: BlastResult, tick: number, spent: numbe
     totalOreValue: result.totalOreValue,
     spent,
     destroyedBuildings: result.destroyedBuildings,
+    accidents,
   };
 }
 

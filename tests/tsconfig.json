@@ -104,53 +104,150 @@
     // lines above. Fixed with a non-null assertion on each access, matching
     // this same file's existing mat.onBeforeCompile!(...) idiom. Measured
     // before: 11 errors with this file re-included. After: 0.
-    // #842 fixed the ./unit/economy/*.test.ts cluster (44 -> 38 entries):
-    // BoulderBreaking.approach, BoulderBreaking, FragmentApproach,
-    // HaulDispatch, HaulingTask, Logistics. 7 TS2739 errors: each file's
-    // makeFragment() (and Logistics.test.ts's makeStoredFragment()) built a
-    // FragmentData object literal missing the required halfExtents/shapeSeed
-    // fields (same drift as #806's FleetPanel.test.ts fix). Fixed by adding
+    // #843 fixed the ./unit/events/*.test.ts cluster (44 -> 39 entries):
+    // EventEngine.test.ts's makeWaitingVehicle Vehicle literal and
+    // MafiaActions.test.ts's addTestEmployee Employee literal were both
+    // missing fixture-vs-interface fields (Vehicle's tier/moveConsecutiveFailures-
+    // onward block, Employee's activeActionId-onward block plus
+    // qualifications/trainingState/taskQueue) -- fixed by matching the same
+    // established fixture conventions already used in
+    // tests/unit/ui/panels/FleetPanel.test.ts and
+    // tests/unit/console/vehicle-list.test.ts respectively.
+    // EventSystem.test.ts's makeEvent EventOption literals were missing
+    // resultKey, and a genuinely-dead `timer` local in runToFirstEvent was
+    // removed (TS6133). LawsuitEvents.test.ts and TutorialEvents.test.ts's
+    // ScoreState literals were missing decayRate (0.05, matching
+    // SCORE_DECAY_RATE in balance.ts), and TutorialEvents.test.ts's makeCtx
+    // GameContext literal was missing landscape/playableArea. No test
+    // logic or assertions changed. Freshly measured 75 errors remain across
+    // the 39 still-excluded files.
+    // #844 fixed the ./unit/renderer/*.test.ts cluster (39 -> 34 entries), 14
+    // errors: BlastPlanOverlay.test.ts's makeHole HoleOverlayData literal was
+    // missing drilled; CharacterMesh.test.ts's makeEmployee Employee literal
+    // was missing the qualifications-onward field block (matching the same
+    // convention already used in TaskProgressBar.test.ts); GameRenderer.test.ts
+    // (7 errors) had makeCtx's MiningContext literal and four separate
+    // makeLandscapeCtx() helpers plus one inline finishLevelLoad() call all
+    // missing playableArea, plus one ghostPreviews.push() GhostPreview literal
+    // missing claimed; LandscapeMesh.test.ts's makeFakeHandle LandscapeHandle
+    // literal was missing groundLevelY/structureSet, and its makeBumpyTile
+    // helper had an unused step param renamed to _step (TS6133);
+    // TaskProgressBar.test.ts's makeEmployee Employee literal was missing
+    // taskQueue, and two group.quaternion.equals() sites needed a
+    // guard-and-throw on the array-destructured `group` (already this file's
+    // own findFillMesh() idiom) under noUncheckedIndexedAccess. No test logic
+    // or assertions changed.
+    // #845 fixed the ./unit/state/*.test.ts cluster (34 -> 30 entries), 8
+    // errors across 4 files: GameState.test.ts had an unused NavGrid import
+    // (TS6133, deleted) and a single-cast `(employee as Record<string,
+    // unknown>)` widened to the established `as unknown as Record<string,
+    // unknown>` double-cast idiom (matching WorkerRevolt.test.ts). SaveLoad.test.ts's
+    // updateScores() call and its plannedBuildings/pendingActions round-trip
+    // fixture were missing fields BuildingState/PlannedBuilding have since
+    // grown (TS2739/TS2345): `{ buildings: [] }` replaced with
+    // createBuildingState() (nextId/researchQueue/unlockedTiers), and the
+    // pushed PlannedBuilding literal plus its matching toEqual() assertion
+    // both gained `buildingId`. logistics-serialization.test.ts's makeCtx
+    // MiningContext literal carried softwareTier/tubingState (TS2353), fields
+    // that moved off MiningContext onto GameState itself in the SaveLoad
+    // v6->v7 migration -- removed along with the now-dead createTubingState
+    // import, and replaced with the landscape/playableArea fields
+    // GameContext has since grown; its makeFragment FragmentData literal was
+    // missing halfExtents/shapeSeed (TS2739), same fix as the #804/#806
+    // clusters. navgrid-serialization.test.ts's two inline MiningContext
+    // literals (makeCtx and the "no game" test) were missing the same
+    // landscape/playableArea fields (TS2739). No test logic or assertions
+    // changed.
+    // #846 fixed the ./unit/mining/{BlastExecution,MuckPileSummary,SoftwarePreview,
+    // SurveyCalc}.test.ts cluster (30 -> 26 entries). BlastExecution.test.ts's
+    // hand-built BlastResult literal (the "reports zero projection distance when
+    // nothing was projected" test) was missing maxThrowDistance/projectileCount/
+    // flights/clearedColumns (TS2739). MuckPileSummary.test.ts's fragment()
+    // helper cast `as FragmentData` was missing rockId (TS2352), fixed by adding
+    // it to match the rockId already used in this same file's composition.rocks.
+    // SoftwarePreview.test.ts had an unused vec3 import (TS6133) and an
+    // assembleBlastPlan(holes, {}, []) call whose third (delays) argument needs
+    // Record<string, number>, not never[] (TS2345) -- [] became {}.
+    // SurveyCalc.test.ts had an unused RunSurveyResult type import (TS6133) and
+    // its makeFragment helper (inside computeBlastOreReport) was missing
+    // halfExtents/shapeSeed (TS2739), same fixture-vs-interface drift pattern as
+    // the #804/#806/#845 clusters. No test logic or assertions changed.
+    // #847 un-excluded the ./unit/{engine,entities,nav} fixture-drift cluster
+    // (26 -> 19 entries): ActionSelection-ore-priority.test.ts,
+    // EntityMovementTick.test.ts, entities/Damage.test.ts,
+    // entities/EmployeeActivity.test.ts, entities/VehicleStatus.test.ts,
+    // entities/Zone.test.ts, and nav/AgentMovement.test.ts. Same
+    // fixture-vs-interface drift pattern as the earlier clusters above --
+    // Employee/Vehicle/FragmentData/AgentState object literals missing
+    // fields their interfaces have since grown (TS2739/TS2740/TS2345/
+    // TS2322/TS2375), plus one non-fixture TS2367 in
+    // EntityMovementTick.test.ts (a vehicle.task narrowing artifact, not a
+    // logic bug). Un-excluding only -- the fixtures themselves still have
+    // real type errors and are fixed in a following commit blind to this
+    // one, per the TDD red-phase split.
+    // #848 fixed the ./unit/{benchmarks,campaign,config,coverage,lint} cluster
+    // (19 -> 12 entries). 12 errors across 7 files: assignability.test.ts (4
+    // TS18048/TS2532) had two `parseInt(match[1], 10)` sites and two
+    // `.comments[0].body` sites under noUncheckedIndexedAccess, fixed with
+    // non-null assertions matching this file's own regex-match and the
+    // repo-wide `array[0]!.field` idiom. balance.test.ts's buildCtx (1
+    // TS2739) was missing EventContext's activeContractCount/weatherId,
+    // matching benchmarks.test.ts's own buildContext. state-schema.test.ts
+    // (1 TS2352) had a `serializeGameState(...) as Record<string, unknown>`
+    // cast that no longer sufficiently overlaps SerializableGameState,
+    // widened to the `as unknown as Record<string, unknown>` double-cast
+    // idiom (same fix as #845's GameState.test.ts). coverage-config.test.ts
+    // (1 TS2307) imported vitest.config.ts directly instead of via the
+    // codebase's `.ts`-source-via-`.js`-specifier convention.
+    // SuccessTracker.test.ts's makeFragment (1 TS2739) was missing
+    // FragmentData's halfExtents/shapeSeed, same fixture-vs-interface drift
+    // as the #804/#806/#845/#846 clusters. benchmarks.test.ts (4 errors) had
+    // setup20AgentGameState's Employee push missing 13 fields grown since
+    // (taskTicksRemaining-onward block), its pendingActions.push() literal
+    // using a non-existent `"drilling"` SkillCategory instead of `"blasting"`
+    // (matching src/console/commands/mining/drillPlan.ts's real dispatch
+    // constant), and that same literal missing PendingAction's
+    // status/holderId. NoDanglingDocReferences.test.ts (1 TS18048) had a
+    // `tokens.push(m[1])` regex-capture access, same non-null-assertion
+    // idiom as assignability.test.ts's fix above. No test logic or
+    // assertions changed; no src/ production files touched.
+    // #849 fixed the ./{integration/tutorial.integration,unit/recording-format,
+    // unit/scenario-defs-validation/{issue-regressions,step-tagging},
+    // unit/scenario/survey-post-blast-ore-report,
+    // unit/scripts/shared/scenario-trace}.test.ts cluster (12 -> 6 entries).
+    // 11 errors across 6 files: issue-regressions.test.ts (3 TS18048) and
+    // step-tagging.test.ts (2 TS18048) both indexed the last/first element of
+    // a scenario step's `interaction` array and read it repeatedly without
+    // narrowing -- fixed with a guard-and-throw right after the index
+    // access, same idiom as the repo-wide `array[0]!`-adjacent fixture
+    // fixes above. survey-post-blast-ore-report.test.ts's makeFragment (2
+    // TS2739) was missing FragmentData's halfExtents/shapeSeed, same
+    // fixture-vs-interface drift as the #804/#806/#845/#846/#848 clusters,
+    // fixed to match SurveyCalc.test.ts's own makeFragment precedent.
+    // scenario-trace.test.ts (2 TS2345) had two `JSON.parse(lines[N])` calls
+    // on a `noUncheckedIndexedAccess` array after only a `toHaveLength(2)`
+    // check -- fixed with a destructure-and-guard-throw before both parses.
+    // recording-format.test.ts (1 TS18046) wrote through
+    // `recording.meta.eventCount`/`.durationMs` where `recording.meta` is
+    // `unknown` -- fixed with an `as Record<string, unknown>` cast
+    // matching this same file's own `parsedMeta` cast a few lines below.
+    // tutorial.integration.test.ts's makeCtx (1 TS2739) GameContext literal
+    // was missing landscape/playableArea, same fixture-vs-interface drift
+    // as every sibling *.integration.test.ts file's makeCtx. No test logic
+    // or assertions changed; no src/ production files touched. 8 errors
+    // remain across the 6 still-excluded ./unit/economy/*.test.ts files, for
+    // a follow-up issue.
+    // #842 fixed the ./unit/economy/*.test.ts cluster (6 -> 0 entries): 8 TS2739
+    // errors across BoulderBreaking.approach, BoulderBreaking, FragmentApproach,
+    // HaulDispatch, HaulingTask, Logistics -- each file's makeFragment() (and
+    // Logistics.test.ts's makeStoredFragment()) built a FragmentData object
+    // literal missing the required halfExtents/shapeSeed fields, same drift as
+    // the #804/#806/#845/#846/#848/#849 clusters. Fixed by adding
     // halfExtents: { x: 0.5, y: 0.5, z: 0.5 }, shapeSeed: 1, to each fixture,
     // matching #806's precedent values. Plus 1 TS6133 in HaulDispatch.test.ts:
-    // an unused GameState type import, dropped. Measured before: 8 errors
-    // across these 6 files. After: 0.
-    "./integration/tutorial.integration.test.ts",
-    "./unit/benchmarks/benchmarks.test.ts",
-    "./unit/campaign/SuccessTracker.test.ts",
-    "./unit/config/assignability.test.ts",
-    "./unit/config/balance.test.ts",
-    "./unit/config/state-schema.test.ts",
-    "./unit/coverage/coverage-config.test.ts",
-    "./unit/engine/ActionSelection-ore-priority.test.ts",
-    "./unit/engine/EntityMovementTick.test.ts",
-    "./unit/entities/Damage.test.ts",
-    "./unit/entities/EmployeeActivity.test.ts",
-    "./unit/entities/VehicleStatus.test.ts",
-    "./unit/entities/Zone.test.ts",
-    "./unit/events/EventEngine.test.ts",
-    "./unit/events/EventSystem.test.ts",
-    "./unit/events/LawsuitEvents.test.ts",
-    "./unit/events/MafiaActions.test.ts",
-    "./unit/events/TutorialEvents.test.ts",
-    "./unit/lint/NoDanglingDocReferences.test.ts",
-    "./unit/mining/BlastExecution.test.ts",
-    "./unit/mining/MuckPileSummary.test.ts",
-    "./unit/mining/SoftwarePreview.test.ts",
-    "./unit/mining/SurveyCalc.test.ts",
-    "./unit/nav/AgentMovement.test.ts",
-    "./unit/recording-format.test.ts",
-    "./unit/renderer/BlastPlanOverlay.test.ts",
-    "./unit/renderer/CharacterMesh.test.ts",
-    "./unit/renderer/GameRenderer.test.ts",
-    "./unit/renderer/LandscapeMesh.test.ts",
-    "./unit/renderer/TaskProgressBar.test.ts",
-    "./unit/scenario-defs-validation/issue-regressions.test.ts",
-    "./unit/scenario-defs-validation/step-tagging.test.ts",
-    "./unit/scenario/survey-post-blast-ore-report.test.ts",
-    "./unit/scripts/shared/scenario-trace.test.ts",
-    "./unit/state/GameState.test.ts",
-    "./unit/state/SaveLoad.test.ts",
-    "./unit/state/logistics-serialization.test.ts",
-    "./unit/state/navgrid-serialization.test.ts"
+    // an unused GameState type import, dropped. No test logic or assertions
+    // changed. All exclude entries from the tests/tsconfig.json fixture-drift
+    // sweep (#743 onward) are now resolved -- tsc --noEmit is green across
+    // tests/ with nothing left in this list but node_modules/../dist.
   ]
 }

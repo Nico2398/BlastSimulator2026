@@ -218,7 +218,10 @@ describe('Visual scenarios have valid shots array', () => {
 
 // ──────────────────────────────────────────────
 // 11. skipBlastPlayback (#761) is a boolean when present, and absent from
-//     every scenario except the one that opts in
+//     every scenario except the explicit, individually-audited opt-in list
+//     below — same "narrow, commented allowlist" shape as
+//     BOOTSTRAP_COMMAND_ALLOWLIST (interaction-executor.ts), not a flag any
+//     scenario can reach for on its own say-so.
 // ──────────────────────────────────────────────
 describe('Scenario skipBlastPlayback field is a boolean when present (#761)', () => {
   for (const name of ALL_SCENARIO_NAMES) {
@@ -229,14 +232,29 @@ describe('Scenario skipBlastPlayback field is a boolean when present (#761)', ()
     });
   }
 
-  it('tutorial-interactive — opts in with skipBlastPlayback: true (functional/bootstrap flow, no blast-visual checkpoint)', () => {
-    const scenario = loadScenarioDef('tutorial-interactive', SCENARIO_DIR) as ScenarioDef;
-    expect(scenario.skipBlastPlayback).toBe(true);
-  });
+  // Every entry here has to justify itself: a scenario whose own screenshots
+  // only ever show the settled aftermath (no `frames`/`interval` multi-shot
+  // capture of the collapse itself mid-fall) loses nothing by skipping the
+  // animation — GameRenderer's own __skipBlastPlayback bridge comment
+  // (main.ts) is explicit that skipping "changes nothing" for exactly that
+  // case, since the animation only walks rock to where the blast already put
+  // it. Left unset, that same collapse costs MINUTES of wall clock without a
+  // GPU (#475) — real budget a scenario pays for nothing it actually checks.
+  const SKIP_BLAST_PLAYBACK_SCENARIOS: Record<string, string> = {
+    'tutorial-interactive': 'functional/bootstrap flow, no blast-visual checkpoint',
+    'tutorial-steps-visual': 'per-step shots are static settled-aftermath orbits (no frames/interval mid-collapse capture) — identical shape to tutorial-interactive\'s own blast step, just via its own shots array instead of inline screenshot actions; without this its blast step (9 holes/994 fragments, same pattern as tutorial-interactive) blew its 65s effective timeout every run (CI regression)',
+  };
 
-  it('every scenario other than tutorial-interactive omits skipBlastPlayback (interaction mode default: OBSERVE the collapse)', () => {
+  for (const [name, reason] of Object.entries(SKIP_BLAST_PLAYBACK_SCENARIOS)) {
+    it(`${name} — opts in with skipBlastPlayback: true (${reason})`, () => {
+      const scenario = loadScenarioDef(name, SCENARIO_DIR) as ScenarioDef;
+      expect(scenario.skipBlastPlayback).toBe(true);
+    });
+  }
+
+  it('every scenario outside the audited opt-in list omits skipBlastPlayback (interaction mode default: OBSERVE the collapse)', () => {
     for (const name of ALL_SCENARIO_NAMES) {
-      if (name === 'tutorial-interactive') continue;
+      if (name in SKIP_BLAST_PLAYBACK_SCENARIOS) continue;
       const scenario = loadScenarioDef(name, SCENARIO_DIR) as ScenarioDef;
       expect(scenario.skipBlastPlayback, `${name} unexpectedly sets skipBlastPlayback`).toBeUndefined();
     }

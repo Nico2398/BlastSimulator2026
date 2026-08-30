@@ -19,7 +19,8 @@ import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
-import { parseStaffedFlag } from './commandUtils.js';
+import { parseStaffedFlag, staffedSuffix } from './commandUtils.js';
+import { t } from '../../core/i18n/I18n.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
 export function parseSandboxArgs(named: Record<string, string>): Partial<SandboxConfig> {
@@ -49,17 +50,17 @@ export function sandboxCommand(
 ): CommandResult {
   const sub = args[0] ?? 'start';
   if (sub !== 'start') {
-    return { success: false, output: `Unknown sub-command: "${sub}". Use: start` };
+    return { success: false, output: t('sandbox.unknown_subcommand', { sub }) };
   }
 
   const requested = parseSandboxArgs(named);
   if (requested.biome !== undefined && !getBiome(requested.biome)) {
     const valid = getAllBiomes().map(b => b.id).join(', ');
-    return { success: false, output: `Unknown biome: "${requested.biome}". Valid: ${valid}` };
+    return { success: false, output: t('sandbox.unknown_biome', { biome: requested.biome, valid }) };
   }
   if (requested.difficulty !== undefined && !SANDBOX_DIFFICULTY_ORDER.includes(requested.difficulty)) {
     const valid = SANDBOX_DIFFICULTY_ORDER.join(', ');
-    return { success: false, output: `Unknown difficulty: "${requested.difficulty}". Valid: ${valid}` };
+    return { success: false, output: t('sandbox.unknown_difficulty', { difficulty: requested.difficulty, valid }) };
   }
 
   const staffedFlag = parseStaffedFlag(named['staffed']);
@@ -94,9 +95,16 @@ export function sandboxCommand(
 
   return {
     success: true,
-    output: `Sandbox started. ${level.gridX}x${level.gridY}x${level.gridZ} ${config.biome}, ` +
-      `difficulty ${config.difficulty}, seed ${config.seed}, cash $${level.startingCash.toLocaleString('en-US')}.` +
-      `${staffedFlag.staffed ? ' Staffed.' : ''}`,
+    output: t('sandbox.start_success', {
+      gridX: level.gridX,
+      gridY: level.gridY,
+      gridZ: level.gridZ,
+      biome: config.biome,
+      difficulty: config.difficulty,
+      seed: config.seed,
+      cash: level.startingCash.toLocaleString('en-US'),
+      staffedSuffix: staffedSuffix(staffedFlag.staffed),
+    }),
   };
 }
 

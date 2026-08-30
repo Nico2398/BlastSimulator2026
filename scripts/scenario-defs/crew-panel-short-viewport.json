@@ -1,0 +1,81 @@
+{
+  "name": "crew-panel-short-viewport",
+  "description": "Regression for the tutorial step 8 report: on a short browser window the Crew panel's Training section (and everything else below the fold) had no way to scroll into view. One root cause, in CrewPanel.ts: the expandable roster row carries overflow:hidden for its rounded corners, which drops that row's automatic flex min-height from content-based to 0. Without a min-height floor the panel body's flex layout compressed an expanded row down to the space available instead of leaving it at natural size and overflowing the body the way a scrollable list does — so bodyEl.scrollHeight sat exactly equal to clientHeight (472=472, nothing to scroll at all) and the body's own overflow-y:auto was a no-op. flex-shrink:0 on the row is the fix. UIManager.ts's leftCol keeps max-height (not height): when the column's content overflows, max-height clamps its used height to a definite value, which is exactly what each panel's own max-height:100% resolves against — reverting that line alone keeps this scenario green, while reverting the roster row's flex-shrink:0 fails it, which is how the single root cause was isolated. Proving it needs a real wheel gesture: clickSelector and expect.usable/blocked both call Element.scrollIntoView internally before acting (interaction-executor.ts's clickSelector; interaction-driver.ts's blockedReason, deliberately, for the ordinary case of a row below the fold in a genuinely scrollable list), a DOM API no player has an equivalent for and one that is not gated by pointer-events — it would have scrolled straight past the bug undetected. This file dispatches mousemove + wheel through Puppeteer's CDP input pipeline, the way a genuine gesture hit-tests, then reads bodyEl's own scrollTop. The read is `waitForProperty` rather than a bare `assert` because page.mouse.wheel() resolving does not mean Chrome has committed the scroll — it can land on the compositor thread after the CDP call returns, which is what turned CI red on this very scenario (PR #888, shard 6/10, Chrome 127: 'expected scrollTop=50, got 0', reproducible there and never locally on Chrome 141 with a dedicated browser per run). waitForProperty polls for the value instead of padding with a fixed delay, so it costs only the time the browser actually takes and still fails by name, reporting the last scrollTop it saw, when the scroll never lands — which is what the negative control depends on.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:150000",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 cash:150000" }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "cash": 150000 } }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Employee #1 — the tutorial's own train-driller stage (tutorialStagesTraining.ts) targets a driller's driving.drill_rig course the same way.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
+      ],
+      "role": "player",
+      "expect": { "decreased": ["cash"], "equals": { "employeeCount": 1 } }
+    },
+    {
+      "command": "build driving_center at:5,5",
+      "description": "The only school that teaches driving.drill_rig — no role starts with it (ROLE_STARTING_QUALIFICATION).",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 5, "z": 5 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "role": "player",
+      "expect": { "decreased": ["cash"] }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the driving_center site to completion — the driller (only employee on site) does the building work itself before returning to train.",
+      "timeout": 95,
+      "interaction": [
+        { "type": "waitUntil", "field": "buildingCount", "equals": 1, "maxTicks": 300, "timeoutMs": 90000 }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "buildingCount": 1, "orderedBuildingCount": 0 } }
+    },
+    {
+      "command": "employee list",
+      "description": "Command field is a harmless placeholder — command mode has no equivalent for 'shrink the browser window and wheel-scroll a panel', so this step only exercises real behaviour in interaction mode. Shrinks to 1280x600 (driving_center's own build panel/tile picker steps above ran fine at that height too, sandbox-checked), opens Crew, and expands employee #1's row — the Training section's Train button is now below the fold, reproducing the tutorial-step-8 report exactly. The scroll is asserted through `waitForProperty` rather than a bare `assert`, because page.mouse.wheel() resolving does not guarantee the scroll has actually landed — Chrome can commit a wheel-triggered scroll on the compositor thread after the CDP call returns, independent of how fast the page itself is running. CI (PR #888, shard 6/10, Chrome 127) caught this asserting scrollTop immediately after the wheel action — 'expected scrollTop=50, got 0' — reproducibly, on a build that already had both real fixes applied, while sandbox runs here (Chrome 141, a dedicated browser per run rather than CI's shared one across a shard) never hit it. `waitForProperty` polls for the value instead of padding with a fixed delay, so it costs only the time the browser actually takes and still fails loudly — naming the last scrollTop it saw — if the scroll never lands, which is what the negative control depends on.",
+      "interaction": [
+        { "type": "viewport", "width": 1280, "height": 600 },
+        { "type": "ensurePanel", "panel": "employees" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" },
+        { "type": "screenshot" },
+        { "type": "assert", "selector": "#bs-employee-panel .bsx-panel-body", "property": "scrollTop", "expectedValue": 0 },
+        { "type": "mousemove", "x": 190, "y": 300 },
+        { "type": "wheel", "deltaX": 0, "deltaY": 50 },
+        {
+          "type": "waitForProperty",
+          "selector": "#bs-employee-panel .bsx-panel-body",
+          "property": "scrollTop",
+          "expectedValue": 50,
+          "timeoutMs": 5000
+        },
+        { "type": "screenshot" }
+      ],
+      "role": "player",
+      "expect": { "note": "The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
+    },
+    {
+      "command": "employee train 1 skill:driving.drill_rig",
+      "description": "Completes the tutorial's own train-driller stage target. clickSelector's own scrollIntoView brings the button the rest of the way into view — legitimate here, since the assert above already proved a real player's own wheel gesture can too.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" }
+      ],
+      "role": "player",
+      "expect": { "decreased": ["cash"], "equals": { "trainingCount": 1 } }
+    }
+  ]
+}

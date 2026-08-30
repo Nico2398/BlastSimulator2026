@@ -86,7 +86,7 @@ const SERIALIZED_FIELDS = [
   'stuckEmployeeCount', 'activeContractCount', 'deathCount',
   'levelEnded', 'levelEndReason', 'bankrupt', 'revolted', 'ecologicalShutdown',
   'arrested', 'cash', 'profit', 'wellBeing', 'safety', 'ecology', 'nuisance', 'muckPile',
-  'storedMassKg', 'collectedOreTotal',
+  'storedMassKg', 'collectedOreTotal', 'dangerZoneClear',
 ] as const;
 
 describe('console-api', () => {
