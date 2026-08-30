@@ -79,7 +79,21 @@ export class UIManager {
     // P4-P9; P1 only replaces the shell around them).
     const leftCol = document.createElement('div');
     leftCol.id = 'bs-left-col';
-    leftCol.style.cssText = 'position:fixed;top:70px;left:8px;z-index:100;display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 80px);overflow-y:auto;pointer-events:none';
+    // height, not max-height: a panel's own root sizes itself with
+    // max-height:100% (BuildMenu.ts and its 8 siblings), which only resolves
+    // against a containing block with a definite height. max-height alone
+    // left that height indefinite, so it never constrained the panel — the
+    // panel grew to its full content size and only leftCol's own overflow
+    // clipped the rest. leftCol is pointer-events:none (for click-through in
+    // the empty gaps around panels), and a real wheel gesture never reaches
+    // a pointer-events:none ancestor, so that clipped remainder was never
+    // reachable by a real player either — sandbox-confirmed via
+    // crew-panel-short-viewport.json's own negative control: a dispatched
+    // wheel scroll left bodyEl.scrollTop at 0 against this exact CSS. height
+    // is definite regardless of content, so each panel's max-height:100% now
+    // actually bounds it and its own body (overflow-y:auto, pointer-events:
+    // all) scrolls instead.
+    leftCol.style.cssText = 'position:fixed;top:70px;left:8px;z-index:100;display:flex;flex-direction:column;gap:6px;height:calc(100vh - 80px);overflow-y:auto;pointer-events:none';
 
     // Right column — minimap
     const rightCol = document.createElement('div');

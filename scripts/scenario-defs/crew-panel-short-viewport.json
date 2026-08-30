@@ -1,0 +1,80 @@
+{
+  "name": "crew-panel-short-viewport",
+  "description": "Regression for the tutorial step 8 report: on a short browser window the Crew panel's Training section (and everything else below the fold) had no way to scroll into view. Two compounding bugs, both in the left-column panel shell (redesign P1/P6), fixed together: (1) UIManager.ts's leftCol sized itself with max-height alone, which never gives a percentage-height child (every panel root, `max-height:100%`) a definite basis to resolve against — so a panel grew to its full content height and only leftCol's own overflow clipped the rest, unreachable to a real player since leftCol is pointer-events:none (kept for click-through in the gaps around panels) and a dispatched wheel gesture — unlike Element.scrollIntoView — never reaches a pointer-events:none ancestor. (2) Once (1) is fixed and bodyEl (CrewPanel.ts) actually has a bounded height, a second bug took over: the roster row's own overflow:hidden (for rounded corners) drops its flex min-height from content-based to 0, so bodyEl's flex layout compressed an expanded row to fit instead of leaving it at natural size and overflowing bodyEl the way scrollable lists normally do — sandbox-confirmed via this file's own iteration: bodyEl.scrollHeight sat exactly equal to clientHeight (472=472, nothing to scroll) until the row also got flex-shrink:0. Neither clickSelector nor expect.usable/blocked can tell a truly-scrollable state from a truly-stuck one: both internally call Element.scrollIntoView first (interaction-executor.ts's clickSelector; interaction-driver.ts's blockedReason, deliberately, for the ordinary case of a row below the fold in a genuinely scrollable list) — a DOM API a real player has no equivalent for, unlike a dispatched wheel event, and it would have scrolled straight past both bugs above undetected. This file instead asserts bodyEl's own scrollTop directly after a small, exact wheel delta, dispatched through Puppeteer's CDP input pipeline (mousemove + wheel) the way a genuine gesture hit-tests: 0 (unmoved) with either bug still present, exactly the dispatched delta once both are fixed.",
+  "steps": [
+    {
+      "command": "new_game seed:42 cash:150000",
+      "interaction": [
+        { "type": "command", "command": "new_game seed:42 cash:150000" }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "cash": 150000 } }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Employee #1 — the tutorial's own train-driller stage (tutorialStagesTraining.ts) targets a driller's driving.drill_rig course the same way.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
+      ],
+      "role": "player",
+      "expect": { "decreased": ["cash"], "equals": { "employeeCount": 1 } }
+    },
+    {
+      "command": "build driving_center at:5,5",
+      "description": "The only school that teaches driving.drill_rig — no role starts with it (ROLE_STARTING_QUALIFICATION).",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"build\"]" },
+        { "type": "clickSelector", "selector": "#bs-build-panel [data-build-type=\"driving_center\"] .bs-build-buy-btn" },
+        { "type": "waitForSelector", "selector": "#bs-tile-select-confirm" },
+        { "type": "pickTile", "x": 5, "z": 5 },
+        { "type": "clickSelector", "selector": "#bs-tile-select-confirm" }
+      ],
+      "role": "player",
+      "expect": { "decreased": ["cash"] }
+    },
+    {
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the driving_center site to completion — the driller (only employee on site) does the building work itself before returning to train.",
+      "timeout": 95,
+      "interaction": [
+        { "type": "waitUntil", "field": "buildingCount", "equals": 1, "maxTicks": 300, "timeoutMs": 90000 }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "buildingCount": 1, "orderedBuildingCount": 0 } }
+    },
+    {
+      "command": "employee list",
+      "description": "Command field is a harmless placeholder — command mode has no equivalent for 'shrink the browser window and wheel-scroll a panel', so this step only exercises real behaviour in interaction mode. Shrinks to 1280x600 (driving_center's own build panel/tile picker steps above ran fine at that height too, sandbox-checked), opens Crew, and expands employee #1's row — the Training section's Train button is now below the fold, reproducing the tutorial-step-8 report exactly.",
+      "interaction": [
+        { "type": "viewport", "width": 1280, "height": 600 },
+        { "type": "ensurePanel", "panel": "employees" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-detail-toggle" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" },
+        { "type": "screenshot" },
+        { "type": "assert", "selector": "#bs-employee-panel .bsx-panel-body", "property": "scrollTop", "expectedValue": 0 },
+        { "type": "mousemove", "x": 190, "y": 300 },
+        { "type": "wheel", "deltaX": 0, "deltaY": 50 },
+        { "type": "screenshot" },
+        {
+          "type": "assert",
+          "selector": "#bs-employee-panel .bsx-panel-body",
+          "property": "scrollTop",
+          "expectedValue": 50
+        }
+      ],
+      "role": "player",
+      "expect": { "note": "The regression proper: the last assert action above proves a real wheel gesture actually scrolled the panel body — 50px dispatched, 50px landed (well short of the ~200px+ this content overflows by, so nothing here depends on the exact overflow amount, only that the wheel event moved bodyEl.scrollTop at all)." }
+    },
+    {
+      "command": "employee train 1 skill:driving.drill_rig",
+      "description": "Completes the tutorial's own train-driller stage target. clickSelector's own scrollIntoView brings the button the rest of the way into view — legitimate here, since the assert above already proved a real player's own wheel gesture can too.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-employee-id=\"1\"] .bs-train-btn[data-skill=\"driving.drill_rig\"]" }
+      ],
+      "role": "player",
+      "expect": { "decreased": ["cash"], "equals": { "trainingCount": 1 } }
+    }
+  ]
+}

@@ -102,6 +102,12 @@ function coveredBy(el: Element): Element | null {
   const rect = el.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
+  // elementFromPoint returns null for a point outside the viewport (CSSOM
+  // View), which used to read as "nothing in the way" and passed a control
+  // scrolled out of a clipped, unscrollable ancestor as usable. Treat that
+  // the same as covered — a real click at the control's centre reaches
+  // nothing either way.
+  if (cx < 0 || cy < 0 || cx >= window.innerWidth || cy >= window.innerHeight) return el;
   const hit = document.elementFromPoint(cx, cy);
   if (!hit) return null;
   if (hit === el || el.contains(hit) || hit.contains(el)) return null;
