@@ -49,7 +49,7 @@ describe('deserialize — v2→v3 migration for Vehicle.waitingTicks', () => {
     expect(restored.vehicles.vehicles[0]!.waitingTicks).toBe(0);
   });
 
-  it('a v3+ save with a non-zero waitingTicks is left untouched by the migration (regression)', () => {
+  it('a pre-v3 save with a non-zero waitingTicks is left untouched by the migration (regression)', () => {
     const state = createGame({ seed: 42 });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     vehicle.waitingTicks = 4;
@@ -594,7 +594,7 @@ describe('deserialize — v9→v10 migration for Vehicle.reservedForActionId (#5
     expect(restored.vehicles.vehicles[0]!.reservedForActionId).toBeNull();
   });
 
-  it('a v10+ save with reservedForActionId already set is left untouched by the migration (regression)', () => {
+  it('a pre-v10 save with reservedForActionId already set is left untouched by the migration (regression)', () => {
     const state = createGame({ seed: 42 });
     const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler');
     vehicle.reservedForActionId = 42;
