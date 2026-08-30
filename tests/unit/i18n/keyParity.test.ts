@@ -216,10 +216,19 @@ describe('en.json / fr.json — key-set parity', () => {
     // status_pending_frames) so mafia.ts's 'status' case can route through
     // t() instead of building its output from hardcoded English literals,
     // both locales translated.
+    // Baseline is now 3464 (up from 3428): #887 wired the last raw-literal
+    // console command strings in src/console/commands/entities.ts (17 new
+    // entities.* keys) and src/console/commands/vehicle.ts (19 new vehicle.*
+    // keys) through t() — both locales translated. entities.ts's build
+    // destroy/upgrade/move and vehicle.ts's vehicle buy reuse the
+    // pre-existing shared console.insufficient_funds key; vehicle.ts's
+    // top-level guard was switched from a hand-rolled literal to
+    // requireGame(ctx), reusing console.no_game_loaded — no new keys needed
+    // for either reuse.
     // Update this baseline only alongside a deliberate key addition/removal,
     // not silently.
     expect(Object.keys(en).length).toBe(Object.keys(fr).length);
-    expect(Object.keys(en).length).toBe(3428);
+    expect(Object.keys(en).length).toBe(3464);
   });
 });
 
